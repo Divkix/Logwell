@@ -4,6 +4,7 @@ import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { nanoid } from 'nanoid';
 import type * as schema from '$lib/server/db/schema';
 import { log } from '$lib/server/db/schema';
+import { logEventBus } from '$lib/server/events';
 import { ApiKeyError, validateApiKey } from '$lib/server/utils/api-key';
 import { batchLogPayloadSchema } from '$lib/shared/schemas/log';
 
@@ -72,6 +73,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
   // Insert all logs
   const insertedLogs = await db.insert(log).values(logEntries).returning();
+
+  // Emit all logs to event bus for real-time streaming
+  for (const insertedLog of insertedLogs) {
+    logEventBus.emitLog(insertedLog);
+  }
 
   return json(
     {

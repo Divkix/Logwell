@@ -1,9 +1,10 @@
 import { eq } from 'drizzle-orm';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as schema from '../../../../../src/lib/server/db/schema';
-import { log } from '../../../../../src/lib/server/db/schema';
+import { type Log, log } from '../../../../../src/lib/server/db/schema';
 import { setupTestDatabase } from '../../../../../src/lib/server/db/test-db';
+import { logEventBus } from '../../../../../src/lib/server/events';
 import { clearApiKeyCache } from '../../../../../src/lib/server/utils/api-key';
 import { POST } from '../../../../../src/routes/api/v1/logs/batch/+server';
 import { seedProject } from '../../../../fixtures/db';
@@ -45,9 +46,11 @@ describe('POST /api/v1/logs/batch', () => {
     db = setup.db;
     cleanup = setup.cleanup;
     clearApiKeyCache();
+    logEventBus.clear();
   });
 
   afterEach(async () => {
+    logEventBus.clear();
     await cleanup();
   });
 
@@ -181,5 +184,130 @@ describe('POST /api/v1/logs/batch', () => {
     expect(levels).toContain('warn');
     expect(levels).toContain('error');
     expect(levels).toContain('fatal');
+  });
+
+  describe('Event Bus Integration', () => {
+    it('emits all logs to event bus after successful batch ingestion', async () => {
+      const project = await seedProject(db);
+
+      // Subscribe to event bus and capture emitted logs
+      const emittedLogs: Log[] = [];
+      const listener = vi.fn((log: Log) => {
+        emittedLogs.push(log);
+      });
+      const unsubscribe = logEventBus.onLog(project.id, listener);
+
+      const logs = [
+        { level: 'info', message: 'Batch log 1' },
+        { level: 'warn', message: 'Batch log 2' },
+        { level: 'error', message: 'Batch log 3' },
+      ];
+
+      const request = new Request('http://localhost/api/v1/logs/batch', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${project.apiKey}`,
+        },
+        body: JSON.stringify({ logs }),
+      });
+
+      const event = createRequestEvent(request, db);
+      const response = await POST(event as never);
+
+      expect(response.status).toBe(201);
+      const body = await response.json();
+
+      // Verify listener was called for each log
+      expect(listener).toHaveBeenCalledTimes(3);
+      expect(emittedLogs).toHaveLength(3);
+
+      // Verify emitted log IDs match returned IDs
+      const returnedIds = body.logs.map((l: { id: string }) => l.id);
+      const emittedIds = emittedLogs.map((l) => l.id);
+      expect(emittedIds.sort()).toEqual(returnedIds.sort());
+
+      // Verify all logs have correct project
+      expect(emittedLogs.every((l) => l.projectId === project.id)).toBe(true);
+
+      // Verify messages are present
+      const emittedMessages = emittedLogs.map((l) => l.message);
+      expect(emittedMessages).toContain('Batch log 1');
+      expect(emittedMessages).toContain('Batch log 2');
+      expect(emittedMessages).toContain('Batch log 3');
+
+      unsubscribe();
+    });
+
+    it('does not emit to event bus on validation error in batch', async () => {
+      const project = await seedProject(db);
+
+      const listener = vi.fn();
+      const unsubscribe = logEventBus.onLog(project.id, listener);
+
+      const logs = [
+        { level: 'info', message: 'Valid log' },
+        { level: 'invalid_level', message: 'Invalid log' }, // Invalid
+      ];
+
+      const request = new Request('http://localhost/api/v1/logs/batch', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${project.apiKey}`,
+        },
+        body: JSON.stringify({ logs }),
+      });
+
+      const event = createRequestEvent(request, db);
+      const response = await POST(event as never);
+
+      expect(response.status).toBe(400);
+      expect(listener).not.toHaveBeenCalled();
+
+      unsubscribe();
+    });
+
+    it('emits logs in insertion order', async () => {
+      const project = await seedProject(db);
+
+      const emittedLogs: Log[] = [];
+      const listener = vi.fn((log: Log) => {
+        emittedLogs.push(log);
+      });
+      const unsubscribe = logEventBus.onLog(project.id, listener);
+
+      const logs = [
+        { level: 'debug', message: 'First log' },
+        { level: 'info', message: 'Second log' },
+        { level: 'warn', message: 'Third log' },
+        { level: 'error', message: 'Fourth log' },
+        { level: 'fatal', message: 'Fifth log' },
+      ];
+
+      const request = new Request('http://localhost/api/v1/logs/batch', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${project.apiKey}`,
+        },
+        body: JSON.stringify({ logs }),
+      });
+
+      const event = createRequestEvent(request, db);
+      const response = await POST(event as never);
+
+      expect(response.status).toBe(201);
+      expect(emittedLogs).toHaveLength(5);
+
+      // Verify order matches input order
+      expect(emittedLogs[0].message).toBe('First log');
+      expect(emittedLogs[1].message).toBe('Second log');
+      expect(emittedLogs[2].message).toBe('Third log');
+      expect(emittedLogs[3].message).toBe('Fourth log');
+      expect(emittedLogs[4].message).toBe('Fifth log');
+
+      unsubscribe();
+    });
   });
 });

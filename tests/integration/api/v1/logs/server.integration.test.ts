@@ -1,9 +1,10 @@
 import { eq } from 'drizzle-orm';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as schema from '../../../../../src/lib/server/db/schema';
-import { log } from '../../../../../src/lib/server/db/schema';
+import { type Log, log } from '../../../../../src/lib/server/db/schema';
 import { setupTestDatabase } from '../../../../../src/lib/server/db/test-db';
+import { logEventBus } from '../../../../../src/lib/server/events';
 import { clearApiKeyCache } from '../../../../../src/lib/server/utils/api-key';
 import { POST } from '../../../../../src/routes/api/v1/logs/+server';
 import { seedProject } from '../../../../fixtures/db';
@@ -45,9 +46,11 @@ describe('POST /api/v1/logs', () => {
     db = setup.db;
     cleanup = setup.cleanup;
     clearApiKeyCache();
+    logEventBus.clear();
   });
 
   afterEach(async () => {
+    logEventBus.clear();
     await cleanup();
   });
 
@@ -459,6 +462,102 @@ describe('POST /api/v1/logs', () => {
 
       expect(storedLog.projectId).toBe(project1.id);
       expect(storedLog.projectId).not.toBe(project2.id);
+    });
+  });
+
+  describe('Event Bus Integration', () => {
+    it('emits log to event bus after successful ingestion', async () => {
+      const project = await seedProject(db);
+
+      // Subscribe to event bus and capture emitted logs
+      const emittedLogs: Log[] = [];
+      const listener = vi.fn((log: Log) => {
+        emittedLogs.push(log);
+      });
+      const unsubscribe = logEventBus.onLog(project.id, listener);
+
+      const request = new Request('http://localhost/api/v1/logs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${project.apiKey}`,
+        },
+        body: JSON.stringify({
+          level: 'info',
+          message: 'Test event bus emission',
+        }),
+      });
+
+      const event = createRequestEvent(request, db);
+      const response = await POST(event as never);
+
+      expect(response.status).toBe(201);
+      const body = await response.json();
+
+      // Verify listener was called with the log
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(emittedLogs).toHaveLength(1);
+      expect(emittedLogs[0].id).toBe(body.id);
+      expect(emittedLogs[0].message).toBe('Test event bus emission');
+      expect(emittedLogs[0].projectId).toBe(project.id);
+      expect(emittedLogs[0].level).toBe('info');
+
+      unsubscribe();
+    });
+
+    it('does not emit to event bus on validation error', async () => {
+      const project = await seedProject(db);
+
+      const listener = vi.fn();
+      const unsubscribe = logEventBus.onLog(project.id, listener);
+
+      const request = new Request('http://localhost/api/v1/logs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${project.apiKey}`,
+        },
+        body: JSON.stringify({
+          level: 'invalid_level', // Invalid level
+          message: 'Should not emit',
+        }),
+      });
+
+      const event = createRequestEvent(request, db);
+      const response = await POST(event as never);
+
+      expect(response.status).toBe(400);
+      expect(listener).not.toHaveBeenCalled();
+
+      unsubscribe();
+    });
+
+    it('does not emit to event bus on auth error', async () => {
+      await seedProject(db);
+
+      // Subscribe to a random project ID
+      const listener = vi.fn();
+      const unsubscribe = logEventBus.onLog('some_project_id', listener);
+
+      const request = new Request('http://localhost/api/v1/logs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer svl_invalid_key_that_does_not_exist_xx',
+        },
+        body: JSON.stringify({
+          level: 'info',
+          message: 'Should not emit',
+        }),
+      });
+
+      const event = createRequestEvent(request, db);
+      const response = await POST(event as never);
+
+      expect(response.status).toBe(401);
+      expect(listener).not.toHaveBeenCalled();
+
+      unsubscribe();
     });
   });
 });

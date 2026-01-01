@@ -4,6 +4,7 @@ import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { nanoid } from 'nanoid';
 import type * as schema from '$lib/server/db/schema';
 import { log } from '$lib/server/db/schema';
+import { logEventBus } from '$lib/server/events';
 import { ApiKeyError, validateApiKey } from '$lib/server/utils/api-key';
 import { logPayloadSchema } from '$lib/shared/schemas/log';
 
@@ -115,6 +116,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       timestamp,
     })
     .returning();
+
+  // Emit log to event bus for real-time streaming
+  logEventBus.emitLog(inserted);
 
   // Return success response
   return json(
