@@ -6,6 +6,8 @@ declare global {
     interface Locals {
       user?: import('./lib/server/auth').User;
       session?: import('./lib/server/auth').Session;
+      // Optional db client for testing (dependency injection)
+      db?: import('drizzle-orm/pglite').PgliteDatabase<typeof import('./lib/server/db/schema')>;
     }
     // interface PageData {}
     // interface PageState {}

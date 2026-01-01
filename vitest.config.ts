@@ -1,9 +1,15 @@
+import path from 'node:path';
 import { sveltekit } from '@sveltejs/kit/vite';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   plugins: [tailwindcss(), sveltekit()],
+  resolve: {
+    alias: {
+      $lib: path.resolve(__dirname, './src/lib'),
+    },
+  },
   test: {
     globals: true,
     environment: 'node',
@@ -21,6 +27,11 @@ export default defineConfig({
         },
       },
       {
+        resolve: {
+          alias: {
+            $lib: path.resolve(__dirname, './src/lib'),
+          },
+        },
         test: {
           name: 'integration',
           include: ['tests/integration/**/*.integration.test.ts', 'scripts/**/*.test.ts'],
