@@ -1,0 +1,13 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": [
+    "src/routes/**/+{page,server,page.server,error,layout,layout.server}{,@*}.{js,ts,svelte}",
+    "src/lib/index.ts",
+    "src/lib/server/**/*.ts"
+  ],
+  "project": ["src/**/*.{js,ts,svelte}"],
+  "ignore": [".svelte-kit/**", "build/**", "dist/**", "src/app.d.ts"],
+  "ignoreDependencies": ["tailwindcss", "@tailwindcss/forms", "@tailwindcss/typography"],
+  "ignoreUnresolved": ["\\$env/.+"],
+  "drizzle": false
+}
