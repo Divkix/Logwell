@@ -1,8 +1,8 @@
 <script lang="ts">
-import type { Dialog as SheetPrimitive } from 'bits-ui';
+import { Dialog as SheetPrimitive } from 'bits-ui';
 import { cn } from '$lib/utils.js';
 
-const {
+let {
   ref = $bindable(null),
   class: className,
   ...restProps

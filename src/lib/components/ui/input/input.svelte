@@ -9,7 +9,7 @@ type Props = WithElementRef<
     ({ type: 'file'; files?: FileList } | { type?: InputType; files?: undefined })
 >;
 
-const {
+let {
   ref = $bindable(null),
   value = $bindable(),
   type,
