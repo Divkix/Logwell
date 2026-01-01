@@ -7,7 +7,7 @@ import * as schema from './schema';
 
 /**
  * Generates CREATE TABLE SQL from Drizzle schema table definition
- * Supports: text, timestamp with timezone, unique constraints, default values
+ * Supports: text, timestamp with timezone, integer, jsonb, enums, unique constraints, default values, foreign keys
  */
 function generateCreateTableSQL(table: PgTable): string {
   const config = getTableConfig(table);
@@ -19,8 +19,31 @@ function generateCreateTableSQL(table: PgTable): string {
   for (const column of config.columns) {
     const parts: string[] = [`"${column.name}"`];
 
+    // Handle custom types (like tsvector)
+    const columnType = column.columnType;
+    const isCustomType = columnType === 'PgCustomColumn';
+    const isEnumType = columnType === 'PgEnumColumn';
+    const isGeneratedColumn = (column as { generated?: unknown }).generated !== undefined;
+
     // Add data type
-    if (column.dataType === 'number') {
+    if (isCustomType) {
+      // For custom types like tsvector, use the dataType() method
+      const customColumn = column as unknown as { getSQLType?: () => string };
+      if (customColumn.getSQLType) {
+        parts.push(customColumn.getSQLType());
+      } else {
+        // Fallback for tsvector
+        parts.push('TSVECTOR');
+      }
+    } else if (isEnumType) {
+      // For enum columns, use the enum type name
+      const enumColumn = column as unknown as { enumName?: string };
+      if (enumColumn.enumName) {
+        parts.push(enumColumn.enumName);
+      } else {
+        parts.push('TEXT');
+      }
+    } else if (column.dataType === 'number') {
       if (column.columnType === 'PgSerial') {
         parts.push('SERIAL');
       } else {
@@ -56,6 +79,16 @@ function generateCreateTableSQL(table: PgTable): string {
       parts.push('TEXT');
     }
 
+    // Handle generated columns
+    if (isGeneratedColumn) {
+      const generated = (column as { generated?: { as: unknown; type?: string } }).generated;
+      if (generated && generated.type === 'stored') {
+        // Skip generated columns in PGlite as it has limited support
+        // We'll handle full-text search via triggers
+        continue;
+      }
+    }
+
     // Add constraints
     if (column.notNull) {
       parts.push('NOT NULL');
@@ -66,7 +99,7 @@ function generateCreateTableSQL(table: PgTable): string {
     }
 
     // Handle default values - check hasDefault first
-    if (column.hasDefault) {
+    if (column.hasDefault && !isGeneratedColumn) {
       // For timestamp columns with defaultNow(), we need to check the actual default
       if (column.dataType === 'date') {
         // Check if the column has a default function
@@ -98,10 +131,49 @@ function generateCreateTableSQL(table: PgTable): string {
     columns.push(parts.join(' '));
   }
 
-  // Combine column definitions and unique constraints
-  const allConstraints = [...columns, ...uniqueConstraints];
+  // Process foreign keys from table config
+  const foreignKeys: string[] = [];
+  if (config.foreignKeys && config.foreignKeys.length > 0) {
+    for (const fk of config.foreignKeys) {
+      try {
+        // Call reference() to get the foreign key details
+        const ref = (fk as { reference: () => unknown }).reference();
+        const refDetails = ref as {
+          columns: Array<{ name: string }>;
+          foreignColumns: Array<{ name: string }>;
+          foreignTable: PgTable;
+        };
 
-  // Create indexes
+        const localColumns = refDetails.columns.map((c) => `"${c.name}"`).join(', ');
+        const foreignColumns = refDetails.foreignColumns.map((c) => `"${c.name}"`).join(', ');
+
+        // Get the foreign table name
+        const foreignTableConfig = getTableConfig(refDetails.foreignTable);
+        const foreignTableName = foreignTableConfig.name;
+
+        let fkConstraint = `FOREIGN KEY (${localColumns}) REFERENCES "${foreignTableName}"(${foreignColumns})`;
+
+        // Add ON DELETE and ON UPDATE clauses
+        const fkWithOptions = fk as { onDelete?: string; onUpdate?: string };
+        if (fkWithOptions.onDelete) {
+          fkConstraint += ` ON DELETE ${fkWithOptions.onDelete.toUpperCase()}`;
+        }
+
+        if (fkWithOptions.onUpdate) {
+          fkConstraint += ` ON UPDATE ${fkWithOptions.onUpdate.toUpperCase()}`;
+        }
+
+        foreignKeys.push(fkConstraint);
+      } catch (error) {
+        console.warn('Could not process foreign key:', error);
+      }
+    }
+  }
+
+  // Combine column definitions, unique constraints, and foreign keys
+  const allConstraints = [...columns, ...uniqueConstraints, ...foreignKeys];
+
+  // Create table SQL
   const createTableSQL = `CREATE TABLE IF NOT EXISTS "${tableName}" (${allConstraints.join(', ')})`;
 
   return createTableSQL;
@@ -120,9 +192,22 @@ function generateIndexSQL(table: PgTable): string[] {
     for (const [indexName, index] of Object.entries(config.indexes)) {
       const columns = (index as unknown as { config?: { columns?: unknown[] } }).config?.columns;
       if (columns && columns.length > 0) {
-        const columnNames = columns.map((col) => `"${(col as { name: string }).name}"`).join(', ');
-        const indexSQL = `CREATE INDEX IF NOT EXISTS "${indexName}" ON "${tableName}" (${columnNames})`;
-        indexSQLs.push(indexSQL);
+        const columnNames = columns
+          .map((col) => {
+            const colName = (col as { name: string }).name;
+            // Skip tsvector search column in PGlite
+            if (colName === 'search') {
+              return null;
+            }
+            return `"${colName}"`;
+          })
+          .filter((name) => name !== null)
+          .join(', ');
+
+        if (columnNames) {
+          const indexSQL = `CREATE INDEX IF NOT EXISTS "${indexName}" ON "${tableName}" (${columnNames})`;
+          indexSQLs.push(indexSQL);
+        }
       }
     }
   }
@@ -131,11 +216,67 @@ function generateIndexSQL(table: PgTable): string[] {
 }
 
 /**
+ * Creates enum types used in the schema
+ */
+async function createEnumTypes(db: PgliteDatabase<typeof schema>): Promise<void> {
+  // Create log_level enum
+  try {
+    await db.execute(
+      sql.raw(`
+      DO $$ BEGIN
+        CREATE TYPE log_level AS ENUM ('debug', 'info', 'warn', 'error', 'fatal');
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+      END $$;
+    `),
+    );
+  } catch (error) {
+    // Enum might already exist, ignore error
+    console.warn('Could not create log_level enum:', error);
+  }
+}
+
+/**
+ * Creates triggers for generated columns (workaround for PGlite limitations)
+ */
+async function createTriggers(db: PgliteDatabase<typeof schema>): Promise<void> {
+  // Create trigger function for log search tsvector
+  try {
+    await db.execute(
+      sql.raw(`
+      CREATE OR REPLACE FUNCTION log_search_trigger() RETURNS trigger AS $$
+      BEGIN
+        NEW.search := setweight(to_tsvector('english', NEW.message), 'A') ||
+                      setweight(to_tsvector('english', COALESCE(NEW.metadata::text, '')), 'B');
+        RETURN NEW;
+      END
+      $$ LANGUAGE plpgsql;
+    `),
+    );
+
+    // Create trigger on log table
+    await db.execute(
+      sql.raw(`
+      CREATE TRIGGER log_search_update
+      BEFORE INSERT OR UPDATE ON log
+      FOR EACH ROW EXECUTE FUNCTION log_search_trigger();
+    `),
+    );
+  } catch (error) {
+    // Trigger might already exist, ignore error
+    console.warn('Could not create log search trigger:', error);
+  }
+}
+
+/**
  * Creates an in-memory PGlite database for testing with dynamic schema application
  */
 export async function createTestDatabase(): Promise<PgliteDatabase<typeof schema>> {
   const client = new PGlite();
   const db = drizzle(client, { schema });
+
+  // Create enum types first
+  await createEnumTypes(db);
 
   // Dynamically create all tables from schema
   const tables = Object.values(schema).filter((item) => is(item, PgTable));
@@ -152,6 +293,9 @@ export async function createTestDatabase(): Promise<PgliteDatabase<typeof schema
     }
   }
 
+  // Create triggers for generated columns
+  await createTriggers(db);
+
   return db;
 }
 
@@ -162,11 +306,14 @@ export async function cleanDatabase(db: PgliteDatabase<typeof schema>): Promise<
   // Get all table names from schema
   const tables = Object.values(schema).filter((item) => is(item, PgTable));
 
-  // Truncate all tables
-  for (const table of tables) {
+  // Truncate all tables in reverse order to handle foreign keys
+  const tableNames = tables.map((table) => {
     const config = getTableConfig(table as PgTable);
-    const tableName = config.name;
+    return config.name;
+  });
 
+  // Reverse to handle cascades properly
+  for (const tableName of tableNames.reverse()) {
     try {
       await db.execute(sql.raw(`TRUNCATE TABLE "${tableName}" RESTART IDENTITY CASCADE`));
     } catch (error) {

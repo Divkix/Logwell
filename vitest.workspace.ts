@@ -1,6 +1,6 @@
-import { defineProject } from 'vitest/config';
 import { sveltekit } from '@sveltejs/kit/vite';
 import tailwindcss from '@tailwindcss/vite';
+import { defineProject } from 'vitest/config';
 
 export default [
   defineProject({
