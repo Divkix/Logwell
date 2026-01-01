@@ -1,46 +1,45 @@
 import type { Handle } from '@sveltejs/kit';
-import { sequence } from '@sveltejs/kit/hooks';
+import { svelteKitHandler } from 'better-auth/svelte-kit';
+import { building } from '$app/environment';
 import { auth, initAuth } from '$lib/server/auth';
-import { getSession } from '$lib/server/session';
 
 // Initialize auth on server startup
 let authInitialized = false;
 
 /**
- * Authentication hook - populates event.locals with user and session
+ * Ensures auth is initialized before handling requests
  */
-const authenticationHandle: Handle = async ({ event, resolve }) => {
-  // Get session from database
-  const sessionData = await getSession(event.request.headers);
-
-  // Populate event.locals with user and session
-  if (sessionData) {
-    event.locals.user = sessionData.user;
-    event.locals.session = sessionData.session;
-  }
-
-  return resolve(event);
-};
-
-/**
- * Better-auth API handler for /api/auth/* routes
- */
-const authHandler: Handle = async ({ event, resolve }) => {
-  // Ensure auth is initialized before handling requests
+async function ensureAuthInitialized(): Promise<void> {
   if (!authInitialized) {
     await initAuth();
     authInitialized = true;
   }
-
-  // Let better-auth handle its own routes
-  if (event.url.pathname.startsWith('/api/auth')) {
-    return auth.handler(event.request);
-  }
-
-  return resolve(event);
-};
+}
 
 /**
- * Combined hooks sequence: auth handler first, then authentication
+ * Combined SvelteKit handle hook for better-auth
+ * - Populates event.locals with session/user data
+ * - Routes /api/auth/* to better-auth handler
  */
-export const handle = sequence(authHandler, authenticationHandle);
+export const handle: Handle = async ({ event, resolve }) => {
+  // Skip auth during build
+  if (building) {
+    return resolve(event);
+  }
+
+  await ensureAuthInitialized();
+
+  // Fetch current session from Better Auth
+  const session = await auth.api.getSession({
+    headers: event.request.headers,
+  });
+
+  // Make session and user available on server
+  if (session) {
+    event.locals.session = session.session;
+    event.locals.user = session.user;
+  }
+
+  // Use better-auth's SvelteKit handler for proper routing
+  return svelteKitHandler({ event, resolve, auth, building });
+};
