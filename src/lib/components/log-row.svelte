@@ -36,10 +36,10 @@ function handleKeyDown(event: KeyboardEvent) {
 }
 </script>
 
-<div
+<tr
   data-testid="log-row"
   class={cn(
-    'flex items-center gap-4 px-4 py-2 cursor-pointer hover:bg-muted/50 transition-colors border-b border-border',
+    'cursor-pointer hover:bg-muted/50 transition-colors border-b',
     className
   )}
   role="button"
@@ -47,26 +47,31 @@ function handleKeyDown(event: KeyboardEvent) {
   onclick={handleClick}
   onkeydown={handleKeyDown}
 >
-  <span
-    data-testid="log-timestamp"
-    class="font-mono text-sm text-muted-foreground whitespace-nowrap"
-  >
-    {formattedTimestamp}
-  </span>
-
-  <LevelBadge level={log.level} />
-
-  <span
-    data-testid="log-message"
-    class="flex-1 text-sm truncate max-w-md"
-    title={log.message}
-  >
-    {log.message}
-  </span>
-
-  {#if sourceInfo}
-    <span class="text-xs text-muted-foreground font-mono whitespace-nowrap">
-      {sourceInfo}
+  <td class="px-4 py-2">
+    <span
+      data-testid="log-timestamp"
+      class="font-mono text-sm text-muted-foreground whitespace-nowrap"
+    >
+      {formattedTimestamp}
     </span>
-  {/if}
-</div>
+  </td>
+
+  <td class="px-4 py-2">
+    <LevelBadge level={log.level} />
+  </td>
+
+  <td class="px-4 py-2">
+    <span
+      data-testid="log-message"
+      class="text-sm truncate block max-w-md"
+      title={log.message}
+    >
+      {log.message}
+    </span>
+    {#if sourceInfo}
+      <span class="text-xs text-muted-foreground font-mono">
+        {sourceInfo}
+      </span>
+    {/if}
+  </td>
+</tr>

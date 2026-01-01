@@ -1,0 +1,633 @@
+import { expect, type Page, test } from '@playwright/test';
+
+/**
+ * E2E tests for Project Log Stream Page
+ *
+ * Phase 8.4 from the implementation plan
+ * Tests follow Trophy testing methodology - focus on user behavior
+ */
+
+// Test user credentials (matches seeded admin from scripts/seed-admin.ts)
+const TEST_USER = {
+  email: 'admin@example.com',
+  password: 'adminpass',
+};
+
+/**
+ * Helper to perform login
+ */
+async function login(page: Page) {
+  await page.goto('/login');
+  await page.waitForSelector('form');
+
+  const emailInput = page.getByLabel(/email/i);
+  const passwordInput = page.getByLabel(/password/i);
+
+  await emailInput.click();
+  await emailInput.fill(TEST_USER.email);
+  await expect(emailInput).toHaveValue(TEST_USER.email);
+
+  await passwordInput.click();
+  await passwordInput.fill(TEST_USER.password);
+  await expect(passwordInput).toHaveValue(TEST_USER.password);
+
+  await page.getByRole('button', { name: /sign in/i }).click();
+  await expect(page).toHaveURL('/', { timeout: 15000 });
+}
+
+/**
+ * Helper to create a project via API
+ * Returns the created project data including apiKey
+ */
+async function createProject(page: Page, name: string) {
+  const response = await page.request.post('/api/projects', {
+    data: { name },
+  });
+  expect(response.ok()).toBeTruthy();
+  return response.json();
+}
+
+/**
+ * Helper to delete a project via API
+ */
+async function deleteProject(page: Page, projectId: string) {
+  const response = await page.request.delete(`/api/projects/${projectId}`);
+  return response.ok();
+}
+
+/**
+ * Helper to ingest a log via API
+ */
+async function ingestLog(
+  page: Page,
+  apiKey: string,
+  log: {
+    level: 'debug' | 'info' | 'warn' | 'error' | 'fatal';
+    message: string;
+    metadata?: Record<string, unknown>;
+    source_file?: string;
+    line_number?: number;
+    request_id?: string;
+    user_id?: string;
+    ip_address?: string;
+  },
+) {
+  const response = await page.request.post('/api/v1/logs', {
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    data: log,
+  });
+  expect(response.ok()).toBeTruthy();
+  return response.json();
+}
+
+/**
+ * Helper to ingest multiple logs via batch API
+ */
+async function ingestLogsBatch(
+  page: Page,
+  apiKey: string,
+  logs: Array<{
+    level: 'debug' | 'info' | 'warn' | 'error' | 'fatal';
+    message: string;
+    metadata?: Record<string, unknown>;
+  }>,
+) {
+  const response = await page.request.post('/api/v1/logs/batch', {
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    data: { logs },
+  });
+  expect(response.ok()).toBeTruthy();
+  return response.json();
+}
+
+test.describe('Log Stream Page - Display', () => {
+  // Allow retries due to potential cold start issues
+  test.describe.configure({ retries: 1 });
+
+  let testProject: { id: string; name: string; apiKey: string };
+
+  test.beforeEach(async ({ page }) => {
+    await login(page);
+    testProject = await createProject(page, `log-stream-test-${Date.now()}`);
+
+    // Ingest some test logs
+    await ingestLogsBatch(page, testProject.apiKey, [
+      { level: 'info', message: 'Application started successfully' },
+      { level: 'warn', message: 'Deprecated API usage detected' },
+      { level: 'error', message: 'Failed to connect to database' },
+      { level: 'debug', message: 'Processing request payload' },
+    ]);
+  });
+
+  test.afterEach(async ({ page }) => {
+    if (testProject?.id) {
+      await deleteProject(page, testProject.id);
+    }
+  });
+
+  test('should display log table with entries', async ({ page }) => {
+    await page.goto(`/projects/${testProject.id}`);
+
+    // Should display log table
+    await expect(page.locator('[data-testid="log-table"]')).toBeVisible();
+
+    // Should display log entries
+    await expect(page.getByText('Application started successfully')).toBeVisible();
+    await expect(page.getByText('Deprecated API usage detected')).toBeVisible();
+    await expect(page.getByText('Failed to connect to database')).toBeVisible();
+    await expect(page.getByText('Processing request payload')).toBeVisible();
+  });
+
+  test('should display project name in header', async ({ page }) => {
+    await page.goto(`/projects/${testProject.id}`);
+
+    // Should display project name
+    await expect(page.getByRole('heading', { name: testProject.name })).toBeVisible();
+  });
+
+  test('should display level badges for each log', async ({ page }) => {
+    await page.goto(`/projects/${testProject.id}`);
+
+    // Should display level badges
+    await expect(page.getByText('INFO')).toBeVisible();
+    await expect(page.getByText('WARN')).toBeVisible();
+    await expect(page.getByText('ERROR')).toBeVisible();
+    await expect(page.getByText('DEBUG')).toBeVisible();
+  });
+});
+
+test.describe('Log Stream Page - Live Toggle', () => {
+  test.describe.configure({ retries: 1 });
+
+  let testProject: { id: string; name: string; apiKey: string };
+
+  test.beforeEach(async ({ page }) => {
+    await login(page);
+    testProject = await createProject(page, `live-toggle-test-${Date.now()}`);
+  });
+
+  test.afterEach(async ({ page }) => {
+    if (testProject?.id) {
+      await deleteProject(page, testProject.id);
+    }
+  });
+
+  test('should show live toggle in enabled state by default', async ({ page }) => {
+    await page.goto(`/projects/${testProject.id}`);
+
+    // Live toggle should be visible
+    const liveToggle = page.locator('[data-testid="live-pulse"]');
+    await expect(liveToggle).toBeVisible();
+
+    // Should show green pulse when enabled
+    await expect(liveToggle).toHaveClass(/bg-green-500/);
+  });
+
+  test('should receive new logs when live streaming is enabled', async ({ page }) => {
+    await page.goto(`/projects/${testProject.id}`);
+
+    // Wait for page to load
+    await expect(page.locator('[data-testid="log-table"]')).toBeVisible();
+
+    // Ingest a new log while on the page
+    await ingestLog(page, testProject.apiKey, {
+      level: 'info',
+      message: 'New log from live stream test',
+    });
+
+    // The new log should appear in the table (via SSE)
+    await expect(page.getByText('New log from live stream test')).toBeVisible({ timeout: 5000 });
+  });
+
+  test('should stop receiving logs when live toggle is disabled', async ({ page }) => {
+    await page.goto(`/projects/${testProject.id}`);
+
+    // Disable live toggle
+    const liveSwitch = page.getByRole('switch', { name: /toggle live streaming/i });
+    await liveSwitch.click();
+
+    // Pulse should no longer be green
+    const livePulse = page.locator('[data-testid="live-pulse"]');
+    await expect(livePulse).not.toHaveClass(/bg-green-500/);
+
+    // Ingest a new log
+    await ingestLog(page, testProject.apiKey, {
+      level: 'error',
+      message: 'Log after live disabled',
+    });
+
+    // Wait a bit to ensure the log doesn't appear
+    await page.waitForTimeout(2000);
+
+    // The new log should NOT appear (live is disabled)
+    await expect(page.getByText('Log after live disabled')).not.toBeVisible();
+  });
+});
+
+test.describe('Log Stream Page - Search Filter', () => {
+  test.describe.configure({ retries: 1 });
+
+  let testProject: { id: string; name: string; apiKey: string };
+
+  test.beforeEach(async ({ page }) => {
+    await login(page);
+    testProject = await createProject(page, `search-test-${Date.now()}`);
+
+    // Ingest logs with distinct messages for search testing
+    await ingestLogsBatch(page, testProject.apiKey, [
+      { level: 'info', message: 'User authentication successful' },
+      { level: 'info', message: 'Payment processing completed' },
+      { level: 'error', message: 'Database connection failed' },
+      { level: 'warn', message: 'Memory usage high' },
+    ]);
+  });
+
+  test.afterEach(async ({ page }) => {
+    if (testProject?.id) {
+      await deleteProject(page, testProject.id);
+    }
+  });
+
+  test('should filter logs by search term', async ({ page }) => {
+    await page.goto(`/projects/${testProject.id}`);
+
+    // Wait for logs to load
+    await expect(page.getByText('User authentication successful')).toBeVisible();
+
+    // Type in search input
+    const searchInput = page.getByPlaceholder(/search/i);
+    await searchInput.fill('database');
+
+    // Wait for debounce and API call
+    await page.waitForTimeout(500);
+
+    // Should show matching log
+    await expect(page.getByText('Database connection failed')).toBeVisible();
+
+    // Should hide non-matching logs
+    await expect(page.getByText('User authentication successful')).not.toBeVisible();
+    await expect(page.getByText('Payment processing completed')).not.toBeVisible();
+  });
+
+  test('should show all logs when search is cleared', async ({ page }) => {
+    await page.goto(`/projects/${testProject.id}`);
+
+    // Apply search filter
+    const searchInput = page.getByPlaceholder(/search/i);
+    await searchInput.fill('payment');
+    await page.waitForTimeout(500);
+
+    // Clear search
+    await searchInput.fill('');
+    await page.waitForTimeout(500);
+
+    // All logs should be visible again
+    await expect(page.getByText('User authentication successful')).toBeVisible();
+    await expect(page.getByText('Payment processing completed')).toBeVisible();
+    await expect(page.getByText('Database connection failed')).toBeVisible();
+  });
+});
+
+test.describe('Log Stream Page - Level Filter', () => {
+  test.describe.configure({ retries: 1 });
+
+  let testProject: { id: string; name: string; apiKey: string };
+
+  test.beforeEach(async ({ page }) => {
+    await login(page);
+    testProject = await createProject(page, `level-filter-test-${Date.now()}`);
+
+    // Ingest logs with different levels
+    await ingestLogsBatch(page, testProject.apiKey, [
+      { level: 'debug', message: 'Debug message one' },
+      { level: 'info', message: 'Info message one' },
+      { level: 'warn', message: 'Warning message one' },
+      { level: 'error', message: 'Error message one' },
+      { level: 'fatal', message: 'Fatal message one' },
+    ]);
+  });
+
+  test.afterEach(async ({ page }) => {
+    if (testProject?.id) {
+      await deleteProject(page, testProject.id);
+    }
+  });
+
+  test('should filter logs by level', async ({ page }) => {
+    await page.goto(`/projects/${testProject.id}`);
+
+    // Wait for logs to load
+    await expect(page.getByText('Error message one')).toBeVisible();
+
+    // Click on error level button to select only error
+    const levelFilter = page.locator('[data-testid="level-filter"]');
+    await levelFilter.getByRole('button', { name: /error/i }).click();
+
+    // Wait for filter to apply
+    await page.waitForTimeout(500);
+
+    // Should show only error logs
+    await expect(page.getByText('Error message one')).toBeVisible();
+
+    // Should hide other level logs
+    await expect(page.getByText('Debug message one')).not.toBeVisible();
+    await expect(page.getByText('Info message one')).not.toBeVisible();
+    await expect(page.getByText('Warning message one')).not.toBeVisible();
+  });
+
+  test('should support multiple level selection', async ({ page }) => {
+    await page.goto(`/projects/${testProject.id}`);
+
+    // Wait for logs to load
+    await expect(page.getByText('Error message one')).toBeVisible();
+
+    const levelFilter = page.locator('[data-testid="level-filter"]');
+
+    // Select error level
+    await levelFilter.getByRole('button', { name: /error/i }).click();
+    await page.waitForTimeout(300);
+
+    // Select fatal level
+    await levelFilter.getByRole('button', { name: /fatal/i }).click();
+    await page.waitForTimeout(500);
+
+    // Should show error and fatal logs
+    await expect(page.getByText('Error message one')).toBeVisible();
+    await expect(page.getByText('Fatal message one')).toBeVisible();
+
+    // Should hide other levels
+    await expect(page.getByText('Debug message one')).not.toBeVisible();
+    await expect(page.getByText('Info message one')).not.toBeVisible();
+  });
+});
+
+test.describe('Log Stream Page - Time Range Filter', () => {
+  test.describe.configure({ retries: 1 });
+
+  let testProject: { id: string; name: string; apiKey: string };
+
+  test.beforeEach(async ({ page }) => {
+    await login(page);
+    testProject = await createProject(page, `time-range-test-${Date.now()}`);
+  });
+
+  test.afterEach(async ({ page }) => {
+    if (testProject?.id) {
+      await deleteProject(page, testProject.id);
+    }
+  });
+
+  test('should display time range picker with options', async ({ page }) => {
+    await page.goto(`/projects/${testProject.id}`);
+
+    // Time range picker should be visible with all options
+    await expect(page.getByRole('button', { name: '15m' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '1h' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '24h' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '7d' })).toBeVisible();
+  });
+
+  test('should highlight selected time range', async ({ page }) => {
+    await page.goto(`/projects/${testProject.id}`);
+
+    // Default should be 1h
+    const hourButton = page.getByRole('button', { name: '1h' });
+    await expect(hourButton).toHaveAttribute('data-selected', 'true');
+
+    // Click 24h
+    await page.getByRole('button', { name: '24h' }).click();
+
+    // 24h should now be selected
+    await expect(page.getByRole('button', { name: '24h' })).toHaveAttribute(
+      'data-selected',
+      'true',
+    );
+    await expect(hourButton).toHaveAttribute('data-selected', 'false');
+  });
+
+  test('should filter logs by time range', async ({ page }) => {
+    // Ingest a log
+    await ingestLog(page, testProject.apiKey, {
+      level: 'info',
+      message: 'Recent log message',
+    });
+
+    await page.goto(`/projects/${testProject.id}`);
+
+    // Should show recent log with 15m filter
+    await page.getByRole('button', { name: '15m' }).click();
+    await expect(page.getByText('Recent log message')).toBeVisible();
+  });
+});
+
+test.describe('Log Stream Page - Log Detail Modal', () => {
+  test.describe.configure({ retries: 1 });
+
+  let testProject: { id: string; name: string; apiKey: string };
+
+  test.beforeEach(async ({ page }) => {
+    await login(page);
+    testProject = await createProject(page, `detail-modal-test-${Date.now()}`);
+
+    // Ingest a log with all fields
+    await ingestLog(page, testProject.apiKey, {
+      level: 'error',
+      message: 'Detailed error for testing',
+      metadata: { key: 'value', nested: { foo: 'bar' } },
+      source_file: 'src/test.ts',
+      line_number: 42,
+      request_id: 'req_abc123',
+      user_id: 'user_456',
+      ip_address: '192.168.1.100',
+    });
+  });
+
+  test.afterEach(async ({ page }) => {
+    if (testProject?.id) {
+      await deleteProject(page, testProject.id);
+    }
+  });
+
+  test('should open detail modal when clicking log row', async ({ page }) => {
+    await page.goto(`/projects/${testProject.id}`);
+
+    // Wait for log to appear
+    await expect(page.getByText('Detailed error for testing')).toBeVisible();
+
+    // Click on the log row
+    await page.getByText('Detailed error for testing').click();
+
+    // Modal should open
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(page.getByText('Log Details')).toBeVisible();
+  });
+
+  test('should display all log fields in detail modal', async ({ page }) => {
+    await page.goto(`/projects/${testProject.id}`);
+
+    // Click on log row to open modal
+    await page.getByText('Detailed error for testing').click();
+
+    // Verify all fields are displayed
+    await expect(page.getByText('Detailed error for testing')).toBeVisible();
+    await expect(page.getByText('src/test.ts:42')).toBeVisible();
+    await expect(page.getByText('req_abc123')).toBeVisible();
+    await expect(page.getByText('user_456')).toBeVisible();
+    await expect(page.getByText('192.168.1.100')).toBeVisible();
+
+    // Metadata should be pretty-printed
+    await expect(page.locator('[data-testid="log-metadata"]')).toContainText('"key": "value"');
+  });
+
+  test('should close modal on Escape key', async ({ page }) => {
+    await page.goto(`/projects/${testProject.id}`);
+
+    // Open modal
+    await page.getByText('Detailed error for testing').click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+
+    // Press Escape
+    await page.keyboard.press('Escape');
+
+    // Modal should close
+    await expect(page.getByRole('dialog')).not.toBeVisible();
+  });
+
+  test('should close modal on overlay click', async ({ page }) => {
+    await page.goto(`/projects/${testProject.id}`);
+
+    // Open modal
+    await page.getByText('Detailed error for testing').click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+
+    // Click overlay
+    await page.locator('[data-testid="modal-overlay"]').click({ position: { x: 10, y: 10 } });
+
+    // Modal should close
+    await expect(page.getByRole('dialog')).not.toBeVisible();
+  });
+});
+
+test.describe('Log Stream Page - Project Settings Modal', () => {
+  test.describe.configure({ retries: 1 });
+
+  let testProject: { id: string; name: string; apiKey: string };
+
+  test.beforeEach(async ({ page }) => {
+    await login(page);
+    testProject = await createProject(page, `settings-modal-test-${Date.now()}`);
+  });
+
+  test.afterEach(async ({ page }) => {
+    if (testProject?.id) {
+      await deleteProject(page, testProject.id);
+    }
+  });
+
+  test('should open settings modal when clicking settings button', async ({ page }) => {
+    await page.goto(`/projects/${testProject.id}`);
+
+    // Find and click settings button
+    const settingsButton = page.getByRole('button', { name: /settings/i });
+    await expect(settingsButton).toBeVisible();
+    await settingsButton.click();
+
+    // Settings modal should open
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(page.getByText('Project Settings')).toBeVisible();
+  });
+
+  test('should display API key in settings modal', async ({ page }) => {
+    await page.goto(`/projects/${testProject.id}`);
+
+    // Open settings modal
+    await page.getByRole('button', { name: /settings/i }).click();
+
+    // API key should be displayed
+    await expect(page.locator('[data-testid="api-key-display"]')).toContainText('svl_');
+  });
+
+  test('should show curl example in settings modal', async ({ page }) => {
+    await page.goto(`/projects/${testProject.id}`);
+
+    // Open settings modal
+    await page.getByRole('button', { name: /settings/i }).click();
+
+    // Curl example should be visible
+    await expect(page.locator('[data-testid="curl-example"]')).toContainText('curl');
+    await expect(page.locator('[data-testid="curl-example"]')).toContainText('Authorization');
+  });
+
+  test('should close settings modal on Escape', async ({ page }) => {
+    await page.goto(`/projects/${testProject.id}`);
+
+    // Open settings modal
+    await page.getByRole('button', { name: /settings/i }).click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+
+    // Press Escape
+    await page.keyboard.press('Escape');
+
+    // Modal should close
+    await expect(page.getByRole('dialog')).not.toBeVisible();
+  });
+});
+
+test.describe('Log Stream Page - Empty State', () => {
+  test.describe.configure({ retries: 1 });
+
+  let testProject: { id: string; name: string; apiKey: string };
+
+  test.beforeEach(async ({ page }) => {
+    await login(page);
+    testProject = await createProject(page, `empty-state-test-${Date.now()}`);
+  });
+
+  test.afterEach(async ({ page }) => {
+    if (testProject?.id) {
+      await deleteProject(page, testProject.id);
+    }
+  });
+
+  test('should show empty state when no logs exist', async ({ page }) => {
+    await page.goto(`/projects/${testProject.id}`);
+
+    // Should show empty message
+    await expect(page.getByText(/no logs/i)).toBeVisible();
+  });
+});
+
+test.describe('Log Stream Page - Navigation', () => {
+  test.describe.configure({ retries: 1 });
+
+  let testProject: { id: string; name: string; apiKey: string };
+
+  test.beforeEach(async ({ page }) => {
+    await login(page);
+    testProject = await createProject(page, `navigation-test-${Date.now()}`);
+  });
+
+  test.afterEach(async ({ page }) => {
+    if (testProject?.id) {
+      await deleteProject(page, testProject.id);
+    }
+  });
+
+  test('should have back button to dashboard', async ({ page }) => {
+    await page.goto(`/projects/${testProject.id}`);
+
+    // Back button should be visible
+    const backButton = page.getByRole('link', { name: /back|dashboard|home/i });
+    await expect(backButton).toBeVisible();
+
+    // Click should navigate to dashboard
+    await backButton.click();
+    await expect(page).toHaveURL('/');
+  });
+});
