@@ -1,76 +1,69 @@
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
+import { nanoid } from 'nanoid';
 import * as schema from '../../src/lib/server/db/schema';
 
 /**
- * Type for user creation
+ * Type for project creation/selection
  */
-export type UserInsert = typeof schema.user.$inferInsert;
-export type UserSelect = typeof schema.user.$inferSelect;
+export type ProjectInsert = typeof schema.project.$inferInsert;
+export type ProjectSelect = typeof schema.project.$inferSelect;
 
 /**
- * Factory function to create test users
+ * Generates a unique API key in the format: svl_<32-random-chars>
  */
-export function createUserFactory(overrides: Partial<UserInsert> = {}): UserInsert {
+export function generateApiKey(): string {
+  return `svl_${nanoid(32)}`;
+}
+
+/**
+ * Factory function to create test projects
+ */
+export function createProjectFactory(overrides: Partial<ProjectInsert> = {}): ProjectInsert {
   return {
-    age: 25,
+    id: nanoid(),
+    name: `test-project-${nanoid(8)}`,
+    apiKey: generateApiKey(),
     ...overrides,
   };
 }
 
 /**
- * Seed multiple users into the database
+ * Seed multiple projects into the database
  */
-export async function seedUsers(
+export async function seedProjects(
   db: PgliteDatabase<typeof schema>,
   count: number = 3,
-  overrides: Partial<UserInsert> = {},
-): Promise<UserSelect[]> {
-  const users: UserInsert[] = Array.from({ length: count }, (_, i) =>
-    createUserFactory({ age: 20 + i * 5, ...overrides }),
+  overrides: Partial<ProjectInsert> = {},
+): Promise<ProjectSelect[]> {
+  const projects: ProjectInsert[] = Array.from({ length: count }, () =>
+    createProjectFactory(overrides),
   );
 
-  return await db.insert(schema.user).values(users).returning();
+  return await db.insert(schema.project).values(projects).returning();
 }
 
 /**
- * Seed a single user into the database
+ * Seed a single project into the database
  */
-export async function seedUser(
+export async function seedProject(
   db: PgliteDatabase<typeof schema>,
-  overrides: Partial<UserInsert> = {},
-): Promise<UserSelect> {
-  // Use createUserFactory to ensure default values are used
-  const user = createUserFactory(overrides);
-  const [result] = await db.insert(schema.user).values(user).returning();
+  overrides: Partial<ProjectInsert> = {},
+): Promise<ProjectSelect> {
+  const project = createProjectFactory(overrides);
+  const [result] = await db.insert(schema.project).values(project).returning();
   return result;
 }
 
 /**
- * Generic seeder for any table
+ * Generic seeder for test data
  */
 export async function seedTestData(
   db: PgliteDatabase<typeof schema>,
   data: {
-    users?: UserInsert[];
+    projects?: ProjectInsert[];
   },
 ): Promise<void> {
-  if (data.users && data.users.length > 0) {
-    await db.insert(schema.user).values(data.users);
+  if (data.projects && data.projects.length > 0) {
+    await db.insert(schema.project).values(data.projects);
   }
-}
-
-/**
- * Create multiple users with specific ages
- */
-export async function seedUsersWithAges(
-  db: PgliteDatabase<typeof schema>,
-  ages: number[],
-): Promise<UserSelect[]> {
-  // Handle empty array
-  if (ages.length === 0) {
-    return [];
-  }
-
-  const users = ages.map((age) => createUserFactory({ age }));
-  return await db.insert(schema.user).values(users).returning();
 }
