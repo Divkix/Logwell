@@ -81,9 +81,18 @@ describe('TimeRangePicker', () => {
     it('does not highlight unselected options', () => {
       render(TimeRangePicker, { props: { value: '1h' } });
 
-      expect(screen.getByRole('button', { name: /15 minutes/i })).not.toHaveAttribute('data-selected', 'true');
-      expect(screen.getByRole('button', { name: /24 hours/i })).not.toHaveAttribute('data-selected', 'true');
-      expect(screen.getByRole('button', { name: /7 days/i })).not.toHaveAttribute('data-selected', 'true');
+      expect(screen.getByRole('button', { name: /15 minutes/i })).not.toHaveAttribute(
+        'data-selected',
+        'true',
+      );
+      expect(screen.getByRole('button', { name: /24 hours/i })).not.toHaveAttribute(
+        'data-selected',
+        'true',
+      );
+      expect(screen.getByRole('button', { name: /7 days/i })).not.toHaveAttribute(
+        'data-selected',
+        'true',
+      );
     });
 
     it('defaults to 1h when no value provided', () => {
