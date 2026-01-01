@@ -11,13 +11,23 @@ import ProjectSettings from '$lib/components/project-settings.svelte';
 import SearchInput from '$lib/components/search-input.svelte';
 import TimeRangePicker, { type TimeRange } from '$lib/components/time-range-picker.svelte';
 import Button from '$lib/components/ui/button/button.svelte';
+import { useLogStream } from '$lib/hooks/use-log-stream.svelte';
 import type { Log, LogLevel, Project } from '$lib/server/db/schema';
+import type { ClientLog } from '$lib/stores/logs.svelte';
 import type { PageData } from './$types';
 
 const { data }: { data: PageData } = $props();
 
 // Convert server data logs (with string timestamps) to Log type (with Date timestamps)
 function parseLogTimestamp(log: PageData['logs'][number]): Log {
+  return {
+    ...log,
+    timestamp: log.timestamp ? new Date(log.timestamp) : null,
+  } as Log;
+}
+
+// Convert ClientLog (from SSE) to Log type (with Date timestamps)
+function parseClientLog(log: ClientLog): Log {
   return {
     ...log,
     timestamp: log.timestamp ? new Date(log.timestamp) : null,
@@ -43,100 +53,40 @@ let showDetailModal = $state(false);
 let showSettingsModal = $state(false);
 let loading = $state(false);
 
-// SSE connection state
-let eventSource: EventSource | null = null;
+// Live streaming is paused when search is active
+const isLivePaused = $derived(Boolean(data.filters.search));
+
+// Streamed logs from SSE
 let streamedLogs = $state<Log[]>([]);
 
-// Combined logs: server-loaded + streamed (with proper Date conversion)
-const allLogs = $derived([...streamedLogs, ...data.logs.map(parseLogTimestamp)]);
+// Handle incoming logs from SSE stream
+function handleIncomingLogs(logs: ClientLog[]) {
+  const parsedLogs = logs.map(parseClientLog);
+  streamedLogs = [...parsedLogs, ...streamedLogs];
+}
 
-// Start/stop SSE based on liveEnabled
+// Use the SSE hook for log streaming
+const logStream = useLogStream({
+  projectId: data.project.id,
+  enabled: liveEnabled && !isLivePaused,
+  onLogs: handleIncomingLogs,
+});
+
+// Manage stream connection based on liveEnabled and pause state
 $effect(() => {
-  if (liveEnabled) {
-    startSSE();
+  if (liveEnabled && !isLivePaused) {
+    logStream.connect();
   } else {
-    stopSSE();
+    logStream.disconnect();
   }
 
   return () => {
-    stopSSE();
+    logStream.disconnect();
   };
 });
 
-function startSSE() {
-  if (eventSource) return;
-
-  // Use POST for SSE (as per the API design)
-  const projectId = data.project.id;
-
-  // Create a fetch-based SSE reader since POST isn't natively supported
-  const controller = new AbortController();
-
-  fetch(`/api/projects/${projectId}/logs/stream`, {
-    method: 'POST',
-    credentials: 'same-origin',
-    signal: controller.signal,
-  })
-    .then(async (response) => {
-      if (!response.ok || !response.body) return;
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-
-        // Parse SSE events from buffer
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        let eventType = '';
-        let eventData = '';
-
-        for (const line of lines) {
-          if (line.startsWith('event: ')) {
-            eventType = line.slice(7);
-          } else if (line.startsWith('data: ')) {
-            eventData = line.slice(6);
-          } else if (line === '' && eventData) {
-            // End of event
-            if (eventType === 'logs') {
-              try {
-                const logs = JSON.parse(eventData) as Array<Log & { timestamp: string | null }>;
-                // Parse timestamps and prepend to streamed logs
-                const parsedLogs = logs.map((l) => ({
-                  ...l,
-                  timestamp: l.timestamp ? new Date(l.timestamp) : null,
-                })) as Log[];
-                streamedLogs = [...parsedLogs, ...streamedLogs];
-              } catch {
-                // Ignore parse errors
-              }
-            }
-            eventType = '';
-            eventData = '';
-          }
-        }
-      }
-    })
-    .catch(() => {
-      // Connection closed or error
-    });
-
-  // Store controller for cleanup
-  (eventSource as unknown) = { close: () => controller.abort() };
-}
-
-function stopSSE() {
-  if (eventSource) {
-    (eventSource as { close: () => void }).close();
-    eventSource = null;
-  }
-}
+// Combined logs: server-loaded + streamed (with proper Date conversion)
+const allLogs = $derived([...streamedLogs, ...data.logs.map(parseLogTimestamp)]);
 
 function handleSearch(value: string) {
   searchValue = value;
@@ -243,11 +193,20 @@ async function handleDelete() {
 
   <!-- Filters Bar -->
   <div class="flex flex-wrap items-center gap-4">
-    <LiveToggle bind:enabled={liveEnabled} />
+    <LiveToggle bind:enabled={liveEnabled} disabled={isLivePaused} />
+
+    {#if isLivePaused}
+      <span
+        data-testid="live-paused-notice"
+        class="text-sm text-muted-foreground bg-muted px-2 py-1 rounded"
+      >
+        Live paused during search
+      </span>
+    {/if}
 
     <div class="flex-1 max-w-sm">
       <SearchInput
-        value={searchValue}
+        bind:value={searchValue}
         placeholder="Search logs..."
         onsearch={handleSearch}
       />
