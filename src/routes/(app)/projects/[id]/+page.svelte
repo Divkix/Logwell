@@ -16,6 +16,7 @@ import Button from '$lib/components/ui/button/button.svelte';
 import { useLogStream } from '$lib/hooks/use-log-stream.svelte';
 import type { Log, LogLevel, Project } from '$lib/server/db/schema';
 import type { ClientLog } from '$lib/stores/logs.svelte';
+import { toastError, toastSuccess } from '$lib/utils/toast';
 import type { PageData } from './$types';
 
 const { data }: { data: PageData } = $props();
@@ -148,23 +149,39 @@ function closeSettings() {
 }
 
 async function handleRegenerate() {
-  const response = await fetch(`/api/projects/${data.project.id}/regenerate`, {
-    method: 'POST',
-  });
+  try {
+    const response = await fetch(`/api/projects/${data.project.id}/regenerate`, {
+      method: 'POST',
+    });
 
-  if (response.ok) {
-    await invalidateAll();
-    closeSettings();
+    if (response.ok) {
+      await invalidateAll();
+      closeSettings();
+      toastSuccess('API key regenerated successfully');
+    } else {
+      const result = await response.json();
+      toastError(result.message || 'Failed to regenerate API key');
+    }
+  } catch (error) {
+    toastError(error);
   }
 }
 
 async function handleDelete() {
-  const response = await fetch(`/api/projects/${data.project.id}`, {
-    method: 'DELETE',
-  });
+  try {
+    const response = await fetch(`/api/projects/${data.project.id}`, {
+      method: 'DELETE',
+    });
 
-  if (response.ok) {
-    await goto('/');
+    if (response.ok) {
+      toastSuccess('Project deleted successfully');
+      await goto('/');
+    } else {
+      const result = await response.json();
+      toastError(result.message || 'Failed to delete project');
+    }
+  } catch (error) {
+    toastError(error);
   }
 }
 </script>

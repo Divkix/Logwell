@@ -5,6 +5,7 @@ import Trash2Icon from '@lucide/svelte/icons/trash-2';
 import XIcon from '@lucide/svelte/icons/x';
 import type { Project } from '$lib/server/db/schema';
 import { cn } from '$lib/utils';
+import { toastError, toastSuccess } from '$lib/utils/toast';
 import Button from './ui/button/button.svelte';
 import Separator from './ui/separator/separator.svelte';
 
@@ -32,7 +33,12 @@ const truncatedApiKey = $derived(
 );
 
 async function copyToClipboard(text: string) {
-  await navigator.clipboard.writeText(text);
+  try {
+    await navigator.clipboard.writeText(text);
+    toastSuccess('API key copied to clipboard');
+  } catch {
+    toastError('Failed to copy to clipboard');
+  }
 }
 
 function handleKeyDown(event: KeyboardEvent) {

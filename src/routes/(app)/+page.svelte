@@ -7,6 +7,7 @@ import CreateProjectModal from '$lib/components/create-project-modal.svelte';
 import DashboardSkeleton from '$lib/components/dashboard-skeleton.svelte';
 import ProjectCard from '$lib/components/project-card.svelte';
 import { Button } from '$lib/components/ui/button/index.js';
+import { toastError, toastSuccess } from '$lib/utils/toast';
 import type { PageData } from './$types';
 
 const { data }: { data: PageData } = $props();
@@ -39,6 +40,7 @@ async function handleCreateProject(name: string) {
   const result = await response.json();
 
   if (!response.ok) {
+    toastError(result.message || 'Failed to create project');
     throw new Error(result.message || 'Failed to create project');
   }
 
@@ -54,6 +56,8 @@ async function handleCreateProject(name: string) {
     },
     ...projects,
   ];
+
+  toastSuccess(`Project "${name}" created successfully`);
 }
 </script>
 

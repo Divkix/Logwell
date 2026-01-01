@@ -4,6 +4,7 @@ import { goto } from '$app/navigation';
 import { authClient } from '$lib/auth-client';
 import ThemeToggle from '$lib/components/theme-toggle.svelte';
 import { Button } from '$lib/components/ui/button/index.js';
+import { toastError } from '$lib/utils/toast';
 
 const { data, children } = $props();
 
@@ -15,6 +16,7 @@ async function handleLogout() {
     await authClient.signOut();
     await goto('/login');
   } catch (error) {
+    toastError('Logout failed. Please try again.');
     console.error('Logout failed:', error);
     isLoggingOut = false;
   }

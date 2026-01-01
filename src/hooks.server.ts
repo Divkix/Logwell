@@ -1,7 +1,8 @@
-import type { Handle } from '@sveltejs/kit';
+import type { Handle, HandleServerError } from '@sveltejs/kit';
 import { svelteKitHandler } from 'better-auth/svelte-kit';
 import { building } from '$app/environment';
 import { auth, initAuth } from '$lib/server/auth';
+import { createErrorHandler } from '$lib/server/error-handler';
 
 // Initialize auth on server startup
 let authInitialized = false;
@@ -42,4 +43,23 @@ export const handle: Handle = async ({ event, resolve }) => {
 
   // Use better-auth's SvelteKit handler for proper routing
   return svelteKitHandler({ event, resolve, auth, building });
+};
+
+/**
+ * Global error handler for server-side errors
+ * - Logs errors with context for debugging
+ * - Returns sanitized error messages to clients
+ * - Generates unique error IDs for tracking
+ */
+const errorHandler = createErrorHandler();
+
+export const handleError: HandleServerError = ({ error, event, status, message }) => {
+  return errorHandler({
+    error,
+    url: event.url.href,
+    method: event.request.method,
+    route: event.route?.id ?? 'unknown',
+    status,
+    message,
+  });
 };
