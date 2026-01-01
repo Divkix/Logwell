@@ -1,14 +1,19 @@
 services:
   db:
-    image: postgres
+    image: postgres:17-alpine
     restart: always
     ports:
       - 5432:5432
-    environment: 
+    environment:
       POSTGRES_USER: root
       POSTGRES_PASSWORD: mysecretpassword
       POSTGRES_DB: local
     volumes:
-      - pgdata:/var/lib/postgresql
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U root -d local']
+      interval: 5s
+      timeout: 5s
+      retries: 5
 volumes:
   pgdata:

@@ -33,18 +33,32 @@ export function createAuth(
  * Lazy-loaded to avoid importing $env/dynamic/private in test environments
  */
 let _auth: ReturnType<typeof createAuth> | undefined;
+let _initPromise: Promise<void> | undefined;
+
+async function initAuth(): Promise<void> {
+  if (_auth) return;
+  if (_initPromise) return _initPromise;
+
+  _initPromise = (async () => {
+    const { db } = await import('./db');
+    _auth = createAuth(db);
+  })();
+
+  return _initPromise;
+}
 
 export const auth = new Proxy({} as ReturnType<typeof createAuth>, {
   get(_target, prop) {
     if (!_auth) {
-      // Lazy-load the production database
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { db } = require('./db');
-      _auth = createAuth(db);
+      // For synchronous access, we need to throw if not initialized
+      // The hooks.server.ts should call initAuth() first
+      throw new Error('Auth not initialized. Call initAuth() before accessing auth properties.');
     }
     return _auth[prop as keyof typeof _auth];
   },
 });
+
+export { initAuth };
 
 /**
  * Type exports for better-auth session and user
