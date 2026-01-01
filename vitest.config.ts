@@ -41,10 +41,19 @@ export default defineConfig({
         },
       },
       {
+        plugins: [tailwindcss(), sveltekit()],
+        resolve: {
+          alias: {
+            $lib: path.resolve(__dirname, './src/lib'),
+          },
+          conditions: ['browser'],
+        },
         test: {
-          name: 'browser',
-          include: ['src/**/*.browser.test.ts'],
+          name: 'component',
+          include: ['src/**/*.component.test.ts'],
+          environment: 'jsdom',
           globals: true,
+          setupFiles: ['./tests/setup.ts'],
         },
       },
     ],
