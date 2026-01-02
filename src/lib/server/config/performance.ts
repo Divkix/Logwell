@@ -105,6 +105,15 @@ export const API_CONFIG = {
 } as const;
 
 /**
+ * Export configuration for log export operations.
+ *
+ * - MAX_LOGS: Maximum number of logs that can be exported in a single request
+ */
+export const EXPORT_CONFIG = {
+  MAX_LOGS: 10000,
+} as const;
+
+/**
  * Type for SSE configuration object.
  */
 export type SSEConfigType = {

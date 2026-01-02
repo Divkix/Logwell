@@ -5,6 +5,7 @@ import SettingsIcon from '@lucide/svelte/icons/settings';
 import { goto, invalidateAll } from '$app/navigation';
 import { navigating } from '$app/stores';
 import BottomNav from '$lib/components/bottom-nav.svelte';
+import ExportButton from '$lib/components/export-button.svelte';
 import FilterPanel from '$lib/components/filter-panel.svelte';
 import LevelFilter from '$lib/components/level-filter.svelte';
 import LiveToggle from '$lib/components/live-toggle.svelte';
@@ -265,6 +266,16 @@ async function handleDelete() {
         <!-- Time Range Picker -->
         <div class="w-full sm:w-auto">
           <TimeRangePicker value={selectedRange} onchange={handleTimeRangeChange} />
+        </div>
+
+        <!-- Export Button -->
+        <div class="w-full sm:w-auto">
+          <ExportButton
+            projectId={data.project.id}
+            level={selectedLevels.length > 0 ? selectedLevels : undefined}
+            search={searchValue || undefined}
+            range={selectedRange}
+          />
         </div>
       </FilterPanel>
     </div>
