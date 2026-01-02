@@ -225,8 +225,10 @@ test.describe('Dashboard - Create Project Modal', () => {
     // Modal should close
     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 5000 });
 
-    // Project should appear in the list
-    await expect(page.getByText('my-new-project')).toBeVisible();
+    // Project should appear in the list (use testid to avoid matching toast notification)
+    await expect(
+      page.locator('[data-testid="project-card"]').getByText('my-new-project'),
+    ).toBeVisible();
 
     // Cleanup
     const response = await page.request.get('/api/projects');

@@ -106,8 +106,11 @@ test.describe('Live Stream SSE Integration', () => {
       message: 'Live stream test log - should appear',
     });
 
-    // The log should appear via SSE within reasonable time (use .first() for dual layout)
-    await expect(page.getByText('Live stream test log - should appear').first()).toBeVisible({
+    // The log should appear via SSE within reasonable time
+    // Use filter({ visible: true }) since we have dual mobile/desktop layouts (sm:hidden vs hidden sm:table)
+    await expect(
+      page.getByText('Live stream test log - should appear').filter({ visible: true }),
+    ).toBeVisible({
       timeout: 5000,
     });
   });
@@ -135,10 +138,9 @@ test.describe('Live Stream SSE Integration', () => {
     // Wait to ensure the log would have time to appear if streaming was active
     await page.waitForTimeout(3000);
 
-    // The log should NOT appear since live is disabled (use .first() for dual layout)
-    await expect(
-      page.getByText('Log after disabling live - should NOT appear').first(),
-    ).not.toBeVisible();
+    // The log should NOT appear since live is disabled
+    // Check that no element with this text exists (avoids dual layout visibility issues)
+    await expect(page.getByText('Log after disabling live - should NOT appear')).toHaveCount(0);
   });
 
   test('search pauses live with notice', async ({ page }) => {
