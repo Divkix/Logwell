@@ -1,55 +1,20 @@
 import { formatFullDate, formatRelativeTime, formatTimestamp, getTimeRangeStart } from './format';
 
 describe('formatTimestamp', () => {
-  it('returns HH:mm:ss.SSS format for afternoon time', () => {
-    const date = new Date('2024-01-15T14:30:45.123Z');
-    expect(formatTimestamp(date)).toBe('14:30:45.123');
-  });
-
-  it('returns HH:mm:ss.SSS format for morning time', () => {
-    const date = new Date('2024-01-15T09:15:30.456Z');
-    expect(formatTimestamp(date)).toBe('09:15:30.456');
-  });
-
-  it('handles midnight (00:00:00)', () => {
-    const date = new Date('2024-01-15T00:00:00.000Z');
-    expect(formatTimestamp(date)).toBe('00:00:00.000');
-  });
-
-  it('handles noon (12:00:00)', () => {
-    const date = new Date('2024-01-15T12:00:00.000Z');
-    expect(formatTimestamp(date)).toBe('12:00:00.000');
-  });
-
-  it('pads single-digit hours with leading zero', () => {
-    const date = new Date('2024-01-15T01:05:08.100Z');
-    expect(formatTimestamp(date)).toBe('01:05:08.100');
-  });
-
-  it('pads single-digit minutes with leading zero', () => {
-    const date = new Date('2024-01-15T14:05:45.123Z');
-    expect(formatTimestamp(date)).toBe('14:05:45.123');
-  });
-
-  it('pads single-digit seconds with leading zero', () => {
-    const date = new Date('2024-01-15T14:30:05.123Z');
-    expect(formatTimestamp(date)).toBe('14:30:05.123');
-  });
-
-  it('pads milliseconds to three digits', () => {
-    const date1 = new Date('2024-01-15T14:30:45.001Z');
-    expect(formatTimestamp(date1)).toBe('14:30:45.001');
-
-    const date2 = new Date('2024-01-15T14:30:45.010Z');
-    expect(formatTimestamp(date2)).toBe('14:30:45.010');
-
-    const date3 = new Date('2024-01-15T14:30:45.100Z');
-    expect(formatTimestamp(date3)).toBe('14:30:45.100');
-  });
-
-  it('handles maximum time values (23:59:59.999)', () => {
-    const date = new Date('2024-01-15T23:59:59.999Z');
-    expect(formatTimestamp(date)).toBe('23:59:59.999');
+  it.each([
+    ['2024-01-15T14:30:45.123Z', '14:30:45.123', 'afternoon time'],
+    ['2024-01-15T09:15:30.456Z', '09:15:30.456', 'morning time'],
+    ['2024-01-15T00:00:00.000Z', '00:00:00.000', 'midnight'],
+    ['2024-01-15T12:00:00.000Z', '12:00:00.000', 'noon'],
+    ['2024-01-15T01:05:08.100Z', '01:05:08.100', 'single-digit hours'],
+    ['2024-01-15T14:05:45.123Z', '14:05:45.123', 'single-digit minutes'],
+    ['2024-01-15T14:30:05.123Z', '14:30:05.123', 'single-digit seconds'],
+    ['2024-01-15T14:30:45.001Z', '14:30:45.001', 'single-digit milliseconds'],
+    ['2024-01-15T14:30:45.010Z', '14:30:45.010', 'double-digit milliseconds'],
+    ['2024-01-15T14:30:45.100Z', '14:30:45.100', 'triple-digit milliseconds'],
+    ['2024-01-15T23:59:59.999Z', '23:59:59.999', 'maximum time values'],
+  ])('formatTimestamp(%s) returns %s (%s)', (input, expected) => {
+    expect(formatTimestamp(new Date(input))).toBe(expected);
   });
 
   it('handles Date object at the start of epoch', () => {
@@ -62,94 +27,51 @@ describe('formatRelativeTime', () => {
   const now = new Date('2024-01-15T14:30:45.000Z');
 
   describe('seconds range', () => {
-    it('returns "just now" for times less than 5 seconds ago', () => {
-      const date = new Date(now.getTime() - 4 * 1000);
-      expect(formatRelativeTime(date, now)).toBe('just now');
-    });
-
-    it('returns "just now" for current time', () => {
-      expect(formatRelativeTime(now, now)).toBe('just now');
-    });
-
-    it('returns "5 seconds ago" for 5 seconds ago', () => {
-      const date = new Date(now.getTime() - 5 * 1000);
-      expect(formatRelativeTime(date, now)).toBe('5 seconds ago');
-    });
-
-    it('returns "30 seconds ago" for 30 seconds ago', () => {
-      const date = new Date(now.getTime() - 30 * 1000);
-      expect(formatRelativeTime(date, now)).toBe('30 seconds ago');
-    });
-
-    it('returns "59 seconds ago" for 59 seconds ago', () => {
-      const date = new Date(now.getTime() - 59 * 1000);
-      expect(formatRelativeTime(date, now)).toBe('59 seconds ago');
+    it.each([
+      [0, 'just now', 'current time'],
+      [4 * 1000, 'just now', 'less than 5 seconds ago'],
+      [5 * 1000, '5 seconds ago', '5 seconds ago'],
+      [30 * 1000, '30 seconds ago', '30 seconds ago'],
+      [59 * 1000, '59 seconds ago', '59 seconds ago'],
+    ])('formatRelativeTime(%i ms ago) returns "%s" (%s)', (offset, expected) => {
+      const date = new Date(now.getTime() - offset);
+      expect(formatRelativeTime(date, now)).toBe(expected);
     });
   });
 
   describe('minutes range', () => {
-    it('returns "1 minute ago" for 60 seconds ago', () => {
-      const date = new Date(now.getTime() - 60 * 1000);
-      expect(formatRelativeTime(date, now)).toBe('1 minute ago');
-    });
-
-    it('returns "2 minutes ago" for 2 minutes ago', () => {
-      const date = new Date(now.getTime() - 2 * 60 * 1000);
-      expect(formatRelativeTime(date, now)).toBe('2 minutes ago');
-    });
-
-    it('returns "15 minutes ago" for 15 minutes ago', () => {
-      const date = new Date(now.getTime() - 15 * 60 * 1000);
-      expect(formatRelativeTime(date, now)).toBe('15 minutes ago');
-    });
-
-    it('returns "59 minutes ago" for 59 minutes ago', () => {
-      const date = new Date(now.getTime() - 59 * 60 * 1000);
-      expect(formatRelativeTime(date, now)).toBe('59 minutes ago');
+    it.each([
+      [60 * 1000, '1 minute ago', '60 seconds ago'],
+      [2 * 60 * 1000, '2 minutes ago', '2 minutes ago'],
+      [15 * 60 * 1000, '15 minutes ago', '15 minutes ago'],
+      [59 * 60 * 1000, '59 minutes ago', '59 minutes ago'],
+    ])('formatRelativeTime(%i ms ago) returns "%s" (%s)', (offset, expected) => {
+      const date = new Date(now.getTime() - offset);
+      expect(formatRelativeTime(date, now)).toBe(expected);
     });
   });
 
   describe('hours range', () => {
-    it('returns "1 hour ago" for 60 minutes ago', () => {
-      const date = new Date(now.getTime() - 60 * 60 * 1000);
-      expect(formatRelativeTime(date, now)).toBe('1 hour ago');
-    });
-
-    it('returns "2 hours ago" for 2 hours ago', () => {
-      const date = new Date(now.getTime() - 2 * 60 * 60 * 1000);
-      expect(formatRelativeTime(date, now)).toBe('2 hours ago');
-    });
-
-    it('returns "12 hours ago" for 12 hours ago', () => {
-      const date = new Date(now.getTime() - 12 * 60 * 60 * 1000);
-      expect(formatRelativeTime(date, now)).toBe('12 hours ago');
-    });
-
-    it('returns "23 hours ago" for 23 hours ago', () => {
-      const date = new Date(now.getTime() - 23 * 60 * 60 * 1000);
-      expect(formatRelativeTime(date, now)).toBe('23 hours ago');
+    it.each([
+      [60 * 60 * 1000, '1 hour ago', '60 minutes ago'],
+      [2 * 60 * 60 * 1000, '2 hours ago', '2 hours ago'],
+      [12 * 60 * 60 * 1000, '12 hours ago', '12 hours ago'],
+      [23 * 60 * 60 * 1000, '23 hours ago', '23 hours ago'],
+    ])('formatRelativeTime(%i ms ago) returns "%s" (%s)', (offset, expected) => {
+      const date = new Date(now.getTime() - offset);
+      expect(formatRelativeTime(date, now)).toBe(expected);
     });
   });
 
   describe('days range', () => {
-    it('returns "1 day ago" for 24 hours ago', () => {
-      const date = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      expect(formatRelativeTime(date, now)).toBe('1 day ago');
-    });
-
-    it('returns "2 days ago" for 2 days ago', () => {
-      const date = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
-      expect(formatRelativeTime(date, now)).toBe('2 days ago');
-    });
-
-    it('returns "7 days ago" for 7 days ago', () => {
-      const date = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      expect(formatRelativeTime(date, now)).toBe('7 days ago');
-    });
-
-    it('returns "30 days ago" for 30 days ago', () => {
-      const date = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      expect(formatRelativeTime(date, now)).toBe('30 days ago');
+    it.each([
+      [24 * 60 * 60 * 1000, '1 day ago', '24 hours ago'],
+      [2 * 24 * 60 * 60 * 1000, '2 days ago', '2 days ago'],
+      [7 * 24 * 60 * 60 * 1000, '7 days ago', '7 days ago'],
+      [30 * 24 * 60 * 60 * 1000, '30 days ago', '30 days ago'],
+    ])('formatRelativeTime(%i ms ago) returns "%s" (%s)', (offset, expected) => {
+      const date = new Date(now.getTime() - offset);
+      expect(formatRelativeTime(date, now)).toBe(expected);
     });
   });
 
@@ -174,134 +96,59 @@ describe('formatRelativeTime', () => {
 describe('getTimeRangeStart', () => {
   const now = new Date('2024-01-15T14:30:45.123Z');
 
-  describe('15 minutes range', () => {
-    it('returns Date 15 minutes before reference time', () => {
-      const result = getTimeRangeStart('15m', now);
-      const expected = new Date(now.getTime() - 15 * 60 * 1000);
-      expect(result).toEqual(expected);
-    });
-
-    it('calculates correct timestamp for 15m', () => {
-      const result = getTimeRangeStart('15m', now);
-      expect(result.getTime()).toBe(now.getTime() - 15 * 60 * 1000);
-    });
+  it.each([
+    ['15m', 15 * 60 * 1000, '15 minutes'],
+    ['1h', 60 * 60 * 1000, '1 hour'],
+    ['24h', 24 * 60 * 60 * 1000, '24 hours'],
+    ['7d', 7 * 24 * 60 * 60 * 1000, '7 days'],
+  ])('getTimeRangeStart(%s) returns Date %i ms before reference time (%s)', (range, offset) => {
+    const result = getTimeRangeStart(range, now);
+    const expected = new Date(now.getTime() - offset);
+    expect(result).toEqual(expected);
+    expect(result.getTime()).toBe(now.getTime() - offset);
   });
 
-  describe('1 hour range', () => {
-    it('returns Date 1 hour before reference time', () => {
-      const result = getTimeRangeStart('1h', now);
-      const expected = new Date(now.getTime() - 60 * 60 * 1000);
-      expect(result).toEqual(expected);
-    });
+  it('uses current time when reference time is not provided', () => {
+    const before = Date.now();
+    const result = getTimeRangeStart('1h');
+    const after = Date.now();
 
-    it('calculates correct timestamp for 1h', () => {
-      const result = getTimeRangeStart('1h', now);
-      expect(result.getTime()).toBe(now.getTime() - 60 * 60 * 1000);
-    });
+    // Result should be approximately 1 hour before now
+    expect(result.getTime()).toBeGreaterThanOrEqual(before - 60 * 60 * 1000);
+    expect(result.getTime()).toBeLessThanOrEqual(after - 60 * 60 * 1000);
   });
 
-  describe('24 hours range', () => {
-    it('returns Date 24 hours before reference time', () => {
-      const result = getTimeRangeStart('24h', now);
-      const expected = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      expect(result).toEqual(expected);
-    });
-
-    it('calculates correct timestamp for 24h', () => {
-      const result = getTimeRangeStart('24h', now);
-      expect(result.getTime()).toBe(now.getTime() - 24 * 60 * 60 * 1000);
-    });
+  it('returns a Date object for all valid ranges', () => {
+    expect(getTimeRangeStart('15m', now)).toBeInstanceOf(Date);
+    expect(getTimeRangeStart('1h', now)).toBeInstanceOf(Date);
+    expect(getTimeRangeStart('24h', now)).toBeInstanceOf(Date);
+    expect(getTimeRangeStart('7d', now)).toBeInstanceOf(Date);
   });
 
-  describe('7 days range', () => {
-    it('returns Date 7 days before reference time', () => {
-      const result = getTimeRangeStart('7d', now);
-      const expected = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      expect(result).toEqual(expected);
-    });
-
-    it('calculates correct timestamp for 7d', () => {
-      const result = getTimeRangeStart('7d', now);
-      expect(result.getTime()).toBe(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    });
-  });
-
-  describe('default behavior', () => {
-    it('uses current time when reference time is not provided', () => {
-      const before = Date.now();
-      const result = getTimeRangeStart('1h');
-      const after = Date.now();
-
-      // Result should be approximately 1 hour before now
-      expect(result.getTime()).toBeGreaterThanOrEqual(before - 60 * 60 * 1000);
-      expect(result.getTime()).toBeLessThanOrEqual(after - 60 * 60 * 1000);
-    });
-  });
-
-  describe('return type validation', () => {
-    it('returns a Date object for all valid ranges', () => {
-      expect(getTimeRangeStart('15m', now)).toBeInstanceOf(Date);
-      expect(getTimeRangeStart('1h', now)).toBeInstanceOf(Date);
-      expect(getTimeRangeStart('24h', now)).toBeInstanceOf(Date);
-      expect(getTimeRangeStart('7d', now)).toBeInstanceOf(Date);
-    });
-  });
-
-  describe('precision verification', () => {
-    it('preserves millisecond precision', () => {
-      const result = getTimeRangeStart('1h', now);
-      // If now has milliseconds, the result should maintain them
-      expect(result.getMilliseconds()).toBe(now.getMilliseconds());
-    });
+  it('preserves millisecond precision', () => {
+    const result = getTimeRangeStart('1h', now);
+    // If now has milliseconds, the result should maintain them
+    expect(result.getMilliseconds()).toBe(now.getMilliseconds());
   });
 });
 
 describe('formatFullDate', () => {
-  it('returns YYYY-MM-DD HH:mm:ss.SSS UTC format', () => {
-    const date = new Date('2024-01-15T14:30:45.123Z');
-    expect(formatFullDate(date)).toBe('2024-01-15 14:30:45.123 UTC');
-  });
-
-  it('handles morning times correctly', () => {
-    const date = new Date('2024-06-20T08:15:30.456Z');
-    expect(formatFullDate(date)).toBe('2024-06-20 08:15:30.456 UTC');
-  });
-
-  it('handles midnight correctly', () => {
-    const date = new Date('2024-01-01T00:00:00.000Z');
-    expect(formatFullDate(date)).toBe('2024-01-01 00:00:00.000 UTC');
-  });
-
-  it('handles end of year correctly', () => {
-    const date = new Date('2024-12-31T23:59:59.999Z');
-    expect(formatFullDate(date)).toBe('2024-12-31 23:59:59.999 UTC');
-  });
-
-  it('pads single-digit months with leading zero', () => {
-    const date = new Date('2024-01-15T14:30:45.123Z');
-    expect(formatFullDate(date)).toContain('01-15');
-  });
-
-  it('pads single-digit days with leading zero', () => {
-    const date = new Date('2024-01-05T14:30:45.123Z');
-    expect(formatFullDate(date)).toContain('01-05');
+  it.each([
+    ['2024-01-15T14:30:45.123Z', '2024-01-15 14:30:45.123 UTC', 'afternoon time'],
+    ['2024-06-20T08:15:30.456Z', '2024-06-20 08:15:30.456 UTC', 'morning time'],
+    ['2024-01-01T00:00:00.000Z', '2024-01-01 00:00:00.000 UTC', 'midnight'],
+    ['2024-12-31T23:59:59.999Z', '2024-12-31 23:59:59.999 UTC', 'end of year'],
+    ['2024-01-15T14:30:45.123Z', '2024-01-15 14:30:45.123 UTC', 'single-digit month'],
+    ['2024-01-05T14:30:45.123Z', '2024-01-05 14:30:45.123 UTC', 'single-digit day'],
+    ['2024-11-20T14:30:45.123Z', '2024-11-20 14:30:45.123 UTC', 'double-digit month'],
+    ['2024-01-15T14:30:45.001Z', '2024-01-15 14:30:45.001 UTC', 'single-digit milliseconds'],
+    ['2024-01-15T14:30:45.010Z', '2024-01-15 14:30:45.010 UTC', 'double-digit milliseconds'],
+  ])('formatFullDate(%s) returns %s (%s)', (input, expected) => {
+    expect(formatFullDate(new Date(input))).toBe(expected);
   });
 
   it('handles epoch start', () => {
     const date = new Date(0); // 1970-01-01T00:00:00.000Z
     expect(formatFullDate(date)).toBe('1970-01-01 00:00:00.000 UTC');
-  });
-
-  it('handles double-digit months correctly', () => {
-    const date = new Date('2024-11-20T14:30:45.123Z');
-    expect(formatFullDate(date)).toBe('2024-11-20 14:30:45.123 UTC');
-  });
-
-  it('pads milliseconds to three digits', () => {
-    const date1 = new Date('2024-01-15T14:30:45.001Z');
-    expect(formatFullDate(date1)).toContain('.001 UTC');
-
-    const date2 = new Date('2024-01-15T14:30:45.010Z');
-    expect(formatFullDate(date2)).toContain('.010 UTC');
   });
 });

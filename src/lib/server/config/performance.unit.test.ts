@@ -16,55 +16,36 @@ describe('Performance Configuration', () => {
   });
 
   describe('SSE Batching Configuration', () => {
-    it('exports BATCH_WINDOW_MS with default value of 1500', async () => {
+    it.each([
+      ['BATCH_WINDOW_MS', 1500],
+      ['MAX_BATCH_SIZE', 50],
+      ['HEARTBEAT_INTERVAL_MS', 30000],
+    ])('exports %s with default value of %d', async (key, expected) => {
+      vi.resetModules();
       const { SSE_CONFIG } = await import('./performance');
-      expect(SSE_CONFIG.BATCH_WINDOW_MS).toBe(1500);
+      expect(SSE_CONFIG[key as keyof typeof SSE_CONFIG]).toBe(expected);
     });
 
-    it('exports MAX_BATCH_SIZE with default value of 50', async () => {
+    it.each([
+      ['SSE_BATCH_WINDOW_MS', 'BATCH_WINDOW_MS', '2000', 2000],
+      ['SSE_MAX_BATCH_SIZE', 'MAX_BATCH_SIZE', '100', 100],
+      ['SSE_HEARTBEAT_INTERVAL_MS', 'HEARTBEAT_INTERVAL_MS', '60000', 60000],
+    ])('respects %s environment variable', async (envKey, configKey, envValue, expected) => {
+      vi.resetModules();
+      process.env[envKey] = envValue;
       const { SSE_CONFIG } = await import('./performance');
-      expect(SSE_CONFIG.MAX_BATCH_SIZE).toBe(50);
+      expect(SSE_CONFIG[configKey as keyof typeof SSE_CONFIG]).toBe(expected);
     });
 
-    it('exports HEARTBEAT_INTERVAL_MS with default value of 30000', async () => {
+    it.each([
+      ['SSE_BATCH_WINDOW_MS', 'BATCH_WINDOW_MS', '50', 100],
+      ['SSE_MAX_BATCH_SIZE', 'MAX_BATCH_SIZE', '0', 1],
+      ['SSE_HEARTBEAT_INTERVAL_MS', 'HEARTBEAT_INTERVAL_MS', '1000', 5000],
+    ])('clamps %s to minimum', async (envKey, configKey, envValue, expected) => {
+      vi.resetModules();
+      process.env[envKey] = envValue;
       const { SSE_CONFIG } = await import('./performance');
-      expect(SSE_CONFIG.HEARTBEAT_INTERVAL_MS).toBe(30000);
-    });
-
-    it('respects SSE_BATCH_WINDOW_MS environment variable', async () => {
-      process.env.SSE_BATCH_WINDOW_MS = '2000';
-      const { SSE_CONFIG } = await import('./performance');
-      expect(SSE_CONFIG.BATCH_WINDOW_MS).toBe(2000);
-    });
-
-    it('respects SSE_MAX_BATCH_SIZE environment variable', async () => {
-      process.env.SSE_MAX_BATCH_SIZE = '100';
-      const { SSE_CONFIG } = await import('./performance');
-      expect(SSE_CONFIG.MAX_BATCH_SIZE).toBe(100);
-    });
-
-    it('respects SSE_HEARTBEAT_INTERVAL_MS environment variable', async () => {
-      process.env.SSE_HEARTBEAT_INTERVAL_MS = '60000';
-      const { SSE_CONFIG } = await import('./performance');
-      expect(SSE_CONFIG.HEARTBEAT_INTERVAL_MS).toBe(60000);
-    });
-
-    it('clamps BATCH_WINDOW_MS to minimum of 100ms', async () => {
-      process.env.SSE_BATCH_WINDOW_MS = '50';
-      const { SSE_CONFIG } = await import('./performance');
-      expect(SSE_CONFIG.BATCH_WINDOW_MS).toBe(100);
-    });
-
-    it('clamps MAX_BATCH_SIZE to minimum of 1', async () => {
-      process.env.SSE_MAX_BATCH_SIZE = '0';
-      const { SSE_CONFIG } = await import('./performance');
-      expect(SSE_CONFIG.MAX_BATCH_SIZE).toBe(1);
-    });
-
-    it('clamps HEARTBEAT_INTERVAL_MS to minimum of 5000ms', async () => {
-      process.env.SSE_HEARTBEAT_INTERVAL_MS = '1000';
-      const { SSE_CONFIG } = await import('./performance');
-      expect(SSE_CONFIG.HEARTBEAT_INTERVAL_MS).toBe(5000);
+      expect(SSE_CONFIG[configKey as keyof typeof SSE_CONFIG]).toBe(expected);
     });
 
     it('ignores invalid (non-numeric) environment values', async () => {
