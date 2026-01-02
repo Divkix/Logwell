@@ -49,7 +49,7 @@ function handleKeyDown(event: KeyboardEvent) {
 >
   <td class="px-4 py-2">
     <span
-      data-testid="log-timestamp"
+      data-testid="log-timestamp-desktop"
       class="font-mono text-sm text-muted-foreground whitespace-nowrap"
     >
       {formattedTimestamp}
@@ -62,7 +62,7 @@ function handleKeyDown(event: KeyboardEvent) {
 
   <td class="px-4 py-2">
     <span
-      data-testid="log-message"
+      data-testid="log-message-desktop"
       class="text-sm truncate block max-w-md"
       title={log.message}
     >

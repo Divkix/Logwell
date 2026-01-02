@@ -49,11 +49,11 @@ function handleKeyDown(event: KeyboardEvent) {
 >
   <!-- Header row: Level badge + Timestamp -->
   <div class="flex items-center justify-between gap-2 mb-2">
-    <span data-testid="log-level-badge">
+    <span data-testid="log-level-badge-mobile">
       <LevelBadge level={log.level} />
     </span>
     <span
-      data-testid="log-timestamp"
+      data-testid="log-timestamp-mobile"
       class="font-mono text-xs text-muted-foreground"
     >
       {formattedTimestamp}
@@ -62,7 +62,7 @@ function handleKeyDown(event: KeyboardEvent) {
 
   <!-- Message -->
   <p
-    data-testid="log-message"
+    data-testid="log-message-mobile"
     class="text-sm wrap-break-word line-clamp-3"
     title={log.message}
   >

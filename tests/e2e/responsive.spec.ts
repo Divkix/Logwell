@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
+import { getLogCard } from './helpers/log-selectors';
 
 /**
  * E2E tests for Responsive Design
@@ -135,8 +136,7 @@ test.describe('Responsive Design - Mobile Viewport', () => {
     await page.goto(`/projects/${testProject.id}`);
 
     // On mobile, logs should be displayed as cards, not table
-    const logCards = page.locator('[data-testid="log-card"]');
-    await expect(logCards.first()).toBeVisible();
+    await expect(getLogCard(page).first()).toBeVisible();
 
     // Table should be hidden on mobile
     const logTable = page.locator('[data-testid="log-table"] table');
@@ -232,8 +232,7 @@ test.describe('Responsive Design - Tablet Viewport', () => {
 
     // Cards container should be hidden on tablet (via sm:hidden CSS class)
     // Cards exist in DOM but are not visible at tablet+ viewports
-    const logCard = page.locator('[data-testid="log-card"]').first();
-    await expect(logCard).not.toBeVisible();
+    await expect(getLogCard(page).first()).not.toBeVisible();
   });
 
   test('should show inline filters on tablet', async ({ page }) => {
@@ -438,12 +437,10 @@ test.describe('Responsive Design - Filter Collapsing Interaction', () => {
     await page.waitForTimeout(500);
 
     // Should show only error logs in card view
-    const errorCard = page.locator('[data-testid="log-card"]').filter({ hasText: 'Error message' });
-    await expect(errorCard).toBeVisible();
+    await expect(getLogCard(page, { hasText: 'Error message' })).toBeVisible();
 
     // Info message should be hidden (check within visible mobile cards container)
-    const infoCard = page.locator('[data-testid="log-card"]').filter({ hasText: 'Info message' });
-    await expect(infoCard).not.toBeVisible();
+    await expect(getLogCard(page, { hasText: 'Info message' })).not.toBeVisible();
   });
 
   test('should show active filter count badge on toggle button', async ({ page }) => {
@@ -464,8 +461,8 @@ test.describe('Responsive Design - Filter Collapsing Interaction', () => {
     // Wait for filter to apply
     await page.waitForTimeout(300);
 
-    // Close filter panel by clicking backdrop (same pattern as other tests)
-    await page.getByRole('button', { name: /close filter panel/i }).click();
+    // Close filter panel by pressing Escape
+    await page.keyboard.press('Escape');
     await expect(filterPanel).not.toBeVisible();
 
     // Badge should show active filter count
@@ -504,20 +501,20 @@ test.describe('Responsive Design - Log Card Layout', () => {
   test('should display log cards with all essential info on mobile', async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
-    const logCard = page.locator('[data-testid="log-card"]').first();
+    const logCard = getLogCard(page).first();
     await expect(logCard).toBeVisible();
 
-    // Card should contain: level badge, timestamp, message
-    await expect(logCard.locator('[data-testid="log-level-badge"]')).toBeVisible();
-    await expect(logCard.locator('[data-testid="log-timestamp"]')).toBeVisible();
-    await expect(logCard.locator('[data-testid="log-message"]')).toBeVisible();
+    // Card should contain: level badge, timestamp, message (mobile-specific test IDs)
+    await expect(logCard.locator('[data-testid="log-level-badge-mobile"]')).toBeVisible();
+    await expect(logCard.locator('[data-testid="log-timestamp-mobile"]')).toBeVisible();
+    await expect(logCard.locator('[data-testid="log-message-mobile"]')).toBeVisible();
   });
 
   test('should open detail modal when clicking log card', async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
     // Click on log card
-    await page.locator('[data-testid="log-card"]').first().click();
+    await getLogCard(page).first().click();
 
     // Detail modal should open
     await expect(page.getByRole('dialog')).toBeVisible();

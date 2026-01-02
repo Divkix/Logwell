@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
+import { getLevelBadge, getLogMessage } from './helpers/log-selectors';
 
 /**
  * E2E tests for Project Log Stream Page
@@ -104,21 +105,6 @@ async function ingestLogsBatch(
   });
   expect(response.ok()).toBeTruthy();
   return response.json();
-}
-
-/**
- * Helper to get log message locator scoped to the visible table layout.
- * LogTable renders both mobile cards and desktop table - this targets the table (visible in default viewport).
- */
-function getLogMessage(page: Page, text: string) {
-  return page.locator('[data-testid="log-table"] table').getByText(text);
-}
-
-/**
- * Helper to get level badge locator scoped to the visible table layout.
- */
-function getLevelBadge(page: Page, level: string) {
-  return page.locator('[data-testid="log-table"] table').getByText(level);
 }
 
 test.describe('Log Stream Page - Display', () => {
