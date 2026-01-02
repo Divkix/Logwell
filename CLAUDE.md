@@ -62,8 +62,30 @@ Uses in-memory event bus (not pg_notify) to avoid database polling at high volum
 
 ## Environment Variables
 
+See `.env.example` for comprehensive documentation. Key variables:
+
+### Required
+```bash
+DATABASE_URL=postgresql://user:password@localhost:5432/dbname  # PostgreSQL connection
+BETTER_AUTH_SECRET=<32-char-secret>  # Required in production, min 32 chars
 ```
-DATABASE_URL=postgresql://user:password@localhost:5432/dbname
-ADMIN_PASSWORD=<admin-password>
-BETTER_AUTH_SECRET=<32-char-secret>
+
+### Optional
+```bash
+ADMIN_PASSWORD=<password>            # For seeding admin user (min 8 chars)
+ORIGIN=https://your-domain.com       # Production base URL for CORS
+NODE_ENV=development                 # Environment mode
 ```
+
+### Performance Tuning
+```bash
+SSE_BATCH_WINDOW_MS=1500             # SSE batch window (100-10000)
+SSE_MAX_BATCH_SIZE=50                # Max logs per batch (1-500)
+SSE_HEARTBEAT_INTERVAL_MS=30000      # Keep-alive interval (5000-300000)
+LOG_STREAM_MAX_LOGS=1000             # Max logs in memory (1-10000)
+```
+
+### Server Configuration (`src/lib/server/config/`)
+- `env.ts` - Environment validation with startup checks
+- `performance.ts` - SSE and log stream tuning parameters
+- `index.ts` - Unified exports for all config
