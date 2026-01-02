@@ -70,19 +70,20 @@ describe('TimeRangePicker', () => {
   });
 
   describe('emits change event with range value', () => {
-    it.each(TIME_RANGES)(
-      'emits change event when clicking $value',
-      async ({ value, label, initialValue }) => {
-        const onchange = vi.fn();
-        render(TimeRangePicker, { props: { value: initialValue, onchange } });
+    it.each(TIME_RANGES)('emits change event when clicking $value', async ({
+      value,
+      label,
+      initialValue,
+    }) => {
+      const onchange = vi.fn();
+      render(TimeRangePicker, { props: { value: initialValue, onchange } });
 
-        const button = screen.getByRole('button', { name: label });
-        await fireEvent.click(button);
+      const button = screen.getByRole('button', { name: label });
+      await fireEvent.click(button);
 
-        expect(onchange).toHaveBeenCalledTimes(1);
-        expect(onchange).toHaveBeenCalledWith(value);
-      },
-    );
+      expect(onchange).toHaveBeenCalledTimes(1);
+      expect(onchange).toHaveBeenCalledWith(value);
+    });
 
     it('does not emit change event when clicking already selected option', async () => {
       const onchange = vi.fn();
