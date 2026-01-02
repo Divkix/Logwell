@@ -33,6 +33,7 @@ RUN bun install --frozen-lockfile --production
 FROM base AS deps-dev
 WORKDIR /app
 COPY package.json bun.lock ./
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 RUN bun install --frozen-lockfile
 
 # -----------------------------------------------------------------------------
