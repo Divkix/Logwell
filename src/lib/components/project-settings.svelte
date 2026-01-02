@@ -12,6 +12,7 @@ import Separator from './ui/separator/separator.svelte';
 
 interface Props {
   project: Project;
+  appUrl?: string | null;
   open: boolean;
   onClose?: () => void;
   onRegenerate?: () => void;
@@ -22,6 +23,7 @@ interface Props {
 
 const {
   project,
+  appUrl = null,
   open,
   onClose,
   onRegenerate,
@@ -52,17 +54,34 @@ $effect(() => {
 
 const isDeleteConfirmValid = $derived(deleteConfirmInput === project.name);
 
-const truncatedApiKey = $derived(
-  project.apiKey.length > 20
-    ? `${project.apiKey.substring(0, 12)}...${project.apiKey.slice(-8)}`
-    : project.apiKey,
+// Dynamic base URL: use ORIGIN env var if set, otherwise fall back to current origin
+const baseUrl = $derived(
+  appUrl || (typeof window !== 'undefined' ? window.location.origin : 'https://your-domain.com'),
 );
 
-async function copyToClipboard(text: string) {
+// Full curl command for easy copy-paste
+const curlCommand = $derived(
+  `curl -X POST ${baseUrl}/api/v1/logs \\
+  -H "Authorization: Bearer ${project.apiKey}" \\
+  -H "Content-Type: application/json" \\
+  -d '${JSON.stringify({ level: 'info', message: 'Hello!' })}'`,
+);
+
+async function copyApiKey() {
   try {
-    await navigator.clipboard.writeText(text);
+    await navigator.clipboard.writeText(project.apiKey);
     toastSuccess('API key copied to clipboard');
     announceToScreenReader('API key copied to clipboard');
+  } catch {
+    toastError('Failed to copy to clipboard');
+  }
+}
+
+async function copyCurlCommand() {
+  try {
+    await navigator.clipboard.writeText(curlCommand);
+    toastSuccess('Curl command copied to clipboard');
+    announceToScreenReader('Curl command copied to clipboard');
   } catch {
     toastError('Failed to copy to clipboard');
   }
@@ -169,7 +188,7 @@ function handleDeleteCancel() {
               size="sm"
               data-testid="copy-api-key-button"
               aria-label="Copy API key to clipboard"
-              onclick={() => copyToClipboard(project.apiKey)}
+              onclick={copyApiKey}
             >
               <CopyIcon class="mr-2 size-4" aria-hidden="true" />
               Copy
@@ -194,10 +213,19 @@ function handleDeleteCancel() {
             data-testid="curl-example"
             aria-label="API usage example"
             class="bg-muted mt-2 rounded-md p-3 text-sm font-mono overflow-x-auto whitespace-pre-wrap"
-          >curl -X POST https://your-domain.com/api/v1/logs \
-  -H "Authorization: Bearer {truncatedApiKey}" \
-  -H "Content-Type: application/json" \
-  -d '{JSON.stringify({ level: 'info', message: 'Hello!' })}'</pre>
+          >{curlCommand}</pre>
+          <div class="mt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              data-testid="copy-curl-button"
+              aria-label="Copy curl command to clipboard"
+              onclick={copyCurlCommand}
+            >
+              <CopyIcon class="mr-2 size-4" aria-hidden="true" />
+              Copy Command
+            </Button>
+          </div>
         </div>
 
         <Separator />

@@ -292,6 +292,7 @@ async function handleDelete() {
 <!-- Project Settings Modal -->
 <ProjectSettings
   project={projectData}
+  appUrl={data.appUrl}
   open={showSettingsModal}
   onClose={closeSettings}
   onRegenerate={handleRegenerate}

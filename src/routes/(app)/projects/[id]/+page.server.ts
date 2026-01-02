@@ -1,5 +1,6 @@
 import { error } from '@sveltejs/kit';
 import { and, count, desc, eq, gte, inArray, type SQL, sql } from 'drizzle-orm';
+import { env } from '$lib/server/config';
 import { log, project } from '$lib/server/db/schema';
 import { requireAuth } from '$lib/server/utils/auth-guard';
 import { LOG_LEVELS, type LogLevel } from '$lib/shared/types';
@@ -172,5 +173,6 @@ export const load: PageServerLoad = async (event) => {
       search: searchParam ?? '',
       range: rangeParam,
     },
+    appUrl: env.ORIGIN || null,
   };
 };
