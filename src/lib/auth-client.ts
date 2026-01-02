@@ -8,8 +8,3 @@ import { createAuthClient } from 'better-auth/svelte';
  * works with whatever port the server is running on
  */
 export const authClient = createAuthClient();
-
-/**
- * Svelte store for current session
- */
-export const { useSession } = authClient;

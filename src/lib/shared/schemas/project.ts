@@ -24,8 +24,3 @@ export const projectCreatePayloadSchema = z.object({
       'Project name must contain only alphanumeric characters, hyphens, and underscores',
     ),
 });
-
-/**
- * Project create payload type
- */
-export type ProjectCreatePayload = z.infer<typeof projectCreatePayloadSchema>;

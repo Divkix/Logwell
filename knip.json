@@ -7,7 +7,7 @@
   ],
   "project": ["src/**/*.{js,ts,svelte}"],
   "ignore": [".svelte-kit/**", "build/**", "dist/**", "src/app.d.ts"],
-  "ignoreDependencies": ["tailwindcss", "@tailwindcss/forms", "@tailwindcss/typography"],
+  "ignoreDependencies": ["tw-animate-css"],
   "ignoreUnresolved": ["\\$env/.+"],
   "drizzle": false
 }

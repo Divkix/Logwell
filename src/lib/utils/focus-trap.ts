@@ -49,7 +49,7 @@ function getFocusableElements(container: HTMLElement): HTMLElement[] {
  * Creates a focus trap for the given container element.
  * Returns cleanup functions for the trap.
  */
-export function createFocusTrap(container: HTMLElement, options: FocusTrapOptions = {}) {
+function createFocusTrap(container: HTMLElement, options: FocusTrapOptions = {}) {
   const { initialFocus, returnFocus, autoFocus = true } = options;
 
   // Store the previously focused element

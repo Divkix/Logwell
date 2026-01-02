@@ -133,8 +133,3 @@ export function createLogStreamStore(options: LogStreamStoreOptions = {}) {
     },
   };
 }
-
-/**
- * Type for the log stream store instance
- */
-export type LogStreamStore = ReturnType<typeof createLogStreamStore>;

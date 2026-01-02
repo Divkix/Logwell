@@ -47,24 +47,3 @@ export function toastInfo(message: string, options?: ExternalToast): void {
 export function toastWarning(message: string, options?: ExternalToast): void {
   toast.warning(message, options);
 }
-
-/**
- * Show a loading toast that can be updated
- * Returns a function to dismiss the toast
- */
-export function toastLoading(
-  message: string,
-  options?: ExternalToast,
-): { dismiss: () => void; update: (message: string, type?: ToastType) => void } {
-  const id = toast.loading(message, options);
-
-  return {
-    dismiss: () => toast.dismiss(id),
-    update: (newMessage: string, type: ToastType = 'success') => {
-      toast[type](newMessage, { ...options, id });
-    },
-  };
-}
-
-// Re-export toast for advanced usage
-export { toast };

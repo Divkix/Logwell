@@ -8,7 +8,7 @@ export const LOG_LEVELS = ['debug', 'info', 'warn', 'error', 'fatal'] as const;
 /**
  * Maximum batch size for batch log ingestion
  */
-export const MAX_BATCH_SIZE = 100;
+const MAX_BATCH_SIZE = 100;
 
 /**
  * Log level schema
@@ -54,11 +54,6 @@ export const logPayloadSchema = z
   }));
 
 /**
- * Log payload type (camelCase)
- */
-export type LogPayload = z.infer<typeof logPayloadSchema>;
-
-/**
  * Batch log payload schema for POST /api/v1/logs/batch
  *
  * Validates array of logs with min 1 and max 100 items
@@ -69,8 +64,3 @@ export const batchLogPayloadSchema = z.object({
     .min(1, 'Batch must contain at least one log')
     .max(MAX_BATCH_SIZE, `Batch cannot exceed ${MAX_BATCH_SIZE} logs`),
 });
-
-/**
- * Batch log payload type
- */
-export type BatchLogPayload = z.infer<typeof batchLogPayloadSchema>;
