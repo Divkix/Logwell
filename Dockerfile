@@ -67,15 +67,10 @@ WORKDIR /app
 RUN addgroup --system --gid 1001 svlogger && \
     adduser --system --uid 1001 svlogger
 
-# Copy production dependencies
-COPY --from=deps /app/node_modules ./node_modules
-
-# Copy built application
-COPY --from=build /app/build ./build
-COPY --from=build /app/package.json ./
-
-# Set ownership to non-root user
-RUN chown -R svlogger:svlogger /app
+# Copy production dependencies and built application with correct ownership
+COPY --from=deps --chown=svlogger:svlogger /app/node_modules ./node_modules
+COPY --from=build --chown=svlogger:svlogger /app/build ./build
+COPY --from=build --chown=svlogger:svlogger /app/package.json ./
 
 # Switch to non-root user
 USER svlogger
