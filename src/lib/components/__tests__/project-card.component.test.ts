@@ -72,12 +72,12 @@ describe('ProjectCard', () => {
     expect(screen.getByText('No logs yet')).toBeInTheDocument();
   });
 
-  it('View Logs button navigates correctly', () => {
+  it('View Logs button is rendered', () => {
     render(ProjectCard, { props: { project: baseProject } });
 
-    const link = screen.getByRole('link', { name: /view logs/i });
-    expect(link).toBeInTheDocument();
-    expect(link).toHaveAttribute('href', '/projects/proj_123');
+    // Button is now a regular button - navigation is handled by parent anchor wrapper
+    const button = screen.getByRole('button', { name: /view logs/i });
+    expect(button).toBeInTheDocument();
   });
 
   it('displays large log counts with proper formatting', () => {

@@ -38,7 +38,7 @@ const lastActivityText = $derived(
     <p class="text-sm text-muted-foreground">{lastActivityText}</p>
   </CardContent>
   <CardFooter>
-    <Button variant="outline" href="/projects/{project.id}" class="w-full">
+    <Button variant="outline" class="w-full">
       View Logs
     </Button>
   </CardFooter>
