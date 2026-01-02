@@ -45,19 +45,22 @@ function parseClientLog(log: ClientLog): Log {
   } as Log;
 }
 
-// Convert server project data to Project type
-const projectData: Project = {
+// Convert server project data to Project type (reactive to handle invalidateAll)
+const projectData = $derived<Project>({
   id: data.project.id,
   name: data.project.name,
   apiKey: data.project.apiKey,
   createdAt: data.project.createdAt ? new Date(data.project.createdAt) : null,
   updatedAt: data.project.updatedAt ? new Date(data.project.updatedAt) : null,
-};
+});
 
-// Local state
+// Local state (intentionally capture initial values - managed via URL navigation)
 let liveEnabled = $state(true);
+// svelte-ignore state_referenced_locally
 let searchValue = $state(data.filters.search);
+// svelte-ignore state_referenced_locally
 let selectedLevels = $state<LogLevel[]>(data.filters.levels);
+// svelte-ignore state_referenced_locally
 let selectedRange = $state<TimeRange>((data.filters.range as TimeRange) || '1h');
 let selectedLog = $state<Log | null>(null);
 let showDetailModal = $state(false);
@@ -81,10 +84,11 @@ function handleIncomingLogs(logs: ClientLog[]) {
   streamedLogs = [...parsedLogs, ...streamedLogs];
 }
 
-// Use the SSE hook for log streaming
+// Use the SSE hook for log streaming (connection managed reactively via $effect below)
+// svelte-ignore state_referenced_locally
 const logStream = useLogStream({
   projectId: data.project.id,
-  enabled: liveEnabled && !isLivePaused,
+  enabled: false, // Initial state; $effect manages actual connection
   onLogs: handleIncomingLogs,
 });
 

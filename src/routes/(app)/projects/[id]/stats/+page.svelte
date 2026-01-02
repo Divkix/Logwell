@@ -10,7 +10,8 @@ import type { PageData } from './$types';
 
 const { data }: { data: PageData } = $props();
 
-// Local state
+// Local state (intentionally capture initial value - managed via URL navigation)
+// svelte-ignore state_referenced_locally
 let selectedRange = $state<TimeRange>((data.filters.range as TimeRange) || '24h');
 let loading = $state(false);
 

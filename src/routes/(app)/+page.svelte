@@ -1,7 +1,6 @@
 <script lang="ts">
 import FolderPlusIcon from '@lucide/svelte/icons/folder-plus';
 import PlusIcon from '@lucide/svelte/icons/plus';
-import { goto } from '$app/navigation';
 import { navigating } from '$app/stores';
 import CreateProjectModal from '$lib/components/create-project-modal.svelte';
 import DashboardSkeleton from '$lib/components/dashboard-skeleton.svelte';
@@ -18,7 +17,7 @@ const isLoading = $derived(
 );
 
 // Create a local copy of projects for state management
-// We intentionally capture the initial value since we manage additions locally
+// svelte-ignore state_referenced_locally
 let projects = $state([...data.projects]);
 let isCreateModalOpen = $state(false);
 
@@ -93,11 +92,10 @@ async function handleCreateProject(name: string) {
       <!-- Project Grid -->
       <div data-testid="project-grid" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {#each projects as project (project.id)}
-          <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-          <div
+          <a
+            href="/projects/{project.id}"
             data-testid="project-card"
-            class="cursor-pointer transition-transform hover:scale-[1.02] rounded-lg"
-            onclick={() => goto(`/projects/${project.id}`)}
+            class="block transition-transform hover:scale-[1.02] rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             <ProjectCard
               project={{
@@ -107,7 +105,7 @@ async function handleCreateProject(name: string) {
                 lastActivity: project.lastActivity ? new Date(project.lastActivity) : null,
               }}
             />
-          </div>
+          </a>
         {/each}
       </div>
     {/if}

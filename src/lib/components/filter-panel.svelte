@@ -86,11 +86,12 @@ $effect(() => {
   </div>
 
   <!-- Backdrop for mobile filter panel -->
-  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-  <div
-    class="fixed inset-0 z-30 bg-black/50 sm:hidden"
+  <button
+    type="button"
+    class="fixed inset-0 z-30 bg-black/50 sm:hidden cursor-default"
     onclick={close}
-  ></div>
+    aria-label="Close filter panel"
+  ></button>
 {/if}
 
 <!-- Desktop/Tablet: render filters inline - visible on sm and above -->

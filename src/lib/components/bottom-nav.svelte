@@ -34,7 +34,6 @@ const inactiveClass = 'text-muted-foreground hover:text-foreground';
 <nav
   data-testid="bottom-nav"
   class="fixed bottom-0 left-0 right-0 z-50 bg-background border-t sm:hidden"
-  role="navigation"
   aria-label="Main navigation"
 >
   <div class="flex items-center justify-around py-1">
