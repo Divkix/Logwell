@@ -440,8 +440,8 @@ test.describe('Responsive Design - Filter Collapsing Interaction', () => {
     const errorCard = page.locator('[data-testid="log-card"]').filter({ hasText: 'Error message' });
     await expect(errorCard).toBeVisible();
 
-    // Info message should be hidden
-    await expect(page.getByText('Info message')).not.toBeVisible();
+    // Info message should be hidden (use .first() for dual layout)
+    await expect(page.getByText('Info message').first()).not.toBeVisible();
   });
 
   test('should show active filter count badge on toggle button', async ({ page }) => {

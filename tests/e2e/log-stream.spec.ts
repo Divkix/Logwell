@@ -137,11 +137,11 @@ test.describe('Log Stream Page - Display', () => {
     // Should display log table
     await expect(page.locator('[data-testid="log-table"]')).toBeVisible();
 
-    // Should display log entries
-    await expect(page.getByText('Application started successfully')).toBeVisible();
-    await expect(page.getByText('Deprecated API usage detected')).toBeVisible();
-    await expect(page.getByText('Failed to connect to database')).toBeVisible();
-    await expect(page.getByText('Processing request payload')).toBeVisible();
+    // Should display log entries (use .first() because LogTable renders both mobile cards and desktop table)
+    await expect(page.getByText('Application started successfully').first()).toBeVisible();
+    await expect(page.getByText('Deprecated API usage detected').first()).toBeVisible();
+    await expect(page.getByText('Failed to connect to database').first()).toBeVisible();
+    await expect(page.getByText('Processing request payload').first()).toBeVisible();
   });
 
   test('should display project name in header', async ({ page }) => {
@@ -154,11 +154,11 @@ test.describe('Log Stream Page - Display', () => {
   test('should display level badges for each log', async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
-    // Should display level badges
-    await expect(page.getByText('INFO')).toBeVisible();
-    await expect(page.getByText('WARN')).toBeVisible();
-    await expect(page.getByText('ERROR')).toBeVisible();
-    await expect(page.getByText('DEBUG')).toBeVisible();
+    // Should display level badges (use .first() because LogTable renders both mobile cards and desktop table)
+    await expect(page.getByText('INFO').first()).toBeVisible();
+    await expect(page.getByText('WARN').first()).toBeVisible();
+    await expect(page.getByText('ERROR').first()).toBeVisible();
+    await expect(page.getByText('DEBUG').first()).toBeVisible();
   });
 });
 
@@ -201,8 +201,10 @@ test.describe('Log Stream Page - Live Toggle', () => {
       message: 'New log from live stream test',
     });
 
-    // The new log should appear in the table (via SSE)
-    await expect(page.getByText('New log from live stream test')).toBeVisible({ timeout: 5000 });
+    // The new log should appear in the table (via SSE) - use .first() for dual layout
+    await expect(page.getByText('New log from live stream test').first()).toBeVisible({
+      timeout: 5000,
+    });
   });
 
   test('should stop receiving logs when live toggle is disabled', async ({ page }) => {
@@ -225,8 +227,8 @@ test.describe('Log Stream Page - Live Toggle', () => {
     // Wait a bit to ensure the log doesn't appear
     await page.waitForTimeout(2000);
 
-    // The new log should NOT appear (live is disabled)
-    await expect(page.getByText('Log after live disabled')).not.toBeVisible();
+    // The new log should NOT appear (live is disabled) - use .first() for dual layout
+    await expect(page.getByText('Log after live disabled').first()).not.toBeVisible();
   });
 });
 
@@ -257,8 +259,8 @@ test.describe('Log Stream Page - Search Filter', () => {
   test('should filter logs by search term', async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
-    // Wait for logs to load
-    await expect(page.getByText('User authentication successful')).toBeVisible();
+    // Wait for logs to load (use .first() for dual layout)
+    await expect(page.getByText('User authentication successful').first()).toBeVisible();
 
     // Type in search input
     const searchInput = page.getByPlaceholder(/search/i);
@@ -267,12 +269,12 @@ test.describe('Log Stream Page - Search Filter', () => {
     // Wait for debounce and API call
     await page.waitForTimeout(500);
 
-    // Should show matching log
-    await expect(page.getByText('Database connection failed')).toBeVisible();
+    // Should show matching log (use .first() for dual layout)
+    await expect(page.getByText('Database connection failed').first()).toBeVisible();
 
-    // Should hide non-matching logs
-    await expect(page.getByText('User authentication successful')).not.toBeVisible();
-    await expect(page.getByText('Payment processing completed')).not.toBeVisible();
+    // Should hide non-matching logs (use .first() for dual layout)
+    await expect(page.getByText('User authentication successful').first()).not.toBeVisible();
+    await expect(page.getByText('Payment processing completed').first()).not.toBeVisible();
   });
 
   test('should show all logs when search is cleared', async ({ page }) => {
@@ -287,10 +289,10 @@ test.describe('Log Stream Page - Search Filter', () => {
     await searchInput.fill('');
     await page.waitForTimeout(500);
 
-    // All logs should be visible again
-    await expect(page.getByText('User authentication successful')).toBeVisible();
-    await expect(page.getByText('Payment processing completed')).toBeVisible();
-    await expect(page.getByText('Database connection failed')).toBeVisible();
+    // All logs should be visible again (use .first() for dual layout)
+    await expect(page.getByText('User authentication successful').first()).toBeVisible();
+    await expect(page.getByText('Payment processing completed').first()).toBeVisible();
+    await expect(page.getByText('Database connection failed').first()).toBeVisible();
   });
 });
 
@@ -322,8 +324,8 @@ test.describe('Log Stream Page - Level Filter', () => {
   test('should filter logs by level', async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
-    // Wait for logs to load
-    await expect(page.getByText('Error message one')).toBeVisible();
+    // Wait for logs to load (use .first() for dual layout)
+    await expect(page.getByText('Error message one').first()).toBeVisible();
 
     // Click on error level button to select only error
     const levelFilter = page.locator('[data-testid="level-filter"]');
@@ -332,20 +334,20 @@ test.describe('Log Stream Page - Level Filter', () => {
     // Wait for filter to apply
     await page.waitForTimeout(500);
 
-    // Should show only error logs
-    await expect(page.getByText('Error message one')).toBeVisible();
+    // Should show only error logs (use .first() for dual layout)
+    await expect(page.getByText('Error message one').first()).toBeVisible();
 
-    // Should hide other level logs
-    await expect(page.getByText('Debug message one')).not.toBeVisible();
-    await expect(page.getByText('Info message one')).not.toBeVisible();
-    await expect(page.getByText('Warning message one')).not.toBeVisible();
+    // Should hide other level logs (use .first() for dual layout)
+    await expect(page.getByText('Debug message one').first()).not.toBeVisible();
+    await expect(page.getByText('Info message one').first()).not.toBeVisible();
+    await expect(page.getByText('Warning message one').first()).not.toBeVisible();
   });
 
   test('should support multiple level selection', async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
-    // Wait for logs to load
-    await expect(page.getByText('Error message one')).toBeVisible();
+    // Wait for logs to load (use .first() for dual layout)
+    await expect(page.getByText('Error message one').first()).toBeVisible();
 
     const levelFilter = page.locator('[data-testid="level-filter"]');
 
@@ -357,13 +359,13 @@ test.describe('Log Stream Page - Level Filter', () => {
     await levelFilter.getByRole('button', { name: /fatal/i }).click();
     await page.waitForTimeout(500);
 
-    // Should show error and fatal logs
-    await expect(page.getByText('Error message one')).toBeVisible();
-    await expect(page.getByText('Fatal message one')).toBeVisible();
+    // Should show error and fatal logs (use .first() for dual layout)
+    await expect(page.getByText('Error message one').first()).toBeVisible();
+    await expect(page.getByText('Fatal message one').first()).toBeVisible();
 
-    // Should hide other levels
-    await expect(page.getByText('Debug message one')).not.toBeVisible();
-    await expect(page.getByText('Info message one')).not.toBeVisible();
+    // Should hide other levels (use .first() for dual layout)
+    await expect(page.getByText('Debug message one').first()).not.toBeVisible();
+    await expect(page.getByText('Info message one').first()).not.toBeVisible();
   });
 });
 
@@ -420,9 +422,9 @@ test.describe('Log Stream Page - Time Range Filter', () => {
 
     await page.goto(`/projects/${testProject.id}`);
 
-    // Should show recent log with 15m filter
+    // Should show recent log with 15m filter (use .first() for dual layout)
     await page.getByRole('button', { name: /last 15 minutes/i }).click();
-    await expect(page.getByText('Recent log message')).toBeVisible();
+    await expect(page.getByText('Recent log message').first()).toBeVisible();
   });
 });
 
@@ -457,11 +459,11 @@ test.describe('Log Stream Page - Log Detail Modal', () => {
   test('should open detail modal when clicking log row', async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
-    // Wait for log to appear
-    await expect(page.getByText('Detailed error for testing')).toBeVisible();
+    // Wait for log to appear (use .first() for dual layout)
+    await expect(page.getByText('Detailed error for testing').first()).toBeVisible();
 
-    // Click on the log row
-    await page.getByText('Detailed error for testing').click();
+    // Click on the log row (use .first() for dual layout)
+    await page.getByText('Detailed error for testing').first().click();
 
     // Modal should open
     await expect(page.getByRole('dialog')).toBeVisible();
@@ -471,8 +473,8 @@ test.describe('Log Stream Page - Log Detail Modal', () => {
   test('should display all log fields in detail modal', async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
-    // Click on log row to open modal
-    await page.getByText('Detailed error for testing').click();
+    // Click on log row to open modal (use .first() for dual layout)
+    await page.getByText('Detailed error for testing').first().click();
 
     // Verify all fields are displayed
     await expect(page.getByText('Detailed error for testing')).toBeVisible();
@@ -488,8 +490,8 @@ test.describe('Log Stream Page - Log Detail Modal', () => {
   test('should close modal on Escape key', async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
-    // Open modal
-    await page.getByText('Detailed error for testing').click();
+    // Open modal (use .first() for dual layout)
+    await page.getByText('Detailed error for testing').first().click();
     await expect(page.getByRole('dialog')).toBeVisible();
 
     // Press Escape
@@ -502,8 +504,8 @@ test.describe('Log Stream Page - Log Detail Modal', () => {
   test('should close modal on overlay click', async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
-    // Open modal
-    await page.getByText('Detailed error for testing').click();
+    // Open modal (use .first() for dual layout)
+    await page.getByText('Detailed error for testing').first().click();
     await expect(page.getByRole('dialog')).toBeVisible();
 
     // Click overlay
@@ -598,8 +600,8 @@ test.describe('Log Stream Page - Empty State', () => {
   test('should show empty state when no logs exist', async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
-    // Should show empty message
-    await expect(page.getByText(/no logs/i)).toBeVisible();
+    // Should show empty message (use .first() for dual layout)
+    await expect(page.getByText(/no logs/i).first()).toBeVisible();
   });
 });
 
