@@ -491,12 +491,16 @@ test.describe('Log Stream Page - Log Detail Modal', () => {
     // Click on log row to open modal (scoped to table layout)
     await getLogMessage(page, 'Detailed error for testing').click();
 
-    // Verify all fields are displayed
-    await expect(page.getByText('Detailed error for testing')).toBeVisible();
-    await expect(page.getByText('src/test.ts:42')).toBeVisible();
-    await expect(page.getByText('req_abc123')).toBeVisible();
-    await expect(page.getByText('user_456')).toBeVisible();
-    await expect(page.getByText('192.168.1.100')).toBeVisible();
+    // Wait for modal to open
+    const modal = page.getByRole('dialog');
+    await expect(modal).toBeVisible();
+
+    // Verify all fields are displayed (scoped to modal to avoid matching table/card elements)
+    await expect(modal.getByText('Detailed error for testing')).toBeVisible();
+    await expect(modal.getByText('src/test.ts:42')).toBeVisible();
+    await expect(modal.getByText('req_abc123')).toBeVisible();
+    await expect(modal.getByText('user_456')).toBeVisible();
+    await expect(modal.getByText('192.168.1.100')).toBeVisible();
 
     // Metadata should be pretty-printed
     await expect(page.locator('[data-testid="log-metadata"]')).toContainText('"key": "value"');

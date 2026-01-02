@@ -454,13 +454,19 @@ test.describe('Responsive Design - Filter Collapsing Interaction', () => {
 
     // Apply level filter (within the panel)
     const filterPanel = page.locator('[data-testid="filter-panel"]');
+    await expect(filterPanel).toBeVisible();
+
     await filterPanel
       .locator('[data-testid="level-filter"]')
       .getByRole('button', { name: /error/i })
       .click();
 
-    // Close filter panel by clicking close button
-    await filterPanel.getByRole('button', { name: /close filters/i }).click();
+    // Wait for filter to apply
+    await page.waitForTimeout(300);
+
+    // Close filter panel by clicking backdrop (same pattern as other tests)
+    await page.getByRole('button', { name: /close filter panel/i }).click();
+    await expect(filterPanel).not.toBeVisible();
 
     // Badge should show active filter count
     const filterBadge = page.locator(
