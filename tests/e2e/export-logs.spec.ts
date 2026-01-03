@@ -188,7 +188,7 @@ test.describe('Log Export - Format Selection', () => {
     await expect(page.locator('[data-testid="export-json"]')).toBeVisible();
   });
 
-  test('should close dropdown when clicking outside', async ({ page }) => {
+  test('should close dropdown when pressing Escape', async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
     // Open dropdown
@@ -196,8 +196,8 @@ test.describe('Log Export - Format Selection', () => {
     await exportButton.click();
     await expect(page.locator('[data-testid="export-csv"]')).toBeVisible();
 
-    // Click outside
-    await page.locator('body').click({ position: { x: 10, y: 10 } });
+    // Press Escape to close dropdown
+    await page.keyboard.press('Escape');
 
     // Dropdown should close
     await expect(page.locator('[data-testid="export-csv"]')).not.toBeVisible();

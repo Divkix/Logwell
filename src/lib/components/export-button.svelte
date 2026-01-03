@@ -35,7 +35,10 @@ function getTimeRangeStart(timeRange: TimeRange | undefined): Date | null {
   }
 }
 
-function exportLogs(format: 'csv' | 'json') {
+/**
+ * Build export URL with current filters
+ */
+function buildExportUrl(format: 'csv' | 'json'): string {
   const params = new URLSearchParams();
   params.set('format', format);
 
@@ -53,8 +56,12 @@ function exportLogs(format: 'csv' | 'json') {
     params.set('from', fromDate.toISOString());
   }
 
-  window.location.href = `/api/projects/${projectId}/logs/export?${params}`;
+  return `/api/projects/${projectId}/logs/export?${params}`;
 }
+
+// Reactive URLs that update when filters change
+const csvUrl = $derived(buildExportUrl('csv'));
+const jsonUrl = $derived(buildExportUrl('json'));
 </script>
 
 <DropdownMenu.Root>
@@ -73,11 +80,21 @@ function exportLogs(format: 'csv' | 'json') {
     {/snippet}
   </DropdownMenu.Trigger>
   <DropdownMenu.Content>
-    <DropdownMenu.Item data-testid="export-csv" onclick={() => exportLogs('csv')}>
+    <a
+      href={csvUrl}
+      download
+      data-testid="export-csv"
+      class="relative flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+    >
       Download CSV
-    </DropdownMenu.Item>
-    <DropdownMenu.Item data-testid="export-json" onclick={() => exportLogs('json')}>
+    </a>
+    <a
+      href={jsonUrl}
+      download
+      data-testid="export-json"
+      class="relative flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+    >
       Download JSON
-    </DropdownMenu.Item>
+    </a>
   </DropdownMenu.Content>
 </DropdownMenu.Root>

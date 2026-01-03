@@ -268,15 +268,17 @@ async function handleDelete() {
           <TimeRangePicker value={selectedRange} onchange={handleTimeRangeChange} />
         </div>
 
-        <!-- Export Button -->
-        <div class="w-full sm:w-auto">
-          <ExportButton
-            projectId={data.project.id}
-            level={selectedLevels.length > 0 ? selectedLevels : undefined}
-            search={searchValue || undefined}
-            range={selectedRange}
-          />
-        </div>
+        <!-- Export Button - only show when logs exist -->
+        {#if allLogs.length > 0}
+          <div class="w-full sm:w-auto">
+            <ExportButton
+              projectId={data.project.id}
+              level={selectedLevels.length > 0 ? selectedLevels : undefined}
+              search={searchValue || undefined}
+              range={selectedRange}
+            />
+          </div>
+        {/if}
       </FilterPanel>
     </div>
 
