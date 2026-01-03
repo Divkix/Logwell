@@ -155,7 +155,7 @@ test.describe('Stats Page - Time Range Filter', () => {
     testProject = await createProject(page, `stats-time-range-test-${Date.now()}`);
 
     // Ingest some recent logs
-    await ingestLogsBatch(page, testProject.apiKey, [
+    await ingestOtlpLogs(page, testProject.apiKey, [
       { level: 'info', message: 'Recent info log 1' },
       { level: 'info', message: 'Recent info log 2' },
       { level: 'error', message: 'Recent error log' },
@@ -303,7 +303,7 @@ test.describe('Stats Page - Responsive Layout', () => {
     testProject = await createProject(page, `stats-responsive-test-${Date.now()}`);
 
     // Ingest some logs
-    await ingestLogsBatch(page, testProject.apiKey, [
+    await ingestOtlpLogs(page, testProject.apiKey, [
       { level: 'info', message: 'Test log' },
       { level: 'error', message: 'Test error' },
     ]);

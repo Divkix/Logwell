@@ -65,11 +65,27 @@ type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'fatal';
 async function ingestLog(
   page: Page,
   apiKey: string,
-  log: { level: LogLevel; message: string; metadata?: Record<string, unknown> },
+  log: {
+    level: LogLevel;
+    message: string;
+    metadata?: Record<string, unknown>;
+    source_file?: string;
+    line_number?: number;
+    request_id?: string;
+    user_id?: string;
+    ip_address?: string;
+  },
 ) {
-  await ingestOtlpLogs(page, apiKey, [
-    { level: log.level, message: log.message, attributes: log.metadata },
-  ]);
+  const attributes: Record<string, unknown> = { ...(log.metadata ?? {}) };
+
+  // Map fields to OTLP semantic conventions
+  if (log.source_file) attributes['code.filepath'] = log.source_file;
+  if (log.line_number !== undefined) attributes['code.lineno'] = log.line_number;
+  if (log.request_id) attributes['request.id'] = log.request_id;
+  if (log.user_id) attributes['enduser.id'] = log.user_id;
+  if (log.ip_address) attributes['client.address'] = log.ip_address;
+
+  await ingestOtlpLogs(page, apiKey, [{ level: log.level, message: log.message, attributes }]);
 }
 
 test.describe('Log Stream Page - Display', () => {
