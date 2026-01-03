@@ -42,21 +42,9 @@ type OtlpScope = {
   droppedAttributesCount?: number;
 };
 
-type OtlpScopeLogs = {
-  scope?: OtlpScope;
-  logRecords?: OtlpLogRecord[];
-  schemaUrl?: string;
-};
-
 type OtlpResource = {
   attributes?: OtlpKeyValue[];
   droppedAttributesCount?: number;
-};
-
-type OtlpResourceLogs = {
-  resource?: OtlpResource;
-  scopeLogs?: OtlpScopeLogs[];
-  schemaUrl?: string;
 };
 
 export type NormalizedOtlpLogRecord = {
@@ -282,7 +270,7 @@ export function parseOtlpAnyValue(value: OtlpAnyValue): unknown {
   }
 
   if (value.arrayValue !== undefined) {
-    const values = Array.isArray(value.arrayValue?.values) ? value.arrayValue?.values ?? [] : [];
+    const values = Array.isArray(value.arrayValue?.values) ? (value.arrayValue?.values ?? []) : [];
     return values.map((entry) => parseOtlpAnyValue(entry));
   }
 
@@ -354,9 +342,7 @@ export function normalizeOtlpLogsRequest(body: unknown): NormalizedOtlpLogsResul
 
     const resource = isRecord(resourceLog.resource) ? (resourceLog.resource as OtlpResource) : null;
     const resourceAttributes = parseAttributes(resource?.attributes);
-    const resourceDroppedAttributesCount = parseOptionalNumber(
-      resource?.droppedAttributesCount,
-    );
+    const resourceDroppedAttributesCount = parseOptionalNumber(resource?.droppedAttributesCount);
     const resourceSchemaUrl =
       typeof resourceLog.schemaUrl === 'string' ? resourceLog.schemaUrl : null;
 

@@ -14,4 +14,3 @@ describe('logLevelSchema', () => {
     expect(result.success).toBe(false);
   });
 });
-

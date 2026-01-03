@@ -71,4 +71,3 @@ export async function ingestOtlpLogs(
 
   await postOtlpLogs(page.request, apiKey, payload);
 }
-

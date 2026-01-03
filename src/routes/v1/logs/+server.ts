@@ -7,9 +7,10 @@ import { log } from '$lib/server/db/schema';
 import { logEventBus } from '$lib/server/events';
 import { ApiKeyError, validateApiKey } from '$lib/server/utils/api-key';
 import {
+  mapOtlpAttributesToLogColumns,
+  type NormalizedOtlpLogsResult,
   normalizeOtlpLogsRequest,
   OtlpValidationError,
-  mapOtlpAttributesToLogColumns,
 } from '$lib/server/utils/otlp';
 
 async function getDbClient(
@@ -64,7 +65,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     );
   }
 
-  let normalized;
+  let normalized: NormalizedOtlpLogsResult;
   try {
     normalized = normalizeOtlpLogsRequest(body);
   } catch (err) {

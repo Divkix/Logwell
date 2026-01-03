@@ -6,7 +6,13 @@
     "src/lib/server/**/*.ts"
   ],
   "project": ["src/**/*.{js,ts,svelte}"],
-  "ignore": [".svelte-kit/**", "build/**", "dist/**", "src/app.d.ts"],
+  "ignore": [
+    ".svelte-kit/**",
+    "build/**",
+    "dist/**",
+    "src/app.d.ts",
+    "src/lib/components/ui/**/index.ts"
+  ],
   "ignoreDependencies": ["tw-animate-css"],
   "ignoreUnresolved": ["\\$env/.+"],
   "drizzle": false
