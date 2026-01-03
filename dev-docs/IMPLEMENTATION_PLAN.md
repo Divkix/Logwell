@@ -284,36 +284,19 @@ export const project = pgTable('project', {
 
 > Public API endpoints with comprehensive integration tests.
 
-### Step 4.1: Single Log Ingestion Endpoint
+### Step 4.1: OTLP/HTTP Log Ingestion Endpoint
 
-**Commit:** `feat: add POST /api/v1/logs endpoint`
+**Commit:** `feat: add POST /v1/logs endpoint`
 
 **TDD Flow:**
 1. Write integration test: "returns 401 without Authorization header"
 2. Write integration test: "returns 401 with invalid API key"
-3. Write integration test: "returns 400 for invalid log level"
-4. Write integration test: "returns 400 for missing message"
-5. Write integration test: "returns 201 with log id and timestamp"
-6. Write integration test: "auto-assigns timestamp if not provided"
-7. Write integration test: "stores all optional fields correctly"
-8. Implement `src/routes/api/v1/logs/+server.ts`
+3. Write integration test: "returns 400 for invalid OTLP payload"
+4. Write integration test: "ingests OTLP log records"
+5. Write integration test: "returns partial success when some records rejected"
+6. Implement `src/routes/v1/logs/+server.ts`
 
-**Tests:** `src/routes/api/v1/logs/__tests__/server.test.ts`
-
----
-
-### Step 4.2: Batch Log Ingestion Endpoint
-
-**Commit:** `feat: add POST /api/v1/logs/batch endpoint`
-
-**TDD Flow:**
-1. Write integration test: "returns 400 if batch exceeds 100 logs"
-2. Write integration test: "returns 400 if any log in batch is invalid"
-3. Write integration test: "returns 201 with all inserted log ids"
-4. Write integration test: "inserts all logs in single transaction"
-5. Implement `src/routes/api/v1/logs/batch/+server.ts`
-
-**Tests:** `src/routes/api/v1/logs/batch/__tests__/server.test.ts`
+**Tests:** `tests/integration/otlp/logs.integration.test.ts`
 
 ---
 
@@ -437,8 +420,7 @@ export const project = pgTable('project', {
 **Commit:** `feat: emit events on log ingestion`
 
 **TDD Flow:**
-1. Write integration test: "POST /api/v1/logs emits to event bus"
-2. Write integration test: "batch insert emits all logs to event bus"
+1. Write integration test: "POST /v1/logs emits to event bus"
 3. Update log ingestion routes to call `logEventBus.emitLog()`
 
 ---

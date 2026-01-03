@@ -8,7 +8,7 @@ A self-hosted logging platform with real-time log streaming, full-text search, a
 - **Full-text search** - Search across log messages and metadata
 - **Per-project API keys** - Isolated logging for multiple applications
 - **Log levels** - debug, info, warn, error, fatal with color coding
-- **Batch ingestion** - Send up to 100 logs per request
+- **Standard ingestion (OTLP/HTTP)** - Send logs using the OpenTelemetry Protocol (OTLP) `/v1/logs` endpoint
 - **Clean UI** - Minimal, responsive interface with dark mode
 
 ## Tech Stack
@@ -91,46 +91,48 @@ openssl rand -base64 32
 
 ### Send Logs
 
-**Single log:**
+sv-logger accepts logs via **OTLP/HTTP JSON** at `POST /v1/logs`.
 
 ```bash
-curl -X POST http://localhost:5173/api/v1/logs \
+curl -X POST http://localhost:5173/v1/logs \
   -H "Authorization: Bearer svl_YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "level": "info",
-    "message": "User signed in",
-    "metadata": {"user_id": "123"}
-  }'
-```
-
-**Batch logs (up to 100):**
-
-```bash
-curl -X POST http://localhost:5173/api/v1/logs/batch \
-  -H "Authorization: Bearer svl_YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "logs": [
-      {"level": "info", "message": "Request started"},
-      {"level": "debug", "message": "Cache hit", "metadata": {"key": "user:123"}}
+    "resourceLogs": [
+      {
+        "resource": {
+          "attributes": [
+            { "key": "service.name", "value": { "stringValue": "my-service" } }
+          ]
+        },
+        "scopeLogs": [
+          {
+            "scope": { "name": "sv-logger" },
+            "logRecords": [
+              {
+                "severityNumber": 9,
+                "severityText": "INFO",
+                "body": { "stringValue": "User signed in" }
+              }
+            ]
+          }
+        ]
+      }
     ]
   }'
 ```
 
-### Log Payload
+### OTLP Attribute Mapping
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `level` | string | Yes | `debug`, `info`, `warn`, `error`, or `fatal` |
-| `message` | string | Yes | Log message |
-| `metadata` | object | No | Arbitrary JSON data |
-| `source_file` | string | No | Source file path |
-| `line_number` | number | No | Line number |
-| `request_id` | string | No | Request correlation ID |
-| `user_id` | string | No | Application user ID |
-| `ip_address` | string | No | Client IP address |
-| `timestamp` | string | No | ISO 8601 timestamp (auto-generated if omitted) |
+sv-logger derives some UI fields from common OTLP log attributes (if present):
+
+| UI field | Preferred OTLP attribute keys |
+|----------|-------------------------------|
+| `sourceFile` | `code.filepath`, `source.file` |
+| `lineNumber` | `code.lineno`, `source.line` |
+| `requestId` | `request.id`, `http.request_id` |
+| `userId` | `enduser.id`, `user.id` |
+| `ipAddress` | `client.address`, `net.peer.ip`, `net.sock.peer.addr` |
 
 ## Commands
 
@@ -244,8 +246,7 @@ The app runs on port 3000 by default.
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/v1/logs` | POST | Ingest single log |
-| `/api/v1/logs/batch` | POST | Ingest batch (max 100) |
+| `/v1/logs` | POST | OTLP/HTTP JSON log export |
 
 ### Project Management (Session Auth)
 

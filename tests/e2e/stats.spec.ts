@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
+import { ingestOtlpLogs } from './helpers/otlp';
 
 /**
  * E2E tests for Project Stats Page
@@ -59,29 +60,6 @@ async function deleteProject(page: Page, projectId: string) {
   return response.ok();
 }
 
-/**
- * Helper to ingest multiple logs via batch API
- */
-async function ingestLogsBatch(
-  page: Page,
-  apiKey: string,
-  logs: Array<{
-    level: 'debug' | 'info' | 'warn' | 'error' | 'fatal';
-    message: string;
-    metadata?: Record<string, unknown>;
-  }>,
-) {
-  const response = await page.request.post('/api/v1/logs/batch', {
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    data: { logs },
-  });
-  expect(response.ok()).toBeTruthy();
-  return response.json();
-}
-
 test.describe('Stats Page - Display', () => {
   // Allow retries due to potential cold start issues
   test.describe.configure({ retries: 1 });
@@ -93,7 +71,7 @@ test.describe('Stats Page - Display', () => {
     testProject = await createProject(page, `stats-test-${Date.now()}`);
 
     // Ingest logs with different levels for stats testing
-    await ingestLogsBatch(page, testProject.apiKey, [
+    await ingestOtlpLogs(page, testProject.apiKey, [
       { level: 'debug', message: 'Debug log 1' },
       { level: 'debug', message: 'Debug log 2' },
       { level: 'info', message: 'Info log 1' },

@@ -44,8 +44,7 @@ bun run db:studio        # Open Drizzle Studio
 - `index.ts` - Database client initialization using postgres.js
 
 ### API Structure (planned)
-- `POST /api/v1/logs` - Single log ingestion (API key auth)
-- `POST /api/v1/logs/batch` - Batch ingestion (max 100)
+- `POST /v1/logs` - OTLP/HTTP log export ingestion (API key auth)
 - `/api/projects/*` - Project CRUD (session auth)
 - `/api/projects/[id]/logs/stream` - SSE endpoint for real-time logs
 

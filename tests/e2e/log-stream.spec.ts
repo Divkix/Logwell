@@ -1,5 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 import { getLevelBadge, getLogMessage } from './helpers/log-selectors';
+import { ingestOtlpLogs } from './helpers/otlp';
 
 /**
  * E2E tests for Project Log Stream Page
@@ -59,52 +60,16 @@ async function deleteProject(page: Page, projectId: string) {
 /**
  * Helper to ingest a log via API
  */
+type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'fatal';
+
 async function ingestLog(
   page: Page,
   apiKey: string,
-  log: {
-    level: 'debug' | 'info' | 'warn' | 'error' | 'fatal';
-    message: string;
-    metadata?: Record<string, unknown>;
-    source_file?: string;
-    line_number?: number;
-    request_id?: string;
-    user_id?: string;
-    ip_address?: string;
-  },
+  log: { level: LogLevel; message: string; metadata?: Record<string, unknown> },
 ) {
-  const response = await page.request.post('/api/v1/logs', {
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    data: log,
-  });
-  expect(response.ok()).toBeTruthy();
-  return response.json();
-}
-
-/**
- * Helper to ingest multiple logs via batch API
- */
-async function ingestLogsBatch(
-  page: Page,
-  apiKey: string,
-  logs: Array<{
-    level: 'debug' | 'info' | 'warn' | 'error' | 'fatal';
-    message: string;
-    metadata?: Record<string, unknown>;
-  }>,
-) {
-  const response = await page.request.post('/api/v1/logs/batch', {
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    data: { logs },
-  });
-  expect(response.ok()).toBeTruthy();
-  return response.json();
+  await ingestOtlpLogs(page, apiKey, [
+    { level: log.level, message: log.message, attributes: log.metadata },
+  ]);
 }
 
 test.describe('Log Stream Page - Display', () => {
@@ -118,7 +83,7 @@ test.describe('Log Stream Page - Display', () => {
     testProject = await createProject(page, `log-stream-test-${Date.now()}`);
 
     // Ingest some test logs
-    await ingestLogsBatch(page, testProject.apiKey, [
+    await ingestOtlpLogs(page, testProject.apiKey, [
       { level: 'info', message: 'Application started successfully' },
       { level: 'warn', message: 'Deprecated API usage detected' },
       { level: 'error', message: 'Failed to connect to database' },
@@ -243,7 +208,7 @@ test.describe('Log Stream Page - Search Filter', () => {
     testProject = await createProject(page, `search-test-${Date.now()}`);
 
     // Ingest logs with distinct messages for search testing
-    await ingestLogsBatch(page, testProject.apiKey, [
+    await ingestOtlpLogs(page, testProject.apiKey, [
       { level: 'info', message: 'User authentication successful' },
       { level: 'info', message: 'Payment processing completed' },
       { level: 'error', message: 'Database connection failed' },
@@ -307,7 +272,7 @@ test.describe('Log Stream Page - Level Filter', () => {
     testProject = await createProject(page, `level-filter-test-${Date.now()}`);
 
     // Ingest logs with different levels
-    await ingestLogsBatch(page, testProject.apiKey, [
+    await ingestOtlpLogs(page, testProject.apiKey, [
       { level: 'debug', message: 'Debug message one' },
       { level: 'info', message: 'Info message one' },
       { level: 'warn', message: 'Warning message one' },

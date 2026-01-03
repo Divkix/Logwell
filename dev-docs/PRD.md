@@ -185,8 +185,7 @@ Use a consistent 4px base unit:
 
 | Feature | Description |
 |---------|-------------|
-| Single log POST | `POST /api/v1/logs` with JSON body |
-| Batch log POST | `POST /api/v1/logs/batch` with array (max 100) |
+| OTLP/HTTP JSON | `POST /v1/logs` with OTLP JSON payload |
 | Auto-timestamp | Server assigns `timestamp` if not provided |
 | Validation | Level must be valid enum, message required |
 | Rate handling | 300/s burst, 50-75/s sustained |
@@ -385,9 +384,9 @@ Authorization: Bearer svl_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 #### Log Ingestion (Public, API Key Auth)
 
-##### POST /api/v1/logs
+##### POST /v1/logs
 
-Ingest a single log entry.
+Ingest logs via OTLP/HTTP JSON (OpenTelemetry Protocol).
 
 **Headers:**
 ```
@@ -398,33 +397,43 @@ Content-Type: application/json
 **Request Body:**
 ```json
 {
-  "level": "error",
-  "message": "Database connection failed",
-  "metadata": {
-    "database": "users_db",
-    "error_code": "ECONNREFUSED"
-  },
-  "source_file": "src/db/connection.ts",
-  "line_number": 45,
-  "request_id": "req_abc123",
-  "user_id": "user_456",
-  "ip_address": "192.168.1.100"
+  "resourceLogs": [
+    {
+      "resource": {
+        "attributes": [
+          { "key": "service.name", "value": { "stringValue": "my-service" } }
+        ]
+      },
+      "scopeLogs": [
+        {
+          "scope": { "name": "sv-logger" },
+          "logRecords": [
+            {
+              "severityNumber": 17,
+              "severityText": "ERROR",
+              "body": { "stringValue": "Database connection failed" },
+              "attributes": [
+                { "key": "request.id", "value": { "stringValue": "req_abc123" } }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
 }
 ```
 
-**Response (201 Created):**
+**Response (200 OK):**
 ```json
-{
-  "id": "log_V1StGXR8_Z5jdHi",
-  "timestamp": "2024-01-15T14:32:05.123Z"
-}
+{}
 ```
 
 **Error Response (400 Bad Request):**
 ```json
 {
   "error": "validation_error",
-  "message": "level must be one of: debug, info, warn, error, fatal"
+  "message": "resourceLogs must be an array."
 }
 ```
 
@@ -433,39 +442,6 @@ Content-Type: application/json
 {
   "error": "unauthorized",
   "message": "Invalid or missing API key"
-}
-```
-
-##### POST /api/v1/logs/batch
-
-Ingest multiple log entries (max 100 per request).
-
-**Request Body:**
-```json
-{
-  "logs": [
-    {
-      "level": "info",
-      "message": "User logged in",
-      "user_id": "user_123"
-    },
-    {
-      "level": "debug",
-      "message": "Cache hit",
-      "metadata": { "key": "user:123:profile" }
-    }
-  ]
-}
-```
-
-**Response (201 Created):**
-```json
-{
-  "inserted": 2,
-  "logs": [
-    { "id": "log_abc", "timestamp": "2024-01-15T14:32:05.123Z" },
-    { "id": "log_def", "timestamp": "2024-01-15T14:32:05.124Z" }
-  ]
 }
 ```
 
@@ -879,12 +855,12 @@ Get log level distribution for charts.
 │  └─────────────────────────────────────────────────────────┘    │
 │  [📋 Copy]  [↻ Regenerate]                                      │
 │                                                                 │
-│  Usage Example                                                  │
+│  OTLP/HTTP Example                                              │
 │  ┌─────────────────────────────────────────────────────────┐    │
-│  │ curl -X POST https://your-domain.com/api/v1/logs \      │    │
+│  │ curl -X POST https://your-domain.com/v1/logs \          │    │
 │  │   -H "Authorization: Bearer svl_aBcD..." \              │    │
 │  │   -H "Content-Type: application/json" \                 │    │
-│  │   -d '{"level":"info","message":"Hello!"}'              │    │
+│  │   -d '{"resourceLogs":[{"scopeLogs":[{"logRecords":...}]}}]}'│    │
 │  └─────────────────────────────────────────────────────────┘    │
 │                                                                 │
 │  ───────────────────────────────────────────────────────────    │
@@ -1000,7 +976,7 @@ The API endpoint writes to the database AND pushes to an in-memory channel. SSE 
 
 ```
 ┌─────────────┐                              ┌─────────────────┐
-│   Client    │  POST /api/v1/logs           │   API Route     │
+│   Client    │  POST /v1/logs               │   API Route     │
 │  (Logger)   │ ────────────────────────────►│                 │
 └─────────────┘                              └────────┬────────┘
                                                       │
@@ -1066,7 +1042,7 @@ export const logEventBus = LogEventBus.getInstance();
 #### Log Ingestion (writes to DB + emits to bus)
 
 ```typescript
-// src/routes/api/v1/logs/+server.ts
+// src/routes/v1/logs/+server.ts
 
 import { json, error } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
@@ -1519,7 +1495,7 @@ export function clearApiKeyCache(): void {
 #### Usage in API Routes
 
 ```typescript
-// src/routes/api/v1/logs/+server.ts
+// src/routes/v1/logs/+server.ts
 
 import { json } from '@sveltejs/kit';
 import { validateApiKey } from '$lib/server/utils/api-key';

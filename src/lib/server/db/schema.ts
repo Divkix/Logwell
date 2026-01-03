@@ -49,6 +49,23 @@ export const log = pgTable(
     level: logLevelEnum('level').notNull(),
     message: text('message').notNull(),
     metadata: jsonb('metadata'),
+    timeUnixNano: text('time_unix_nano'),
+    observedTimeUnixNano: text('observed_time_unix_nano'),
+    severityNumber: integer('severity_number'),
+    severityText: text('severity_text'),
+    body: jsonb('body'),
+    droppedAttributesCount: integer('dropped_attributes_count'),
+    flags: integer('flags'),
+    traceId: text('trace_id'),
+    spanId: text('span_id'),
+    resourceAttributes: jsonb('resource_attributes'),
+    resourceDroppedAttributesCount: integer('resource_dropped_attributes_count'),
+    resourceSchemaUrl: text('resource_schema_url'),
+    scopeName: text('scope_name'),
+    scopeVersion: text('scope_version'),
+    scopeAttributes: jsonb('scope_attributes'),
+    scopeDroppedAttributesCount: integer('scope_dropped_attributes_count'),
+    scopeSchemaUrl: text('scope_schema_url'),
     sourceFile: text('source_file'),
     lineNumber: integer('line_number'),
     requestId: text('request_id'),
@@ -57,7 +74,11 @@ export const log = pgTable(
     timestamp: timestamp('timestamp', { withTimezone: true }).defaultNow(),
     search: tsvector('search').generatedAlwaysAs(
       (): SQL =>
-        sql`setweight(to_tsvector('english', ${log.message}), 'A') || setweight(to_tsvector('english', COALESCE(${log.metadata}::text, '')), 'B')`,
+        sql`setweight(to_tsvector('english', ${log.message}), 'A') ||
+        setweight(to_tsvector('english', COALESCE(${log.body}::text, '')), 'B') ||
+        setweight(to_tsvector('english', COALESCE(${log.metadata}::text, '')), 'B') ||
+        setweight(to_tsvector('english', COALESCE(${log.resourceAttributes}::text, '')), 'C') ||
+        setweight(to_tsvector('english', COALESCE(${log.scopeAttributes}::text, '')), 'C')`,
     ),
   },
   (table) => [

@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
+import { ingestOtlpLogs } from './helpers/otlp';
 
 /**
  * E2E tests for Log Export Feature
@@ -56,7 +57,7 @@ async function deleteProject(page: Page, projectId: string) {
 }
 
 /**
- * Helper to ingest multiple logs via batch API
+ * Helper to ingest logs via OTLP/HTTP
  */
 async function ingestLogsBatch(
   page: Page,
@@ -72,15 +73,19 @@ async function ingestLogsBatch(
     ipAddress?: string;
   }>,
 ) {
-  const response = await page.request.post('/api/v1/logs/batch', {
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    data: { logs },
+  const otlpLogs = logs.map((log) => {
+    const attributes: Record<string, unknown> = { ...(log.metadata ?? {}) };
+
+    if (log.sourceFile) attributes['code.filepath'] = log.sourceFile;
+    if (log.lineNumber !== undefined) attributes['code.lineno'] = log.lineNumber;
+    if (log.requestId) attributes['request.id'] = log.requestId;
+    if (log.userId) attributes['enduser.id'] = log.userId;
+    if (log.ipAddress) attributes['client.address'] = log.ipAddress;
+
+    return { level: log.level, message: log.message, attributes };
   });
-  expect(response.ok()).toBeTruthy();
-  return response.json();
+
+  await ingestOtlpLogs(page, apiKey, otlpLogs);
 }
 
 /**

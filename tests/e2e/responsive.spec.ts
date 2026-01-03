@@ -1,5 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 import { getLogCard } from './helpers/log-selectors';
+import { ingestOtlpLogs } from './helpers/otlp';
 
 /**
  * E2E tests for Responsive Design
@@ -65,29 +66,6 @@ async function deleteProject(page: Page, projectId: string) {
   return response.ok();
 }
 
-/**
- * Helper to ingest logs via batch API
- */
-async function ingestLogsBatch(
-  page: Page,
-  apiKey: string,
-  logs: Array<{
-    level: 'debug' | 'info' | 'warn' | 'error' | 'fatal';
-    message: string;
-    metadata?: Record<string, unknown>;
-  }>,
-) {
-  const response = await page.request.post('/api/v1/logs/batch', {
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    data: { logs },
-  });
-  expect(response.ok()).toBeTruthy();
-  return response.json();
-}
-
 test.describe('Responsive Design - Mobile Viewport', () => {
   test.describe.configure({ retries: 1 });
   test.use({ viewport: VIEWPORTS.mobile });
@@ -97,7 +75,7 @@ test.describe('Responsive Design - Mobile Viewport', () => {
   test.beforeEach(async ({ page }) => {
     await login(page);
     testProject = await createProject(page, `responsive-mobile-${Date.now()}`);
-    await ingestLogsBatch(page, testProject.apiKey, [
+    await ingestOtlpLogs(page, testProject.apiKey, [
       { level: 'info', message: 'Test log message one' },
       { level: 'error', message: 'Test error message' },
       { level: 'warn', message: 'Test warning message' },
@@ -211,7 +189,7 @@ test.describe('Responsive Design - Tablet Viewport', () => {
   test.beforeEach(async ({ page }) => {
     await login(page);
     testProject = await createProject(page, `responsive-tablet-${Date.now()}`);
-    await ingestLogsBatch(page, testProject.apiKey, [
+    await ingestOtlpLogs(page, testProject.apiKey, [
       { level: 'info', message: 'Test log message one' },
       { level: 'error', message: 'Test error message' },
     ]);
@@ -274,7 +252,7 @@ test.describe('Responsive Design - Desktop Viewport', () => {
   test.beforeEach(async ({ page }) => {
     await login(page);
     testProject = await createProject(page, `responsive-desktop-${Date.now()}`);
-    await ingestLogsBatch(page, testProject.apiKey, [
+    await ingestOtlpLogs(page, testProject.apiKey, [
       { level: 'info', message: 'Test log message one' },
       { level: 'error', message: 'Test error message' },
       { level: 'debug', message: 'Test debug message' },
@@ -391,7 +369,7 @@ test.describe('Responsive Design - Filter Collapsing Interaction', () => {
   test.beforeEach(async ({ page }) => {
     await login(page);
     testProject = await createProject(page, `filter-collapse-${Date.now()}`);
-    await ingestLogsBatch(page, testProject.apiKey, [
+    await ingestOtlpLogs(page, testProject.apiKey, [
       { level: 'info', message: 'Info message' },
       { level: 'error', message: 'Error message' },
       { level: 'warn', message: 'Warning message' },
@@ -483,11 +461,11 @@ test.describe('Responsive Design - Log Card Layout', () => {
   test.beforeEach(async ({ page }) => {
     await login(page);
     testProject = await createProject(page, `log-cards-${Date.now()}`);
-    await ingestLogsBatch(page, testProject.apiKey, [
+    await ingestOtlpLogs(page, testProject.apiKey, [
       {
         level: 'error',
         message: 'Database connection failed with timeout error',
-        metadata: { key: 'value' },
+        attributes: { key: 'value' },
       },
     ]);
   });

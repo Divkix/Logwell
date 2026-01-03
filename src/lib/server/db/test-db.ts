@@ -258,7 +258,10 @@ async function createTriggers(db: PgliteDatabase<typeof schema>): Promise<void> 
       CREATE OR REPLACE FUNCTION log_search_trigger() RETURNS trigger AS $$
       BEGIN
         NEW.search := setweight(to_tsvector('english', NEW.message), 'A') ||
-                      setweight(to_tsvector('english', COALESCE(NEW.metadata::text, '')), 'B');
+                      setweight(to_tsvector('english', COALESCE(NEW.body::text, '')), 'B') ||
+                      setweight(to_tsvector('english', COALESCE(NEW.metadata::text, '')), 'B') ||
+                      setweight(to_tsvector('english', COALESCE(NEW.resource_attributes::text, '')), 'C') ||
+                      setweight(to_tsvector('english', COALESCE(NEW.scope_attributes::text, '')), 'C');
         RETURN NEW;
       END
       $$ LANGUAGE plpgsql;

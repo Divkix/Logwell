@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
+import { ingestOtlpLogs } from './helpers/otlp';
 
 /**
  * E2E tests for Live Stream SSE Integration
@@ -54,27 +55,12 @@ async function deleteProject(page: Page, projectId: string) {
   return response.ok();
 }
 
-/**
- * Helper to ingest a log via API
- */
 async function ingestLog(
   page: Page,
   apiKey: string,
-  log: {
-    level: 'debug' | 'info' | 'warn' | 'error' | 'fatal';
-    message: string;
-    metadata?: Record<string, unknown>;
-  },
+  log: { level: 'debug' | 'info' | 'warn' | 'error' | 'fatal'; message: string },
 ) {
-  const response = await page.request.post('/api/v1/logs', {
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    data: log,
-  });
-  expect(response.ok()).toBeTruthy();
-  return response.json();
+  await ingestOtlpLogs(page, apiKey, [{ level: log.level, message: log.message }]);
 }
 
 test.describe('Live Stream SSE Integration', () => {

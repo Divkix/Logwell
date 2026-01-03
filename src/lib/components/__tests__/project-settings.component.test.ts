@@ -245,7 +245,7 @@ describe('ProjectSettings', () => {
     it('displays usage example section', () => {
       render(ProjectSettings, { props: { project: baseProject, open: true } });
 
-      expect(screen.getByText('Usage Example')).toBeInTheDocument();
+      expect(screen.getByText('OTLP/HTTP Example')).toBeInTheDocument();
     });
 
     it('displays curl command', () => {
@@ -274,7 +274,7 @@ describe('ProjectSettings', () => {
       render(ProjectSettings, { props: { project: baseProject, open: true } });
 
       const curlExample = screen.getByTestId('curl-example');
-      expect(curlExample).toHaveTextContent(/\/api\/v1\/logs/);
+      expect(curlExample).toHaveTextContent(/\/v1\/logs/);
     });
 
     it('curl example includes Content-Type header', () => {
@@ -288,7 +288,8 @@ describe('ProjectSettings', () => {
       render(ProjectSettings, { props: { project: baseProject, open: true } });
 
       const curlExample = screen.getByTestId('curl-example');
-      expect(curlExample).toHaveTextContent(/level.*message/);
+      expect(curlExample).toHaveTextContent(/resourceLogs/);
+      expect(curlExample).toHaveTextContent(/logRecords/);
     });
   });
 

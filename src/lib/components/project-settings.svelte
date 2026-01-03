@@ -59,12 +59,34 @@ const baseUrl = $derived(
   appUrl || (typeof window !== 'undefined' ? window.location.origin : 'https://your-domain.com'),
 );
 
+const otlpSamplePayload = {
+  resourceLogs: [
+    {
+      resource: {
+        attributes: [{ key: 'service.name', value: { stringValue: 'my-service' } }],
+      },
+      scopeLogs: [
+        {
+          scope: { name: 'sv-logger' },
+          logRecords: [
+            {
+              severityNumber: 9,
+              severityText: 'INFO',
+              body: { stringValue: 'Hello!' },
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
 // Full curl command for easy copy-paste
 const curlCommand = $derived(
-  `curl -X POST ${baseUrl}/api/v1/logs \\
+  `curl -X POST ${baseUrl}/v1/logs \\
   -H "Authorization: Bearer ${project.apiKey}" \\
   -H "Content-Type: application/json" \\
-  -d '${JSON.stringify({ level: 'info', message: 'Hello!' })}'`,
+  -d '${JSON.stringify(otlpSamplePayload)}'`,
 );
 
 async function copyApiKey() {
@@ -208,7 +230,7 @@ function handleDeleteCancel() {
 
         <!-- Usage Example Section -->
         <div>
-          <span class="text-muted-foreground text-sm font-medium">Usage Example</span>
+          <span class="text-muted-foreground text-sm font-medium">OTLP/HTTP Example</span>
           <pre
             data-testid="curl-example"
             aria-label="API usage example"
