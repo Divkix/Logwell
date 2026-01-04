@@ -1,0 +1,211 @@
+name: SDK TypeScript
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "sdks/typescript/**"
+      - ".github/workflows/sdk-typescript.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "sdks/typescript/**"
+      - ".github/workflows/sdk-typescript.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+# Cancel in-progress runs on same branch/PR
+concurrency:
+  group: sdk-ts-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: sdks/typescript
+
+jobs:
+  # =============================================================================
+  # Lint & Type Check
+  # =============================================================================
+  lint:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run Biome linter
+        run: bun run lint
+
+      - name: Run TypeScript check
+        run: bun run check
+
+  # =============================================================================
+  # Unit Tests
+  # =============================================================================
+  test-unit:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run unit tests
+        run: bun run test:unit
+
+  # =============================================================================
+  # Integration Tests
+  # =============================================================================
+  test-integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run integration tests
+        run: bun run test:integration
+
+  # =============================================================================
+  # Build & Verify
+  # =============================================================================
+  build:
+    name: Build & Verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build package
+        run: bun run build
+
+      - name: Verify types with attw
+        run: bun run attw
+
+      - name: Check bundle size
+        run: bun run size
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: sdk-typescript-dist
+          path: sdks/typescript/dist/
+          retention-days: 7
+
+  # =============================================================================
+  # Publish to npm (only on main, only if version changed)
+  # =============================================================================
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [lint, test-unit, test-integration, build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Node.js (for npm publish)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build package
+        run: bun run build
+
+      - name: Check if version exists on npm
+        id: version-check
+        run: |
+          PACKAGE_NAME=$(jq -r '.name' package.json)
+          LOCAL_VERSION=$(jq -r '.version' package.json)
+          echo "package_name=$PACKAGE_NAME" >> $GITHUB_OUTPUT
+          echo "local_version=$LOCAL_VERSION" >> $GITHUB_OUTPUT
+
+          # Check if this version already exists on npm
+          if npm view "${PACKAGE_NAME}@${LOCAL_VERSION}" version 2>/dev/null; then
+            echo "Version $LOCAL_VERSION already exists on npm"
+            echo "should_publish=false" >> $GITHUB_OUTPUT
+          else
+            echo "Version $LOCAL_VERSION is new, will publish"
+            echo "should_publish=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Publish to npm
+        if: steps.version-check.outputs.should_publish == 'true'
+        run: npm publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Add publish info to job summary
+        if: steps.version-check.outputs.should_publish == 'true'
+        run: |
+          echo "## 📦 SDK Published to npm" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Package:** \`${{ steps.version-check.outputs.package_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** \`${{ steps.version-check.outputs.local_version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Install with:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "npm install ${{ steps.version-check.outputs.package_name }}@${{ steps.version-check.outputs.local_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Skip publish info
+        if: steps.version-check.outputs.should_publish == 'false'
+        run: |
+          echo "## ℹ️ SDK Publish Skipped" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Version \`${{ steps.version-check.outputs.local_version }}\` already exists on npm." >> $GITHUB_STEP_SUMMARY
+          echo "Bump the version in \`sdks/typescript/package.json\` to trigger a new publish." >> $GITHUB_STEP_SUMMARY
