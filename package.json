@@ -14,6 +14,7 @@
     "lint:fix": "biome check --write .",
     "knip": "knip",
     "db:start": "docker compose up",
+    "db:stop": "docker compose down -v",
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
