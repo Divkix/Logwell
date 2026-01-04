@@ -26,7 +26,11 @@
     "test:component": "vitest run --project component",
     "test:e2e": "playwright test",
     "test:coverage": "vitest run --coverage",
-    "test:ui": "vitest --ui"
+    "test:ui": "vitest --ui",
+    "sdk:test": "bun run --cwd sdks/typescript test",
+    "sdk:build": "bun run --cwd sdks/typescript build",
+    "sdk:lint": "bun run --cwd sdks/typescript lint",
+    "sdk:version": "bun run --cwd sdks/typescript npm version"
   },
   "devDependencies": {
     "@biomejs/biome": "2.3.11",
