@@ -128,7 +128,95 @@ openssl rand -base64 32
 
 ### Send Logs
 
-Logwell accepts logs via **OTLP/HTTP JSON** at `POST /v1/logs`.
+Logwell provides two ingestion APIs:
+
+| API | Endpoint | Best For |
+|-----|----------|----------|
+| **Simple API** | `POST /v1/ingest` | Quick integration, any HTTP client |
+| **OTLP API** | `POST /v1/logs` | OpenTelemetry SDKs, rich metadata |
+
+---
+
+#### Simple API (Recommended for quick start)
+
+The simple API accepts flat JSON with minimal boilerplate:
+
+```bash
+curl -X POST http://localhost:5173/v1/ingest \
+  -H "Authorization: Bearer lw_YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"level": "info", "message": "User signed in"}'
+```
+
+**Batch multiple logs:**
+
+```bash
+curl -X POST http://localhost:5173/v1/ingest \
+  -H "Authorization: Bearer lw_YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '[
+    {"level": "info", "message": "Request started"},
+    {"level": "error", "message": "Database timeout", "metadata": {"query": "SELECT..."}}
+  ]'
+```
+
+**Available fields:**
+
+| Field | Required | Type | Description |
+|-------|----------|------|-------------|
+| `level` | Yes | `debug` \| `info` \| `warn` \| `error` \| `fatal` | Log severity |
+| `message` | Yes | string | Log message |
+| `timestamp` | No | ISO8601 string | Defaults to current time |
+| `service` | No | string | Service name for filtering |
+| `metadata` | No | object | Additional structured data |
+
+<details>
+<summary><strong>Node.js (no SDK needed)</strong></summary>
+
+```javascript
+await fetch('http://localhost:5173/v1/ingest', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer lw_YOUR_API_KEY',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({ level: 'info', message: 'Hello from Node.js' })
+});
+```
+
+</details>
+
+<details>
+<summary><strong>Python (no SDK needed)</strong></summary>
+
+```python
+import requests
+
+requests.post('http://localhost:5173/v1/ingest',
+    headers={'Authorization': 'Bearer lw_YOUR_API_KEY'},
+    json={'level': 'info', 'message': 'Hello from Python'})
+```
+
+</details>
+
+<details>
+<summary><strong>Go (no SDK needed)</strong></summary>
+
+```go
+body := []byte(`{"level": "info", "message": "Hello from Go"}`)
+req, _ := http.NewRequest("POST", "http://localhost:5173/v1/ingest", bytes.NewBuffer(body))
+req.Header.Set("Authorization", "Bearer lw_YOUR_API_KEY")
+req.Header.Set("Content-Type", "application/json")
+http.DefaultClient.Do(req)
+```
+
+</details>
+
+---
+
+#### OTLP API (OpenTelemetry)
+
+For applications using OpenTelemetry SDKs, use the OTLP endpoint at `POST /v1/logs`.
 
 ```bash
 curl -X POST http://localhost:5173/v1/logs \
@@ -416,6 +504,7 @@ The app runs on port 3000 by default.
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
+| `/v1/ingest` | POST | Simple JSON log ingestion |
 | `/v1/logs` | POST | OTLP/HTTP JSON log export |
 
 ### Project Management (Session Auth)
