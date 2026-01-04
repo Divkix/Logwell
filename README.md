@@ -160,29 +160,116 @@ curl -X POST http://localhost:5173/v1/logs \
 ```
 
 <details>
-<summary><strong>Node.js (OpenTelemetry SDK)</strong></summary>
+<summary><strong>Node.js / TypeScript</strong></summary>
+
+```bash
+npm install @opentelemetry/exporter-logs-otlp-http @opentelemetry/sdk-logs
+```
 
 ```typescript
 import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-http';
+import { LoggerProvider, BatchLogRecordProcessor } from '@opentelemetry/sdk-logs';
 
 const exporter = new OTLPLogExporter({
   url: 'http://localhost:5173/v1/logs',
   headers: { 'Authorization': 'Bearer lw_YOUR_API_KEY' },
 });
+
+const loggerProvider = new LoggerProvider();
+loggerProvider.addLogRecordProcessor(new BatchLogRecordProcessor(exporter));
 ```
 
 </details>
 
 <details>
-<summary><strong>Python (OpenTelemetry SDK)</strong></summary>
+<summary><strong>Python</strong></summary>
+
+```bash
+pip install opentelemetry-exporter-otlp-proto-http
+```
 
 ```python
 from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
+from opentelemetry.sdk._logs import LoggerProvider
+from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
 
 exporter = OTLPLogExporter(
     endpoint="http://localhost:5173/v1/logs",
     headers={"Authorization": "Bearer lw_YOUR_API_KEY"},
 )
+
+logger_provider = LoggerProvider()
+logger_provider.add_log_record_processor(BatchLogRecordProcessor(exporter))
+```
+
+</details>
+
+<details>
+<summary><strong>Go</strong></summary>
+
+```bash
+go get go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp
+```
+
+```go
+import (
+    "go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
+    "go.opentelemetry.io/otel/sdk/log"
+)
+
+exporter, _ := otlploghttp.New(ctx,
+    otlploghttp.WithEndpointURL("http://localhost:5173/v1/logs"),
+    otlploghttp.WithHeaders(map[string]string{
+        "Authorization": "Bearer lw_YOUR_API_KEY",
+    }),
+)
+
+processor := log.NewBatchProcessor(exporter)
+provider := log.NewLoggerProvider(log.WithProcessor(processor))
+```
+
+</details>
+
+<details>
+<summary><strong>Java</strong></summary>
+
+```xml
+<!-- Maven -->
+<dependency>
+    <groupId>io.opentelemetry</groupId>
+    <artifactId>opentelemetry-exporter-otlp</artifactId>
+</dependency>
+```
+
+```java
+import io.opentelemetry.exporter.otlp.http.logs.OtlpHttpLogRecordExporter;
+
+OtlpHttpLogRecordExporter exporter = OtlpHttpLogRecordExporter.builder()
+    .setEndpoint("http://localhost:5173/v1/logs")
+    .addHeader("Authorization", "Bearer lw_YOUR_API_KEY")
+    .build();
+```
+
+</details>
+
+<details>
+<summary><strong>C# / .NET</strong></summary>
+
+```bash
+dotnet add package OpenTelemetry.Exporter.OpenTelemetryProtocol
+```
+
+```csharp
+using OpenTelemetry;
+using OpenTelemetry.Exporter;
+
+builder.Logging.AddOpenTelemetry(logging =>
+    logging.AddOtlpExporter(options =>
+    {
+        options.Endpoint = new Uri("http://localhost:5173/v1/logs");
+        options.Protocol = OtlpExportProtocol.HttpProtobuf;
+        options.Headers = "Authorization=Bearer lw_YOUR_API_KEY";
+    }));
 ```
 
 </details>
