@@ -34,6 +34,7 @@ services:
       - PORT=3000
       - DATABASE_URL=postgresql://svlogger:${DB_PASSWORD:-changeme}@db:5432/svlogger
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET is required}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
       - ORIGIN=${ORIGIN:-http://localhost:3000}
     depends_on:
       db:
@@ -42,7 +43,7 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
       interval: 30s
       timeout: 10s
-      start_period: 10s
+      start_period: 30s
       retries: 3
     networks:
       - svlogger-network
