@@ -13,7 +13,8 @@
     "src/app.d.ts",
     "src/lib/components/ui/**/index.ts"
   ],
-  "ignoreDependencies": ["tw-animate-css"],
-  "ignoreUnresolved": ["\\$env/.+"],
+  "ignoreDependencies": ["tw-animate-css", "@divkix/logwell"],
+  "ignoreBinaries": ["jsr"],
+  "ignoreUnresolved": ["\\$env/.+", "\\$\\{packageName\\}"],
   "drizzle": false
 }
