@@ -24,10 +24,8 @@ export function createAuth(
       updateAge: 60 * 60 * 24, // Update session every 24 hours
     },
     secret: process.env.BETTER_AUTH_SECRET || 'default-secret-for-development-only',
-    advanced: {
-      // Self-hosted app - allow any origin (Cloudflare Tunnel, reverse proxies, etc.)
-      disableOriginCheck: true,
-    },
+    // Self-hosted app - trust the configured ORIGIN for reverse proxies/tunnels
+    trustedOrigins: [process.env.ORIGIN].filter(Boolean) as string[],
   });
 }
 

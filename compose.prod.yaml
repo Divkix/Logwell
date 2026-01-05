@@ -6,6 +6,7 @@
 # Required Environment Variables:
 #   BETTER_AUTH_SECRET - Auth secret (min 32 chars). Generate: openssl rand -base64 32
 #   ADMIN_PASSWORD     - Admin user password (min 8 chars)
+#   ORIGIN             - Production URL (e.g., https://logs.example.com)
 #
 # Optional Environment Variables:
 #   DB_PASSWORD - Database password (default: logwell_internal_db)
@@ -34,6 +35,7 @@ services:
       - DATABASE_URL=postgresql://logwell:${DB_PASSWORD:-logwell_internal_db}@db:5432/logwell
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET is required}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:?ADMIN_PASSWORD is required}
+      - ORIGIN=${ORIGIN:?ORIGIN is required}
     depends_on:
       db:
         condition: service_healthy

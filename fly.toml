@@ -20,3 +20,4 @@ primary_region = "iad"
 
 [env]
   NODE_ENV = "production"
+  # ORIGIN must be set via: fly secrets set ORIGIN=https://your-app.fly.dev

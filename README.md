@@ -158,6 +158,9 @@ BETTER_AUTH_SECRET="your-32-character-secret-key-here"
 
 # Admin user password (minimum 8 characters)
 ADMIN_PASSWORD="your-admin-password"
+
+# Production URL (required for auth behind reverse proxies)
+ORIGIN="https://your-domain.com"
 ```
 
 Generate a secure secret:
