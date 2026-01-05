@@ -24,12 +24,24 @@ Official TypeScript SDK for [Logwell](https://github.com/divkix/logwell) - a sel
 
 ## Installation
 
+### npm / bun / pnpm
+
 ```bash
 npm install logwell
 # or
 bun add logwell
 # or
 pnpm add logwell
+```
+
+### JSR (Deno)
+
+```bash
+deno add jsr:@divkix/logwell
+```
+
+```typescript
+import { Logwell } from '@divkix/logwell';
 ```
 
 ## Quick Start

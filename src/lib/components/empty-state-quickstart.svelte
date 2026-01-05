@@ -34,11 +34,30 @@ const logger = new Logwell({
 logger.info('Hello!');`,
 );
 
+const jsrExample = $derived(
+  `import { Logwell } from '@divkix/logwell';
+
+const logger = new Logwell({
+  apiKey: '${apiKey}',
+  endpoint: '${baseUrl}',
+});
+
+logger.info('Hello!');`,
+);
+
 const currentExampleCode = $derived(
-  selectedExample === 'curl' ? simpleCurlCommand : typescriptExample,
+  selectedExample === 'curl'
+    ? simpleCurlCommand
+    : selectedExample === 'jsr'
+      ? jsrExample
+      : typescriptExample,
 );
 const currentExampleInstall = $derived(
-  selectedExample === 'typescript' ? 'npm install logwell' : null,
+  selectedExample === 'typescript'
+    ? 'npm install logwell'
+    : selectedExample === 'jsr'
+      ? 'deno add jsr:@divkix/logwell'
+      : null,
 );
 
 async function copyCode() {
@@ -66,6 +85,7 @@ async function copyCode() {
         <Select.Content>
           <Select.Item value="curl">curl</Select.Item>
           <Select.Item value="typescript">TypeScript</Select.Item>
+          <Select.Item value="jsr">JSR (Deno)</Select.Item>
         </Select.Content>
       </Select.Root>
     </div>

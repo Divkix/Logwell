@@ -240,6 +240,8 @@ await logger.shutdown();
 
 Features: Zero dependencies, automatic batching, retry with backoff, TypeScript-first.
 
+> **Deno users:** Install from JSR with `deno add jsr:@divkix/logwell` and import from `@divkix/logwell`
+
 [Full SDK documentation →](./sdks/typescript/README.md)
 
 ---

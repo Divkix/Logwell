@@ -82,17 +82,19 @@ const simpleCurlCommand = $derived(
   -d '{"level": "info", "message": "Hello from my app"}'`,
 );
 
-// SDK example
-const sdkExample = $derived(
-  `import { Logwell } from 'logwell';
+// SDK example generator (takes package name for npm vs JSR)
+const sdkExample = (packageName: string) =>
+  `import { Logwell } from '${packageName}';
 
 const logger = new Logwell({
   apiKey: '${project.apiKey}',
   endpoint: '${baseUrl}',
 });
 
-logger.info('Hello from my app');`,
-);
+logger.info('Hello from my app');`;
+
+const typescriptExample = $derived(sdkExample('logwell'));
+const jsrExample = $derived(sdkExample('@divkix/logwell'));
 
 async function copyApiKey() {
   try {
@@ -105,9 +107,19 @@ async function copyApiKey() {
 }
 
 // Get current example code based on selection
-const currentExampleCode = $derived(selectedExample === 'curl' ? simpleCurlCommand : sdkExample);
+const currentExampleCode = $derived(
+  selectedExample === 'curl'
+    ? simpleCurlCommand
+    : selectedExample === 'jsr'
+      ? jsrExample
+      : typescriptExample,
+);
 const currentExampleInstall = $derived(
-  selectedExample === 'typescript' ? 'npm install logwell' : null,
+  selectedExample === 'typescript'
+    ? 'npm install logwell'
+    : selectedExample === 'jsr'
+      ? 'deno add jsr:@divkix/logwell'
+      : null,
 );
 
 async function copyExampleCode() {
@@ -342,6 +354,7 @@ async function handleSaveName() {
               <Select.Content>
                 <Select.Item value="curl" data-testid="example-option-curl">curl</Select.Item>
                 <Select.Item value="typescript" data-testid="example-option-typescript">TypeScript</Select.Item>
+                <Select.Item value="jsr" data-testid="example-option-jsr">JSR (Deno)</Select.Item>
               </Select.Content>
             </Select.Root>
           </div>
