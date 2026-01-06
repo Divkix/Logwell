@@ -331,6 +331,10 @@ jobs:
         env:
           PLATFORM: ${{ matrix.platform }}
 
+      - name: Set image name
+        id: image
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> $GITHUB_OUTPUT
+
       - name: Build and push by digest
         id: build
         uses: docker/build-push-action@v6
@@ -338,7 +342,7 @@ jobs:
           context: .
           platforms: ${{ matrix.platform }}
           push: true
-          outputs: type=image,name=ghcr.io/${{ github.repository }},push-by-digest=true,name-canonical=true
+          outputs: type=image,name=${{ steps.image.outputs.name }},push-by-digest=true,name-canonical=true
           cache-from: type=gha,scope=${{ matrix.platform }}
           cache-to: type=gha,mode=max,scope=${{ matrix.platform }}
           provenance: false
@@ -392,6 +396,10 @@ jobs:
         id: short-sha
         run: echo "short_sha=${GITHUB_SHA:0:7}" >> $GITHUB_OUTPUT
 
+      - name: Set image name
+        id: image
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> $GITHUB_OUTPUT
+
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -413,12 +421,12 @@ jobs:
         run: |
           docker buildx imagetools create \
             $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf 'ghcr.io/${{ github.repository }}@sha256:%s ' *)
+            $(printf '${{ steps.image.outputs.name }}@sha256:%s ' *)
 
       - name: Get final digest
         id: digest
         run: |
-          digest=$(docker buildx imagetools inspect ghcr.io/${{ github.repository }}:dev --format '{{json .Manifest.Digest}}')
+          digest=$(docker buildx imagetools inspect ${{ steps.image.outputs.name }}:dev --format '{{json .Manifest.Digest}}')
           echo "digest=${digest//\"/}" >> $GITHUB_OUTPUT
 
       - name: Add build info to job summary
