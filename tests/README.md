@@ -93,11 +93,11 @@ describe('My Integration Test', () => {
 
 ## Coverage Thresholds
 
-The project maintains 90% coverage across:
-- Lines
-- Functions
-- Branches
-- Statements
+The project maintains the following coverage thresholds:
+- Lines: 75%
+- Functions: 75%
+- Branches: 65%
+- Statements: 75%
 
 ## Tech Stack
 

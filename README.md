@@ -596,7 +596,6 @@ The app runs on port 3000 by default.
 
 | Limitation | Impact | Workaround |
 |------------|--------|------------|
-| **No log retention/TTL** | Storage grows unbounded | Manual `DELETE FROM logs WHERE timestamp < ...` |
 | **Single-user auth** | No team collaboration | Share credentials (not recommended) |
 | **No log export** | Can't backup to S3/file | Direct database dumps via `pg_dump` |
 | **No rate limiting** | API keys have unlimited access | Implement at reverse proxy level |
