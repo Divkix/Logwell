@@ -225,7 +225,8 @@ async function handleRegenerateApiKey() {
     showRegenerateConfirm = false;
     toastSuccess('API key regenerated successfully');
     announceToScreenReader('API key regenerated successfully');
-  } catch {
+  } catch (error) {
+    console.error('Failed to regenerate API key:', error);
     toastError('Failed to regenerate API key');
   }
 }
@@ -244,7 +245,8 @@ async function handleDeleteProject() {
 
     toastSuccess('Project deleted successfully');
     goto('/');
-  } catch {
+  } catch (error) {
+    console.error('Failed to delete project:', error);
     toastError('Failed to delete project');
   }
 }

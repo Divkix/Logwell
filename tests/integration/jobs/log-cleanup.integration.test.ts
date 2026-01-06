@@ -195,7 +195,7 @@ describe('cleanupOldLogs', () => {
 
     it('should handle projects with no logs', async () => {
       const project1 = await seedProject(db, { retentionDays: 30 });
-      // Create project2 but don't use it (intentionally unused for the test)
+      // Create a second project without logs to verify cleanup handles empty projects gracefully
       await seedProject(db, { retentionDays: 7 });
 
       // Only add logs to project1
