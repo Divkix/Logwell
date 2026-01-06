@@ -1,7 +1,7 @@
 import { expect, type Page, test } from '@playwright/test';
 
 const TEST_USER = {
-  email: 'admin@example.com',
+  username: 'admin',
   password: 'adminpass',
 };
 
@@ -10,16 +10,16 @@ async function login(page: Page) {
   await page.waitForLoadState('networkidle');
   await page.waitForSelector('form');
 
-  const emailInput = page.getByLabel(/email/i);
+  const usernameInput = page.getByLabel(/username/i);
   const passwordInput = page.getByLabel(/password/i);
 
   // Wait for Svelte hydration
   await page.waitForTimeout(500);
 
-  // Clear and fill email - use clear() first to ensure clean state
-  await emailInput.clear();
-  await emailInput.fill(TEST_USER.email);
-  await expect(emailInput).toHaveValue(TEST_USER.email);
+  // Clear and fill username - use clear() first to ensure clean state
+  await usernameInput.clear();
+  await usernameInput.fill(TEST_USER.username);
+  await expect(usernameInput).toHaveValue(TEST_USER.username);
 
   // Clear and fill password
   await passwordInput.clear();

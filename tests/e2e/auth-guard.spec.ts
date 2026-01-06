@@ -9,7 +9,7 @@ import { expect, test } from '@playwright/test';
 
 // Test user credentials (matches seeded admin from scripts/seed-admin.ts)
 const TEST_USER = {
-  email: 'admin@example.com',
+  username: 'admin',
   password: 'adminpass',
 };
 
@@ -20,13 +20,13 @@ async function login(page: import('@playwright/test').Page) {
   await page.goto('/login');
   await page.waitForSelector('form');
 
-  const emailInput = page.getByLabel(/email/i);
+  const usernameInput = page.getByLabel(/username/i);
   const passwordInput = page.getByLabel(/password/i);
 
-  // Clear and fill email, verify value
-  await emailInput.click();
-  await emailInput.fill(TEST_USER.email);
-  await expect(emailInput).toHaveValue(TEST_USER.email);
+  // Clear and fill username, verify value
+  await usernameInput.click();
+  await usernameInput.fill(TEST_USER.username);
+  await expect(usernameInput).toHaveValue(TEST_USER.username);
 
   // Clear and fill password, verify value
   await passwordInput.click();

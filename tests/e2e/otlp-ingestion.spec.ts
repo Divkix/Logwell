@@ -2,7 +2,7 @@ import { expect, type Page, test } from '@playwright/test';
 import { getLogMessage } from './helpers/log-selectors';
 
 const TEST_USER = {
-  email: 'admin@example.com',
+  username: 'admin',
   password: 'adminpass',
 };
 
@@ -10,7 +10,7 @@ async function login(page: Page) {
   await page.goto('/login');
   await page.waitForSelector('form');
 
-  await page.getByLabel(/email/i).fill(TEST_USER.email);
+  await page.getByLabel(/username/i).fill(TEST_USER.username);
   await page.getByLabel(/password/i).fill(TEST_USER.password);
 
   await page.getByRole('button', { name: /sign in/i }).click();

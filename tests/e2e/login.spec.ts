@@ -10,7 +10,7 @@ import { expect, test } from '@playwright/test';
 // Test user credentials for E2E testing
 // Matches the seeded admin user from scripts/seed-admin.ts
 const TEST_USER = {
-  email: 'admin@example.com',
+  username: 'admin',
   password: 'adminpass', // From .env ADMIN_PASSWORD
   name: 'Admin',
 };
@@ -23,10 +23,10 @@ test.describe('Login Page', () => {
     await page.waitForSelector('form');
   });
 
-  test('should display login form with email and password fields', async ({ page }) => {
+  test('should display login form with username and password fields', async ({ page }) => {
     // Verify login form elements are present
     await expect(page.getByRole('heading', { name: /sign in/i })).toBeVisible();
-    await expect(page.getByLabel(/email/i)).toBeVisible();
+    await expect(page.getByLabel(/username/i)).toBeVisible();
     await expect(page.getByLabel(/password/i)).toBeVisible();
     await expect(page.getByRole('button', { name: /sign in/i })).toBeVisible();
   });
@@ -40,13 +40,13 @@ test.describe('Login Page', () => {
 
   test('should redirect to / after successful login', async ({ page }) => {
     // Fill in credentials
-    const emailInput = page.getByLabel(/email/i);
+    const usernameInput = page.getByLabel(/username/i);
     const passwordInput = page.getByLabel(/password/i);
 
     // Clear any pre-filled values and fill with test credentials
-    await emailInput.click();
-    await emailInput.fill(TEST_USER.email);
-    await expect(emailInput).toHaveValue(TEST_USER.email);
+    await usernameInput.click();
+    await usernameInput.fill(TEST_USER.username);
+    await expect(usernameInput).toHaveValue(TEST_USER.username);
 
     await passwordInput.click();
     await passwordInput.fill(TEST_USER.password);
@@ -62,10 +62,10 @@ test.describe('Login Page', () => {
 
   test('should show error for invalid credentials', async ({ page }) => {
     // Fill in wrong password
-    const emailInput = page.getByLabel(/email/i);
+    const usernameInput = page.getByLabel(/username/i);
     const passwordInput = page.getByLabel(/password/i);
 
-    await emailInput.fill(TEST_USER.email);
+    await usernameInput.fill(TEST_USER.username);
     await passwordInput.fill('WrongPassword123!');
 
     // Click sign in button
@@ -81,15 +81,15 @@ test.describe('Login Page', () => {
   });
 
   test('should show error for non-existent user', async ({ page }) => {
-    // Fill in non-existent email
-    await page.getByLabel(/email/i).fill('nonexistent@example.com');
+    // Fill in non-existent username
+    await page.getByLabel(/username/i).fill('nonexistentuser');
     await page.getByLabel(/password/i).fill('SomePassword123!');
 
     // Click sign in button
     await page.getByRole('button', { name: /sign in/i }).click();
 
-    // Wait for error message to appear
-    await expect(page.getByText(/invalid|not found|incorrect|credentials|user/i)).toBeVisible({
+    // Wait for error message to appear (better-auth returns generic error to prevent user enumeration)
+    await expect(page.getByText(/invalid username or password/i)).toBeVisible({
       timeout: 10000,
     });
 
@@ -99,12 +99,12 @@ test.describe('Login Page', () => {
 
   test('should submit form when Enter key is pressed', async ({ page }) => {
     // Fill in credentials
-    const emailInput = page.getByLabel(/email/i);
+    const usernameInput = page.getByLabel(/username/i);
     const passwordInput = page.getByLabel(/password/i);
 
-    await emailInput.click();
-    await emailInput.fill(TEST_USER.email);
-    await expect(emailInput).toHaveValue(TEST_USER.email);
+    await usernameInput.click();
+    await usernameInput.fill(TEST_USER.username);
+    await expect(usernameInput).toHaveValue(TEST_USER.username);
 
     await passwordInput.click();
     await passwordInput.fill(TEST_USER.password);
@@ -119,7 +119,7 @@ test.describe('Login Page', () => {
 
   test('should disable form inputs during submission', async ({ page }) => {
     // Fill in credentials
-    await page.getByLabel(/email/i).fill(TEST_USER.email);
+    await page.getByLabel(/username/i).fill(TEST_USER.username);
     await page.getByLabel(/password/i).fill(TEST_USER.password);
 
     // Click sign in - check for disabled state during request
@@ -135,38 +135,26 @@ test.describe('Login Page', () => {
     await clickPromise;
   });
 
-  test('should show validation error for empty email', async ({ page }) => {
-    // Leave email empty, fill password
+  test('should show validation error for empty username', async ({ page }) => {
+    // Leave username empty, fill password
     await page.getByLabel(/password/i).fill(TEST_USER.password);
 
     // Click sign in button
     await page.getByRole('button', { name: /sign in/i }).click();
 
     // Should show validation error - be specific about the error text
-    await expect(page.getByText('Email is required')).toBeVisible();
+    await expect(page.getByText('Username is required')).toBeVisible();
   });
 
   test('should show validation error for empty password', async ({ page }) => {
-    // Fill email, leave password empty
-    await page.getByLabel(/email/i).fill(TEST_USER.email);
+    // Fill username, leave password empty
+    await page.getByLabel(/username/i).fill(TEST_USER.username);
 
     // Click sign in button
     await page.getByRole('button', { name: /sign in/i }).click();
 
     // Should show validation error - be specific about the error text
     await expect(page.getByText('Password is required')).toBeVisible();
-  });
-
-  test('should show validation error for invalid email format', async ({ page }) => {
-    // Fill invalid email format
-    await page.getByLabel(/email/i).fill('not-an-email');
-    await page.getByLabel(/password/i).fill(TEST_USER.password);
-
-    // Click sign in button
-    await page.getByRole('button', { name: /sign in/i }).click();
-
-    // Should show validation error for invalid email - be specific
-    await expect(page.getByText('Invalid email format')).toBeVisible();
   });
 });
 
@@ -179,11 +167,11 @@ test.describe('Login Page - Authentication State', () => {
     await page.goto('/login');
     await page.waitForSelector('form');
 
-    const emailInput = page.getByLabel(/email/i);
+    const usernameInput = page.getByLabel(/username/i);
     const passwordInput = page.getByLabel(/password/i);
 
-    await emailInput.click();
-    await emailInput.fill(TEST_USER.email);
+    await usernameInput.click();
+    await usernameInput.fill(TEST_USER.username);
     await passwordInput.click();
     await passwordInput.fill(TEST_USER.password);
 
