@@ -263,7 +263,7 @@ function formatDate(isoDate: string | null): string {
   <title>Settings - {projectName} | Logwell</title>
 </svelte:head>
 
-<div class="container mx-auto max-w-3xl px-4 py-8">
+<div class="container mx-auto max-w-5xl px-4 py-8">
   <!-- Header with back button -->
   <div class="mb-8">
     <a
@@ -278,8 +278,11 @@ function formatDate(isoDate: string | null): string {
   </div>
 
   <div class="space-y-8">
-    <!-- General Section -->
-    <section class="bg-card rounded-lg border p-6">
+    <!-- Settings Grid: 2x2 on desktop, 1-column on mobile -->
+    <div data-testid="settings-grid" class="grid gap-6 sm:grid-cols-2">
+      <!-- Row 1: General + API Key -->
+      <!-- General Section -->
+      <section class="bg-card rounded-lg border p-6">
       <h2 class="text-lg font-semibold">General</h2>
 
       <div class="mt-4 space-y-4">
@@ -367,11 +370,12 @@ function formatDate(isoDate: string | null): string {
       </div>
     </section>
 
-    <!-- Quick Start Section -->
-    <section class="bg-card rounded-lg border p-6">
-      <div class="flex items-center justify-between">
-        <div>
-          <h2 class="text-lg font-semibold">Quick Start</h2>
+      <!-- Row 2: Quick Start + Log Retention -->
+      <!-- Quick Start Section -->
+      <section class="bg-card rounded-lg border p-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-lg font-semibold">Quick Start</h2>
           <p class="text-muted-foreground mt-1 text-sm">
             Get started with sending logs to your project.
           </p>
@@ -473,11 +477,12 @@ function formatDate(isoDate: string | null): string {
             </div>
           </div>
         </div>
-      </div>
-    </section>
+        </div>
+      </section>
+    </div>
 
-    <!-- Danger Zone Section -->
-    <section class="rounded-lg border border-destructive/50 p-6">
+    <!-- Danger Zone: Full-width, outside grid -->
+    <section data-testid="danger-zone" class="rounded-lg border border-destructive/50 p-6">
       <h2 class="text-destructive text-lg font-semibold">Danger Zone</h2>
       <p class="text-muted-foreground mt-1 text-sm">
         Permanently delete this project and all associated logs. This action cannot be undone.

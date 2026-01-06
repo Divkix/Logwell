@@ -458,3 +458,81 @@ test.describe('Project Settings - Quick Start Section', () => {
     expect(clipboardText).toContain(testProject.apiKey);
   });
 });
+
+test.describe('Project Settings - Layout', () => {
+  let testProject: { id: string; name: string; apiKey: string };
+
+  test.beforeEach(async ({ page }) => {
+    await login(page);
+    await cleanupProjects(page);
+    testProject = await createProject(page, 'layout-test-project');
+    await page.goto(`/projects/${testProject.id}/settings`);
+  });
+
+  test.afterEach(async ({ page }) => {
+    if (testProject?.id) {
+      await deleteProject(page, testProject.id);
+    }
+  });
+
+  test('should display 2-column grid on desktop', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+
+    const grid = page.getByTestId('settings-grid');
+    await expect(grid).toBeVisible();
+
+    // Verify grid has 2 columns by checking CSS
+    const gridStyle = await grid.evaluate((el) => {
+      const computed = window.getComputedStyle(el);
+      return computed.gridTemplateColumns;
+    });
+
+    // Should have 2 equal columns (e.g., "400px 400px" or similar)
+    const columns = gridStyle.split(' ').filter((c) => c !== '');
+    expect(columns.length).toBe(2);
+  });
+
+  test('should stack to single column on mobile', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 667 });
+
+    const grid = page.getByTestId('settings-grid');
+    await expect(grid).toBeVisible();
+
+    // Verify grid has 1 column on mobile
+    const gridStyle = await grid.evaluate((el) => {
+      const computed = window.getComputedStyle(el);
+      return computed.gridTemplateColumns;
+    });
+
+    const columns = gridStyle.split(' ').filter((c) => c !== '');
+    expect(columns.length).toBe(1);
+  });
+
+  test('should keep danger zone full-width outside grid', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+
+    const dangerZone = page.getByTestId('danger-zone');
+    await expect(dangerZone).toBeVisible();
+
+    // Danger zone should NOT be inside the grid
+    const isInsideGrid = await dangerZone.evaluate((el) => {
+      return el.closest('[data-testid="settings-grid"]') !== null;
+    });
+    expect(isInsideGrid).toBe(false);
+  });
+
+  test('should have correct section order in grid', async ({ page }) => {
+    const grid = page.getByTestId('settings-grid');
+    const sections = grid.locator('section');
+
+    // 4 sections in grid (General, API Key, Quick Start, Log Retention)
+    await expect(sections).toHaveCount(4);
+
+    // Verify order by checking headings
+    const headings = await sections.locator('h2').allTextContents();
+    expect(headings[0]).toContain('General');
+    expect(headings[1]).toContain('API Key');
+    expect(headings[2]).toContain('Quick Start');
+    expect(headings[3]).toContain('Log Retention');
+  });
+});
