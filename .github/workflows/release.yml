@@ -268,28 +268,95 @@ jobs:
         run: bun --bun run build
 
   # =============================================================================
-  # Publish Docker images for releases
+  # Build Docker images for each platform (native runners)
   # =============================================================================
   docker-publish:
-    name: Publish Docker Images
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+    name: Build ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
     needs: [lint, test-unit, test-integration, test-e2e, build]
-    outputs:
-      image-tags: ${{ steps.meta.outputs.tags }}
-      image-digest: ${{ steps.build.outputs.digest }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract platform slug
+        id: platform
+        run: echo "slug=${PLATFORM//\//-}" >> $GITHUB_OUTPUT
+        env:
+          PLATFORM: ${{ matrix.platform }}
+
+      - name: Set image name
+        id: image
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> $GITHUB_OUTPUT
+
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          push: true
+          outputs: type=image,name=${{ steps.image.outputs.name }},push-by-digest=true,name-canonical=true
+          cache-from: type=gha,scope=${{ matrix.platform }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.platform }}
+          provenance: false
+
+      - name: Export digest
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ steps.platform.outputs.slug }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # =============================================================================
+  # Merge multi-platform manifests
+  # =============================================================================
+  docker-merge:
+    name: Create Multi-Platform Manifest
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [docker-publish]
+    outputs:
+      image-tags: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.digest.outputs.digest }}
+      version-tag: ${{ steps.version.outputs.tag }}
+
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digests-*
+          merge-multiple: true
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-        with:
-          version: latest
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
@@ -307,45 +374,46 @@ jobs:
             echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
           fi
 
+      - name: Set image name
+        id: image
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> $GITHUB_OUTPUT
+
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository }}
+          images: ${{ steps.image.outputs.name }}
           tags: |
             type=raw,value=${{ steps.version.outputs.tag }}
             type=raw,value=latest
           labels: |
             org.opencontainers.image.title=Logwell
             org.opencontainers.image.description=Self-hosted logging platform with real-time streaming
-            org.opencontainers.image.source=${{ github.event.repository.html_url }}
-            org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.version=${{ steps.version.outputs.tag }}
 
-      - name: Build and push Docker image
-        id: build
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=release
-          cache-to: type=gha,mode=max,scope=release
-          provenance: true
-          sbom: true
+      - name: Create manifest list and push
+        working-directory: /tmp/digests
+        run: |
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ steps.image.outputs.name }}@sha256:%s ' *)
+
+      - name: Get final digest
+        id: digest
+        run: |
+          digest=$(docker buildx imagetools inspect ${{ steps.image.outputs.name }}:${{ steps.version.outputs.tag }} --format '{{json .Manifest.Digest}}')
+          echo "digest=${digest//\"/}" >> $GITHUB_OUTPUT
 
       - name: Add build info to job summary
         run: |
-          echo "## 🚀 Release Build Complete" >> $GITHUB_STEP_SUMMARY
+          echo "## Release Build Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Version:** \`${{ steps.version.outputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Docker Images" >> $GITHUB_STEP_SUMMARY
-          echo "- **Version:** \`ghcr.io/${{ github.repository }}:${{ steps.version.outputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Latest:** \`ghcr.io/${{ github.repository }}:latest\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Digest:** \`${{ steps.build.outputs.digest }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** \`${{ steps.image.outputs.name }}:${{ steps.version.outputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Latest:** \`${{ steps.image.outputs.name }}:latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Digest:** \`${{ steps.digest.outputs.digest }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Platforms:** \`linux/amd64\`, \`linux/arm64\`" >> $GITHUB_STEP_SUMMARY
 
   # =============================================================================
@@ -355,36 +423,31 @@ jobs:
     name: Create GitHub Release
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [docker-publish]
+    needs: [docker-merge]
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Determine version tag
-        id: version
-        run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "tag=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
-          else
-            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-          fi
+      - name: Set image name
+        id: image
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> $GITHUB_OUTPUT
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: ${{ steps.version.outputs.tag }}
+          tag_name: ${{ needs.docker-merge.outputs.version-tag }}
+          name: ${{ needs.docker-merge.outputs.version-tag }}
           generate_release_notes: true
           body: |
             ## Docker Images
 
             Pull the image:
             ```bash
-            docker pull ghcr.io/${{ github.repository }}:${{ steps.version.outputs.tag }}
+            docker pull ${{ steps.image.outputs.name }}:${{ needs.docker-merge.outputs.version-tag }}
             ```
 
-            **Digest:** `${{ needs.docker-publish.outputs.image-digest }}`
+            **Digest:** `${{ needs.docker-merge.outputs.image-digest }}`
             **Platforms:** `linux/amd64`, `linux/arm64`
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -396,7 +459,7 @@ jobs:
     name: Release Success
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [lint, test-unit, test-integration, test-e2e, build, docker-publish, github-release]
+    needs: [lint, test-unit, test-integration, test-e2e, build, docker-publish, docker-merge, github-release]
     if: always()
 
     steps:
@@ -408,8 +471,9 @@ jobs:
              [[ "${{ needs.test-e2e.result }}" != "success" ]] || \
              [[ "${{ needs.build.result }}" != "success" ]] || \
              [[ "${{ needs.docker-publish.result }}" != "success" ]] || \
+             [[ "${{ needs.docker-merge.result }}" != "success" ]] || \
              [[ "${{ needs.github-release.result }}" != "success" ]]; then
-            echo "❌ One or more release jobs failed"
+            echo "One or more release jobs failed"
             exit 1
           fi
-          echo "✅ Release completed successfully"
+          echo "Release completed successfully"
