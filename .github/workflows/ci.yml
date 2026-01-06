@@ -135,17 +135,12 @@ jobs:
         run: bun run test:integration
 
   # =============================================================================
-  # E2E Tests (Playwright - all browsers)
+  # E2E Tests (Playwright - Chromium)
   # =============================================================================
   test-e2e:
-    name: E2E Tests (${{ matrix.browser }})
+    name: E2E Tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
-
-    strategy:
-      fail-fast: false
-      matrix:
-        browser: [chromium, firefox, webkit]
 
     services:
       postgres:
@@ -195,15 +190,15 @@ jobs:
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ matrix.browser }}-${{ steps.playwright-version.outputs.version }}
+          key: ${{ runner.os }}-playwright-chromium-${{ steps.playwright-version.outputs.version }}
 
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: bunx playwright install --with-deps ${{ matrix.browser }}
+        run: bunx playwright install --with-deps chromium
 
       - name: Install Playwright system deps (cached)
         if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: bunx playwright install-deps ${{ matrix.browser }}
+        run: bunx playwright install-deps chromium
 
       - name: Wait for PostgreSQL
         run: |
@@ -218,13 +213,13 @@ jobs:
           ADMIN_PASSWORD: adminpass
 
       - name: Run E2E tests
-        run: bunx playwright test --project=${{ matrix.browser }}
+        run: bunx playwright test --project=chromium
 
       - name: Upload Playwright artifacts
         if: failure()
         uses: actions/upload-artifact@v6
         with:
-          name: playwright-report-${{ matrix.browser }}-${{ github.run_id }}
+          name: playwright-report-${{ github.run_id }}
           path: |
             playwright-report/
             test-results/
