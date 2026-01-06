@@ -10,10 +10,6 @@ type DatabaseClient = PostgresJsDatabase<typeof schema> | PgliteDatabase<typeof 
 // Track server start time for uptime calculation
 const serverStartTime = Date.now();
 
-// Package version (read from package.json at build time would be ideal,
-// but for simplicity we use a constant that matches package.json)
-const VERSION = '0.1.2';
-
 /**
  * Helper to get database client from locals or production db
  * Supports test injection via locals.db
@@ -94,7 +90,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
     database: dbStatus.connected ? 'connected' : 'disconnected',
     timestamp: new Date().toISOString(),
     uptime: uptimeSeconds,
-    version: VERSION,
+    version: __APP_VERSION__,
   };
 
   // Include error details when unhealthy
