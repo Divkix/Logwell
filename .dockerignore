@@ -15,7 +15,6 @@ build
 # Development files
 *.md
 !README.md
-dev-docs/
 
 # Git
 .git

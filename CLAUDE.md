@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Logwell is a self-hosted logging platform with real-time log streaming, full-text search, and per-project API key authentication. See `dev-docs/PRD.md` for complete specifications.
+Logwell is a self-hosted logging platform with real-time log streaming, full-text search, and per-project API key authentication.
 
 ## Commands
 
@@ -17,7 +17,7 @@ bun run preview          # Preview production build
 # Code Quality
 bun run check            # TypeScript + Svelte checks
 bun run lint             # Biome linting
-bun run lint:fix         # Auto-fix lint issues
+bun run lint:fix          # Auto-fix lint issues
 bun run knip             # Find unused exports/dependencies
 
 # Database (requires DATABASE_URL)
@@ -26,6 +26,8 @@ bun run db:push          # Push schema to database
 bun run db:generate      # Generate migration files
 bun run db:migrate       # Run migrations
 bun run db:studio        # Open Drizzle Studio
+bun run db:seed          # Seed initial data (admin user, sample project)
+bun run db:stop          # Stop PostgreSQL Docker container
 ```
 
 ## Tech Stack
