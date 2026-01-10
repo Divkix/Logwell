@@ -21,6 +21,7 @@ Official TypeScript SDK for [Logwell](https://github.com/divkix/logwell) - a sel
 - **Automatic batching** - Configurable batch size and flush intervals
 - **Retry with backoff** - Exponential backoff on transient failures
 - **Child loggers** - Request-scoped context propagation
+- **Source location capture** - Opt-in file/line number tracking
 - **Lightweight** - < 10KB gzipped
 
 ## Installation
@@ -81,6 +82,7 @@ interface LogwellConfig {
   flushInterval?: number;      // Auto-flush interval in ms (default: 5000)
   maxQueueSize?: number;       // Max queue size (default: 1000)
   maxRetries?: number;         // Retry attempts (default: 3)
+  captureSourceLocation?: boolean; // Capture file/line (default: false)
 
   // Callbacks
   onError?: (error: Error) => void;  // Called on send failures
@@ -133,6 +135,23 @@ requestLogger.info('Request received', { path: req.path });
 // Current queue size
 logger.queueSize: number
 ```
+
+### Source Location Capture
+
+Enable automatic file and line number capture for debugging:
+
+```typescript
+const logger = new Logwell({
+  apiKey: 'lw_xxx',
+  endpoint: 'https://logs.example.com',
+  captureSourceLocation: true, // opt-in
+});
+
+logger.info('User logged in');
+// Log includes: sourceFile: '/app/src/auth.ts', lineNumber: 42
+```
+
+> **Note:** This feature has performance overhead (creates Error object per log). Disabled by default. Works across Node.js, Bun, and browsers.
 
 ## Usage Examples
 

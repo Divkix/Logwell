@@ -1,5 +1,6 @@
 import { validateConfig } from './config';
 import { BatchQueue, type QueueConfig } from './queue';
+import { captureSourceLocation } from './source-location';
 import { HttpTransport } from './transport';
 import type { IngestResponse, LogEntry, LogwellConfig } from './types';
 
@@ -22,6 +23,7 @@ interface ResolvedConfig {
   flushInterval: number;
   maxQueueSize: number;
   maxRetries: number;
+  captureSourceLocation: boolean;
   onError?: (error: Error) => void;
   onFlush?: (count: number) => void;
 }
@@ -99,54 +101,76 @@ export class Logwell {
   }
 
   /**
-   * Log a message at the specified level
+   * Internal log method with source location capture.
+   * @param entry - The log entry
+   * @param skipFrames - Number of frames to skip for source location (2 for public methods)
    */
-  log(entry: LogEntry): void {
+  private _addLog(entry: LogEntry, skipFrames: number): void {
     if (this.stopped) return;
+
+    let sourceFile: string | undefined;
+    let lineNumber: number | undefined;
+
+    if (this.config.captureSourceLocation) {
+      const location = captureSourceLocation(skipFrames);
+      if (location) {
+        sourceFile = location.sourceFile;
+        lineNumber = location.lineNumber;
+      }
+    }
 
     const fullEntry: LogEntry = {
       ...entry,
       timestamp: entry.timestamp ?? new Date().toISOString(),
       service: entry.service ?? this.config.service,
       metadata: this.mergeMetadata(entry.metadata),
+      ...(sourceFile !== undefined && { sourceFile }),
+      ...(lineNumber !== undefined && { lineNumber }),
     };
 
     this.queue.add(fullEntry);
   }
 
   /**
+   * Log a message at the specified level
+   */
+  log(entry: LogEntry): void {
+    this._addLog(entry, 2);
+  }
+
+  /**
    * Log a debug message
    */
   debug(message: string, metadata?: Record<string, unknown>): void {
-    this.log({ level: 'debug', message, metadata });
+    this._addLog({ level: 'debug', message, metadata }, 2);
   }
 
   /**
    * Log an info message
    */
   info(message: string, metadata?: Record<string, unknown>): void {
-    this.log({ level: 'info', message, metadata });
+    this._addLog({ level: 'info', message, metadata }, 2);
   }
 
   /**
    * Log a warning message
    */
   warn(message: string, metadata?: Record<string, unknown>): void {
-    this.log({ level: 'warn', message, metadata });
+    this._addLog({ level: 'warn', message, metadata }, 2);
   }
 
   /**
    * Log an error message
    */
   error(message: string, metadata?: Record<string, unknown>): void {
-    this.log({ level: 'error', message, metadata });
+    this._addLog({ level: 'error', message, metadata }, 2);
   }
 
   /**
    * Log a fatal error message
    */
   fatal(message: string, metadata?: Record<string, unknown>): void {
-    this.log({ level: 'fatal', message, metadata });
+    this._addLog({ level: 'fatal', message, metadata }, 2);
   }
 
   /**

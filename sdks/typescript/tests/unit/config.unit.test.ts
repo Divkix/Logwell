@@ -198,4 +198,27 @@ describe('validateConfig', () => {
       }
     });
   });
+
+  describe('captureSourceLocation', () => {
+    it('defaults captureSourceLocation to false', () => {
+      const result = validateConfig(validConfigs.minimal);
+      expect(result.captureSourceLocation).toBe(false);
+    });
+
+    it('preserves captureSourceLocation when set to true', () => {
+      const result = validateConfig({
+        ...validConfigs.minimal,
+        captureSourceLocation: true,
+      });
+      expect(result.captureSourceLocation).toBe(true);
+    });
+
+    it('preserves captureSourceLocation when set to false explicitly', () => {
+      const result = validateConfig({
+        ...validConfigs.minimal,
+        captureSourceLocation: false,
+      });
+      expect(result.captureSourceLocation).toBe(false);
+    });
+  });
 });
