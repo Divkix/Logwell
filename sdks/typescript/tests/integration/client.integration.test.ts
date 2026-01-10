@@ -313,4 +313,48 @@ describe('Logwell Client', () => {
       expect(attempts).toBeGreaterThanOrEqual(2);
     }, 10000);
   });
+
+  describe('source location capture', () => {
+    it('sends sourceFile and lineNumber when captureSourceLocation is enabled', async () => {
+      const client = new Logwell({
+        ...defaultConfig,
+        captureSourceLocation: true,
+      });
+
+      client.info('Log with source location');
+      await client.flush();
+
+      expect(capturedLogs).toHaveLength(1);
+      expect(capturedLogs[0].sourceFile).toBeDefined();
+      expect(capturedLogs[0].sourceFile).toContain('client.integration.test.ts');
+      expect(capturedLogs[0].lineNumber).toBeDefined();
+      expect(typeof capturedLogs[0].lineNumber).toBe('number');
+      expect(capturedLogs[0].lineNumber).toBeGreaterThan(0);
+    });
+
+    it('does not send sourceFile when captureSourceLocation is disabled', async () => {
+      const client = new Logwell({
+        ...defaultConfig,
+        captureSourceLocation: false,
+      });
+
+      client.info('Log without source location');
+      await client.flush();
+
+      expect(capturedLogs).toHaveLength(1);
+      expect(capturedLogs[0].sourceFile).toBeUndefined();
+      expect(capturedLogs[0].lineNumber).toBeUndefined();
+    });
+
+    it('does not send sourceFile by default', async () => {
+      const client = new Logwell(defaultConfig);
+
+      client.info('Log with default config');
+      await client.flush();
+
+      expect(capturedLogs).toHaveLength(1);
+      expect(capturedLogs[0].sourceFile).toBeUndefined();
+      expect(capturedLogs[0].lineNumber).toBeUndefined();
+    });
+  });
 });

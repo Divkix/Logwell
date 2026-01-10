@@ -9,6 +9,7 @@ export const DEFAULT_CONFIG = {
   flushInterval: 5000,
   maxQueueSize: 1000,
   maxRetries: 3,
+  captureSourceLocation: false,
 } as const;
 
 /**
@@ -100,6 +101,7 @@ export function validateConfig(config: Partial<LogwellConfig>): LogwellConfig {
     flushInterval: config.flushInterval ?? DEFAULT_CONFIG.flushInterval,
     maxQueueSize: config.maxQueueSize ?? DEFAULT_CONFIG.maxQueueSize,
     maxRetries: config.maxRetries ?? DEFAULT_CONFIG.maxRetries,
+    captureSourceLocation: config.captureSourceLocation ?? DEFAULT_CONFIG.captureSourceLocation,
     onError: config.onError,
     onFlush: config.onFlush,
   };

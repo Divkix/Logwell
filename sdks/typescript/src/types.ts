@@ -12,6 +12,10 @@ export interface LogEntry {
   timestamp?: string;
   service?: string;
   metadata?: Record<string, unknown>;
+  /** Source file path where the log was called */
+  sourceFile?: string;
+  /** Line number in the source file where the log was called */
+  lineNumber?: number;
 }
 
 /**
@@ -32,6 +36,8 @@ export interface LogwellConfig {
   maxQueueSize?: number;
   /** Max retry attempts (default: 3) */
   maxRetries?: number;
+  /** Capture source file and line number (default: false). Has performance overhead when enabled. */
+  captureSourceLocation?: boolean;
   /** Called on send failures */
   onError?: (error: Error) => void;
   /** Called after successful flush */

@@ -26,6 +26,12 @@ export const validConfigs = {
     endpoint: 'https://test.logwell.io',
     service: 'my-app',
   } satisfies LogwellConfig,
+
+  withSourceLocation: {
+    apiKey: 'lw_aBcDeFgHiJkLmNoPqRsTuVwXyZ123456',
+    endpoint: 'https://test.logwell.io',
+    captureSourceLocation: true,
+  } satisfies LogwellConfig,
 };
 
 /**

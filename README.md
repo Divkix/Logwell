@@ -295,7 +295,7 @@ logger.error('Database failed', { host: 'db.local' });
 await logger.shutdown();
 ```
 
-Features: Zero dependencies, automatic batching, retry with backoff, TypeScript-first.
+Features: Zero dependencies, automatic batching, retry with backoff, TypeScript-first, opt-in source location capture.
 
 > **Deno users:** Install from JSR with `deno add jsr:@divkix/logwell` and import from `@divkix/logwell`
 
