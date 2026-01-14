@@ -82,7 +82,20 @@ export function formatBucketLabel(timestamp: Date, range: TimeRange): string {
   const minutes = timestamp.getUTCMinutes().toString().padStart(2, '0');
 
   if (range === '7d') {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
     const month = months[timestamp.getUTCMonth()];
     const day = timestamp.getUTCDate();
     return `${month} ${day} ${hours}:${minutes}`;

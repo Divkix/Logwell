@@ -2,16 +2,12 @@ import { json } from '@sveltejs/kit';
 import { and, eq, gte, lte, type SQL } from 'drizzle-orm';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
+import type { TimeRange } from '$lib/components/time-range-picker.svelte';
 import type * as schema from '$lib/server/db/schema';
 import { log, project } from '$lib/server/db/schema';
 import { requireAuth } from '$lib/server/utils/auth-guard';
 import { getTimeRangeStart } from '$lib/utils/format';
-import {
-  bucketTimestamps,
-  fillMissingBuckets,
-  getTimeBucketConfig,
-} from '$lib/utils/timeseries';
-import type { TimeRange } from '$lib/components/time-range-picker.svelte';
+import { bucketTimestamps, fillMissingBuckets, getTimeBucketConfig } from '$lib/utils/timeseries';
 import type { RequestEvent } from './$types';
 
 type DatabaseClient = PostgresJsDatabase<typeof schema> | PgliteDatabase<typeof schema>;
@@ -91,15 +87,10 @@ export async function GET(event: RequestEvent): Promise<Response> {
   const whereClause = and(...conditions);
 
   // Fetch log timestamps in range
-  const logs = await db
-    .select({ timestamp: log.timestamp })
-    .from(log)
-    .where(whereClause);
+  const logs = await db.select({ timestamp: log.timestamp }).from(log).where(whereClause);
 
   // Convert to Date objects (filter nulls)
-  const timestamps = logs
-    .map((l) => l.timestamp)
-    .filter((ts): ts is Date => ts !== null);
+  const timestamps = logs.map((l) => l.timestamp).filter((ts): ts is Date => ts !== null);
 
   // Bucket the timestamps
   const bucketCounts = bucketTimestamps(timestamps, config, rangeStart);

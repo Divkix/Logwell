@@ -121,12 +121,7 @@ describe('GET /api/projects/[id]/stats/timeseries', () => {
         { method: 'GET' },
       );
 
-      const event = createRequestEvent(
-        request,
-        db,
-        { id: 'non-existent-id' },
-        authenticatedLocals,
-      );
+      const event = createRequestEvent(request, db, { id: 'non-existent-id' }, authenticatedLocals);
       const response = await GET(event as never);
 
       expect(response.status).toBe(404);
@@ -144,12 +139,7 @@ describe('GET /api/projects/[id]/stats/timeseries', () => {
         { method: 'GET' },
       );
 
-      const event = createRequestEvent(
-        request,
-        db,
-        { id: testProject.id },
-        authenticatedLocals,
-      );
+      const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
       const response = await GET(event as never);
       const data = await response.json();
 
@@ -165,12 +155,7 @@ describe('GET /api/projects/[id]/stats/timeseries', () => {
         { method: 'GET' },
       );
 
-      const event = createRequestEvent(
-        request,
-        db,
-        { id: testProject.id },
-        authenticatedLocals,
-      );
+      const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
       const response = await GET(event as never);
       const data = await response.json();
 
@@ -185,12 +170,7 @@ describe('GET /api/projects/[id]/stats/timeseries', () => {
         { method: 'GET' },
       );
 
-      const event = createRequestEvent(
-        request,
-        db,
-        { id: testProject.id },
-        authenticatedLocals,
-      );
+      const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
       const response = await GET(event as never);
       const data = await response.json();
 
@@ -205,12 +185,7 @@ describe('GET /api/projects/[id]/stats/timeseries', () => {
         { method: 'GET' },
       );
 
-      const event = createRequestEvent(
-        request,
-        db,
-        { id: testProject.id },
-        authenticatedLocals,
-      );
+      const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
       const response = await GET(event as never);
       const data = await response.json();
 
@@ -225,12 +200,7 @@ describe('GET /api/projects/[id]/stats/timeseries', () => {
         { method: 'GET' },
       );
 
-      const event = createRequestEvent(
-        request,
-        db,
-        { id: testProject.id },
-        authenticatedLocals,
-      );
+      const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
       const response = await GET(event as never);
       const data = await response.json();
 
@@ -249,12 +219,7 @@ describe('GET /api/projects/[id]/stats/timeseries', () => {
         { method: 'GET' },
       );
 
-      const event = createRequestEvent(
-        request,
-        db,
-        { id: testProject.id },
-        authenticatedLocals,
-      );
+      const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
       const response = await GET(event as never);
       const data = await response.json();
 
@@ -277,12 +242,7 @@ describe('GET /api/projects/[id]/stats/timeseries', () => {
         { method: 'GET' },
       );
 
-      const event = createRequestEvent(
-        request,
-        db,
-        { id: testProject.id },
-        authenticatedLocals,
-      );
+      const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
       const response = await GET(event as never);
       const data = await response.json();
 
@@ -310,12 +270,7 @@ describe('GET /api/projects/[id]/stats/timeseries', () => {
         { method: 'GET' },
       );
 
-      const event = createRequestEvent(
-        request,
-        db,
-        { id: testProject.id },
-        authenticatedLocals,
-      );
+      const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
       const response = await GET(event as never);
       const data = await response.json();
 
@@ -333,17 +288,12 @@ describe('GET /api/projects/[id]/stats/timeseries', () => {
         { method: 'GET' },
       );
 
-      const event = createRequestEvent(
-        request,
-        db,
-        { id: testProject.id },
-        authenticatedLocals,
-      );
+      const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
       const response = await GET(event as never);
       const data = await response.json();
 
-      const timestamps = data.buckets.map(
-        (b: { timestamp: string }) => new Date(b.timestamp).getTime(),
+      const timestamps = data.buckets.map((b: { timestamp: string }) =>
+        new Date(b.timestamp).getTime(),
       );
       const sorted = [...timestamps].sort((a, b) => a - b);
 
@@ -357,12 +307,7 @@ describe('GET /api/projects/[id]/stats/timeseries', () => {
         { method: 'GET' },
       );
 
-      const event = createRequestEvent(
-        request,
-        db,
-        { id: testProject.id },
-        authenticatedLocals,
-      );
+      const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
       const response = await GET(event as never);
       const data = await response.json();
 
@@ -387,12 +332,7 @@ describe('GET /api/projects/[id]/stats/timeseries', () => {
         { method: 'GET' },
       );
 
-      const event = createRequestEvent(
-        request,
-        db,
-        { id: project1.id },
-        authenticatedLocals,
-      );
+      const event = createRequestEvent(request, db, { id: project1.id }, authenticatedLocals);
       const response = await GET(event as never);
       const data = await response.json();
 
@@ -419,12 +359,7 @@ describe('GET /api/projects/[id]/stats/timeseries', () => {
         { method: 'GET' },
       );
 
-      const event = createRequestEvent(
-        request,
-        db,
-        { id: testProject.id },
-        authenticatedLocals,
-      );
+      const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
       const response = await GET(event as never);
       const data = await response.json();
 
