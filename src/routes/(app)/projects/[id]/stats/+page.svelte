@@ -6,6 +6,8 @@ import BottomNav from '$lib/components/bottom-nav.svelte';
 import LevelChart from '$lib/components/level-chart.svelte';
 import StatsSkeleton from '$lib/components/stats-skeleton.svelte';
 import TimeRangePicker, { type TimeRange } from '$lib/components/time-range-picker.svelte';
+import TimeseriesChart from '$lib/components/timeseries-chart.svelte';
+import type { TimeSeriesBucket } from '$lib/utils/timeseries';
 import type { PageData } from './$types';
 
 const { data }: { data: PageData } = $props();
@@ -14,6 +16,35 @@ const { data }: { data: PageData } = $props();
 // svelte-ignore state_referenced_locally
 let selectedRange = $state<TimeRange>((data.filters.range as TimeRange) || '24h');
 let loading = $state(false);
+
+// Timeseries chart state
+let timeseriesData = $state<TimeSeriesBucket[]>([]);
+let timeseriesLoading = $state(true);
+let timeseriesError = $state<string | undefined>();
+
+// Fetch timeseries data
+async function fetchTimeseries(range: TimeRange) {
+  timeseriesLoading = true;
+  timeseriesError = undefined;
+  try {
+    const res = await fetch(`/api/projects/${data.project.id}/stats/timeseries?range=${range}`);
+    if (!res.ok) {
+      throw new Error('Failed to load timeseries data');
+    }
+    const json = await res.json();
+    timeseriesData = json.buckets;
+  } catch (e) {
+    timeseriesError = e instanceof Error ? e.message : 'Unknown error';
+    timeseriesData = [];
+  } finally {
+    timeseriesLoading = false;
+  }
+}
+
+// Fetch timeseries on mount and when range changes
+$effect(() => {
+  fetchTimeseries(selectedRange);
+});
 
 // Show skeleton when navigating TO this page
 const isNavigating = $derived($navigating?.to?.url.pathname.endsWith('/stats') ?? false);
@@ -77,7 +108,7 @@ const chartData = $derived({
       </div>
     </div>
 
-    <!-- Chart Section -->
+    <!-- Level Distribution Chart Section -->
     <div class="flex justify-center py-4 sm:py-8">
       {#if loading}
         <div class="flex flex-col gap-4">
@@ -95,6 +126,19 @@ const chartData = $derived({
         <LevelChart data={chartData} />
       {/if}
     </div>
+
+    <!-- Timeseries Chart Section -->
+    <section class="mt-6 sm:mt-8">
+      <h3 class="text-base sm:text-lg font-semibold mb-4">Logs Over Time</h3>
+      <div class="h-[250px] sm:h-[300px]">
+        <TimeseriesChart
+          data={timeseriesData}
+          range={selectedRange}
+          loading={timeseriesLoading}
+          error={timeseriesError}
+        />
+      </div>
+    </section>
 
     <!-- Summary Stats -->
     <div class="text-center text-xs sm:text-sm text-muted-foreground">

@@ -1,47 +1,47 @@
 <script lang="ts">
-  import { browser } from '$app/environment';
-  import { cn } from '$lib/utils';
-  import type { TimeSeriesBucket } from '$lib/utils/timeseries';
-  import type { TimeRange } from './time-range-picker.svelte';
+import { browser } from '$app/environment';
+import { cn } from '$lib/utils';
+import type { TimeSeriesBucket } from '$lib/utils/timeseries';
+import type { TimeRange } from './time-range-picker.svelte';
 
-  interface Props {
-    data: TimeSeriesBucket[];
-    range: TimeRange;
-    loading?: boolean;
-    error?: string;
-    class?: string;
+interface Props {
+  data: TimeSeriesBucket[];
+  range: TimeRange;
+  loading?: boolean;
+  error?: string;
+  class?: string;
+}
+
+let { data, range, loading = false, error, class: className }: Props = $props();
+
+// Transform data for chart
+const chartData = $derived(
+  data.map((d) => ({
+    date: new Date(d.timestamp),
+    count: d.count,
+  })),
+);
+
+// Determine if we should show the chart
+const showChart = $derived(!loading && !error && data.length > 0);
+const showEmpty = $derived(!loading && !error && data.length === 0);
+
+// Format axis label based on range
+function formatAxisLabel(date: Date): string {
+  const hours = date.getUTCHours().toString().padStart(2, '0');
+  const minutes = date.getUTCMinutes().toString().padStart(2, '0');
+
+  if (range === '7d') {
+    return `${date.getUTCMonth() + 1}/${date.getUTCDate()}`;
   }
 
-  let { data, range, loading = false, error, class: className }: Props = $props();
+  return `${hours}:${minutes}`;
+}
 
-  // Transform data for chart
-  const chartData = $derived(
-    data.map((d) => ({
-      date: new Date(d.timestamp),
-      count: d.count,
-    })),
-  );
-
-  // Determine if we should show the chart
-  const showChart = $derived(!loading && !error && data.length > 0);
-  const showEmpty = $derived(!loading && !error && data.length === 0);
-
-  // Format axis label based on range
-  function formatAxisLabel(date: Date): string {
-    const hours = date.getUTCHours().toString().padStart(2, '0');
-    const minutes = date.getUTCMinutes().toString().padStart(2, '0');
-
-    if (range === '7d') {
-      return `${date.getUTCMonth() + 1}/${date.getUTCDate()}`;
-    }
-
-    return `${hours}:${minutes}`;
-  }
-
-  // Format tooltip date
-  function formatTooltipDate(date: Date): string {
-    return date.toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
-  }
+// Format tooltip date
+function formatTooltipDate(date: Date): string {
+  return `${date.toISOString().replace('T', ' ').slice(0, 19)} UTC`;
+}
 </script>
 
 <div

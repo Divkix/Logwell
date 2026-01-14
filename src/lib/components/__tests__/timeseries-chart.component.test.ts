@@ -28,10 +28,7 @@ describe('TimeseriesChart', () => {
     it('has accessible aria-label', () => {
       render(TimeseriesChart, { props: { data: mockData, range: '24h' } });
       const chart = screen.getByTestId('timeseries-chart');
-      expect(chart).toHaveAttribute(
-        'aria-label',
-        'Time series chart showing log volume over time',
-      );
+      expect(chart).toHaveAttribute('aria-label', 'Time series chart showing log volume over time');
     });
 
     it('has role="figure"', () => {
@@ -108,9 +105,7 @@ describe('TimeseriesChart', () => {
     it('shows empty state message when data is empty array', () => {
       render(TimeseriesChart, { props: { data: [], range: '24h' } });
       expect(screen.getByTestId('timeseries-empty')).toBeInTheDocument();
-      expect(
-        screen.getByText('No data available for this time range'),
-      ).toBeInTheDocument();
+      expect(screen.getByText('No data available for this time range')).toBeInTheDocument();
     });
 
     it('does not show skeleton when empty', () => {
