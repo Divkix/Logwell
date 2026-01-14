@@ -328,3 +328,118 @@ test.describe('Stats Page - Responsive Layout', () => {
     await expect(page.getByRole('button', { name: /last 24 hours/i })).toBeVisible();
   });
 });
+
+test.describe('Stats Page - Timeseries Chart', () => {
+  test.describe.configure({ retries: 1 });
+
+  let testProject: { id: string; name: string; apiKey: string };
+
+  test.beforeEach(async ({ page }) => {
+    await login(page);
+    testProject = await createProject(page, `stats-timeseries-test-${Date.now()}`);
+
+    // Ingest logs with different levels for timeseries testing
+    await ingestOtlpLogs(page, testProject.apiKey, [
+      { level: 'info', message: 'Info log 1' },
+      { level: 'info', message: 'Info log 2' },
+      { level: 'error', message: 'Error log 1' },
+    ]);
+  });
+
+  test.afterEach(async ({ page }) => {
+    if (testProject?.id) {
+      await deleteProject(page, testProject.id);
+    }
+  });
+
+  test('should display timeseries chart on stats page', async ({ page }) => {
+    await page.goto(`/projects/${testProject.id}/stats`);
+
+    // Should display the timeseries chart container
+    await expect(page.locator('[data-testid="timeseries-chart"]')).toBeVisible();
+
+    // Should display the "Logs Over Time" heading
+    await expect(page.getByRole('heading', { name: /logs over time/i })).toBeVisible();
+  });
+
+  test('should show loading state then chart', async ({ page }) => {
+    // Set up response listener BEFORE navigating to avoid race condition
+    const responsePromise = page.waitForResponse(
+      (response) => response.url().includes('/stats/timeseries') && response.status() === 200,
+    );
+
+    await page.goto(`/projects/${testProject.id}/stats`);
+
+    // Chart container should be visible
+    await expect(page.locator('[data-testid="timeseries-chart"]')).toBeVisible();
+
+    // Wait for loading to complete
+    await responsePromise;
+
+    // After loading, chart should be rendered (no skeleton or error)
+    await expect(page.locator('[data-testid="timeseries-skeleton"]')).not.toBeVisible();
+    await expect(page.locator('[data-testid="timeseries-error"]')).not.toBeVisible();
+  });
+
+  test('should update timeseries chart when time range changes', async ({ page }) => {
+    // Set up response listener BEFORE navigating to avoid race condition
+    const initialResponsePromise = page.waitForResponse(
+      (response) => response.url().includes('/stats/timeseries') && response.status() === 200,
+    );
+
+    await page.goto(`/projects/${testProject.id}/stats`);
+
+    // Wait for initial chart to load
+    await initialResponsePromise;
+
+    // Click 7d time range
+    await page.getByRole('button', { name: /last 7 days/i }).click();
+
+    // Should trigger a new API request
+    await page.waitForResponse(
+      (response) =>
+        response.url().includes('/stats/timeseries?range=7d') && response.status() === 200,
+    );
+
+    // Chart should still be visible
+    await expect(page.locator('[data-testid="timeseries-chart"]')).toBeVisible();
+  });
+});
+
+test.describe('Stats Page - Timeseries Empty State', () => {
+  test.describe.configure({ retries: 1 });
+
+  let testProject: { id: string; name: string; apiKey: string };
+
+  test.beforeEach(async ({ page }) => {
+    await login(page);
+    testProject = await createProject(page, `stats-timeseries-empty-test-${Date.now()}`);
+    // Don't ingest any logs
+  });
+
+  test.afterEach(async ({ page }) => {
+    if (testProject?.id) {
+      await deleteProject(page, testProject.id);
+    }
+  });
+
+  test('should display empty state when no logs exist', async ({ page }) => {
+    // Set up response listener BEFORE navigating to avoid race condition
+    const responsePromise = page.waitForResponse(
+      (response) => response.url().includes('/stats/timeseries') && response.status() === 200,
+    );
+
+    await page.goto(`/projects/${testProject.id}/stats`);
+
+    // Wait for API response
+    await responsePromise;
+
+    // Should show the chart container
+    await expect(page.locator('[data-testid="timeseries-chart"]')).toBeVisible();
+
+    // Should show empty state (all buckets have 0 count, which still renders the chart)
+    // The chart renders with zero values, so we just verify it's not in error/loading state
+    await expect(page.locator('[data-testid="timeseries-skeleton"]')).not.toBeVisible();
+    await expect(page.locator('[data-testid="timeseries-error"]')).not.toBeVisible();
+  });
+});
