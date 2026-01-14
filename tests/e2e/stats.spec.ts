@@ -363,16 +363,18 @@ test.describe('Stats Page - Timeseries Chart', () => {
   });
 
   test('should show loading state then chart', async ({ page }) => {
+    // Set up response listener BEFORE navigating to avoid race condition
+    const responsePromise = page.waitForResponse(
+      (response) => response.url().includes('/stats/timeseries') && response.status() === 200,
+    );
+
     await page.goto(`/projects/${testProject.id}/stats`);
 
     // Chart container should be visible
     await expect(page.locator('[data-testid="timeseries-chart"]')).toBeVisible();
 
-    // Either skeleton (loading) or chart should be visible
     // Wait for loading to complete
-    await page.waitForResponse(
-      (response) => response.url().includes('/stats/timeseries') && response.status() === 200,
-    );
+    await responsePromise;
 
     // After loading, chart should be rendered (no skeleton or error)
     await expect(page.locator('[data-testid="timeseries-skeleton"]')).not.toBeVisible();
@@ -380,12 +382,15 @@ test.describe('Stats Page - Timeseries Chart', () => {
   });
 
   test('should update timeseries chart when time range changes', async ({ page }) => {
+    // Set up response listener BEFORE navigating to avoid race condition
+    const initialResponsePromise = page.waitForResponse(
+      (response) => response.url().includes('/stats/timeseries') && response.status() === 200,
+    );
+
     await page.goto(`/projects/${testProject.id}/stats`);
 
     // Wait for initial chart to load
-    await page.waitForResponse(
-      (response) => response.url().includes('/stats/timeseries') && response.status() === 200,
-    );
+    await initialResponsePromise;
 
     // Click 7d time range
     await page.getByRole('button', { name: /last 7 days/i }).click();
@@ -419,12 +424,15 @@ test.describe('Stats Page - Timeseries Empty State', () => {
   });
 
   test('should display empty state when no logs exist', async ({ page }) => {
+    // Set up response listener BEFORE navigating to avoid race condition
+    const responsePromise = page.waitForResponse(
+      (response) => response.url().includes('/stats/timeseries') && response.status() === 200,
+    );
+
     await page.goto(`/projects/${testProject.id}/stats`);
 
     // Wait for API response
-    await page.waitForResponse(
-      (response) => response.url().includes('/stats/timeseries') && response.status() === 200,
-    );
+    await responsePromise;
 
     // Should show the chart container
     await expect(page.locator('[data-testid="timeseries-chart"]')).toBeVisible();
