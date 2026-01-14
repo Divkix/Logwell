@@ -102,6 +102,8 @@ export const load: PageServerLoad = async (event) => {
     },
     filters: {
       range: rangeParam,
+      // Pass the exact timestamp used so timeseries can use the same range
+      from: fromDate?.toISOString() ?? null,
     },
   };
 };

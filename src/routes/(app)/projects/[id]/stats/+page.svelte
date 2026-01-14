@@ -23,11 +23,16 @@ let timeseriesLoading = $state(true);
 let timeseriesError = $state<string | undefined>();
 
 // Fetch timeseries data
-async function fetchTimeseries(range: TimeRange) {
+async function fetchTimeseries(range: TimeRange, from: string | null) {
   timeseriesLoading = true;
   timeseriesError = undefined;
   try {
-    const res = await fetch(`/api/projects/${data.project.id}/stats/timeseries?range=${range}`);
+    // Pass the 'from' timestamp to sync with page server's time range
+    const params = new URLSearchParams({ range });
+    if (from) {
+      params.set('from', from);
+    }
+    const res = await fetch(`/api/projects/${data.project.id}/stats/timeseries?${params}`);
     if (!res.ok) {
       throw new Error('Failed to load timeseries data');
     }
@@ -41,9 +46,9 @@ async function fetchTimeseries(range: TimeRange) {
   }
 }
 
-// Fetch timeseries on mount and when range changes
+// Fetch timeseries on mount and when data changes (page reload updates data.filters.from)
 $effect(() => {
-  fetchTimeseries(selectedRange);
+  fetchTimeseries(selectedRange, data.filters.from);
 });
 
 // Show skeleton when navigating TO this page

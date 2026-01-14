@@ -34,6 +34,7 @@ const VALID_RANGES: TimeRange[] = ['15m', '1h', '24h', '7d'];
  *
  * Query Parameters:
  * - range: string ('15m' | '1h' | '24h' | '7d') - Time range, defaults to '24h'
+ * - from: string (ISO 8601) - Optional start timestamp to sync with page server
  *
  * Response:
  * {
@@ -72,9 +73,14 @@ export async function GET(event: RequestEvent): Promise<Response> {
     ? (rangeParam as TimeRange)
     : '24h';
 
+  // Parse optional from parameter (to sync with page server's time range)
+  const fromParam = event.url.searchParams.get('from');
+
   // Calculate time boundaries
+  // If 'from' is provided, use it to ensure consistency with page server
+  // Otherwise calculate from current time
   const rangeEnd = new Date();
-  const rangeStart = getTimeRangeStart(range, rangeEnd);
+  const rangeStart = fromParam ? new Date(fromParam) : getTimeRangeStart(range, rangeEnd);
   const config = getTimeBucketConfig(range);
 
   // Build WHERE conditions
