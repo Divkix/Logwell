@@ -41,7 +41,7 @@ function handleKeyDown(event: KeyboardEvent) {
 <tr
   data-testid="log-row"
   data-selected={isSelected}
-  aria-selected={isSelected}
+  aria-current={isSelected ? 'true' : undefined}
   class={cn(
     'cursor-pointer hover:bg-muted/50 transition-colors border-b',
     isSelected && 'bg-primary/10 ring-1 ring-primary/50',

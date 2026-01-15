@@ -95,7 +95,7 @@ Focus: Validate the idea works end-to-end. Skip tests, accept hardcoded values.
   - _Requirements: FR-14, AC-1.7_
   - _Design: LogCard Component, Selected style_
 
-- [ ] V1 [VERIFY] Quality checkpoint: `bun run lint && bun run check`
+- [x] V1 [VERIFY] Quality checkpoint: `bun run lint && bun run check`
   - **Do**: Run quality commands and verify all pass
   - **Verify**: All commands exit 0
   - **Done when**: No lint errors, no type errors
