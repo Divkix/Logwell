@@ -275,7 +275,7 @@ After POC validated, clean up code and add polish.
   - **Commit**: `refactor(keyboard): clean up and document keyboard handling`
   - _Design: Code maintainability (NFR-5)_
 
-- [ ] V3 [VERIFY] Quality checkpoint: `bun run lint && bun run check && bun run knip`
+- [x] V3 [VERIFY] Quality checkpoint: `bun run lint && bun run check && bun run knip`
   - **Do**: Run all quality commands including knip for unused exports
   - **Verify**: All commands exit 0
   - **Done when**: No lint errors, no type errors, no unused exports
@@ -283,7 +283,7 @@ After POC validated, clean up code and add polish.
 
 ## Phase 3: Testing
 
-- [ ] 3.1 Unit tests for keyboard utilities
+- [x] 3.1 Unit tests for keyboard utilities
   - **Do**:
     1. Create `src/lib/utils/keyboard.test.ts`
     2. Test `shouldBlockShortcut`:
