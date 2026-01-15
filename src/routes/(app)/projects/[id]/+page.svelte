@@ -11,6 +11,7 @@ import ClearFiltersButton from '$lib/components/clear-filters-button.svelte';
 import ConnectionStatus from '$lib/components/connection-status.svelte';
 import ExportButton from '$lib/components/export-button.svelte';
 import FilterPanel from '$lib/components/filter-panel.svelte';
+import KeyboardHelpModal from '$lib/components/keyboard-help-modal.svelte';
 import LevelFilter from '$lib/components/level-filter.svelte';
 import LiveToggle from '$lib/components/live-toggle.svelte';
 import LogDetailModal from '$lib/components/log-detail-modal.svelte';
@@ -71,6 +72,7 @@ let selectedLevels = $state<LogLevel[]>(data.filters.levels);
 let selectedRange = $state<TimeRange>((data.filters.range as TimeRange) || '1h');
 let selectedLog = $state<Log | null>(null);
 let showDetailModal = $state(false);
+let showHelpModal = $state(false);
 let selectedIndex = $state(-1);
 let loading = $state(false);
 let searchInputRef = $state<HTMLInputElement | null>(null);
@@ -251,7 +253,7 @@ function handleKeyboardShortcut(event: KeyboardEvent) {
   }
 
   // Block shortcuts when modal is open
-  if (showDetailModal) {
+  if (showDetailModal || showHelpModal) {
     return;
   }
 
@@ -289,6 +291,11 @@ function handleKeyboardShortcut(event: KeyboardEvent) {
       // Toggle live mode (skip if paused due to search)
       if (isLivePaused) return;
       liveEnabled = !liveEnabled;
+      break;
+    case '?':
+      // Open help modal
+      showHelpModal = true;
+      event.preventDefault();
       break;
   }
 }
@@ -448,6 +455,9 @@ function handleKeyboardShortcut(event: KeyboardEvent) {
 {#if selectedLog}
   <LogDetailModal log={selectedLog} open={showDetailModal} onClose={closeDetailModal} />
 {/if}
+
+<!-- Keyboard Help Modal -->
+<KeyboardHelpModal open={showHelpModal} onClose={() => showHelpModal = false} />
 
 <!-- Mobile Bottom Navigation -->
 <BottomNav projectId={data.project.id} />

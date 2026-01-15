@@ -187,7 +187,7 @@ Focus: Validate the idea works end-to-end. Skip tests, accept hardcoded values.
   - _Requirements: FR-11, AC-6.1, AC-6.2, AC-6.3, AC-6.4_
   - _Design: KeyboardHelpModal Component (NEW)_
 
-- [ ] 1.11 Add ? shortcut to open help modal
+- [x] 1.11 Add ? shortcut to open help modal
   - **Do**:
     1. In `+page.svelte`, add `let showHelpModal = $state(false)`
     2. In `handleKeyboardShortcut`, add case for `?`:
