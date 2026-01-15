@@ -267,4 +267,55 @@ describe('LogRow', () => {
       expect(row).not.toHaveClass('log-new');
     });
   });
+
+  describe('isSelected prop for keyboard navigation', () => {
+    it('renders without isSelected prop (default false)', () => {
+      render(LogRow, { props: { log: baseLog } });
+
+      const row = screen.getByTestId('log-row');
+      expect(row).toHaveAttribute('data-selected', 'false');
+      expect(row).not.toHaveAttribute('aria-current');
+      expect(row).not.toHaveClass('bg-primary/10');
+      expect(row).not.toHaveClass('ring-1');
+    });
+
+    it('applies selected class when isSelected=true', () => {
+      render(LogRow, { props: { log: baseLog, isSelected: true } });
+
+      const row = screen.getByTestId('log-row');
+      expect(row).toHaveClass('bg-primary/10');
+      expect(row).toHaveClass('ring-1');
+      expect(row).toHaveClass('ring-primary/50');
+    });
+
+    it('does not apply selected class when isSelected=false', () => {
+      render(LogRow, { props: { log: baseLog, isSelected: false } });
+
+      const row = screen.getByTestId('log-row');
+      expect(row).not.toHaveClass('bg-primary/10');
+      expect(row).not.toHaveClass('ring-1');
+      expect(row).not.toHaveClass('ring-primary/50');
+    });
+
+    it('has data-selected="true" when selected', () => {
+      render(LogRow, { props: { log: baseLog, isSelected: true } });
+
+      const row = screen.getByTestId('log-row');
+      expect(row).toHaveAttribute('data-selected', 'true');
+    });
+
+    it('has aria-current="true" when selected', () => {
+      render(LogRow, { props: { log: baseLog, isSelected: true } });
+
+      const row = screen.getByTestId('log-row');
+      expect(row).toHaveAttribute('aria-current', 'true');
+    });
+
+    it('does not have aria-current when not selected', () => {
+      render(LogRow, { props: { log: baseLog, isSelected: false } });
+
+      const row = screen.getByTestId('log-row');
+      expect(row).not.toHaveAttribute('aria-current');
+    });
+  });
 });

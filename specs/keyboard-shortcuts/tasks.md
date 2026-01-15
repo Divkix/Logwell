@@ -304,7 +304,7 @@ After POC validated, clean up code and add polish.
   - _Requirements: NFR-3_
   - _Design: Test Strategy - Unit Tests_
 
-- [ ] 3.2 Component tests for LogRow isSelected
+- [x] 3.2 Component tests for LogRow isSelected
   - **Do**:
     1. Add tests to existing `src/lib/components/log-row.test.ts` (or create if missing)
     2. Test:
