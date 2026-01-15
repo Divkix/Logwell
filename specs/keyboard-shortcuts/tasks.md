@@ -202,7 +202,7 @@ Focus: Validate the idea works end-to-end. Skip tests, accept hardcoded values.
   - _Requirements: FR-11, AC-6.1, AC-6.2_
   - _Design: Architecture diagram (HM state)_
 
-- [ ] 1.12 POC Checkpoint - End-to-end verification
+- [x] 1.12 POC Checkpoint - End-to-end verification
   - **Do**:
     1. Start dev server: `bun run dev`
     2. Navigate to a project with logs
