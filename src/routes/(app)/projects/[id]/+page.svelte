@@ -271,6 +271,14 @@ function handleKeyboardShortcut(event: KeyboardEvent) {
         scrollSelectedIntoView();
       }
       break;
+    case 'Enter':
+      // Open modal for selected log
+      if (selectedIndex >= 0 && selectedIndex < allLogs.length) {
+        selectedLog = allLogs[selectedIndex];
+        showDetailModal = true;
+      }
+      event.preventDefault();
+      break;
   }
 }
 </script>

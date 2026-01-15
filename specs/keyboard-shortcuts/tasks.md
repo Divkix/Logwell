@@ -101,7 +101,7 @@ Focus: Validate the idea works end-to-end. Skip tests, accept hardcoded values.
   - **Done when**: No lint errors, no type errors
   - **Commit**: `chore(keyboard): pass quality checkpoint` (only if fixes needed)
 
-- [ ] 1.6 Add Enter to open modal for selected log
+- [x] 1.6 Add Enter to open modal for selected log
   - **Do**:
     1. In `handleKeyboardShortcut`, add case for `Enter`:
        - If `selectedIndex >= 0 && selectedIndex < allLogs.length`:
