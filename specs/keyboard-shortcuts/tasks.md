@@ -115,7 +115,7 @@ Focus: Validate the idea works end-to-end. Skip tests, accept hardcoded values.
   - _Requirements: FR-6, AC-2.1, AC-2.2_
   - _Design: Modal Open Flow_
 
-- [ ] 1.7 Verify Escape closes modal (existing behavior)
+- [x] 1.7 Verify Escape closes modal (existing behavior)
   - **Do**:
     1. Verify `LogDetailModal` already handles Escape via `<svelte:document onkeydown>`
     2. Test manually: open modal with Enter, close with Escape
