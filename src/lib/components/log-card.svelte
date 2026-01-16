@@ -41,7 +41,7 @@ function handleKeyDown(event: KeyboardEvent) {
 <div
   data-testid="log-card"
   data-selected={isSelected}
-  aria-current={isSelected ? 'true' : undefined}
+  aria-current={isSelected || undefined}
   class={cn(
     'p-3 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors',
     isSelected && 'bg-primary/10 ring-1 ring-primary/50',
