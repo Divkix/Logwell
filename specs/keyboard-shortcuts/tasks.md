@@ -361,7 +361,7 @@ After POC validated, clean up code and add polish.
   - **Commit**: `test(keyboard): add component tests for KeyboardHelpModal`
   - _Design: Test Strategy - Component Tests_
 
-- [ ] V4 [VERIFY] Quality checkpoint: `bun run lint && bun run check && bun run test:unit && bun run test:component`
+- [x] V4 [VERIFY] Quality checkpoint: `bun run lint && bun run check && bun run test:unit && bun run test:component`
   - **Do**: Run full quality suite including tests
   - **Verify**: All commands exit 0
   - **Done when**: All lint, type, and test checks pass
@@ -369,13 +369,13 @@ After POC validated, clean up code and add polish.
 
 ## Phase 4: Quality Gates
 
-- [ ] 4.1 [VERIFY] Full local CI: `bun run lint && bun run check && bun run test:unit && bun run test:component && bun run build`
+- [x] 4.1 [VERIFY] Full local CI: `bun run lint && bun run check && bun run test:unit && bun run test:component && bun run build`
   - **Do**: Run complete local CI suite
   - **Verify**: All commands pass
   - **Done when**: Build succeeds, all tests pass
   - **Commit**: `chore(keyboard): pass local CI` (if fixes needed)
 
-- [ ] 4.2 [VERIFY] Create PR and verify CI pipeline
+- [x] 4.2 [VERIFY] Create PR and verify CI pipeline
   - **Do**:
     1. Verify current branch is a feature branch: `git branch --show-current`
     2. If on main, STOP and alert user
