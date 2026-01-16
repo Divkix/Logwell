@@ -297,12 +297,13 @@ function handleKeyboardShortcut(event: KeyboardEvent) {
       break;
     }
     case 'Enter':
-      // Open modal for selected log
+      // Open modal for selected log (only when a log is selected)
       if (selectedIndex >= 0 && selectedIndex < allLogs.length) {
         selectedLog = allLogs[selectedIndex];
         showDetailModal = true;
+        event.preventDefault();
       }
-      event.preventDefault();
+      // Don't preventDefault when no selection - allow buttons to work normally
       break;
     case '/':
       // Focus search input
