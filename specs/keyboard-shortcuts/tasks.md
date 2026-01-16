@@ -387,37 +387,37 @@ After POC validated, clean up code and add polish.
   - **If CI fails**: Read failure details, fix locally, push fixes, re-verify
   - **Commit**: None (PR creation)
 
-- [ ] 4.3 [VERIFY] Acceptance criteria checklist
+- [x] 4.3 [VERIFY] Acceptance criteria checklist
   - **Do**: Read requirements.md, verify each AC is satisfied:
-    - [ ] AC-1.1: j moves selection to next log
-    - [ ] AC-1.2: k moves selection to previous log
-    - [ ] AC-1.3: First j selects first log
-    - [ ] AC-1.4: Navigation stops at boundaries
-    - [ ] AC-1.5: Selected log scrolls into view
-    - [ ] AC-1.6: Shortcuts disabled in form fields
-    - [ ] AC-1.7: Visual selection on LogRow and LogCard
-    - [ ] AC-2.1: Enter opens modal for selected log
-    - [ ] AC-2.2: Enter does nothing without selection
-    - [ ] AC-2.3: Modal has focus trap
-    - [ ] AC-3.1: Escape closes modal
-    - [ ] AC-3.2: Focus returns after modal close
-    - [ ] AC-3.3: Selection preserved after modal close
-    - [ ] AC-4.1: / focuses search
-    - [ ] AC-4.2: / prevented from typing
-    - [ ] AC-4.3: Works regardless of scroll
-    - [ ] AC-4.4: Escape in search blurs it
-    - [ ] AC-5.1: l toggles liveEnabled
-    - [ ] AC-5.2: Visual feedback matches toggle
-    - [ ] AC-5.3: Toggle disabled when search active
-    - [ ] AC-5.4: Shortcut disabled in form fields
-    - [ ] AC-6.1: ? opens help modal
-    - [ ] AC-6.2: Help modal closes with Escape
-    - [ ] AC-6.3: Shortcuts displayed in scannable format
-    - [ ] AC-6.4: Help modal doesn't interfere with other modals
-    - [ ] AC-7.1: Selection resets on search change
-    - [ ] AC-7.2: Selection resets on level filter change
-    - [ ] AC-7.3: Selection resets on time range change
-    - [ ] AC-7.4: Selection visual removed on reset
+    - [x] AC-1.1: j moves selection to next log
+    - [x] AC-1.2: k moves selection to previous log
+    - [x] AC-1.3: First j selects first log
+    - [x] AC-1.4: Navigation stops at boundaries
+    - [x] AC-1.5: Selected log scrolls into view
+    - [x] AC-1.6: Shortcuts disabled in form fields
+    - [x] AC-1.7: Visual selection on LogRow and LogCard
+    - [x] AC-2.1: Enter opens modal for selected log
+    - [x] AC-2.2: Enter does nothing without selection
+    - [x] AC-2.3: Modal has focus trap
+    - [x] AC-3.1: Escape closes modal
+    - [x] AC-3.2: Focus returns after modal close
+    - [x] AC-3.3: Selection preserved after modal close
+    - [x] AC-4.1: / focuses search
+    - [x] AC-4.2: / prevented from typing
+    - [x] AC-4.3: Works regardless of scroll
+    - [x] AC-4.4: Escape in search blurs it
+    - [x] AC-5.1: l toggles liveEnabled
+    - [x] AC-5.2: Visual feedback matches toggle
+    - [x] AC-5.3: Toggle disabled when search active
+    - [x] AC-5.4: Shortcut disabled in form fields
+    - [x] AC-6.1: ? opens help modal
+    - [x] AC-6.2: Help modal closes with Escape
+    - [x] AC-6.3: Shortcuts displayed in scannable format
+    - [x] AC-6.4: Help modal doesn't interfere with other modals
+    - [x] AC-7.1: Selection resets on search change
+    - [x] AC-7.2: Selection resets on level filter change
+    - [x] AC-7.3: Selection resets on time range change
+    - [x] AC-7.4: Selection visual removed on reset
   - **Verify**: Manual review against implementation
   - **Done when**: All acceptance criteria confirmed met
   - **Commit**: None (verification only)
