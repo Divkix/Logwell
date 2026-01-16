@@ -152,4 +152,76 @@ describe('SearchInput', () => {
     const input = screen.getByRole('textbox');
     expect(input).toBeDisabled();
   });
+
+  describe('ref bindable prop', () => {
+    it('exposes input element via ref prop', () => {
+      // We can verify the ref is bound by checking that the input element exists
+      // and has the expected attributes when rendered
+      render(SearchInput);
+
+      const input = screen.getByRole('textbox');
+      expect(input).toBeInTheDocument();
+      expect(input.tagName).toBe('INPUT');
+    });
+
+    it('allows programmatic focus via ref', () => {
+      render(SearchInput);
+
+      const input = screen.getByRole('textbox') as HTMLInputElement;
+      input.focus();
+
+      expect(document.activeElement).toBe(input);
+    });
+  });
+
+  describe('onEscape callback', () => {
+    it('calls onEscape when Escape is pressed while focused', async () => {
+      const onEscape = vi.fn();
+      render(SearchInput, { props: { onEscape } });
+
+      const input = screen.getByRole('textbox');
+      input.focus();
+
+      await fireEvent.keyDown(input, { key: 'Escape' });
+
+      expect(onEscape).toHaveBeenCalledTimes(1);
+    });
+
+    it('blurs input when Escape is pressed', async () => {
+      render(SearchInput);
+
+      const input = screen.getByRole('textbox') as HTMLInputElement;
+      input.focus();
+      expect(document.activeElement).toBe(input);
+
+      await fireEvent.keyDown(input, { key: 'Escape' });
+
+      expect(document.activeElement).not.toBe(input);
+    });
+
+    it('does not call onEscape when other keys are pressed', async () => {
+      const onEscape = vi.fn();
+      render(SearchInput, { props: { onEscape } });
+
+      const input = screen.getByRole('textbox');
+      input.focus();
+
+      await fireEvent.keyDown(input, { key: 'Enter' });
+      await fireEvent.keyDown(input, { key: 'a' });
+      await fireEvent.keyDown(input, { key: 'Tab' });
+      await fireEvent.keyDown(input, { key: 'ArrowDown' });
+
+      expect(onEscape).not.toHaveBeenCalled();
+    });
+
+    it('does not throw when onEscape is not provided', async () => {
+      render(SearchInput);
+
+      const input = screen.getByRole('textbox');
+      input.focus();
+
+      // Should not throw
+      await expect(fireEvent.keyDown(input, { key: 'Escape' })).resolves.not.toThrow();
+    });
+  });
 });

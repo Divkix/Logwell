@@ -9,6 +9,8 @@ interface Props {
   placeholder?: string;
   disabled?: boolean;
   onsearch?: (value: string) => void;
+  ref?: HTMLInputElement | null;
+  onEscape?: () => void;
 }
 
 let {
@@ -16,7 +18,16 @@ let {
   placeholder = 'Search...',
   disabled = false,
   onsearch,
+  ref = $bindable(null),
+  onEscape,
 }: Props = $props();
+
+function handleKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    ref?.blur();
+    onEscape?.();
+  }
+}
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -57,6 +68,8 @@ $effect(() => {
     {disabled}
     {value}
     oninput={handleInput}
+    onkeydown={handleKeydown}
+    bind:ref
     class="pl-9"
   />
 </div>

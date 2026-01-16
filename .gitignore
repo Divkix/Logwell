@@ -27,3 +27,5 @@ coverage/
 test-results/
 playwright-report/
 .playwright/
+specs/.current-spec
+**/.progress.md

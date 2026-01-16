@@ -115,4 +115,39 @@ describe('LogCard', () => {
       await expect(fireEvent.click(card)).resolves.not.toThrow();
     });
   });
+
+  describe('isSelected prop for keyboard navigation', () => {
+    it('renders without isSelected prop (default false)', () => {
+      render(LogCard, { props: { log: baseLog } });
+
+      const card = screen.getByTestId('log-card');
+      expect(card).toHaveAttribute('data-selected', 'false');
+      expect(card).not.toHaveAttribute('aria-current');
+      expect(card).not.toHaveClass('bg-primary/10');
+      expect(card).not.toHaveClass('ring-1');
+    });
+
+    it('applies selected class when isSelected=true', () => {
+      render(LogCard, { props: { log: baseLog, isSelected: true } });
+
+      const card = screen.getByTestId('log-card');
+      expect(card).toHaveClass('bg-primary/10');
+      expect(card).toHaveClass('ring-1');
+      expect(card).toHaveClass('ring-primary/50');
+    });
+
+    it('has data-selected="true" when selected', () => {
+      render(LogCard, { props: { log: baseLog, isSelected: true } });
+
+      const card = screen.getByTestId('log-card');
+      expect(card).toHaveAttribute('data-selected', 'true');
+    });
+
+    it('has aria-current="true" when selected', () => {
+      render(LogCard, { props: { log: baseLog, isSelected: true } });
+
+      const card = screen.getByTestId('log-card');
+      expect(card).toHaveAttribute('aria-current', 'true');
+    });
+  });
 });

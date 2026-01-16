@@ -11,6 +11,7 @@ import ClearFiltersButton from '$lib/components/clear-filters-button.svelte';
 import ConnectionStatus from '$lib/components/connection-status.svelte';
 import ExportButton from '$lib/components/export-button.svelte';
 import FilterPanel from '$lib/components/filter-panel.svelte';
+import KeyboardHelpModal from '$lib/components/keyboard-help-modal.svelte';
 import LevelFilter from '$lib/components/level-filter.svelte';
 import LiveToggle from '$lib/components/live-toggle.svelte';
 import LogDetailModal from '$lib/components/log-detail-modal.svelte';
@@ -22,6 +23,8 @@ import Button from '$lib/components/ui/button/button.svelte';
 import { useLogStream } from '$lib/hooks/use-log-stream.svelte';
 import type { Log, LogLevel, Project } from '$lib/server/db/schema';
 import type { ClientLog } from '$lib/stores/logs.svelte';
+import { announceToScreenReader } from '$lib/utils/focus-trap';
+import { shouldBlockShortcut } from '$lib/utils/keyboard';
 import { toastError } from '$lib/utils/toast';
 import type { PageData } from './$types';
 
@@ -70,7 +73,10 @@ let selectedLevels = $state<LogLevel[]>(data.filters.levels);
 let selectedRange = $state<TimeRange>((data.filters.range as TimeRange) || '1h');
 let selectedLog = $state<Log | null>(null);
 let showDetailModal = $state(false);
+let showHelpModal = $state(false);
+let selectedIndex = $state(-1);
 let loading = $state(false);
+let searchInputRef = $state<HTMLInputElement | null>(null);
 
 // Track new log IDs for highlighting
 let newLogIds = $state<Set<string>>(new Set());
@@ -150,16 +156,19 @@ const allLogs = $derived([...streamedLogs, ...data.logs.map(parseLogTimestamp), 
 
 function handleSearch(value: string) {
   searchValue = value;
+  selectedIndex = -1;
   updateFilters();
 }
 
 function handleLevelChange(levels: LogLevel[]) {
   selectedLevels = levels;
+  selectedIndex = -1;
   updateFilters();
 }
 
 function handleTimeRangeChange(range: TimeRange) {
   selectedRange = range;
+  selectedIndex = -1;
   updateFilters();
 }
 
@@ -218,6 +227,7 @@ function clearFilters() {
   searchValue = '';
   selectedLevels = [];
   selectedRange = '1h';
+  selectedIndex = -1;
   updateFilters();
 }
 
@@ -235,7 +245,86 @@ function handleRemoveRange() {
   selectedRange = '1h';
   updateFilters();
 }
+
+function scrollSelectedIntoView() {
+  const element = document.querySelector('[data-selected="true"]');
+  element?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+function handleKeyboardShortcut(event: KeyboardEvent) {
+  // Block shortcuts in form elements, during IME composition, or with modifiers
+  if (shouldBlockShortcut(event)) {
+    return;
+  }
+
+  // Block shortcuts when modal is open
+  if (showDetailModal || showHelpModal) {
+    return;
+  }
+
+  // Block navigation during loading state
+  const isLoading = loading || isLoadingMore;
+
+  switch (event.key) {
+    case 'j': {
+      // Skip navigation when loading or no logs
+      if (isLoading || allLogs.length === 0) return;
+      // Navigate to next log
+      const prevIndexJ = selectedIndex;
+      if (selectedIndex < allLogs.length - 1) {
+        selectedIndex++;
+      } else if (selectedIndex === -1 && allLogs.length > 0) {
+        selectedIndex = 0;
+      }
+      if (selectedIndex !== prevIndexJ) {
+        scrollSelectedIntoView();
+        announceToScreenReader(`Log ${selectedIndex + 1} of ${allLogs.length}`);
+      }
+      break;
+    }
+    case 'k': {
+      // Skip navigation when loading or no logs
+      if (isLoading || allLogs.length === 0) return;
+      // Navigate to previous log
+      const prevIndexK = selectedIndex;
+      if (selectedIndex > 0) {
+        selectedIndex--;
+      }
+      if (selectedIndex !== prevIndexK) {
+        scrollSelectedIntoView();
+        announceToScreenReader(`Log ${selectedIndex + 1} of ${allLogs.length}`);
+      }
+      break;
+    }
+    case 'Enter':
+      // Open modal for selected log (only when a log is selected)
+      if (selectedIndex >= 0 && selectedIndex < allLogs.length) {
+        selectedLog = allLogs[selectedIndex];
+        showDetailModal = true;
+        event.preventDefault();
+      }
+      // Don't preventDefault when no selection - allow buttons to work normally
+      break;
+    case '/':
+      // Focus search input
+      event.preventDefault();
+      searchInputRef?.focus();
+      break;
+    case 'l':
+      // Toggle live mode (skip if paused due to search)
+      if (isLivePaused) return;
+      liveEnabled = !liveEnabled;
+      break;
+    case '?':
+      // Open help modal
+      showHelpModal = true;
+      event.preventDefault();
+      break;
+  }
+}
 </script>
+
+<svelte:document onkeydown={handleKeyboardShortcut} />
 
 {#if isNavigating}
   <LogStreamSkeleton />
@@ -299,6 +388,7 @@ function handleRemoveRange() {
         <div data-testid="search-container" class="w-full sm:w-auto sm:flex-1 sm:max-w-sm">
           <SearchInput
             bind:value={searchValue}
+            bind:ref={searchInputRef}
             placeholder="Search logs..."
             onsearch={handleSearch}
           />
@@ -350,6 +440,7 @@ function handleRemoveRange() {
       {newLogIds}
       project={projectData}
       appUrl={data.appUrl ?? undefined}
+      {selectedIndex}
     />
 
     <!-- Load More Button -->
@@ -387,6 +478,9 @@ function handleRemoveRange() {
 {#if selectedLog}
   <LogDetailModal log={selectedLog} open={showDetailModal} onClose={closeDetailModal} />
 {/if}
+
+<!-- Keyboard Help Modal -->
+<KeyboardHelpModal open={showHelpModal} onClose={() => showHelpModal = false} />
 
 <!-- Mobile Bottom Navigation -->
 <BottomNav projectId={data.project.id} />

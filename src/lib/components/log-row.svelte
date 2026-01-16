@@ -9,9 +9,10 @@ interface Props {
   onclick?: (log: Log) => void;
   class?: string;
   isNew?: boolean;
+  isSelected?: boolean;
 }
 
-const { log, onclick, class: className, isNew }: Props = $props();
+const { log, onclick, class: className, isNew, isSelected = false }: Props = $props();
 
 const formattedTimestamp = $derived(
   log.timestamp ? formatTimestamp(log.timestamp) : '--:--:--.---',
@@ -39,8 +40,11 @@ function handleKeyDown(event: KeyboardEvent) {
 
 <tr
   data-testid="log-row"
+  data-selected={isSelected}
+  aria-current={isSelected || undefined}
   class={cn(
     'cursor-pointer hover:bg-muted/50 transition-colors border-b',
+    isSelected && 'bg-primary/10 ring-1 ring-primary/50',
     className
   )}
   class:log-new={isNew}
