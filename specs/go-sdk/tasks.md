@@ -48,7 +48,7 @@ Focus: End-to-end log sending works. Skip tests, accept hardcoded values where e
   - _Requirements: FR-11_
   - _Design: HttpTransport_
 
-- [ ] 1.5 Create batch queue (minimal)
+- [x] 1.5 Create batch queue (minimal)
   - **Do**: Create `batchQueue` with `add()`, `flush()`, `size()`. No timer yet, no overflow. Simple mutex-protected slice.
   - **Files**: `sdks/go/logwell/queue.go`
   - **Done when**: Can add entries and flush them
