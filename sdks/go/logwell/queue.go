@@ -16,24 +16,46 @@ type batchQueue struct {
 	flushInterval time.Duration
 	flushFn       func()
 	timer         *time.Timer
+
+	// Overflow protection
+	maxQueueSize int
+	onError      func(*Error)
 }
 
-// newBatchQueue creates a new batch queue with optional auto-flush.
+// newBatchQueue creates a new batch queue with optional auto-flush and overflow protection.
 // If flushInterval > 0 and flushFn is provided, the queue will
 // automatically call flushFn after flushInterval of inactivity.
-func newBatchQueue(flushInterval time.Duration, flushFn func()) *batchQueue {
+// If maxQueueSize > 0, the queue will drop oldest entries when capacity is reached.
+func newBatchQueue(flushInterval time.Duration, flushFn func(), maxQueueSize int, onError func(*Error)) *batchQueue {
 	return &batchQueue{
 		entries:       make([]LogEntry, 0),
 		flushInterval: flushInterval,
 		flushFn:       flushFn,
+		maxQueueSize:  maxQueueSize,
+		onError:       onError,
 	}
 }
 
 // add appends a log entry to the queue.
 // If timer-based auto-flush is configured, starts or resets the timer.
+// If the queue is at max capacity, drops the oldest entry and calls onError.
 func (q *batchQueue) add(entry LogEntry) {
 	q.mu.Lock()
-	defer q.mu.Unlock()
+
+	// Check for overflow - drop oldest entry if at max capacity
+	if q.maxQueueSize > 0 && len(q.entries) >= q.maxQueueSize {
+		// Drop oldest entry (FIFO)
+		q.entries = q.entries[1:]
+
+		// Call onError callback outside the lock to avoid deadlock
+		if q.onError != nil {
+			onError := q.onError
+			q.mu.Unlock()
+			onError(NewError(ErrQueueOverflow, "queue overflow: dropping oldest entry"))
+			q.mu.Lock()
+		}
+	}
+
 	q.entries = append(q.entries, entry)
 
 	// Start or reset the flush timer if auto-flush is enabled
@@ -46,6 +68,8 @@ func (q *batchQueue) add(entry LogEntry) {
 			q.timer.Reset(q.flushInterval)
 		}
 	}
+
+	q.mu.Unlock()
 }
 
 // flush returns all queued entries and clears the queue.

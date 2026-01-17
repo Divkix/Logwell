@@ -48,8 +48,8 @@ func New(endpoint, apiKey string, opts ...Option) (*Client, error) {
 		transport: transport,
 	}
 
-	// Create queue with timer-based auto-flush
-	c.queue = newBatchQueue(cfg.FlushInterval, c.flush)
+	// Create queue with timer-based auto-flush and overflow protection
+	c.queue = newBatchQueue(cfg.FlushInterval, c.flush, cfg.MaxQueueSize, cfg.OnError)
 
 	return c, nil
 }

@@ -115,7 +115,7 @@ After POC validated, add remaining features and clean up code.
   - _Requirements: FR-5_
   - _Design: BatchQueue_
 
-- [ ] 2.5 Add queue overflow protection
+- [x] 2.5 Add queue overflow protection
   - **Do**: When queue exceeds `maxQueueSize`, drop oldest entry and call `onError` callback
   - **Files**: `sdks/go/logwell/queue.go`
   - **Done when**: Overflow drops oldest, callback invoked
