@@ -75,7 +75,7 @@ Focus: Validate Python SDK works end-to-end. Skip tests, accept minimal error ha
   - _Requirements: FR-11, AC-6.1, AC-6.2, AC-6.3_
   - _Design: SourceLocation_
 
-- [ ] 1.8 Implement client module
+- [x] 1.8 Implement client module
   - **Do**: Create `client.py` with Logwell class, all log methods, flush(), shutdown(), child()
   - **Files**: `sdks/python/src/logwell/client.py`
   - **Done when**: Can instantiate, log, flush, create child loggers
