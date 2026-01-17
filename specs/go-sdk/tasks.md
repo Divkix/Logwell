@@ -66,7 +66,7 @@ Focus: End-to-end log sending works. Skip tests, accept hardcoded values where e
   - _Requirements: FR-1, FR-2, FR-4_
   - _Design: Client_
 
-- [ ] 1.7 POC Checkpoint - Manual integration test
+- [x] 1.7 POC Checkpoint - Manual integration test
   - **Do**: Create `sdks/go/examples/basic/main.go` that sends logs to a real/mock server. Verify logs appear.
   - **Files**: `sdks/go/examples/basic/main.go`
   - **Done when**: Example compiles and sends logs (verify with server or request inspection)
