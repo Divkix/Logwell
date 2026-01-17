@@ -178,7 +178,7 @@ After POC validated, add remaining features and clean up code.
   - **Commit**: `test(go-sdk): add transport and retry tests`
   - _Requirements: AC-7.1, AC-7.2, AC-7.3_
 
-- [ ] 3.3 Unit tests for queue
+- [x] 3.3 Unit tests for queue
   - **Do**: Test batch flush, timer flush, overflow, re-queue on failure
   - **Files**: `sdks/go/logwell/queue_test.go`
   - **Done when**: Tests cover all queue behaviors
