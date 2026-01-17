@@ -12,7 +12,7 @@ generated: auto
 
 Focus: Validate Python SDK works end-to-end. Skip tests, accept minimal error handling.
 
-- [ ] 1.1 Create package structure
+- [x] 1.1 Create package structure
   - **Do**: Create `sdks/python/` directory with `pyproject.toml`, `src/logwell/__init__.py`, empty module files
   - **Files**: `sdks/python/pyproject.toml`, `sdks/python/src/logwell/__init__.py`, `sdks/python/src/logwell/py.typed`
   - **Done when**: `cd sdks/python && pip install -e .` succeeds
