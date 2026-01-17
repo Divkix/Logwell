@@ -57,7 +57,7 @@ Focus: End-to-end log sending works. Skip tests, accept hardcoded values where e
   - _Requirements: FR-4_
   - _Design: BatchQueue_
 
-- [ ] 1.6 Create client (minimal)
+- [x] 1.6 Create client (minimal)
   - **Do**: Create `Client` struct, `New(endpoint, apiKey)` constructor, `Info()` method. Wire up queue and transport. Auto-flush on batch size.
   - **Files**: `sdks/go/logwell/client.go`
   - **Done when**: `client.Info("msg")` queues log, batch flushes when size reached
