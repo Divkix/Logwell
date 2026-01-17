@@ -16,7 +16,9 @@
   <a href="https://github.com/divkix/logwell/actions"><img src="https://img.shields.io/github/actions/workflow/status/divkix/logwell/ci.yml?branch=main" alt="Build Status"></a>
   <a href="https://www.npmjs.com/package/logwell"><img src="https://img.shields.io/npm/v/logwell" alt="npm version"></a>
   <a href="https://jsr.io/@divkix/logwell"><img src="https://jsr.io/badges/@divkix/logwell" alt="JSR"></a>
+  <a href="https://pypi.org/project/logwell/"><img src="https://img.shields.io/pypi/v/logwell" alt="PyPI version"></a>
   <img src="https://img.shields.io/badge/TypeScript-5.9-blue?logo=typescript&logoColor=white" alt="TypeScript">
+  <img src="https://img.shields.io/badge/Python-3.9+-3776AB?logo=python&logoColor=white" alt="Python">
   <img src="https://img.shields.io/badge/Bun-1.0+-black?logo=bun&logoColor=white" alt="Bun">
 </p>
 
@@ -301,6 +303,38 @@ Features: Zero dependencies, automatic batching, retry with backoff, TypeScript-
 > **Deno users:** Install from JSR with `deno add jsr:@divkix/logwell` and import from `@divkix/logwell`
 
 [Full SDK documentation →](./sdks/typescript/README.md)
+
+---
+
+#### Python SDK
+
+For Python applications with automatic batching and retries:
+
+```bash
+pip install logwell
+```
+
+```python
+import asyncio
+from logwell import Logwell
+
+client = Logwell({
+    'api_key': 'lw_YOUR_API_KEY',
+    'endpoint': 'http://localhost:5173',
+    'service': 'my-app',
+})
+
+# Log at different levels
+client.info('User signed in', {'user_id': '123'})
+client.error('Database failed', {'host': 'db.local'})
+
+# Flush before shutdown
+asyncio.run(client.shutdown())
+```
+
+Features: Async batching, automatic retries with backoff, child loggers, typed errors, source location capture.
+
+[Full SDK documentation →](./sdks/python/README.md)
 
 ---
 
