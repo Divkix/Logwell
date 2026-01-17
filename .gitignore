@@ -29,3 +29,15 @@ playwright-report/
 .playwright/
 specs/.current-spec
 **/.progress.md
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+*.egg-info/
+dist/
+build/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
