@@ -88,7 +88,7 @@ After POC validated, add remaining features and clean up code.
   - _Requirements: FR-1, FR-18, FR-19, AC-6.1, AC-6.2, AC-6.3, AC-6.4_
   - _Design: Config_
 
-- [ ] 2.2 Add all log level methods
+- [x] 2.2 Add all log level methods
   - **Do**: Implement `Debug()`, `Warn()`, `Error()`, `Fatal()`, `Log(entry)`. All should accept variadic metadata.
   - **Files**: `sdks/go/logwell/client.go`
   - **Done when**: All 5 level methods work plus generic `Log()`
