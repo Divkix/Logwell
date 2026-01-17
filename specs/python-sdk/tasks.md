@@ -140,7 +140,7 @@ After POC validated, clean up code.
 
 ## Phase 3: Testing
 
-- [ ] 3.1 Create test fixtures
+- [x] 3.1 Create test fixtures
   - **Do**: Create conftest.py with valid/invalid configs, mock responses
   - **Files**: `sdks/python/tests/__init__.py`, `sdks/python/tests/conftest.py`
   - **Done when**: Fixtures importable in tests
