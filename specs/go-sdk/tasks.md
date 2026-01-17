@@ -186,7 +186,7 @@ After POC validated, add remaining features and clean up code.
   - **Commit**: `test(go-sdk): add queue tests`
   - _Requirements: AC-8.1, AC-8.2_
 
-- [ ] 3.4 Integration tests for client
+- [x] 3.4 Integration tests for client
   - **Do**: Test full flow: create client, log, flush, shutdown using httptest server
   - **Files**: `sdks/go/logwell/client_test.go`
   - **Done when**: Full integration flow covered
