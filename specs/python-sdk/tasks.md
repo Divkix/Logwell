@@ -156,7 +156,7 @@ After POC validated, clean up code.
   - **Commit**: `test(python-sdk): add config unit tests`
   - _Requirements: AC-7.1, AC-7.2, AC-7.3, AC-7.4_
 
-- [ ] 3.3 Unit tests for errors
+- [x] 3.3 Unit tests for errors
   - **Do**: Test LogwellError construction, attributes, inheritance
   - **Files**: `sdks/python/tests/unit/test_errors.py`
   - **Done when**: All error codes tested
