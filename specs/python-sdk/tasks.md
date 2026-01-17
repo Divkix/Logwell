@@ -180,7 +180,7 @@ After POC validated, clean up code.
   - **Commit**: `test(python-sdk): add source location tests`
   - _Requirements: AC-6.1, AC-6.2, AC-6.3_
 
-- [ ] 3.6 Unit tests for client
+- [x] 3.6 Unit tests for client
   - **Do**: Test all log methods, child loggers, flush, shutdown
   - **Files**: `sdks/python/tests/unit/test_client.py`
   - **Done when**: Client API fully tested
