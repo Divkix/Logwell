@@ -130,7 +130,7 @@ After POC validated, clean up code.
   - _Requirements: NFR-6_
   - _Design: Types_
 
-- [ ] 2.4 Add README and LICENSE
+- [x] 2.4 Add README and LICENSE
   - **Do**: Create README.md with usage examples, create LICENSE (MIT)
   - **Files**: `sdks/python/README.md`, `sdks/python/LICENSE`
   - **Done when**: README has install, basic usage, API reference sections
