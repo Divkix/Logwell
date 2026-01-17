@@ -66,7 +66,7 @@ Focus: Validate Python SDK works end-to-end. Skip tests, accept minimal error ha
   - _Requirements: FR-3, FR-4, FR-5, FR-6, AC-2.1, AC-2.2, AC-2.3, AC-2.4_
   - _Design: BatchQueue_
 
-- [ ] 1.7 Implement source_location module
+- [x] 1.7 Implement source_location module
   - **Do**: Create `source_location.py` with SourceLocation dataclass and capture_source_location()
   - **Files**: `sdks/python/src/logwell/source_location.py`
   - **Done when**: Returns file/line of caller, skips SDK frames
