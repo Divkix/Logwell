@@ -39,7 +39,7 @@ Focus: End-to-end log sending works. Skip tests, accept hardcoded values where e
   - _Requirements: FR-17_
   - _Design: Error Types_
 
-- [ ] 1.4 Create HTTP transport (minimal)
+- [x] 1.4 Create HTTP transport (minimal)
   - **Do**: Create `httpTransport` struct with `send(ctx, []LogEntry)` method. POST to `/v1/ingest` with Bearer auth. No retries yet.
   - **Files**: `sdks/go/logwell/transport.go`
   - **Done when**: Can POST JSON to endpoint and parse response
