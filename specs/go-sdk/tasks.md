@@ -12,7 +12,7 @@ generated: auto
 
 Focus: End-to-end log sending works. Skip tests, accept hardcoded values where expedient.
 
-- [ ] 1.1 Initialize Go module and basic structure
+- [x] 1.1 Initialize Go module and basic structure
   - **Do**: Create `sdks/go/` directory, `go.mod` with module path `github.com/Divkix/Logwell/sdks/go`, create `logwell/` package dir
   - **Files**: `sdks/go/go.mod`, `sdks/go/logwell/doc.go`
   - **Done when**: `go build ./...` passes in `sdks/go/`
