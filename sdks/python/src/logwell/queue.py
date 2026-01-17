@@ -118,7 +118,8 @@ class BatchQueue:
                     msg = dropped.get("message", "")[:50]
                     self._config.on_error(
                         LogwellError(
-                            f"Queue overflow: max_queue_size ({self._config.max_queue_size}) exceeded. "
+                            f"Queue overflow: max_queue_size "
+                            f"({self._config.max_queue_size}) exceeded. "
                             f"Dropped oldest log: '{msg}...'. "
                             "Logs are being generated faster than they can be sent. "
                             "Consider increasing max_queue_size, reducing log volume, "

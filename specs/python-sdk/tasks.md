@@ -197,7 +197,7 @@ After POC validated, clean up code.
 
 ## Phase 4: Quality Gates
 
-- [ ] 4.1 Local quality check
+- [x] 4.1 Local quality check
   - **Do**: Run mypy, ruff, pytest with coverage
   - **Verify**: `cd sdks/python && mypy --strict src && ruff check src && pytest --cov=src --cov-report=term-missing`
   - **Done when**: All pass, coverage >= 90%

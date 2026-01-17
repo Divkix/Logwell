@@ -112,8 +112,8 @@ class HttpTransport:
             LogwellError: On failure after all retries
         """
         last_error: LogwellError = LogwellError(
-            f"Failed to send logs after {self._config.max_retries + 1} attempts to {self._ingest_url}. "
-            "Check your network connection and endpoint URL.",
+            f"Failed to send logs after {self._config.max_retries + 1} attempts "
+            f"to {self._ingest_url}. Check your network connection and endpoint URL.",
             LogwellErrorCode.NETWORK_ERROR,
             None,
             True,
