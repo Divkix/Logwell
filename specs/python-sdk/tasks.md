@@ -164,7 +164,7 @@ After POC validated, clean up code.
   - **Commit**: `test(python-sdk): add error unit tests`
   - _Requirements: FR-9_
 
-- [ ] 3.4 Unit tests for queue
+- [x] 3.4 Unit tests for queue
   - **Do**: Test add, flush, overflow, timer, shutdown, concurrent ops
   - **Files**: `sdks/python/tests/unit/test_queue.py`
   - **Done when**: All BatchQueue methods tested
