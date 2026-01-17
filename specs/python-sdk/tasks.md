@@ -21,7 +21,7 @@ Focus: Validate Python SDK works end-to-end. Skip tests, accept minimal error ha
   - _Requirements: NFR-1_
   - _Design: File Structure_
 
-- [ ] 1.2 Implement types module
+- [x] 1.2 Implement types module
   - **Do**: Create `types.py` with LogLevel, LogEntry, LogwellConfig, IngestResponse TypedDicts
   - **Files**: `sdks/python/src/logwell/types.py`
   - **Done when**: Types importable, mypy passes on module
