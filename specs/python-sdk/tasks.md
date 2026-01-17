@@ -188,7 +188,7 @@ After POC validated, clean up code.
   - **Commit**: `test(python-sdk): add client unit tests`
   - _Requirements: AC-1.1 through AC-4.4_
 
-- [ ] 3.7 Integration tests
+- [x] 3.7 Integration tests
   - **Do**: Test full flow with mocked HTTP (respx)
   - **Files**: `sdks/python/tests/integration/__init__.py`, `sdks/python/tests/integration/test_e2e.py`
   - **Done when**: E2E flow tested with mock server
