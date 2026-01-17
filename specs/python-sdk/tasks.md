@@ -103,7 +103,7 @@ Focus: Validate Python SDK works end-to-end. Skip tests, accept minimal error ha
 
 After POC validated, clean up code.
 
-- [ ] 2.1 Add thread safety to queue
+- [x] 2.1 Add thread safety to queue
   - **Do**: Add threading.Lock to BatchQueue, protect queue/timer operations
   - **Files**: `sdks/python/src/logwell/queue.py`
   - **Done when**: No race conditions under concurrent add/flush

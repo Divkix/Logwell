@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import asyncio
 import threading
-from typing import TYPE_CHECKING, Awaitable, Callable
+from collections.abc import Awaitable, Callable
+from typing import TYPE_CHECKING
 
 from logwell.errors import LogwellError, LogwellErrorCode
 from logwell.types import IngestResponse, LogEntry

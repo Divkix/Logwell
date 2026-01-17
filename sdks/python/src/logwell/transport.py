@@ -8,12 +8,14 @@ from __future__ import annotations
 
 import asyncio
 import random
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
 
 from logwell.errors import LogwellError, LogwellErrorCode
-from logwell.types import IngestResponse, LogEntry, LogwellConfig
+
+if TYPE_CHECKING:
+    from logwell.types import IngestResponse, LogEntry, LogwellConfig
 
 
 class TransportConfig:

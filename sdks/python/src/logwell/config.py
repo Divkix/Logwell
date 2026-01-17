@@ -7,11 +7,13 @@ and config merging utilities.
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
 from logwell.errors import LogwellError, LogwellErrorCode
-from logwell.types import LogwellConfig
+
+if TYPE_CHECKING:
+    from logwell.types import LogwellConfig
 
 # Default configuration values
 DEFAULT_CONFIG: dict[str, Any] = {
