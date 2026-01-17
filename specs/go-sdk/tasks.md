@@ -162,7 +162,7 @@ After POC validated, add remaining features and clean up code.
 
 ## Phase 3: Testing
 
-- [ ] 3.1 Unit tests for config validation
+- [x] 3.1 Unit tests for config validation
   - **Do**: Test API key validation, URL validation, numeric bounds, default values
   - **Files**: `sdks/go/logwell/config_test.go`
   - **Done when**: Tests cover all validation paths
