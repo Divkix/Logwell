@@ -170,7 +170,7 @@ After POC validated, add remaining features and clean up code.
   - **Commit**: `test(go-sdk): add config validation tests`
   - _Requirements: AC-6.1, AC-6.2, AC-6.3_
 
-- [ ] 3.2 Unit tests for transport and retry
+- [x] 3.2 Unit tests for transport and retry
   - **Do**: Test retry behavior, backoff, error classification using httptest
   - **Files**: `sdks/go/logwell/transport_test.go`
   - **Done when**: Tests verify retry on 5xx, no retry on 401
