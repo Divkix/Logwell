@@ -113,13 +113,14 @@ func (c *Client) Child(opts ...ChildOption) *Client {
 
 	// Build child config
 	childCfg := &Config{
-		Endpoint:      c.config.Endpoint,
-		APIKey:        c.config.APIKey,
-		Service:       c.config.Service,
-		BatchSize:     c.config.BatchSize,
-		FlushInterval: c.config.FlushInterval,
-		MaxQueueSize:  c.config.MaxQueueSize,
-		OnError:       c.config.OnError,
+		Endpoint:              c.config.Endpoint,
+		APIKey:                c.config.APIKey,
+		Service:               c.config.Service,
+		BatchSize:             c.config.BatchSize,
+		FlushInterval:         c.config.FlushInterval,
+		MaxQueueSize:          c.config.MaxQueueSize,
+		CaptureSourceLocation: c.config.CaptureSourceLocation,
+		OnError:               c.config.OnError,
 		// Merge parent metadata with child metadata (child overrides parent)
 		Metadata: mergeMetadata(c.config.Metadata, cfg.metadata),
 	}
@@ -215,6 +216,12 @@ func (c *Client) log(level LogLevel, message string, metadata ...map[string]any)
 		Timestamp: now(),
 		Service:   c.config.Service,
 		Metadata:  mergeMetadata(c.config.Metadata, mergeMetadata(metadata...)),
+	}
+
+	// Capture source location if enabled
+	// Skip 3 frames: captureSource -> log -> Debug/Info/Warn/Error/Fatal
+	if c.config.CaptureSourceLocation {
+		entry.SourceFile, entry.LineNumber = captureSource(3)
 	}
 
 	c.mu.Lock()

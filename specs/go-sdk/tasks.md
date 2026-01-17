@@ -142,7 +142,7 @@ After POC validated, add remaining features and clean up code.
   - _Requirements: FR-8, AC-3.1, AC-3.2, AC-3.3, AC-3.4, AC-3.5_
   - _Design: Client_
 
-- [ ] 2.8 Add source location capture
+- [x] 2.8 Add source location capture
   - **Do**: Implement `captureSource(skip)` using `runtime.Caller()`. Add to log entries when `CaptureSourceLocation` enabled.
   - **Files**: `sdks/go/logwell/source.go`, `sdks/go/logwell/client.go`
   - **Done when**: Logs include sourceFile and lineNumber when enabled
