@@ -121,6 +121,7 @@ func (c *Client) Child(opts ...ChildOption) *Client {
 		MaxQueueSize:          c.config.MaxQueueSize,
 		CaptureSourceLocation: c.config.CaptureSourceLocation,
 		OnError:               c.config.OnError,
+		OnFlush:               c.config.OnFlush,
 		// Merge parent metadata with child metadata (child overrides parent)
 		Metadata: mergeMetadata(c.config.Metadata, cfg.metadata),
 	}
@@ -236,19 +237,39 @@ func (c *Client) log(level LogLevel, message string, metadata ...map[string]any)
 
 // flush sends all queued log entries to the server.
 // Internal method - does not respect context cancellation.
+// Calls OnFlush callback on success and OnError callback on failure.
 func (c *Client) flush() {
 	entries := c.queue.flush()
 	if len(entries) == 0 {
 		return
 	}
 
-	// Send logs (fire and forget for now, error handling added later)
+	count := len(entries)
+
+	// Send logs with retry
 	ctx := context.Background()
-	_, _ = c.transport.send(ctx, entries)
+	_, err := c.transport.sendWithRetry(ctx, entries)
+
+	// Call callbacks (non-blocking)
+	if err != nil {
+		if c.config.OnError != nil {
+			if logwellErr, ok := err.(*Error); ok {
+				c.config.OnError(logwellErr)
+			} else {
+				c.config.OnError(NewErrorWithCause(ErrNetworkError, "flush failed", err))
+			}
+		}
+		return
+	}
+
+	if c.config.OnFlush != nil {
+		c.config.OnFlush(count)
+	}
 }
 
 // Flush sends all queued log entries immediately.
 // Respects context cancellation and timeout.
+// Calls OnFlush callback on success and OnError callback on failure.
 // Returns any error from the transport layer.
 func (c *Client) Flush(ctx context.Context) error {
 	entries := c.queue.flush()
@@ -256,8 +277,26 @@ func (c *Client) Flush(ctx context.Context) error {
 		return nil
 	}
 
+	count := len(entries)
 	_, err := c.transport.sendWithRetry(ctx, entries)
-	return err
+
+	// Call callbacks (non-blocking)
+	if err != nil {
+		if c.config.OnError != nil {
+			if logwellErr, ok := err.(*Error); ok {
+				c.config.OnError(logwellErr)
+			} else {
+				c.config.OnError(NewErrorWithCause(ErrNetworkError, "flush failed", err))
+			}
+		}
+		return err
+	}
+
+	if c.config.OnFlush != nil {
+		c.config.OnFlush(count)
+	}
+
+	return nil
 }
 
 // Shutdown gracefully shuts down the client.

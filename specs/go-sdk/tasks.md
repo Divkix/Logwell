@@ -151,7 +151,7 @@ After POC validated, add remaining features and clean up code.
   - _Requirements: FR-14, AC-9.1, AC-9.2, AC-9.3_
   - _Design: Source Location_
 
-- [ ] 2.9 Add callbacks (onError, onFlush)
+- [x] 2.9 Add callbacks (onError, onFlush)
   - **Do**: Wire up `OnError` and `OnFlush` callbacks from config. Ensure they're called in non-blocking manner.
   - **Files**: `sdks/go/logwell/queue.go`, `sdks/go/logwell/client.go`
   - **Done when**: Callbacks fire on errors and successful flushes
