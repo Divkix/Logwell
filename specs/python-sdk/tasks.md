@@ -39,7 +39,7 @@ Focus: Validate Python SDK works end-to-end. Skip tests, accept minimal error ha
   - _Requirements: FR-9_
   - _Design: Errors_
 
-- [ ] 1.4 Implement config module
+- [x] 1.4 Implement config module
   - **Do**: Create `config.py` with DEFAULT_CONFIG, API_KEY_REGEX, validate_api_key_format(), validate_config()
   - **Files**: `sdks/python/src/logwell/config.py`
   - **Done when**: Validates API key format, endpoint URL, merges defaults
