@@ -84,7 +84,7 @@ Focus: Validate Python SDK works end-to-end. Skip tests, accept minimal error ha
   - _Requirements: FR-1, FR-2, FR-7, FR-8, AC-1.1 through AC-4.4_
   - _Design: Logwell_
 
-- [ ] 1.9 Wire up __init__.py exports
+- [x] 1.9 Wire up __init__.py exports
   - **Do**: Export Logwell, LogwellError, LogwellErrorCode, types from `__init__.py`
   - **Files**: `sdks/python/src/logwell/__init__.py`
   - **Done when**: `from logwell import Logwell, LogwellError` works
