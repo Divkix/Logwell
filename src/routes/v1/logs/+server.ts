@@ -7,6 +7,11 @@ import { log } from '$lib/server/db/schema';
 import { logEventBus } from '$lib/server/events';
 import { ApiKeyError, validateApiKey } from '$lib/server/utils/api-key';
 import {
+  assignIncidentIds,
+  prepareLogsForIncidents,
+  upsertIncidentsForPreparedLogs,
+} from '$lib/server/utils/incidents';
+import {
   mapOtlpAttributesToLogColumns,
   type NormalizedOtlpLogsResult,
   normalizeOtlpLogsRequest,
@@ -76,39 +81,78 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   }
 
   const { records, rejectedLogRecords } = normalized;
+  const preparedLogs = prepareLogsForIncidents(
+    records.map((record) => {
+      const mapped = mapOtlpAttributesToLogColumns(record.attributes);
+      return {
+        level: record.level,
+        message: record.message,
+        timestamp: record.timestamp,
+        sourceFile: mapped.sourceFile,
+        lineNumber: mapped.lineNumber,
+        resourceAttributes: record.resourceAttributes,
+        metadata: record.attributes ?? null,
+      };
+    }),
+  );
 
-  const logEntries = records.map((record) => ({
-    ...mapOtlpAttributesToLogColumns(record.attributes),
-    id: nanoid(),
-    projectId,
-    level: record.level,
-    message: record.message,
-    metadata: record.attributes ?? null,
-    timeUnixNano: record.timeUnixNano,
-    observedTimeUnixNano: record.observedTimeUnixNano,
-    severityNumber: record.severityNumber,
-    severityText: record.severityText,
-    body: record.body ?? null,
-    droppedAttributesCount: record.droppedAttributesCount,
-    flags: record.flags,
-    traceId: record.traceId,
-    spanId: record.spanId,
-    resourceAttributes: record.resourceAttributes,
-    resourceDroppedAttributesCount: record.resourceDroppedAttributesCount,
-    resourceSchemaUrl: record.resourceSchemaUrl,
-    scopeName: record.scopeName,
-    scopeVersion: record.scopeVersion,
-    scopeAttributes: record.scopeAttributes,
-    scopeDroppedAttributesCount: record.scopeDroppedAttributesCount,
-    scopeSchemaUrl: record.scopeSchemaUrl,
-    timestamp: record.timestamp,
-  }));
+  const { insertedLogs, touchedIncidents } =
+    preparedLogs.length > 0
+      ? await (db as {
+          transaction: <T>(fn: (tx: typeof db) => Promise<T>) => Promise<T>;
+        }).transaction(async (tx) => {
+          const { incidentByFingerprint, touchedIncidents } = await upsertIncidentsForPreparedLogs(
+            tx,
+            projectId,
+            preparedLogs,
+          );
+          const assigned = assignIncidentIds(preparedLogs, incidentByFingerprint);
 
-  const insertedLogs =
-    logEntries.length > 0 ? await db.insert(log).values(logEntries).returning() : [];
+          const logEntries = assigned.map((prepared, index) => {
+            const record = records[index];
+            const mapped = mapOtlpAttributesToLogColumns(record.attributes);
+
+            return {
+              ...mapped,
+              id: nanoid(),
+              projectId,
+              incidentId: prepared.incidentId,
+              fingerprint: prepared.fingerprint,
+              serviceName: prepared.serviceName,
+              level: record.level,
+              message: record.message,
+              metadata: record.attributes ?? null,
+              timeUnixNano: record.timeUnixNano,
+              observedTimeUnixNano: record.observedTimeUnixNano,
+              severityNumber: record.severityNumber,
+              severityText: record.severityText,
+              body: record.body ?? null,
+              droppedAttributesCount: record.droppedAttributesCount,
+              flags: record.flags,
+              traceId: record.traceId,
+              spanId: record.spanId,
+              resourceAttributes: record.resourceAttributes,
+              resourceDroppedAttributesCount: record.resourceDroppedAttributesCount,
+              resourceSchemaUrl: record.resourceSchemaUrl,
+              scopeName: record.scopeName,
+              scopeVersion: record.scopeVersion,
+              scopeAttributes: record.scopeAttributes,
+              scopeDroppedAttributesCount: record.scopeDroppedAttributesCount,
+              scopeSchemaUrl: record.scopeSchemaUrl,
+              timestamp: record.timestamp,
+            };
+          });
+
+          const insertedLogs = await tx.insert(log).values(logEntries).returning();
+          return { insertedLogs, touchedIncidents };
+        })
+      : { insertedLogs: [], touchedIncidents: [] };
 
   for (const insertedLog of insertedLogs) {
     logEventBus.emitLog(insertedLog);
+  }
+  for (const touchedIncident of touchedIncidents) {
+    logEventBus.emitIncident(touchedIncident);
   }
 
   return json(buildPartialSuccess(rejectedLogRecords), { status: 200 });

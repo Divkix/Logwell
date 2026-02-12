@@ -9,6 +9,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core';
 
 // Project table
@@ -50,6 +51,38 @@ const tsvector = customType<{ data: string }>({
 // Log level enum
 export const logLevelEnum = pgEnum('log_level', ['debug', 'info', 'warn', 'error', 'fatal']);
 
+// Incident table with fingerprint grouping
+export const incident = pgTable(
+  'incident',
+  {
+    id: text('id').primaryKey(),
+    projectId: text('project_id')
+      .notNull()
+      .references(() => project.id, { onDelete: 'cascade' }),
+    fingerprint: text('fingerprint').notNull(),
+    title: text('title').notNull(),
+    normalizedMessage: text('normalized_message').notNull(),
+    serviceName: text('service_name'),
+    sourceFile: text('source_file'),
+    lineNumber: integer('line_number'),
+    highestLevel: logLevelEnum('highest_level').notNull(),
+    firstSeen: timestamp('first_seen', { withTimezone: true }).notNull(),
+    lastSeen: timestamp('last_seen', { withTimezone: true }).notNull(),
+    totalEvents: integer('total_events').notNull().default(0),
+    reopenCount: integer('reopen_count').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+  },
+  (table) => [
+    index('idx_incident_project_last_seen').on(table.projectId, table.lastSeen),
+    uniqueIndex('uq_incident_project_fingerprint').on(table.projectId, table.fingerprint),
+  ],
+);
+
+// Type exports for incident
+export type Incident = typeof incident.$inferSelect;
+export type NewIncident = typeof incident.$inferInsert;
+
 // Log table with full-text search
 export const log = pgTable(
   'log',
@@ -58,6 +91,9 @@ export const log = pgTable(
     projectId: text('project_id')
       .notNull()
       .references(() => project.id, { onDelete: 'cascade' }),
+    incidentId: text('incident_id').references(() => incident.id, { onDelete: 'set null' }),
+    fingerprint: text('fingerprint'),
+    serviceName: text('service_name'),
     level: logLevelEnum('level').notNull(),
     message: text('message').notNull(),
     metadata: jsonb('metadata'),
@@ -95,6 +131,9 @@ export const log = pgTable(
   },
   (table) => [
     index('idx_log_project_id').on(table.projectId),
+    index('idx_log_project_incident_timestamp').on(table.projectId, table.incidentId, table.timestamp),
+    index('idx_log_project_fingerprint_timestamp').on(table.projectId, table.fingerprint, table.timestamp),
+    index('idx_log_project_service_name').on(table.projectId, table.serviceName),
     index('idx_log_timestamp').on(table.timestamp),
     index('idx_log_level').on(table.level),
     index('idx_log_project_timestamp').on(table.projectId, table.timestamp),

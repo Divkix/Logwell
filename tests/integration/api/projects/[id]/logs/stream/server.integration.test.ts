@@ -139,6 +139,9 @@ function createMockLog(projectId: string, overrides: Partial<Log> = {}): Log {
   return {
     id: `log_${Math.random().toString(36).slice(2, 10)}`,
     projectId,
+    incidentId: null,
+    fingerprint: null,
+    serviceName: null,
     level: 'info',
     message: 'Test log message',
     metadata: null,

@@ -297,10 +297,11 @@ export async function createTestDatabase(): Promise<PgliteDatabase<typeof schema
   const tableOrder = [
     'user', // No dependencies
     'project', // No dependencies
+    'incident', // Depends on project
     'session', // Depends on user
     'account', // Depends on user
     'verification', // No dependencies
-    'log', // Depends on project
+    'log', // Depends on project + incident
   ];
 
   const tables = Object.values(schema).filter((item) => is(item, PgTable));

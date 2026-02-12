@@ -18,6 +18,9 @@ describe('LogTable', () => {
   const createLog = (overrides: Partial<Log> = {}): Log => ({
     id: 'log_123',
     projectId: 'proj_456',
+    incidentId: null,
+    fingerprint: null,
+    serviceName: null,
     level: 'info',
     message: 'Test log message',
     metadata: null,

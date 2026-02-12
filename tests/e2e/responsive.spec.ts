@@ -130,6 +130,7 @@ test.describe('Responsive Design - Mobile Viewport', () => {
 
     // Bottom nav should contain key navigation items
     await expect(bottomNav.getByRole('link', { name: /home|dashboard/i })).toBeVisible();
+    await expect(bottomNav.locator('[data-testid="nav-incidents"]')).toBeVisible();
     // Use testid for stats link for reliability
     await expect(bottomNav.locator('[data-testid="nav-stats"]')).toBeVisible();
   });
@@ -534,6 +535,15 @@ test.describe('Responsive Design - Bottom Navigation', () => {
     await bottomNav.locator('[data-testid="nav-stats"]').click();
 
     await expect(page).toHaveURL(`/projects/${testProject.id}/stats`);
+  });
+
+  test('should navigate to incidents via bottom nav', async ({ page }) => {
+    await page.goto(`/projects/${testProject.id}`);
+
+    const bottomNav = page.locator('[data-testid="bottom-nav"]');
+    await bottomNav.locator('[data-testid="nav-incidents"]').click();
+
+    await expect(page).toHaveURL(`/projects/${testProject.id}/incidents`);
   });
 
   test('should navigate to settings from bottom nav', async ({ page }) => {

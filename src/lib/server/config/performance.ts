@@ -12,6 +12,7 @@
  * - LOG_STREAM_MAX_LOGS: Maximum logs in memory per client (default: 1000)
  * - LOG_RETENTION_DAYS: System default retention in days (default: 30, 0 = disabled)
  * - LOG_CLEANUP_INTERVAL_MS: Cleanup job interval in ms (default: 3600000 = 1 hour)
+ * - INCIDENT_AUTO_RESOLVE_MINUTES: Minutes before incident is considered resolved (default: 30)
  */
 
 /**
@@ -143,6 +144,28 @@ export const API_CONFIG = {
  */
 export const EXPORT_CONFIG = {
   MAX_LOGS: 10000,
+} as const;
+
+// Incident configuration defaults and bounds
+const INCIDENT_DEFAULTS = {
+  AUTO_RESOLVE_MINUTES: 30,
+} as const;
+
+const INCIDENT_BOUNDS = {
+  AUTO_RESOLVE_MINUTES: { min: 1, max: 10080 }, // 1 minute to 7 days
+} as const;
+
+/**
+ * Incident configuration.
+ *
+ * - AUTO_RESOLVE_MINUTES: Minutes without new matching errors before an incident is considered resolved
+ */
+export const INCIDENT_CONFIG = {
+  AUTO_RESOLVE_MINUTES: clamp(
+    parseEnvInt('INCIDENT_AUTO_RESOLVE_MINUTES', INCIDENT_DEFAULTS.AUTO_RESOLVE_MINUTES),
+    INCIDENT_BOUNDS.AUTO_RESOLVE_MINUTES.min,
+    INCIDENT_BOUNDS.AUTO_RESOLVE_MINUTES.max,
+  ),
 } as const;
 
 /**

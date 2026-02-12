@@ -3,6 +3,7 @@ import ChartPieIcon from '@lucide/svelte/icons/chart-pie';
 import HomeIcon from '@lucide/svelte/icons/home';
 import ListIcon from '@lucide/svelte/icons/list';
 import SettingsIcon from '@lucide/svelte/icons/settings';
+import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 import { page } from '$app/stores';
 import { cn } from '$lib/utils';
 
@@ -19,6 +20,7 @@ const { projectId }: Props = $props();
 const currentPath = $derived($page.url.pathname);
 const isHomePage = $derived(currentPath === '/');
 const isLogsPage = $derived(projectId && currentPath === `/projects/${projectId}`);
+const isIncidentsPage = $derived(projectId && currentPath === `/projects/${projectId}/incidents`);
 const isStatsPage = $derived(projectId && currentPath === `/projects/${projectId}/stats`);
 const isSettingsPage = $derived(projectId && currentPath === `/projects/${projectId}/settings`);
 
@@ -57,6 +59,18 @@ const inactiveClass = 'text-muted-foreground hover:text-foreground';
       >
         <ListIcon class="size-5" />
         <span>Logs</span>
+      </a>
+
+      <!-- Incidents -->
+      <a
+        href="/projects/{projectId}/incidents"
+        data-testid="nav-incidents"
+        data-active={isIncidentsPage}
+        class={cn(navItemClass, isIncidentsPage ? activeClass : inactiveClass)}
+        aria-current={isIncidentsPage ? 'page' : undefined}
+      >
+        <TriangleAlertIcon class="size-5" />
+        <span>Incidents</span>
       </a>
 
       <!-- Stats -->

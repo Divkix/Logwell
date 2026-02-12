@@ -27,6 +27,9 @@ describe('Accessibility: Modal Focus Management', () => {
   const baseLog: Log = {
     id: 'log_123',
     projectId: 'proj_456',
+    incidentId: null,
+    fingerprint: null,
+    serviceName: null,
     level: 'info',
     message: 'Test log message',
     metadata: { test: 'data' },
@@ -216,6 +219,9 @@ describe('Accessibility: ARIA Labels', () => {
   const baseLog: Log = {
     id: 'log_123',
     projectId: 'proj_456',
+    incidentId: null,
+    fingerprint: null,
+    serviceName: null,
     level: 'info',
     message: 'Test log message',
     metadata: { test: 'data' },
@@ -307,6 +313,9 @@ describe('Accessibility: Keyboard Navigation', () => {
   const baseLog: Log = {
     id: 'log_123',
     projectId: 'proj_456',
+    incidentId: null,
+    fingerprint: null,
+    serviceName: null,
     level: 'info',
     message: 'Test log message',
     metadata: { test: 'data' },

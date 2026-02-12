@@ -155,6 +155,9 @@ export const load: PageServerLoad = async (event) => {
     .select({
       id: log.id,
       projectId: log.projectId,
+      incidentId: log.incidentId,
+      fingerprint: log.fingerprint,
+      serviceName: log.serviceName,
       level: log.level,
       message: log.message,
       metadata: log.metadata,

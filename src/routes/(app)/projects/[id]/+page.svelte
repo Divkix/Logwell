@@ -3,6 +3,7 @@ import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
 import ChartPieIcon from '@lucide/svelte/icons/chart-pie';
 import LoaderIcon from '@lucide/svelte/icons/loader';
 import SettingsIcon from '@lucide/svelte/icons/settings';
+import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 import { goto } from '$app/navigation';
 import { navigating } from '$app/stores';
 import ActiveFilterChips from '$lib/components/active-filter-chips.svelte';
@@ -200,6 +201,10 @@ function closeDetailModal() {
   selectedLog = null;
 }
 
+async function handleViewIncident(incidentId: string) {
+  await goto(`/projects/${data.project.id}/incidents?status=open&range=24h&incident=${incidentId}`);
+}
+
 async function loadMore() {
   if (!nextCursor || isLoadingMore) return;
   isLoadingMore = true;
@@ -347,6 +352,14 @@ function handleKeyboardShortcut(event: KeyboardEvent) {
       <!-- Desktop/Tablet header actions -->
       <div data-testid="project-header-actions" class="hidden sm:flex items-center gap-2">
         <a
+          href="/projects/{data.project.id}/incidents"
+          class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3"
+          aria-label="View incidents"
+        >
+          <TriangleAlertIcon class="size-4 mr-2" />
+          Incidents
+        </a>
+        <a
           href="/projects/{data.project.id}/stats"
           class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3"
           aria-label="View statistics"
@@ -476,7 +489,12 @@ function handleKeyboardShortcut(event: KeyboardEvent) {
 
 <!-- Log Detail Modal -->
 {#if selectedLog}
-  <LogDetailModal log={selectedLog} open={showDetailModal} onClose={closeDetailModal} />
+  <LogDetailModal
+    log={selectedLog}
+    open={showDetailModal}
+    onClose={closeDetailModal}
+    onViewIncident={handleViewIncident}
+  />
 {/if}
 
 <!-- Keyboard Help Modal -->

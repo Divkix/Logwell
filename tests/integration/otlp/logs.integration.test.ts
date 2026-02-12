@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type * as schema from '../../../src/lib/server/db/schema';
-import { log } from '../../../src/lib/server/db/schema';
+import { incident, log } from '../../../src/lib/server/db/schema';
 import { setupTestDatabase } from '../../../src/lib/server/db/test-db';
 import { logEventBus } from '../../../src/lib/server/events';
 import { clearApiKeyCache } from '../../../src/lib/server/utils/api-key';
@@ -177,5 +177,67 @@ describe('POST /v1/logs (OTLP)', () => {
         errorMessage: '1 log record(s) were rejected during ingestion.',
       },
     });
+  });
+
+  it('creates incidents for error/fatal OTLP logs', async () => {
+    const project = await seedProject(db);
+
+    const payload = {
+      resourceLogs: [
+        {
+          resource: {
+            attributes: [{ key: 'service.name', value: { stringValue: 'api' } }],
+          },
+          scopeLogs: [
+            {
+              logRecords: [
+                {
+                  severityNumber: 17,
+                  severityText: 'ERROR',
+                  body: { stringValue: 'Payment failed for order 1234' },
+                  attributes: [{ key: 'code.filepath', value: { stringValue: 'src/payments.ts' } }],
+                },
+                {
+                  severityNumber: 17,
+                  severityText: 'ERROR',
+                  body: { stringValue: 'Payment failed for order 9999' },
+                  attributes: [{ key: 'code.filepath', value: { stringValue: 'src/payments.ts' } }],
+                },
+                {
+                  severityNumber: 9,
+                  severityText: 'INFO',
+                  body: { stringValue: 'Payment retry scheduled' },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const request = new Request('http://localhost/v1/logs', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${project.apiKey}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const event = createRequestEvent(request, db);
+    const response = await POST(event as never);
+    expect(response.status).toBe(200);
+
+    const incidents = await db.select().from(incident).where(eq(incident.projectId, project.id));
+    expect(incidents).toHaveLength(1);
+    expect(incidents[0].totalEvents).toBe(2);
+
+    const logs = await db.select().from(log).where(eq(log.projectId, project.id));
+    const errorLogs = logs.filter((entry) => entry.level === 'error');
+    const infoLogs = logs.filter((entry) => entry.level === 'info');
+
+    expect(errorLogs.every((entry) => entry.incidentId === incidents[0].id)).toBe(true);
+    expect(errorLogs.every((entry) => entry.serviceName === 'api')).toBe(true);
+    expect(infoLogs[0].incidentId).toBeNull();
   });
 });

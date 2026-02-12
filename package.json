@@ -20,6 +20,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "db:seed": "bun run scripts/seed-admin.ts",
+    "incidents:backfill": "bun run scripts/backfill-incidents.ts",
     "test": "vitest",
     "test:unit": "vitest run --project unit",
     "test:integration": "vitest run --project integration",

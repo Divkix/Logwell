@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type * as schema from '../../../src/lib/server/db/schema';
-import { log } from '../../../src/lib/server/db/schema';
+import { incident, log } from '../../../src/lib/server/db/schema';
 import { setupTestDatabase } from '../../../src/lib/server/db/test-db';
 import { logEventBus } from '../../../src/lib/server/events';
 import { clearApiKeyCache } from '../../../src/lib/server/utils/api-key';
@@ -379,6 +379,65 @@ describe('POST /v1/ingest (Simple API)', () => {
       await POST(event as never);
 
       expect(emittedLogs.length).toBe(2);
+    });
+  });
+
+  describe('Incident aggregation', () => {
+    it('groups dynamic error variants into one incident fingerprint', async () => {
+      const project = await seedProject(db);
+
+      const request = new Request('http://localhost/v1/ingest', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${project.apiKey}`,
+        },
+        body: JSON.stringify([
+          {
+            level: 'error',
+            message: 'Database timeout after 1000ms for user 123',
+            service: 'api',
+            sourceFile: 'src/db.ts',
+            lineNumber: 44,
+          },
+          {
+            level: 'error',
+            message: 'Database timeout after 2500ms for user 999',
+            service: 'api',
+            sourceFile: 'src/db.ts',
+            lineNumber: 44,
+          },
+          {
+            level: 'info',
+            message: 'User opened dashboard',
+            service: 'api',
+          },
+        ]),
+      });
+
+      const event = createRequestEvent(request, db);
+      const response = await POST(event as never);
+
+      expect(response.status).toBe(200);
+
+      const incidents = await db.select().from(incident).where(eq(incident.projectId, project.id));
+      expect(incidents).toHaveLength(1);
+      expect(incidents[0].totalEvents).toBe(2);
+
+      const logs = await db.select().from(log).where(eq(log.projectId, project.id));
+      const errorLogs = logs.filter((entry) => entry.level === 'error');
+      const infoLogs = logs.filter((entry) => entry.level === 'info');
+
+      expect(errorLogs).toHaveLength(2);
+      expect(errorLogs[0].incidentId).toBe(incidents[0].id);
+      expect(errorLogs[1].incidentId).toBe(incidents[0].id);
+      expect(errorLogs[0].fingerprint).toBeTruthy();
+      expect(errorLogs[0].fingerprint).toBe(errorLogs[1].fingerprint);
+      expect(errorLogs[0].serviceName).toBe('api');
+
+      expect(infoLogs).toHaveLength(1);
+      expect(infoLogs[0].incidentId).toBeNull();
+      expect(infoLogs[0].fingerprint).toBeNull();
     });
   });
 });

@@ -20,6 +20,9 @@ describe('LogDetailModal', () => {
   const baseLog: Log = {
     id: 'log_123',
     projectId: 'proj_456',
+    incidentId: null,
+    fingerprint: null,
+    serviceName: null,
     level: 'info',
     message: 'User logged in successfully',
     metadata: { userId: 'user_789', action: 'login', details: { ip: '192.168.1.1' } },

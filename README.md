@@ -55,6 +55,7 @@ Logwell is a lightweight, self-hosted log aggregation platform for developers wh
 - **OTLP-native ingestion** — Standard OpenTelemetry protocol, no proprietary SDKs required
 - **PostgreSQL backend** — Full-text search via tsvector, no separate search cluster needed
 - **Real-time streaming** — SSE-powered live log tailing with batching
+- **Incident intelligence** — Error/fatal fingerprinting with incident timeline and correlation hints
 - **Project isolation** — Per-project API keys with separate log streams
 - **Zero telemetry** — No phone-home, no tracking, fully air-gapped deployments supported
 - **Clean UI** — Minimal interface with dark mode and log level color coding
@@ -171,6 +172,7 @@ ORIGIN="https://your-domain.com"
 # Log retention (optional, defaults shown)
 # LOG_RETENTION_DAYS="30"        # 0 = never auto-delete
 # LOG_CLEANUP_INTERVAL_MS="3600000"  # Cleanup job interval (1 hour)
+# INCIDENT_AUTO_RESOLVE_MINUTES="30" # Incident resolves after N quiet minutes
 ```
 
 Generate a secure secret:
@@ -675,6 +677,10 @@ The app runs on port 3000 by default.
 | `/api/projects/[id]/regenerate` | POST | Regenerate API key |
 | `/api/projects/[id]/logs` | GET | Query logs |
 | `/api/projects/[id]/logs/stream` | POST | SSE stream |
+| `/api/projects/[id]/incidents` | GET | List incidents (open/resolved, range filters) |
+| `/api/projects/[id]/incidents/[incidentId]` | GET | Incident detail with root-cause candidates |
+| `/api/projects/[id]/incidents/[incidentId]/timeline` | GET | Incident timeline buckets + peak |
+| `/api/projects/[id]/incidents/stream` | POST | SSE incident updates |
 | `/api/projects/[id]/stats` | GET | Level distribution |
 
 ## Current Limitations

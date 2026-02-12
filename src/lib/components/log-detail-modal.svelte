@@ -1,6 +1,7 @@
 <script lang="ts">
 import CopyIcon from '@lucide/svelte/icons/copy';
 import XIcon from '@lucide/svelte/icons/x';
+import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
 import type { Log } from '$lib/server/db/schema';
 import { cn } from '$lib/utils';
 import { announceToScreenReader, focusTrap } from '$lib/utils/focus-trap';
@@ -11,11 +12,19 @@ interface Props {
   log: Log;
   open: boolean;
   onClose?: () => void;
+  onViewIncident?: (incidentId: string) => void;
   triggerElement?: HTMLElement | null;
   class?: string;
 }
 
-const { log, open, onClose, triggerElement = null, class: className }: Props = $props();
+const {
+  log,
+  open,
+  onClose,
+  onViewIncident,
+  triggerElement = null,
+  class: className,
+}: Props = $props();
 
 const formattedTimestamp = $derived(log.timestamp ? formatFullDate(log.timestamp) : null);
 
@@ -170,6 +179,23 @@ function handleKeyDown(event: KeyboardEvent) {
             </button>
           {/if}
         </div>
+
+        {#if log.incidentId}
+          <div class="rounded-md border p-3">
+            <p class="text-sm font-medium">Linked Incident</p>
+            <p class="text-xs font-mono text-muted-foreground mb-2">{log.incidentId}</p>
+            {#if onViewIncident}
+              <button
+                type="button"
+                class="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-muted/50"
+                onclick={() => onViewIncident(log.incidentId!)}
+              >
+                View Incident Timeline
+                <ArrowRightIcon class="size-3" />
+              </button>
+            {/if}
+          </div>
+        {/if}
 
         <!-- User ID -->
         <div>

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Log } from './db/schema';
+import type { Incident, Log } from './db/schema';
 import { logEventBus } from './events';
 
 describe('Log Event Bus', () => {
@@ -7,6 +7,9 @@ describe('Log Event Bus', () => {
   const sampleLog: Log = {
     id: 'log-1',
     projectId: 'project-1',
+    incidentId: null,
+    fingerprint: null,
+    serviceName: null,
     level: 'info',
     message: 'Test log message',
     metadata: { key: 'value' },
@@ -34,6 +37,24 @@ describe('Log Event Bus', () => {
     ipAddress: '127.0.0.1',
     timestamp: new Date(),
     search: null,
+  };
+
+  const sampleIncident: Incident = {
+    id: 'inc-1',
+    projectId: 'project-1',
+    fingerprint: 'abcd1234',
+    title: 'Database timeout',
+    normalizedMessage: 'database timeout after {num}ms',
+    serviceName: 'api',
+    sourceFile: 'db.ts',
+    lineNumber: 42,
+    highestLevel: 'error',
+    firstSeen: new Date(),
+    lastSeen: new Date(),
+    totalEvents: 5,
+    reopenCount: 0,
+    createdAt: new Date(),
+    updatedAt: new Date(),
   };
 
   beforeEach(() => {
@@ -215,6 +236,37 @@ describe('Log Event Bus', () => {
 
       expect(listener1).not.toHaveBeenCalled();
       expect(listener2).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('incident events', () => {
+    it('triggers registered incident listeners', () => {
+      const listener = vi.fn();
+      logEventBus.onIncident('project-1', listener);
+
+      logEventBus.emitIncident(sampleIncident);
+
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(listener).toHaveBeenCalledWith(sampleIncident);
+    });
+
+    it('incident listeners are project-scoped', () => {
+      const listener1 = vi.fn();
+      const listener2 = vi.fn();
+      logEventBus.onIncident('project-1', listener1);
+      logEventBus.onIncident('project-2', listener2);
+
+      logEventBus.emitIncident(sampleIncident);
+
+      expect(listener1).toHaveBeenCalledTimes(1);
+      expect(listener2).not.toHaveBeenCalled();
+    });
+
+    it('returns incident listener count', () => {
+      logEventBus.onIncident('project-1', vi.fn());
+      logEventBus.onIncident('project-1', vi.fn());
+
+      expect(logEventBus.getIncidentListenerCount('project-1')).toBe(2);
     });
   });
 });

@@ -96,6 +96,25 @@ describe('Performance Configuration', () => {
     });
   });
 
+  describe('Incident Configuration', () => {
+    it('exports AUTO_RESOLVE_MINUTES with default value of 30', async () => {
+      const { INCIDENT_CONFIG } = await import('./performance');
+      expect(INCIDENT_CONFIG.AUTO_RESOLVE_MINUTES).toBe(30);
+    });
+
+    it('respects INCIDENT_AUTO_RESOLVE_MINUTES environment variable', async () => {
+      process.env.INCIDENT_AUTO_RESOLVE_MINUTES = '45';
+      const { INCIDENT_CONFIG } = await import('./performance');
+      expect(INCIDENT_CONFIG.AUTO_RESOLVE_MINUTES).toBe(45);
+    });
+
+    it('clamps INCIDENT_AUTO_RESOLVE_MINUTES to minimum', async () => {
+      process.env.INCIDENT_AUTO_RESOLVE_MINUTES = '0';
+      const { INCIDENT_CONFIG } = await import('./performance');
+      expect(INCIDENT_CONFIG.AUTO_RESOLVE_MINUTES).toBe(1);
+    });
+  });
+
   describe('Configuration Validation', () => {
     it('validateSSEConfig returns true for valid config', async () => {
       const { validateSSEConfig, SSE_CONFIG } = await import('./performance');

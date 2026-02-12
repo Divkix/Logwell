@@ -6,6 +6,11 @@ import type * as schema from '$lib/server/db/schema';
 import { log } from '$lib/server/db/schema';
 import { logEventBus } from '$lib/server/events';
 import { ApiKeyError, validateApiKey } from '$lib/server/utils/api-key';
+import {
+  assignIncidentIds,
+  prepareLogsForIncidents,
+  upsertIncidentsForPreparedLogs,
+} from '$lib/server/utils/incidents';
 import { parseSimpleIngestRequest, SimpleIngestError } from '$lib/server/utils/simple-ingest';
 
 async function getDbClient(
@@ -68,46 +73,79 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
   const { records, accepted, rejected, errors } = result;
 
-  // Map to database schema
-  const logEntries = records.map((record) => ({
-    id: nanoid(),
-    projectId,
-    level: record.level,
-    message: record.message,
-    timestamp: record.timestamp,
-    metadata: record.metadata,
-    resourceAttributes: record.resourceAttributes,
-    // OTLP-specific fields are null for simple API
-    timeUnixNano: null,
-    observedTimeUnixNano: null,
-    severityNumber: null,
-    severityText: null,
-    body: null,
-    droppedAttributesCount: null,
-    flags: null,
-    traceId: null,
-    spanId: null,
-    resourceDroppedAttributesCount: null,
-    resourceSchemaUrl: null,
-    scopeName: null,
-    scopeVersion: null,
-    scopeAttributes: null,
-    scopeDroppedAttributesCount: null,
-    scopeSchemaUrl: null,
-    sourceFile: record.sourceFile,
-    lineNumber: record.lineNumber,
-    requestId: null,
-    userId: null,
-    ipAddress: null,
-  }));
+  const preparedLogs = prepareLogsForIncidents(
+    records.map((record) => ({
+      level: record.level,
+      message: record.message,
+      timestamp: record.timestamp,
+      sourceFile: record.sourceFile,
+      lineNumber: record.lineNumber,
+      resourceAttributes: record.resourceAttributes,
+      metadata: record.metadata,
+    })),
+  );
 
-  // Insert logs into database
-  const insertedLogs =
-    logEntries.length > 0 ? await db.insert(log).values(logEntries).returning() : [];
+  const { insertedLogs, touchedIncidents } =
+    preparedLogs.length > 0
+      ? await (db as {
+          transaction: <T>(fn: (tx: typeof db) => Promise<T>) => Promise<T>;
+        }).transaction(async (tx) => {
+          const { incidentByFingerprint, touchedIncidents } = await upsertIncidentsForPreparedLogs(
+            tx,
+            projectId,
+            preparedLogs,
+          );
+          const assigned = assignIncidentIds(preparedLogs, incidentByFingerprint);
+
+          const logEntries = assigned.map((prepared, index) => {
+            const record = records[index];
+            return {
+              id: nanoid(),
+              projectId,
+              incidentId: prepared.incidentId,
+              fingerprint: prepared.fingerprint,
+              serviceName: prepared.serviceName,
+              level: record.level,
+              message: record.message,
+              timestamp: record.timestamp,
+              metadata: record.metadata,
+              resourceAttributes: record.resourceAttributes,
+              // OTLP-specific fields are null for simple API
+              timeUnixNano: null,
+              observedTimeUnixNano: null,
+              severityNumber: null,
+              severityText: null,
+              body: null,
+              droppedAttributesCount: null,
+              flags: null,
+              traceId: null,
+              spanId: null,
+              resourceDroppedAttributesCount: null,
+              resourceSchemaUrl: null,
+              scopeName: null,
+              scopeVersion: null,
+              scopeAttributes: null,
+              scopeDroppedAttributesCount: null,
+              scopeSchemaUrl: null,
+              sourceFile: record.sourceFile,
+              lineNumber: record.lineNumber,
+              requestId: null,
+              userId: null,
+              ipAddress: null,
+            };
+          });
+
+          const insertedLogs = await tx.insert(log).values(logEntries).returning();
+          return { insertedLogs, touchedIncidents };
+        })
+      : { insertedLogs: [], touchedIncidents: [] };
 
   // Emit to event bus for real-time streaming
   for (const insertedLog of insertedLogs) {
     logEventBus.emitLog(insertedLog);
+  }
+  for (const touchedIncident of touchedIncidents) {
+    logEventBus.emitIncident(touchedIncident);
   }
 
   // Build response
