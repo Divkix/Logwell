@@ -60,13 +60,12 @@ test.describe('Incidents Page', () => {
 
     await page.goto(`/projects/${project.id}/incidents`);
     await expect(page.locator('[data-testid="incident-table"]')).toBeVisible();
-    await expect(
-      page.locator('[data-testid="incident-row"], [data-testid="incident-card"]'),
-    ).toHaveCount(1);
+    const visibleIncidentItems = page.locator(
+      '[data-testid="incident-row"]:visible, [data-testid="incident-card"]:visible',
+    );
+    await expect(visibleIncidentItems).toHaveCount(1);
 
-    const rowOrCard = page
-      .locator('[data-testid="incident-row"], [data-testid="incident-card"]')
-      .first();
+    const rowOrCard = visibleIncidentItems.first();
     await rowOrCard.click();
 
     await expect(page.locator('[data-testid="incident-timeline-panel"]')).toBeVisible();
