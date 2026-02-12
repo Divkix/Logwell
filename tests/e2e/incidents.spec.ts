@@ -68,8 +68,11 @@ test.describe('Incidents Page', () => {
     const rowOrCard = visibleIncidentItems.first();
     await rowOrCard.click();
 
-    await expect(page.locator('[data-testid="incident-timeline-panel"]')).toBeVisible();
-    await expect(page.getByText('Root-Cause Candidates')).toBeVisible();
+    const timelinePanel = page.locator('[data-testid="incident-timeline-panel"]');
+    await expect(timelinePanel).toBeVisible();
+    await expect(
+      timelinePanel.getByRole('heading', { name: 'Root-Cause Candidates', exact: true }),
+    ).toBeVisible();
   });
 
   test('updates incident list in real-time when new error arrives', async ({ page }) => {
