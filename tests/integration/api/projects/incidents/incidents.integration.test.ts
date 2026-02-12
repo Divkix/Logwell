@@ -6,9 +6,9 @@ import type * as schema from '$lib/server/db/schema';
 import { incident } from '$lib/server/db/schema';
 import { setupTestDatabase } from '$lib/server/db/test-db';
 import { getSession } from '$lib/server/session';
+import { GET as GET_LIST } from '../../../../../src/routes/api/projects/[id]/incidents/+server';
 import { GET as GET_DETAIL } from '../../../../../src/routes/api/projects/[id]/incidents/[incidentId]/+server';
 import { GET as GET_TIMELINE } from '../../../../../src/routes/api/projects/[id]/incidents/[incidentId]/timeline/+server';
-import { GET as GET_LIST } from '../../../../../src/routes/api/projects/[id]/incidents/+server';
 import { seedLog, seedProject } from '../../../../fixtures/db';
 
 function createRequestEvent(
@@ -203,7 +203,9 @@ describe('Incident APIs', () => {
       traceId: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
     });
 
-    const request = new Request(`http://localhost/api/projects/${project.id}/incidents/${createdIncident.id}`);
+    const request = new Request(
+      `http://localhost/api/projects/${project.id}/incidents/${createdIncident.id}`,
+    );
     const event = createRequestEvent(
       request,
       db,
@@ -317,7 +319,9 @@ describe('Incident APIs', () => {
       })
       .returning();
 
-    const request = new Request(`http://localhost/api/projects/${otherProject.id}/incidents/${otherIncident.id}`);
+    const request = new Request(
+      `http://localhost/api/projects/${otherProject.id}/incidents/${otherIncident.id}`,
+    );
     const event = createRequestEvent(
       request,
       db,

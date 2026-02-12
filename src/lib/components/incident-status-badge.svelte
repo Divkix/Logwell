@@ -1,6 +1,6 @@
 <script lang="ts">
-import { cn } from '$lib/utils';
 import type { IncidentStatus } from '$lib/shared/types';
+import { cn } from '$lib/utils';
 
 interface Props {
   status: IncidentStatus;

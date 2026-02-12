@@ -102,7 +102,9 @@ export const INCIDENT_GROUPED_LEVELS: readonly LogLevel[] = ['error', 'fatal'] a
 /**
  * Type guard for grouped levels.
  */
-export function isIncidentGroupedLevel(level: string): level is (typeof INCIDENT_GROUPED_LEVELS)[number] {
+export function isIncidentGroupedLevel(
+  level: string,
+): level is (typeof INCIDENT_GROUPED_LEVELS)[number] {
   return (INCIDENT_GROUPED_LEVELS as readonly string[]).includes(level);
 }
 

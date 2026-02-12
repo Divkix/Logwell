@@ -7,8 +7,14 @@ import BottomNav from '$lib/components/bottom-nav.svelte';
 import IncidentTable from '$lib/components/incident-table.svelte';
 import IncidentTimelinePanel from '$lib/components/incident-timeline-panel.svelte';
 import Button from '$lib/components/ui/button/button.svelte';
-import { useIncidentStream, type ClientIncident } from '$lib/hooks/use-incident-stream.svelte';
-import type { IncidentDetail, IncidentListItem, IncidentRange, IncidentStatus, IncidentTimelineResponse } from '$lib/shared/types';
+import { type ClientIncident, useIncidentStream } from '$lib/hooks/use-incident-stream.svelte';
+import type {
+  IncidentDetail,
+  IncidentListItem,
+  IncidentRange,
+  IncidentStatus,
+  IncidentTimelineResponse,
+} from '$lib/shared/types';
 import type { PageData } from './$types';
 
 const { data }: { data: PageData } = $props();
@@ -101,9 +107,7 @@ async function fetchIncidentDetail(incidentId: string) {
   try {
     const [detailRes, timelineRes] = await Promise.all([
       fetch(`/api/projects/${projectId}/incidents/${incidentId}`),
-      fetch(
-        `/api/projects/${projectId}/incidents/${incidentId}/timeline?range=${selectedRange}`,
-      ),
+      fetch(`/api/projects/${projectId}/incidents/${incidentId}/timeline?range=${selectedRange}`),
     ]);
 
     if (!detailRes.ok || !timelineRes.ok) {

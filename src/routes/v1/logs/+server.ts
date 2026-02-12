@@ -98,9 +98,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
   const { insertedLogs, touchedIncidents } =
     preparedLogs.length > 0
-      ? await (db as {
-          transaction: <T>(fn: (tx: typeof db) => Promise<T>) => Promise<T>;
-        }).transaction(async (tx) => {
+      ? await (
+          db as {
+            transaction: <T>(fn: (tx: typeof db) => Promise<T>) => Promise<T>;
+          }
+        ).transaction(async (tx) => {
           const { incidentByFingerprint, touchedIncidents } = await upsertIncidentsForPreparedLogs(
             tx,
             projectId,

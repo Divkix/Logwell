@@ -1,11 +1,16 @@
 import { error } from '@sveltejs/kit';
 import { and, count, desc, eq, gte, lt, or, type SQL } from 'drizzle-orm';
-import { incident, project } from '$lib/server/db/schema';
 import { INCIDENT_CONFIG } from '$lib/server/config';
+import { incident, project } from '$lib/server/db/schema';
+import { requireAuth } from '$lib/server/utils/auth-guard';
 import { decodeCursor, encodeCursor } from '$lib/server/utils/cursor';
 import { getIncidentStatus } from '$lib/server/utils/incidents';
-import { requireAuth } from '$lib/server/utils/auth-guard';
-import { INCIDENT_RANGES, INCIDENT_STATUSES, type IncidentRange, type IncidentStatus } from '$lib/shared/types';
+import {
+  INCIDENT_RANGES,
+  INCIDENT_STATUSES,
+  type IncidentRange,
+  type IncidentStatus,
+} from '$lib/shared/types';
 import { getTimeRangeStart } from '$lib/utils/format';
 import type { PageServerLoad } from './$types';
 
@@ -33,7 +38,9 @@ export const load: PageServerLoad = async (event) => {
 
   const params = event.url.searchParams;
   const limit = clamp(
-    params.get('limit') ? Number.parseInt(params.get('limit') || '', 10) || DEFAULT_LIMIT : DEFAULT_LIMIT,
+    params.get('limit')
+      ? Number.parseInt(params.get('limit') || '', 10) || DEFAULT_LIMIT
+      : DEFAULT_LIMIT,
     MIN_LIMIT,
     MAX_LIMIT,
   );
@@ -85,7 +92,10 @@ export const load: PageServerLoad = async (event) => {
   const hasMore = incidents.length === limit;
   const nextCursor =
     hasMore && incidents.length > 0
-      ? encodeCursor(incidents[incidents.length - 1].lastSeen as Date, incidents[incidents.length - 1].id)
+      ? encodeCursor(
+          incidents[incidents.length - 1].lastSeen as Date,
+          incidents[incidents.length - 1].id,
+        )
       : null;
 
   return {

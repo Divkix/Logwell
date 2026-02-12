@@ -13,9 +13,7 @@ describe('incident-fingerprint', () => {
       ' ERROR User 123 from 192.168.10.20 hit tx 0xdeadbeefcafebabe and request 550e8400-e29b-41d4-a716-446655440000 ';
     const normalized = normalizeIncidentMessage(message);
 
-    expect(normalized).toBe(
-      'error user {num} from {ip} hit tx {hex} and request {uuid}',
-    );
+    expect(normalized).toBe('error user {num} from {ip} hit tx {hex} and request {uuid}');
   });
 
   it('hashes seed into truncated sha256 hex', () => {

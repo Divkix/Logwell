@@ -48,11 +48,7 @@ export const projectUpdatePayloadSchema = z.object({
     .union([
       z.null(), // System default
       z.literal(0), // Never delete
-      z
-        .number()
-        .int()
-        .min(1)
-        .max(3650), // 1 day to 10 years
+      z.number().int().min(1).max(3650), // 1 day to 10 years
     ])
     .optional(),
 });

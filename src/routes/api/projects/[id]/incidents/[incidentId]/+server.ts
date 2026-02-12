@@ -46,7 +46,10 @@ export async function GET(event: RequestEvent): Promise<Response> {
     .from(log)
     .where(and(eq(log.projectId, projectId), eq(log.incidentId, incidentId)));
 
-  const sourceFrequency = new Map<string, { sourceFile: string | null; lineNumber: number | null; count: number }>();
+  const sourceFrequency = new Map<
+    string,
+    { sourceFile: string | null; lineNumber: number | null; count: number }
+  >();
   const requestCounts = new Map<string, number>();
   const traceCounts = new Map<string, number>();
 

@@ -1,16 +1,12 @@
 import { and, eq, inArray } from 'drizzle-orm';
-import { nanoid } from 'nanoid';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
+import { nanoid } from 'nanoid';
+import { type IncidentStatus, isIncidentGroupedLevel, maxIncidentLevel } from '../../shared/types';
 import { INCIDENT_CONFIG } from '../config';
-import { incident, type Incident, type LogLevel } from '../db/schema';
-import {
-  isIncidentGroupedLevel,
-  maxIncidentLevel,
-  type IncidentStatus,
-} from '../../shared/types';
-import { buildIncidentFingerprint } from './incident-fingerprint';
 import type * as schema from '../db/schema';
+import { type Incident, incident, type LogLevel } from '../db/schema';
+import { buildIncidentFingerprint } from './incident-fingerprint';
 
 type DatabaseClient = PostgresJsDatabase<typeof schema> | PgliteDatabase<typeof schema>;
 
@@ -259,7 +255,8 @@ export async function upsertIncidentsForPreparedLogs(
       .update(incident)
       .set({
         highestLevel: maxIncidentLevel(existing.highestLevel, aggregate.highestLevel),
-        lastSeen: aggregate.lastSeen > (existing.lastSeen as Date) ? aggregate.lastSeen : existing.lastSeen,
+        lastSeen:
+          aggregate.lastSeen > (existing.lastSeen as Date) ? aggregate.lastSeen : existing.lastSeen,
         totalEvents: existing.totalEvents + aggregate.totalEvents,
         reopenCount: existing.reopenCount + (shouldReopen ? 1 : 0),
         updatedAt: new Date(),

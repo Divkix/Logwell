@@ -42,7 +42,9 @@ test.describe('Incidents Page', () => {
     }
   });
 
-  test('groups similar errors into a single incident and opens timeline panel', async ({ page }) => {
+  test('groups similar errors into a single incident and opens timeline panel', async ({
+    page,
+  }) => {
     await ingestOtlpLogs(page, project.apiKey, [
       {
         level: 'error',
@@ -58,9 +60,13 @@ test.describe('Incidents Page', () => {
 
     await page.goto(`/projects/${project.id}/incidents`);
     await expect(page.locator('[data-testid="incident-table"]')).toBeVisible();
-    await expect(page.locator('[data-testid="incident-row"], [data-testid="incident-card"]')).toHaveCount(1);
+    await expect(
+      page.locator('[data-testid="incident-row"], [data-testid="incident-card"]'),
+    ).toHaveCount(1);
 
-    const rowOrCard = page.locator('[data-testid="incident-row"], [data-testid="incident-card"]').first();
+    const rowOrCard = page
+      .locator('[data-testid="incident-row"], [data-testid="incident-card"]')
+      .first();
     await rowOrCard.click();
 
     await expect(page.locator('[data-testid="incident-timeline-panel"]')).toBeVisible();
@@ -75,7 +81,11 @@ test.describe('Incidents Page', () => {
       {
         level: 'error',
         message: 'Payment gateway unavailable for order 555',
-        attributes: { 'service.name': 'billing', 'code.filepath': 'src/payment.ts', 'code.lineno': 88 },
+        attributes: {
+          'service.name': 'billing',
+          'code.filepath': 'src/payment.ts',
+          'code.lineno': 88,
+        },
       },
     ]);
 

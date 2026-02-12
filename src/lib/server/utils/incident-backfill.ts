@@ -1,9 +1,9 @@
 import { and, eq, gte, inArray } from 'drizzle-orm';
-import { nanoid } from 'nanoid';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
+import { nanoid } from 'nanoid';
 import type * as schema from '$lib/server/db/schema';
-import { incident, log, type Incident, type LogLevel } from '$lib/server/db/schema';
+import { type Incident, incident, type LogLevel, log } from '$lib/server/db/schema';
 import {
   assignIncidentIds,
   buildIncidentTitle,
@@ -46,7 +46,11 @@ export async function backfillProjectIncidents(
     })
     .from(log)
     .where(
-      and(eq(log.projectId, projectId), gte(log.timestamp, since), inArray(log.level, GROUPED_LEVELS)),
+      and(
+        eq(log.projectId, projectId),
+        gte(log.timestamp, since),
+        inArray(log.level, GROUPED_LEVELS),
+      ),
     )
     .orderBy(log.timestamp);
 
@@ -58,9 +62,11 @@ export async function backfillProjectIncidents(
     };
   }
 
-  return await (db as {
-    transaction: <T>(fn: (tx: DatabaseClient) => Promise<T>) => Promise<T>;
-  }).transaction(async (tx) => {
+  return await (
+    db as {
+      transaction: <T>(fn: (tx: DatabaseClient) => Promise<T>) => Promise<T>;
+    }
+  ).transaction(async (tx) => {
     const prepared = prepareLogsForIncidents(
       logs.map((entry) => ({
         level: entry.level,
@@ -80,7 +86,9 @@ export async function backfillProjectIncidents(
         ? await tx
             .select()
             .from(incident)
-            .where(and(eq(incident.projectId, projectId), inArray(incident.fingerprint, fingerprints)))
+            .where(
+              and(eq(incident.projectId, projectId), inArray(incident.fingerprint, fingerprints)),
+            )
         : [];
 
     const incidentByFingerprint = new Map<string, Incident>(

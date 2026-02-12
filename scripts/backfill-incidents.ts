@@ -27,7 +27,9 @@ async function runBackfill() {
   const db = drizzle(client, { schema });
 
   try {
-    const projects = await db.select({ id: schema.project.id, name: schema.project.name }).from(schema.project);
+    const projects = await db
+      .select({ id: schema.project.id, name: schema.project.name })
+      .from(schema.project);
 
     if (projects.length === 0) {
       console.log('No projects found. Nothing to backfill.');

@@ -2,9 +2,9 @@ import { json } from '@sveltejs/kit';
 import { and, count, desc, eq, gte, lt, or, type SQL } from 'drizzle-orm';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
+import { INCIDENT_CONFIG } from '$lib/server/config';
 import type * as schema from '$lib/server/db/schema';
 import { incident } from '$lib/server/db/schema';
-import { INCIDENT_CONFIG } from '$lib/server/config';
 import { decodeCursor, encodeCursor } from '$lib/server/utils/cursor';
 import { getIncidentStatus } from '$lib/server/utils/incidents';
 import { isErrorResponse, requireProjectOwnership } from '$lib/server/utils/project-guard';
@@ -40,7 +40,9 @@ export async function GET(event: RequestEvent): Promise<Response> {
 
   const params = event.url.searchParams;
   const limit = clamp(
-    params.get('limit') ? Number.parseInt(params.get('limit') || '', 10) || DEFAULT_LIMIT : DEFAULT_LIMIT,
+    params.get('limit')
+      ? Number.parseInt(params.get('limit') || '', 10) || DEFAULT_LIMIT
+      : DEFAULT_LIMIT,
     MIN_LIMIT,
     MAX_LIMIT,
   );
@@ -99,7 +101,10 @@ export async function GET(event: RequestEvent): Promise<Response> {
   const hasMore = incidents.length === limit;
   const nextCursor =
     hasMore && incidents.length > 0
-      ? encodeCursor(incidents[incidents.length - 1].lastSeen as Date, incidents[incidents.length - 1].id)
+      ? encodeCursor(
+          incidents[incidents.length - 1].lastSeen as Date,
+          incidents[incidents.length - 1].id,
+        )
       : null;
 
   return json({

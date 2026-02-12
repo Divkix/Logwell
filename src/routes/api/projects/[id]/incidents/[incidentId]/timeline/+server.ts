@@ -64,13 +64,10 @@ export async function GET(event: RequestEvent): Promise<Response> {
 
   const bucketCounts = bucketTimestamps(timestamps, config, rangeStart);
   const buckets = fillMissingBuckets(bucketCounts, config, rangeStart, rangeEnd);
-  const peakBucket = buckets.reduce<{ timestamp: string; count: number } | null>(
-    (peak, bucket) => {
-      if (!peak) return bucket;
-      return bucket.count > peak.count ? bucket : peak;
-    },
-    null,
-  );
+  const peakBucket = buckets.reduce<{ timestamp: string; count: number } | null>((peak, bucket) => {
+    if (!peak) return bucket;
+    return bucket.count > peak.count ? bucket : peak;
+  }, null);
 
   return json({
     incidentId: incidentRow.id,

@@ -131,8 +131,16 @@ export const log = pgTable(
   },
   (table) => [
     index('idx_log_project_id').on(table.projectId),
-    index('idx_log_project_incident_timestamp').on(table.projectId, table.incidentId, table.timestamp),
-    index('idx_log_project_fingerprint_timestamp').on(table.projectId, table.fingerprint, table.timestamp),
+    index('idx_log_project_incident_timestamp').on(
+      table.projectId,
+      table.incidentId,
+      table.timestamp,
+    ),
+    index('idx_log_project_fingerprint_timestamp').on(
+      table.projectId,
+      table.fingerprint,
+      table.timestamp,
+    ),
     index('idx_log_project_service_name').on(table.projectId, table.serviceName),
     index('idx_log_timestamp').on(table.timestamp),
     index('idx_log_level').on(table.level),

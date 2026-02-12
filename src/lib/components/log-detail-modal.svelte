@@ -1,7 +1,7 @@
 <script lang="ts">
+import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
 import CopyIcon from '@lucide/svelte/icons/copy';
 import XIcon from '@lucide/svelte/icons/x';
-import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
 import type { Log } from '$lib/server/db/schema';
 import { cn } from '$lib/utils';
 import { announceToScreenReader, focusTrap } from '$lib/utils/focus-trap';
