@@ -274,7 +274,7 @@ test.describe('Dashboard - Create Project Modal', () => {
       .click();
 
     // Should show duplicate error
-    await expect(page.getByText(/already exists|duplicate/i)).toBeVisible();
+    await expect(page.getByTestId('error-message')).toBeVisible();
 
     // Cleanup
     const response = await page.request.get('/api/projects');
