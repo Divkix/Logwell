@@ -34,7 +34,7 @@
     "sdk:version": "bun run --cwd sdks/typescript npm version"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.4.0",
+    "@biomejs/biome": "2.4.4",
     "@electric-sql/pglite": "^0.3.15",
     "@internationalized/date": "^3.11.0",
     "@playwright/test": "^1.58.2",
@@ -65,7 +65,7 @@
     "vitest": "^4.0.18"
   },
   "dependencies": {
-    "@lucide/svelte": "^0.564.0",
+    "@lucide/svelte": "^0.575.0",
     "better-auth": "^1.4.18",
     "clsx": "^2.1.1",
     "layerchart": "^1.0.13",
