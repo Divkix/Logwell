@@ -26,7 +26,10 @@ Five phases build the `sdk-go.yml` GitHub Actions workflow from the ground up: f
   1. `sdks/go/.golangci.yml` exists with `version: "2"` at the top and the practical linter set (govet, errcheck, staticcheck, ineffassign, unused) enabled
   2. `sdks/go/go.mod` declares `go 1.22` as the minimum version
   3. Running `golangci-lint run` locally against `sdks/go/` resolves the config without parse errors
-**Plans**: TBD
+**Plans:** 1 plan
+
+Plans:
+- [ ] 01-01-PLAN.md — Create golangci-lint v2 config and bump go.mod to go 1.22
 
 ### Phase 2: Workflow Skeleton
 **Goal**: A valid, committable `sdk-go.yml` workflow file exists with all trigger and infrastructure config, no jobs yet
@@ -81,7 +84,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation Files | 0/? | Not started | - |
+| 1. Foundation Files | 0/1 | Planned | - |
 | 2. Workflow Skeleton | 0/? | Not started | - |
 | 3. Lint Job | 0/? | Not started | - |
 | 4. Test and Build Jobs | 0/? | Not started | - |
