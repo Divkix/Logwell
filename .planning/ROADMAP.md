@@ -10,7 +10,7 @@ Five phases build the `sdk-go.yml` GitHub Actions workflow from the ground up: f
 - Integer phases (1, 2, 3): Planned milestone work
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
-- [ ] **Phase 1: Foundation Files** - golangci-lint v2 config and go.mod version bump
+- [x] **Phase 1: Foundation Files** - golangci-lint v2 config and go.mod version bump (2026-02-26)
 - [ ] **Phase 2: Workflow Skeleton** - Triggers, concurrency, permissions, working-directory defaults
 - [ ] **Phase 3: Lint Job** - golangci-lint-action with subdirectory-aware config and go mod tidy check
 - [ ] **Phase 4: Test and Build Jobs** - Version-matrix unit tests with race detector and build verification
@@ -29,7 +29,7 @@ Five phases build the `sdk-go.yml` GitHub Actions workflow from the ground up: f
 **Plans:** 1 plan
 
 Plans:
-- [ ] 01-01-PLAN.md — Create golangci-lint v2 config and bump go.mod to go 1.22
+- [x] 01-01-PLAN.md — Create golangci-lint v2 config and bump go.mod to go 1.22
 
 ### Phase 2: Workflow Skeleton
 **Goal**: A valid, committable `sdk-go.yml` workflow file exists with all trigger and infrastructure config, no jobs yet
@@ -84,7 +84,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation Files | 0/1 | Planned | - |
+| 1. Foundation Files | 1/1 | Complete | 2026-02-26 |
 | 2. Workflow Skeleton | 0/? | Not started | - |
 | 3. Lint Job | 0/? | Not started | - |
 | 4. Test and Build Jobs | 0/? | Not started | - |
