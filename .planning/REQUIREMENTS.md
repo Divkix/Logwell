@@ -9,8 +9,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Foundation
 
-- [ ] **FOUND-01**: go.mod minimum version bumped from 1.21 to 1.22
-- [ ] **FOUND-02**: golangci-lint v2 config file exists at `sdks/go/.golangci.yml` with `version: "2"`, practical linter set (govet, errcheck, staticcheck, ineffassign, unused), and gofmt/goimports formatters
+- [x] **FOUND-01**: go.mod minimum version bumped from 1.21 to 1.22
+- [x] **FOUND-02**: golangci-lint v2 config file exists at `sdks/go/.golangci.yml` with `version: "2"`, practical linter set (govet, errcheck, staticcheck, ineffassign, unused), and gofmt/goimports formatters
 
 ### Workflow Infrastructure
 
@@ -83,8 +83,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FOUND-01 | Phase 1 | Pending |
-| FOUND-02 | Phase 1 | Pending |
+| FOUND-01 | Phase 1 | Complete |
+| FOUND-02 | Phase 1 | Complete |
 | INFRA-01 | Phase 2 | Pending |
 | INFRA-02 | Phase 2 | Pending |
 | INFRA-03 | Phase 2 | Pending |
