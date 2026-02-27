@@ -319,10 +319,10 @@ func TestTransport_BackoffCalculation(t *testing.T) {
 	transport := newHTTPTransport("http://example.com", "test-api-key")
 
 	testCases := []struct {
-		attempt       int
-		expectedBase  time.Duration
-		minExpected   time.Duration
-		maxExpected   time.Duration
+		attempt      int
+		expectedBase time.Duration
+		minExpected  time.Duration
+		maxExpected  time.Duration
 	}{
 		// Attempt 1: 100ms * 2^1 = 200ms, +/- 30% = [140ms, 260ms]
 		{1, 200 * time.Millisecond, 140 * time.Millisecond, 260 * time.Millisecond},
@@ -408,10 +408,10 @@ func TestTransport_IsRetryableError(t *testing.T) {
 // TestTransport_ErrorMessageParsing tests that error messages are extracted from responses.
 func TestTransport_ErrorMessageParsing(t *testing.T) {
 	testCases := []struct {
-		name           string
-		responseBody   map[string]string
-		statusCode     int
-		expectedInMsg  string
+		name          string
+		responseBody  map[string]string
+		statusCode    int
+		expectedInMsg string
 	}{
 		{
 			name:          "message field",

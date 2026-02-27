@@ -1,0 +1,30 @@
+version: "2"
+
+linters:
+  default: none
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - gocritic
+    - revive
+    - misspell
+  exclusions:
+    rules:
+      - path: '_test\.go'
+        linters:
+          - errcheck
+      - path: '_test\.go'
+        text: "unused-parameter"
+        linters:
+          - revive
+
+formatters:
+  enable:
+    - gofmt
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

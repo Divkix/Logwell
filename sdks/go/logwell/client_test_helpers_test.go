@@ -1,6 +1,7 @@
 package logwell
 
 import (
+	"context"
 	"testing"
 	"time"
 )
@@ -119,7 +120,7 @@ func setupAndLogWithMetadata(t *testing.T, ts *testServer, clientOpts []Option, 
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	defer client.Shutdown(nil)
+	defer client.Shutdown(context.Background())
 
 	clearTestLogs(ts)
 
