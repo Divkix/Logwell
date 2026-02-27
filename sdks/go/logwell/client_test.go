@@ -39,7 +39,7 @@ func newTestServer() *testServer {
 		var req ingestRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 			return
 		}
 
@@ -49,7 +49,7 @@ func newTestServer() *testServer {
 		ts.mu.Unlock()
 
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(IngestResponse{Accepted: len(req.Logs)})
+		_ = json.NewEncoder(w).Encode(IngestResponse{Accepted: len(req.Logs)})
 	}))
 
 	return ts
@@ -87,7 +87,7 @@ func TestClientNew(t *testing.T) {
 		defer ts.Close()
 
 		client := createTestClient(t, ts)
-		defer client.Shutdown(context.Background())
+		defer func() { _ = client.Shutdown(context.Background()) }()
 	})
 
 	t.Run("valid config with all options", func(t *testing.T) {
@@ -105,7 +105,7 @@ func TestClientNew(t *testing.T) {
 			WithOnError(func(e *Error) { _ = e }),
 			WithOnFlush(func(n int) { _ = n }),
 		)
-		defer client.Shutdown(context.Background())
+		defer func() { _ = client.Shutdown(context.Background()) }()
 
 		if client.config.Service != "test-service" {
 			t.Errorf("Service = %q, want %q", client.config.Service, "test-service")
@@ -170,7 +170,7 @@ func TestClientLogLevels(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	defer client.Shutdown(context.Background())
+	defer func() { _ = client.Shutdown(context.Background()) }()
 
 	testCases := []struct {
 		name    string
@@ -228,7 +228,7 @@ func TestClientMetadataMerging(t *testing.T) {
 		if err != nil {
 			t.Fatalf("New() error = %v", err)
 		}
-		defer client.Shutdown(context.Background())
+		defer func() { _ = client.Shutdown(context.Background()) }()
 
 		log := logAndWait(client, ts, client.Info, "test message")
 		assertLogMetadata(t, log, map[string]string{
@@ -295,7 +295,7 @@ func TestClientBatchAutoFlush(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	defer client.Shutdown(context.Background())
+	defer func() { _ = client.Shutdown(context.Background()) }()
 
 	// Log exactly batch size entries
 	for i := 0; i < batchSize; i++ {
@@ -331,7 +331,7 @@ func TestClientManualFlush(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	defer client.Shutdown(context.Background())
+	defer func() { _ = client.Shutdown(context.Background()) }()
 
 	// Log some entries (less than batch size)
 	client.Info("message 1")
@@ -443,7 +443,7 @@ func TestClientChild(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	defer parent.Shutdown(context.Background())
+	defer func() { _ = parent.Shutdown(context.Background()) }()
 
 	t.Run("child inherits parent service", func(t *testing.T) {
 		log := childLogHelper(t, parent, ts, nil, "child message")
@@ -520,7 +520,7 @@ func TestClientOnErrorCallback(t *testing.T) {
 	// Set handler to always return 500
 	ts.setHandler(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "test error"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "test error"})
 	})
 
 	client, err := New(
@@ -537,7 +537,7 @@ func TestClientOnErrorCallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	defer client.Shutdown(context.Background())
+	defer func() { _ = client.Shutdown(context.Background()) }()
 
 	client.Info("trigger error")
 	time.Sleep(100 * time.Millisecond)
@@ -571,7 +571,7 @@ func TestClientOnFlushCallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	defer client.Shutdown(context.Background())
+	defer func() { _ = client.Shutdown(context.Background()) }()
 
 	// Log exactly batch size to trigger flush
 	client.Info("message 1")
@@ -596,7 +596,7 @@ func TestClientSourceLocation(t *testing.T) {
 		if err != nil {
 			t.Fatalf("New() error = %v", err)
 		}
-		defer client.Shutdown(context.Background())
+		defer func() { _ = client.Shutdown(context.Background()) }()
 
 		ts.mu.Lock()
 		ts.logs = ts.logs[:0]
@@ -629,7 +629,7 @@ func TestClientSourceLocation(t *testing.T) {
 		if err != nil {
 			t.Fatalf("New() error = %v", err)
 		}
-		defer client.Shutdown(context.Background())
+		defer func() { _ = client.Shutdown(context.Background()) }()
 
 		ts.mu.Lock()
 		ts.logs = ts.logs[:0]
@@ -665,7 +665,7 @@ func TestClientContextCancellation(t *testing.T) {
 	ts.setHandler(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(500 * time.Millisecond)
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(IngestResponse{Accepted: 1})
+		_ = json.NewEncoder(w).Encode(IngestResponse{Accepted: 1})
 	})
 
 	client, err := New(
@@ -676,7 +676,7 @@ func TestClientContextCancellation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	defer client.Shutdown(context.Background())
+	defer func() { _ = client.Shutdown(context.Background()) }()
 
 	client.Info("test message")
 
@@ -714,7 +714,7 @@ func TestClientLogEntry(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	defer client.Shutdown(context.Background())
+	defer func() { _ = client.Shutdown(context.Background()) }()
 
 	t.Run("Log with full entry", func(t *testing.T) {
 		ts.mu.Lock()
@@ -918,7 +918,7 @@ func TestClientTimerFlush(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	defer client.Shutdown(context.Background())
+	defer func() { _ = client.Shutdown(context.Background()) }()
 
 	// Log a message
 	client.Info("timer flush test")
@@ -952,7 +952,7 @@ func TestClientService(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	defer client.Shutdown(context.Background())
+	defer func() { _ = client.Shutdown(context.Background()) }()
 
 	client.Info("service test")
 	time.Sleep(50 * time.Millisecond)

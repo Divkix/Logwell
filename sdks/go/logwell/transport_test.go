@@ -35,7 +35,7 @@ func TestTransport_SuccessfulRequest(t *testing.T) {
 		}
 
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(IngestResponse{Accepted: 1})
+		_ = json.NewEncoder(w).Encode(IngestResponse{Accepted: 1})
 	}))
 	defer server.Close()
 
@@ -75,12 +75,12 @@ func TestTransport_RetryOn5xx(t *testing.T) {
 				// Fail first 2 attempts, succeed on third
 				if count < 3 {
 					w.WriteHeader(tc.statusCode)
-					json.NewEncoder(w).Encode(map[string]string{"error": "server error"})
+					_ = json.NewEncoder(w).Encode(map[string]string{"error": "server error"})
 					return
 				}
 
 				w.WriteHeader(http.StatusOK)
-				json.NewEncoder(w).Encode(IngestResponse{Accepted: 1})
+				_ = json.NewEncoder(w).Encode(IngestResponse{Accepted: 1})
 			}))
 			defer server.Close()
 
@@ -111,12 +111,12 @@ func TestTransport_RetryOn429(t *testing.T) {
 		// Rate limit first 2 attempts
 		if count < 3 {
 			w.WriteHeader(http.StatusTooManyRequests)
-			json.NewEncoder(w).Encode(map[string]string{"error": "rate limited"})
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "rate limited"})
 			return
 		}
 
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(IngestResponse{Accepted: 1})
+		_ = json.NewEncoder(w).Encode(IngestResponse{Accepted: 1})
 	}))
 	defer server.Close()
 
@@ -142,7 +142,7 @@ func TestTransport_NoRetryOn401(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt32(&requestCount, 1)
 		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]string{"error": "unauthorized"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "unauthorized"})
 	}))
 	defer server.Close()
 
@@ -176,7 +176,7 @@ func TestTransport_NoRetryOn400(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt32(&requestCount, 1)
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "invalid log format"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "invalid log format"})
 	}))
 	defer server.Close()
 
@@ -243,7 +243,7 @@ func TestTransport_ContextCancellation(t *testing.T) {
 		atomic.AddInt32(&requestCount, 1)
 		// Always return 500 to trigger retry
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "server error"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "server error"})
 	}))
 	defer server.Close()
 
@@ -286,7 +286,7 @@ func TestTransport_MaxRetriesExhausted(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt32(&requestCount, 1)
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "persistent failure"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "persistent failure"})
 	}))
 	defer server.Close()
 
@@ -438,7 +438,7 @@ func TestTransport_ErrorMessageParsing(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(tc.statusCode)
 				if tc.responseBody != nil {
-					json.NewEncoder(w).Encode(tc.responseBody)
+					_ = json.NewEncoder(w).Encode(tc.responseBody)
 				}
 			}))
 			defer server.Close()
@@ -473,7 +473,7 @@ func TestTransport_RequestBody(t *testing.T) {
 			t.Errorf("failed to decode body: %v", err)
 		}
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(IngestResponse{Accepted: len(receivedBody.Logs)})
+		_ = json.NewEncoder(w).Encode(IngestResponse{Accepted: len(receivedBody.Logs)})
 	}))
 	defer server.Close()
 
