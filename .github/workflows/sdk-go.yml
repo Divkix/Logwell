@@ -1,0 +1,138 @@
+name: SDK Go
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "sdks/go/**"
+      - ".github/workflows/sdk-go.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "sdks/go/**"
+      - ".github/workflows/sdk-go.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Cancel in-progress runs on same branch/PR
+concurrency:
+  group: sdk-go-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: sdks/go
+
+env:
+  GOTOOLCHAIN: local
+
+jobs:
+  # =============================================================================
+  # Lint
+  # =============================================================================
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: stable
+          cache-dependency-path: sdks/go/go.sum
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.10.1
+          working-directory: sdks/go
+
+  # =============================================================================
+  # Test Matrix
+  # =============================================================================
+  test:
+    name: Test (Go ${{ matrix.go-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        go-version: ["1.25.x", "1.26.x"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Go ${{ matrix.go-version }}
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ matrix.go-version }}
+          cache-dependency-path: sdks/go/go.sum
+
+      - name: Run tests
+        run: go test -race -count=1 -v ./...
+
+  # =============================================================================
+  # Coverage
+  # =============================================================================
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: stable
+          cache-dependency-path: sdks/go/go.sum
+
+      - name: Run tests with coverage
+        run: go test -race -count=1 -covermode=atomic -coverprofile=coverage.out ./...
+
+      - name: Generate coverage summary
+        run: |
+          echo "## Coverage Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          go tool cover -func=coverage.out >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: coverage-go
+          path: sdks/go/coverage.out
+          retention-days: 7
+
+  # =============================================================================
+  # Final Status Check (required for branch protection)
+  # =============================================================================
+  ci-success:
+    name: CI Success
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [lint, test, coverage]
+    if: always()
+
+    steps:
+      - name: Check all jobs status
+        run: |
+          results=("${{ needs.lint.result }}" "${{ needs.test.result }}" "${{ needs.coverage.result }}")
+          for result in "${results[@]}"; do
+            if [[ "$result" != "success" && "$result" != "skipped" ]]; then
+              echo "Job failed with result: $result"
+              exit 1
+            fi
+          done
+          echo "All jobs passed or were skipped"
+        working-directory: .
