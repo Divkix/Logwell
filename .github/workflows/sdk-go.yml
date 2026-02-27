@@ -45,7 +45,6 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version: stable
-          cache-dependency-path: sdks/go/go.sum
 
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v9
@@ -73,7 +72,6 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version: ${{ matrix.go-version }}
-          cache-dependency-path: sdks/go/go.sum
 
       - name: Run tests
         run: go test -race -count=1 -v ./...
@@ -94,7 +92,6 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version: stable
-          cache-dependency-path: sdks/go/go.sum
 
       - name: Run tests with coverage
         run: go test -race -count=1 -covermode=atomic -coverprofile=coverage.out ./...

@@ -8,10 +8,18 @@ linters:
     - ineffassign
     - staticcheck
     - unused
-    - gosimple
     - gocritic
     - revive
     - misspell
+  exclusions:
+    rules:
+      - path: '_test\.go'
+        linters:
+          - errcheck
+      - path: '_test\.go'
+        text: "unused-parameter"
+        linters:
+          - revive
 
 formatters:
   enable:
