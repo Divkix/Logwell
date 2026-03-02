@@ -190,7 +190,7 @@ jobs:
           test-install/bin/python -c "from logwell import Logwell; print('Import OK')"
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: sdk-python-dist
           path: sdks/python/dist/
