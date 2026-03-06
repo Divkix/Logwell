@@ -4,7 +4,7 @@
 version: 2
 updates:
   # Bun/npm dependencies
-  - package-ecosystem: npm
+  - package-ecosystem: bun
     directory: /
     schedule:
       interval: weekly
@@ -17,7 +17,7 @@ updates:
       include: scope
     labels:
       - dependencies
-      - npm
+      - bun
     groups:
       # Group all minor and patch updates together
       minor-and-patch:

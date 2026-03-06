@@ -51,7 +51,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ${{ steps.bun-cache-dir.outputs.dir }}
-          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock') }}
           restore-keys: |
             ${{ runner.os }}-bun-
 
@@ -89,7 +89,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ${{ steps.bun-cache-dir.outputs.dir }}
-          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock') }}
           restore-keys: |
             ${{ runner.os }}-bun-
 
@@ -124,7 +124,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ${{ steps.bun-cache-dir.outputs.dir }}
-          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock') }}
           restore-keys: |
             ${{ runner.os }}-bun-
 
@@ -174,7 +174,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ${{ steps.bun-cache-dir.outputs.dir }}
-          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock') }}
           restore-keys: |
             ${{ runner.os }}-bun-
 
@@ -250,7 +250,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ${{ steps.bun-cache-dir.outputs.dir }}
-          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock') }}
           restore-keys: |
             ${{ runner.os }}-bun-
 
