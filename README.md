@@ -683,16 +683,6 @@ The app runs on port 3000 by default.
 | `/api/projects/[id]/incidents/stream` | POST | SSE incident updates |
 | `/api/projects/[id]/stats` | GET | Level distribution |
 
-## Current Limitations
-
-> **Important:** Logwell is alpha software. Evaluate these limitations before deploying.
-
-| Limitation | Impact | Workaround |
-|------------|--------|------------|
-| **Single-user auth** | No team collaboration | Share credentials (not recommended) |
-| **No log export** | Can't backup to S3/file | Direct database dumps via `pg_dump` |
-| **No rate limiting** | API keys have unlimited access | Implement at reverse proxy level |
-
 ## Security
 
 - **Always use TLS** — Run behind a reverse proxy (nginx, Caddy) with HTTPS in production
