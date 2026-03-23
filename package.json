@@ -65,7 +65,7 @@
     "vitest": "^4.1.0"
   },
   "dependencies": {
-    "@lucide/svelte": "^0.577.0",
+    "@lucide/svelte": "^1.0.1",
     "better-auth": "^1.5.6",
     "clsx": "^2.1.1",
     "layerchart": "^1.0.13",
