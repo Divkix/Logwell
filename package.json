@@ -46,9 +46,9 @@
     "@testing-library/user-event": "^14.6.1",
     "@types/d3-scale": "^4.0.9",
     "@types/node": "^25.5.0",
-    "@vitest/browser": "^4.1.1",
-    "@vitest/coverage-v8": "^4.1.1",
-    "@vitest/ui": "^4.1.1",
+    "@vitest/browser": "^4.1.2",
+    "@vitest/coverage-v8": "^4.1.2",
+    "@vitest/ui": "^4.1.2",
     "bits-ui": "^2.16.5",
     "drizzle-kit": "^0.31.10",
     "drizzle-orm": "^0.45.2",
@@ -62,7 +62,7 @@
     "tailwindcss": "^4.2.2",
     "typescript": "^6.0.2",
     "vite": "^8.0.3",
-    "vitest": "^4.1.1"
+    "vitest": "^4.1.2"
   },
   "dependencies": {
     "@lucide/svelte": "^1.7.0",
