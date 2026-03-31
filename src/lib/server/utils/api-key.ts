@@ -93,7 +93,7 @@ export async function validateApiKey(
 ): Promise<string> {
   // Extract Authorization header
   const authHeader = request.headers.get('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  if (!authHeader?.startsWith('Bearer ')) {
     throw new ApiKeyError(401, 'Missing or invalid authorization header');
   }
 

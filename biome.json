@@ -1,5 +1,5 @@
 {
-  "root": false,
+  "root": true,
   "$schema": "https://biomejs.dev/schemas/2.4.10/schema.json",
   "vcs": {
     "enabled": true,
@@ -14,7 +14,12 @@
       "!!build",
       "!!dist",
       "!!.vercel",
-      "!!.netlify"
+      "!!.netlify",
+      "!!.mypy_cache",
+      "!!**/.mypy_cache",
+      "!!.ruff_cache",
+      "!!**/.ruff_cache",
+      "!!sdks/python/.venv"
     ]
   },
   "formatter": {

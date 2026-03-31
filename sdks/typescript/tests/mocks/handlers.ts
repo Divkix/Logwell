@@ -11,7 +11,7 @@ export const handlers = [
     const authHeader = request.headers.get('Authorization');
 
     // Check authentication
-    if (!authHeader || !authHeader.startsWith('Bearer lw_')) {
+    if (!authHeader?.startsWith('Bearer lw_')) {
       return HttpResponse.json(
         { error: 'unauthorized', message: 'Missing or invalid authorization header' },
         { status: 401 },
