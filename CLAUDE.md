@@ -41,6 +41,11 @@ bun run db:stop          # Stop PostgreSQL Docker container
 
 ## Architecture
 
+### SDKs (`sdks/`)
+- **TypeScript** (`sdks/typescript/`) - Published to both npm and JSR (`@divkix/logwell`). Version in both `package.json` and `jsr.json`.
+- **Python** (`sdks/python/`) - Published to PyPI (`logwell`). Version in `pyproject.toml`.
+- **Go** (`sdks/go/`) - Uses git tags for versioning (e.g., `sdk/go/v1.0.1`).
+
 ### Database Layer (`src/lib/server/db/`)
 - `schema.ts` - Drizzle table definitions (project, log tables with tsvector search)
 - `index.ts` - Database client initialization using postgres.js
