@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "logwell"
-version = "1.0.0"
+version = "1.0.1"
 description = "Official Python SDK for Logwell logging platform"
 readme = "README.md"
 license = "MIT"
