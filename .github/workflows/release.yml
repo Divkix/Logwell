@@ -434,7 +434,7 @@ jobs:
         run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> $GITHUB_OUTPUT
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.docker-merge.outputs.version-tag }}
           name: ${{ needs.docker-merge.outputs.version-tag }}
