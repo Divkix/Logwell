@@ -49,11 +49,11 @@
     "@vitest/browser": "^4.1.4",
     "@vitest/coverage-v8": "^4.1.4",
     "@vitest/ui": "^4.1.4",
-    "bits-ui": "^2.17.3",
+    "bits-ui": "^2.18.0",
     "drizzle-kit": "^0.31.10",
     "drizzle-orm": "^0.45.2",
     "jsdom": "^29.0.2",
-    "knip": "^6.4.1",
+    "knip": "^6.5.0",
     "mode-watcher": "^1.1.0",
     "svelte": "^5.55.4",
     "svelte-adapter-bun": "^1.0.1",
@@ -61,7 +61,7 @@
     "svelte-sonner": "^1.1.0",
     "tailwindcss": "^4.2.2",
     "typescript": "^6.0.3",
-    "vite": "^8.0.8",
+    "vite": "^8.0.9",
     "vitest": "^4.1.4"
   },
   "dependencies": {
