@@ -177,6 +177,10 @@ export function useIncidentStream(options: UseIncidentStreamOptions): UseInciden
         _error = error instanceof Error ? error : new Error(String(error));
         onError?.(_error);
         setConnected(false);
+
+        // Don't reconnect on permanent errors (404)
+        if (_error.message.startsWith('HTTP 404:')) return;
+
         scheduleReconnect();
       });
   }
