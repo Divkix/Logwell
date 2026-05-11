@@ -1,4 +1,4 @@
-import type { Redirect } from '@sveltejs/kit';
+import type { HttpError } from '@sveltejs/kit';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createAuth } from '$lib/server/auth';
@@ -42,18 +42,23 @@ function createRequestEvent(
   } as unknown;
 }
 
-async function expectRedirect(
+/**
+ * Helper to assert that a promise rejects with a SvelteKit HTTP error
+ */
+async function expectHttpError(
   promise: Promise<unknown>,
   expectedStatus: number,
-  expectedLocation: string,
+  expectedBody?: Record<string, unknown>,
 ): Promise<void> {
   try {
     await promise;
-    expect.fail('Expected redirect to be thrown');
+    expect.fail('Expected HTTP error to be thrown');
   } catch (error) {
-    const redirect = error as Redirect;
-    expect(redirect.status).toBe(expectedStatus);
-    expect(redirect.location).toBe(expectedLocation);
+    const httpError = error as HttpError;
+    expect(httpError.status).toBe(expectedStatus);
+    if (expectedBody) {
+      expect(httpError.body).toEqual(expectedBody);
+    }
   }
 }
 
@@ -95,12 +100,12 @@ describe('Incident APIs', () => {
     await cleanup();
   });
 
-  it('requires authentication for incidents list', async () => {
+  it('returns 401 for unauthenticated request', async () => {
     const project = await seedProject(db, { ownerId: userId });
     const request = new Request(`http://localhost/api/projects/${project.id}/incidents`);
     const event = createRequestEvent(request, db, { id: project.id });
 
-    await expectRedirect(GET_LIST(event as never), 303, '/login');
+    await expectHttpError(GET_LIST(event as never), 401, { message: 'Unauthorized' });
   });
 
   it('lists only open incidents by default', async () => {
@@ -121,7 +126,6 @@ describe('Incident APIs', () => {
         firstSeen: new Date(now - 10 * 60 * 1000),
         lastSeen: new Date(now - 5 * 60 * 1000),
         totalEvents: 4,
-        reopenCount: 0,
       },
       {
         id: 'inc-resolved',
@@ -136,7 +140,6 @@ describe('Incident APIs', () => {
         firstSeen: new Date(now - 3 * 60 * 60 * 1000),
         lastSeen: new Date(now - 2 * 60 * 60 * 1000),
         totalEvents: 2,
-        reopenCount: 1,
       },
     ]);
 
@@ -149,6 +152,7 @@ describe('Incident APIs', () => {
     expect(body.incidents).toHaveLength(1);
     expect(body.incidents[0].id).toBe('inc-open');
     expect(body.incidents[0].status).toBe('open');
+    expect(body.incidents[0]).not.toHaveProperty('reopenCount');
   });
 
   it('returns detail with source candidates and correlations', async () => {
@@ -168,7 +172,6 @@ describe('Incident APIs', () => {
         firstSeen: new Date(Date.now() - 20 * 60 * 1000),
         lastSeen: new Date(Date.now() - 5 * 60 * 1000),
         totalEvents: 3,
-        reopenCount: 0,
       })
       .returning();
 
@@ -218,6 +221,7 @@ describe('Incident APIs', () => {
 
     const body = await response.json();
     expect(body.id).toBe(createdIncident.id);
+    expect(body).not.toHaveProperty('reopenCount');
     expect(body.rootCauseCandidates[0].sourceFile).toBe('src/db.ts');
     expect(body.correlations.topRequestIds[0]).toEqual({ requestId: 'req-1', count: 2 });
     expect(body.correlations.topTraceIds[0]).toEqual({
@@ -243,7 +247,6 @@ describe('Incident APIs', () => {
         firstSeen: new Date(Date.now() - 50 * 60 * 1000),
         lastSeen: new Date(Date.now() - 5 * 60 * 1000),
         totalEvents: 0,
-        reopenCount: 0,
       })
       .returning();
 
@@ -315,7 +318,6 @@ describe('Incident APIs', () => {
         firstSeen: new Date(),
         lastSeen: new Date(),
         totalEvents: 1,
-        reopenCount: 0,
       })
       .returning();
 

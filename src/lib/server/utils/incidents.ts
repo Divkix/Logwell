@@ -183,18 +183,6 @@ export function getIncidentStatus(
 }
 
 /**
- * Returns true when the incoming event should reopen an incident.
- */
-export function isIncidentReopened(
-  lastSeen: Date,
-  newFirstSeen: Date,
-  autoResolveMinutes: number = INCIDENT_CONFIG.AUTO_RESOLVE_MINUTES,
-): boolean {
-  const thresholdMs = autoResolveMinutes * 60 * 1000;
-  return newFirstSeen.getTime() - lastSeen.getTime() > thresholdMs;
-}
-
-/**
  * Batch-upserts incidents and returns touched incident rows.
  */
 export async function upsertIncidentsForPreparedLogs(
@@ -239,7 +227,6 @@ export async function upsertIncidentsForPreparedLogs(
           firstSeen: aggregate.firstSeen,
           lastSeen: aggregate.lastSeen,
           totalEvents: aggregate.totalEvents,
-          reopenCount: 0,
           createdAt: now,
           updatedAt: now,
         })
@@ -250,15 +237,17 @@ export async function upsertIncidentsForPreparedLogs(
       continue;
     }
 
-    const shouldReopen = isIncidentReopened(existing.lastSeen as Date, aggregate.firstSeen);
     const [updated] = await db
       .update(incident)
       .set({
         highestLevel: maxIncidentLevel(existing.highestLevel, aggregate.highestLevel),
+        firstSeen:
+          aggregate.firstSeen < (existing.firstSeen as Date)
+            ? aggregate.firstSeen
+            : existing.firstSeen,
         lastSeen:
           aggregate.lastSeen > (existing.lastSeen as Date) ? aggregate.lastSeen : existing.lastSeen,
         totalEvents: existing.totalEvents + aggregate.totalEvents,
-        reopenCount: existing.reopenCount + (shouldReopen ? 1 : 0),
         updatedAt: new Date(),
       })
       .where(eq(incident.id, existing.id))

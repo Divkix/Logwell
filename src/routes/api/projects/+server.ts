@@ -7,6 +7,7 @@ import type * as schema from '$lib/server/db/schema';
 import { log, project } from '$lib/server/db/schema';
 import { generateApiKey } from '$lib/server/utils/api-key';
 import { requireAuth } from '$lib/server/utils/auth-guard';
+import { requireJsonContentType } from '$lib/server/utils/content-type';
 import { checkCsrfOrigin } from '$lib/server/utils/csrf';
 import { projectCreatePayloadSchema } from '$lib/shared/schemas/project';
 import type { RequestEvent } from './$types';
@@ -112,6 +113,10 @@ export async function POST(event: RequestEvent): Promise<Response> {
   // CSRF protection for state-changing request
   const csrfError = checkCsrfOrigin(event);
   if (csrfError) return csrfError;
+
+  // Validate Content-Type
+  const contentTypeError = requireJsonContentType(event.request);
+  if (contentTypeError) return contentTypeError;
 
   // Require session authentication
   const { user } = await requireAuth(event);

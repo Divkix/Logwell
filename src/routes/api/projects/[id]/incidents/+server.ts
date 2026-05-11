@@ -121,7 +121,6 @@ export async function GET(event: RequestEvent): Promise<Response> {
       firstSeen: i.firstSeen.toISOString(),
       lastSeen: i.lastSeen.toISOString(),
       totalEvents: i.totalEvents,
-      reopenCount: i.reopenCount,
       status: getIncidentStatus(i.lastSeen),
     })),
     total,

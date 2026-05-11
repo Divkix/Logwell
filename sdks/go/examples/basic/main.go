@@ -36,7 +36,7 @@ func main() {
 		endpoint,
 		apiKey,
 		logwell.WithService("basic-example"),
-		logwell.WithBatchSize(10),
+		logwell.WithBatchSize(50),
 	)
 	if err != nil {
 		log.Fatalf("Failed to create Logwell client: %v", err)
@@ -58,15 +58,15 @@ func main() {
 	// Simulate some application activity
 	fmt.Println("Logged 3 info messages")
 
-	// Add more logs to trigger auto-flush (default batch size is 10)
-	for i := 0; i < 8; i++ {
+	// Add more logs to trigger auto-flush (default batch size is 50)
+	for i := 0; i < 48; i++ {
 		client.Info("Processing item", logwell.M{
 			"itemId":   fmt.Sprintf("item-%d", i),
-			"progress": fmt.Sprintf("%d%%", (i+1)*10),
+			"progress": fmt.Sprintf("%d%%", (i+1)*2),
 		})
 	}
 
-	fmt.Println("Logged 8 more messages (total: 11, should trigger auto-flush)")
+	fmt.Println("Logged 48 more messages (total: 51, should trigger auto-flush)")
 
 	// Give some time for the flush to complete
 	time.Sleep(100 * time.Millisecond)

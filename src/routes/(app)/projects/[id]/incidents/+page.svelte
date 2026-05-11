@@ -60,7 +60,6 @@ function normalizeClientIncident(incident: ClientIncident): IncidentListItem {
     firstSeen: incident.firstSeen,
     lastSeen: incident.lastSeen,
     totalEvents: incident.totalEvents,
-    reopenCount: incident.reopenCount,
     status: computeStatus(incident.lastSeen),
   };
 }

@@ -72,6 +72,30 @@ func (q *batchQueue) add(entry LogEntry) {
 	q.mu.Unlock()
 }
 
+// prepend adds entries to the front of the queue.
+// Used to re-queue entries after a failed flush.
+// Starts or resets the flush timer if auto-flush is enabled.
+func (q *batchQueue) prepend(entries []LogEntry) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	if len(entries) == 0 {
+		return
+	}
+
+	// Prepend entries to the front: new slice = entries + existing
+	q.entries = append(entries, q.entries...)
+
+	// Start or reset the flush timer if auto-flush is enabled
+	if q.flushInterval > 0 && q.flushFn != nil {
+		if q.timer == nil {
+			q.timer = time.AfterFunc(q.flushInterval, q.flushFn)
+		} else {
+			q.timer.Reset(q.flushInterval)
+		}
+	}
+}
+
 // flush returns all queued entries and clears the queue.
 // Stops the flush timer if running.
 func (q *batchQueue) flush() []LogEntry {
