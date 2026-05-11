@@ -358,15 +358,16 @@ class TestBatchQueueFlush:
     async def test_concurrent_flush_prevented(self) -> None:
         """Concurrent flush() calls are prevented."""
         call_count = 0
-        flush_started = asyncio.Event()
-        flush_continue = asyncio.Event()
+        flush_started = threading.Event()
+        flush_continue = threading.Event()
 
         async def slow_send(batch: list[LogEntry]) -> IngestResponse:
             nonlocal call_count
             call_count += 1
             flush_started.set()
             # Wait until test signals to continue
-            await flush_continue.wait()
+            while not flush_continue.is_set():
+                await asyncio.sleep(0.01)
             return {"accepted": len(batch)}
 
         mock = MagicMock(side_effect=slow_send)
@@ -379,7 +380,8 @@ class TestBatchQueueFlush:
         task1 = asyncio.create_task(queue.flush())
 
         # Wait for first flush to start
-        await flush_started.wait()
+        while not flush_started.is_set():
+            await asyncio.sleep(0.01)
 
         # Try second flush while first is in progress
         result2 = await queue.flush()
@@ -827,14 +829,15 @@ class TestBatchQueueEdgeCases:
     @pytest.mark.asyncio
     async def test_entries_added_during_flush_are_preserved(self) -> None:
         """Entries added during flush are not lost."""
-        flush_started = asyncio.Event()
-        flush_continue = asyncio.Event()
+        flush_started = threading.Event()
+        flush_continue = threading.Event()
         captured_batches: list[list[LogEntry]] = []
 
         async def slow_send(batch: list[LogEntry]) -> IngestResponse:
             captured_batches.append(batch)
             flush_started.set()
-            await flush_continue.wait()
+            while not flush_continue.is_set():
+                await asyncio.sleep(0.01)
             return {"accepted": len(batch)}
 
         mock = MagicMock(side_effect=slow_send)
@@ -846,7 +849,8 @@ class TestBatchQueueEdgeCases:
         flush_task = asyncio.create_task(queue.flush())
 
         # Wait for flush to start
-        await flush_started.wait()
+        while not flush_started.is_set():
+            await asyncio.sleep(0.01)
 
         # Add during flush
         queue.add(make_log_entry("during"))
