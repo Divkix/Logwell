@@ -16,6 +16,7 @@ const CSV_HEADERS = [
 /**
  * Escapes a field value for CSV format.
  * - Converts null/undefined to empty string
+ * - Prefixes fields starting with formula characters (=, +, -, @) with single quote (OWASP CSV injection prevention)
  * - Wraps fields containing commas, quotes, or newlines in double quotes
  * - Escapes double quotes by doubling them
  */
@@ -24,7 +25,12 @@ export function escapeCSVField(field: unknown): string {
     return '';
   }
 
-  const value = String(field);
+  let value = String(field);
+
+  // Prefix formula-starting characters to prevent CSV injection (OWASP)
+  if (/^[=+\-@]/.test(value)) {
+    value = `'${value}`;
+  }
 
   // Check if field needs quoting (contains comma, quote, or newline)
   if (value.includes(',') || value.includes('"') || value.includes('\n')) {
