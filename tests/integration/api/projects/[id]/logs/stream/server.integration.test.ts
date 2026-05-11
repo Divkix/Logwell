@@ -199,7 +199,7 @@ describe('POST /api/projects/[id]/logs/stream', () => {
   });
 
   describe('Authentication & Authorization', () => {
-    it('returns 303 redirect when not authenticated', async () => {
+    it('returns 401 when not authenticated', async () => {
       const project = await seedProject(db, { ownerId: userId });
 
       const request = new Request(`http://localhost/api/projects/${project.id}/logs/stream`, {
@@ -216,11 +216,10 @@ describe('POST /api/projects/[id]/logs/stream', () => {
 
       try {
         await POST(event as never);
-        expect.fail('Should have thrown redirect');
+        expect.fail('Should have thrown HTTP error');
       } catch (e) {
-        // SvelteKit redirects throw an object with status and location
-        expect(e).toHaveProperty('status', 303);
-        expect(e).toHaveProperty('location', '/login');
+        expect(e).toHaveProperty('status', 401);
+        expect(e).toHaveProperty('body', { message: 'Unauthorized' });
       }
     });
 
