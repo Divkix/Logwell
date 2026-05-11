@@ -74,6 +74,7 @@ export type NormalizedOtlpLogRecord = {
 export type NormalizedOtlpLogsResult = {
   records: NormalizedOtlpLogRecord[];
   rejectedLogRecords: number;
+  errors: string[];
 };
 
 const TRACE_ID_REGEX = /^[0-9a-f]{32}$/i;
@@ -334,6 +335,7 @@ export function normalizeOtlpLogsRequest(body: unknown): NormalizedOtlpLogsResul
 
   const records: NormalizedOtlpLogRecord[] = [];
   let rejectedLogRecords = 0;
+  const errors: string[] = [];
 
   for (const resourceLog of resourceLogs) {
     if (!isRecord(resourceLog)) {
@@ -365,6 +367,7 @@ export function normalizeOtlpLogsRequest(body: unknown): NormalizedOtlpLogsResul
       for (const logRecord of logRecords) {
         if (!isRecord(logRecord)) {
           rejectedLogRecords += 1;
+          errors.push('Log record rejected: must be an object.');
           continue;
         }
 
@@ -411,5 +414,5 @@ export function normalizeOtlpLogsRequest(body: unknown): NormalizedOtlpLogsResul
     }
   }
 
-  return { records, rejectedLogRecords };
+  return { records, rejectedLogRecords, errors };
 }

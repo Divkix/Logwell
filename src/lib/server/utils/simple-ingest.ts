@@ -1,4 +1,5 @@
 import type { LogLevel } from '../db/schema';
+import { mapOtlpAttributesToLogColumns } from './otlp';
 
 /**
  * Valid log levels for simple ingestion API
@@ -29,6 +30,9 @@ export interface NormalizedSimpleLog {
   metadata: Record<string, unknown> | null;
   sourceFile: string | null;
   lineNumber: number | null;
+  requestId: string | null;
+  userId: string | null;
+  ipAddress: string | null;
 }
 
 /**
@@ -122,6 +126,8 @@ function validateLogEntry(
   const lineNumber =
     typeof entry.lineNumber === 'number' && entry.lineNumber > 0 ? entry.lineNumber : null;
 
+  const mapped = mapOtlpAttributesToLogColumns(metadata);
+
   return {
     log: {
       level: entry.level as LogLevel,
@@ -131,6 +137,9 @@ function validateLogEntry(
       metadata,
       sourceFile,
       lineNumber,
+      requestId: mapped.requestId,
+      userId: mapped.userId,
+      ipAddress: mapped.ipAddress,
     },
     error: null,
   };

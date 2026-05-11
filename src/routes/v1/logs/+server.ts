@@ -28,17 +28,13 @@ async function getDbClient(
   return db;
 }
 
-function buildPartialSuccess(rejected: number) {
-  if (rejected <= 0) {
-    return {};
+function buildIngestResponse(accepted: number, rejected: number, errors: string[]) {
+  const response: { accepted: number; rejected?: number; errors?: string[] } = { accepted };
+  if (rejected > 0) {
+    response.rejected = rejected;
+    response.errors = errors;
   }
-
-  return {
-    partialSuccess: {
-      rejectedLogRecords: rejected.toString(),
-      errorMessage: `${rejected} log record(s) were rejected during ingestion.`,
-    },
-  };
+  return response;
 }
 
 /**
@@ -80,7 +76,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     throw err;
   }
 
-  const { records, rejectedLogRecords } = normalized;
+  const { records, rejectedLogRecords, errors } = normalized;
   const preparedLogs = prepareLogsForIncidents(
     records.map((record) => {
       const mapped = mapOtlpAttributesToLogColumns(record.attributes);
@@ -157,5 +153,5 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     logEventBus.emitIncident(touchedIncident);
   }
 
-  return json(buildPartialSuccess(rejectedLogRecords), { status: 200 });
+  return json(buildIngestResponse(records.length, rejectedLogRecords, errors), { status: 200 });
 };
