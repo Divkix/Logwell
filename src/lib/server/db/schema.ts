@@ -17,7 +17,7 @@ export const project = pgTable(
   'project',
   {
     id: text('id').primaryKey(),
-    name: text('name').notNull().unique(),
+    name: text('name').notNull(),
     apiKey: text('api_key').notNull().unique(),
     // Owner of the project - required for authorization
     ownerId: text('owner_id')
@@ -34,6 +34,7 @@ export const project = pgTable(
   (table) => [
     index('idx_project_api_key').on(table.apiKey),
     index('idx_project_owner_id').on(table.ownerId),
+    uniqueIndex('uq_project_name_owner').on(table.name, table.ownerId),
   ],
 );
 

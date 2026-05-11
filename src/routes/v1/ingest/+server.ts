@@ -1,10 +1,11 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
+import { eq } from 'drizzle-orm';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { nanoid } from 'nanoid';
 import { API_CONFIG } from '$lib/server/config/performance';
 import type * as schema from '$lib/server/db/schema';
-import { log } from '$lib/server/db/schema';
+import { log, project } from '$lib/server/db/schema';
 import { logEventBus } from '$lib/server/events';
 import { ApiKeyError, validateApiKey } from '$lib/server/utils/api-key';
 import { requireJsonContentType } from '$lib/server/utils/content-type';
@@ -48,6 +49,15 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   let projectId: string;
   try {
     projectId = await validateApiKey(request, db);
+
+    // Re-verify project exists to prevent stale cache (multi-process) from causing FK violations
+    const [projectRow] = await db
+      .select({ id: project.id })
+      .from(project)
+      .where(eq(project.id, projectId));
+    if (!projectRow) {
+      throw new ApiKeyError(401, 'Invalid API key');
+    }
   } catch (err) {
     if (err instanceof ApiKeyError) {
       return json({ error: 'unauthorized', message: err.message }, { status: err.status });

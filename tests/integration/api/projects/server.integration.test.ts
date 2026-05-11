@@ -289,7 +289,7 @@ describe('POST /api/projects', () => {
       expect(dbProject.apiKey).toBe(body.apiKey);
     });
 
-    it('returns 400 for duplicate name', async () => {
+    it('returns 400 for duplicate name for same user', async () => {
       // Create existing project
       await seedProject(db, { name: 'existing-project', ownerId: userId });
 
@@ -310,6 +310,51 @@ describe('POST /api/projects', () => {
       expect(body.error).toBe('duplicate_name');
       expect(body).toHaveProperty('message');
       expect(body.message).toContain('name');
+    });
+
+    it('allows different users to create projects with the same name', async () => {
+      // Create a project for the first user
+      await seedProject(db, { name: 'shared-project-name', ownerId: userId });
+
+      // Create a second user
+      const signUpResult2 = await auth.api.signUpEmail({
+        body: {
+          email: 'other@example.com',
+          password: 'SecureP@ssw0rd123',
+          name: 'Other User',
+        },
+      });
+
+      const mockRequest2 = new Request('http://localhost:5173', {
+        headers: {
+          cookie: `better-auth.session_token=${signUpResult2.token}`,
+        },
+      });
+
+      const sessionData2 = await getSession(mockRequest2.headers, db);
+      if (!sessionData2) throw new Error('Session data should not be null');
+
+      const otherUserLocals = {
+        user: sessionData2.user,
+        session: sessionData2.session,
+      };
+
+      // Second user tries to create a project with the same name
+      const request = new Request('http://localhost/api/projects', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name: 'shared-project-name' }),
+      });
+
+      const event = createRequestEvent(request, db, otherUserLocals);
+      const response = await POST(event as never);
+
+      expect(response.status).toBe(201);
+      const body = await response.json();
+      expect(body).toHaveProperty('id');
+      expect(body).toHaveProperty('name', 'shared-project-name');
     });
 
     it('returns 400 for empty name', async () => {

@@ -84,14 +84,19 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-function parseUint64String(value: unknown): string | null {
+export function parseUint64String(value: unknown): string | null {
   if (typeof value === 'string') {
     const trimmed = value.trim();
     if (!trimmed) return null;
-    if (!/^-?\d+$/.test(trimmed)) return null;
+    if (!/^\d+$/.test(trimmed)) return null;
     return trimmed;
   }
-  if (typeof value === 'number' && Number.isFinite(value)) {
+  if (
+    typeof value === 'number' &&
+    Number.isFinite(value) &&
+    Number.isInteger(value) &&
+    value >= 0
+  ) {
     return Math.trunc(value).toString();
   }
   return null;
@@ -132,7 +137,11 @@ function parseTimestamp(timeUnixNano: string | null, observedTimeUnixNano: strin
   try {
     const nanos = BigInt(candidate);
     const millis = Number(nanos / 1000000n);
-    return new Date(millis);
+    const date = new Date(millis);
+    if (Number.isNaN(date.getTime())) {
+      return new Date();
+    }
+    return date;
   } catch {
     return new Date();
   }
