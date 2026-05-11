@@ -25,12 +25,6 @@ describe('cleanupOldLogs batch selection', () => {
                   limit: vi.fn().mockResolvedValue([{ id: 'log-1' }]),
                 };
               }),
-              limit: vi.fn().mockImplementation(async () => {
-                if (!orderByCalled) {
-                  throw new Error('missing orderBy');
-                }
-                return [{ id: 'log-1' }];
-              }),
             }),
           }),
         }),
