@@ -245,6 +245,27 @@ describe('POST /v1/ingest (Simple API)', () => {
   });
 
   describe('Validation errors', () => {
+    it('returns 415 for non-JSON Content-Type', async () => {
+      const project = await seedProject(db);
+
+      const request = new Request('http://localhost/v1/ingest', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain',
+          Authorization: `Bearer ${project.apiKey}`,
+        },
+        body: JSON.stringify({ level: 'info', message: 'test' }),
+      });
+
+      const event = createRequestEvent(request, db);
+      const response = await POST(event as never);
+
+      expect(response.status).toBe(415);
+      const body = await response.json();
+      expect(body.error).toBe('unsupported_media_type');
+      expect(body.message).toBe('Content-Type must be application/json');
+    });
+
     it('returns 400 for invalid JSON', async () => {
       const project = await seedProject(db);
 

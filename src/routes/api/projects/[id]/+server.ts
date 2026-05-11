@@ -5,6 +5,7 @@ import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import type * as schema from '$lib/server/db/schema';
 import { log, project } from '$lib/server/db/schema';
 import { invalidateApiKeyCache } from '$lib/server/utils/api-key';
+import { requireJsonContentType } from '$lib/server/utils/content-type';
 import { checkCsrfOrigin } from '$lib/server/utils/csrf';
 import { isErrorResponse, requireProjectOwnership } from '$lib/server/utils/project-guard';
 import { projectUpdatePayloadSchema } from '$lib/shared/schemas/project';
@@ -131,6 +132,10 @@ export async function PATCH(event: RequestEvent): Promise<Response> {
   // CSRF protection for state-changing request
   const csrfError = checkCsrfOrigin(event);
   if (csrfError) return csrfError;
+
+  // Validate Content-Type
+  const contentTypeError = requireJsonContentType(event.request);
+  if (contentTypeError) return contentTypeError;
 
   // Require authentication and project ownership
   const authResult = await requireProjectOwnership(event, event.params.id);

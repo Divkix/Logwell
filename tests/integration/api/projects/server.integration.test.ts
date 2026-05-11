@@ -364,6 +364,24 @@ describe('POST /api/projects', () => {
       expect(body.error).toBe('validation_error');
     });
 
+    it('returns 415 for non-JSON Content-Type', async () => {
+      const request = new Request('http://localhost/api/projects', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain',
+        },
+        body: JSON.stringify({ name: 'test-project' }),
+      });
+
+      const event = createRequestEvent(request, db, authenticatedLocals);
+      const response = await POST(event as never);
+
+      expect(response.status).toBe(415);
+      const body = await response.json();
+      expect(body).toHaveProperty('error', 'unsupported_media_type');
+      expect(body).toHaveProperty('message', 'Content-Type must be application/json');
+    });
+
     it('returns 400 for invalid JSON body', async () => {
       const request = new Request('http://localhost/api/projects', {
         method: 'POST',

@@ -66,6 +66,27 @@ describe('POST /v1/logs (OTLP)', () => {
     expect(response.status).toBe(401);
   });
 
+  it('returns 415 for non-JSON Content-Type', async () => {
+    const project = await seedProject(db);
+
+    const request = new Request('http://localhost/v1/logs', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Authorization: `Bearer ${project.apiKey}`,
+      },
+      body: 'resourceLogs=[]',
+    });
+
+    const event = createRequestEvent(request, db);
+    const response = await POST(event as never);
+
+    expect(response.status).toBe(415);
+    const body = await response.json();
+    expect(body.error).toBe('unsupported_media_type');
+    expect(body.message).toBe('Content-Type must be application/json');
+  });
+
   it('ingests OTLP log records and maps core fields', async () => {
     const project = await seedProject(db);
 
