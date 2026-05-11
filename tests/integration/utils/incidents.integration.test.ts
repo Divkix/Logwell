@@ -23,7 +23,7 @@ describe('upsertIncidentsForPreparedLogs', () => {
     await cleanup();
   });
 
-  it('uses the stored incident firstSeen when deciding reopen count', async () => {
+  it('updates incident lastSeen and totalEvents on matching log', async () => {
     const project = await seedProject(db);
 
     await db.insert(incident).values({
@@ -39,7 +39,6 @@ describe('upsertIncidentsForPreparedLogs', () => {
       firstSeen: new Date('2026-02-12T10:00:00.000Z'),
       lastSeen: new Date('2026-02-12T10:00:00.000Z'),
       totalEvents: 1,
-      reopenCount: 0,
     });
 
     const preparedLog: PreparedIncidentLog = {
@@ -62,6 +61,8 @@ describe('upsertIncidentsForPreparedLogs', () => {
     ]);
 
     expect(touchedIncidents).toHaveLength(1);
-    expect(touchedIncidents[0].reopenCount).toBe(0);
+    expect(touchedIncidents[0].totalEvents).toBe(2);
+    expect(touchedIncidents[0].lastSeen).toEqual(new Date('2026-02-12T13:30:00.000Z'));
+    expect(touchedIncidents[0].firstSeen).toEqual(new Date('2026-02-12T10:00:00.000Z'));
   });
 });
