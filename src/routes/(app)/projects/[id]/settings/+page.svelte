@@ -141,13 +141,9 @@ async function handleSaveName() {
     return;
   }
 
-  if (trimmedName.length > 50) {
-    nameError = 'Project name cannot exceed 50 characters';
-    return;
-  }
-
-  if (!/^[a-zA-Z0-9_-]+$/.test(trimmedName)) {
-    nameError = 'Project name must contain only alphanumeric characters, hyphens, and underscores';
+  const validNameRegex = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,49}$/;
+  if (!validNameRegex.test(trimmedName)) {
+    nameError = 'Name must be 1-50 characters, alphanumeric with hyphens/underscores';
     return;
   }
 

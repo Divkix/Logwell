@@ -4,6 +4,7 @@ import type { TimeRange } from '$lib/components/time-range-picker.svelte';
 import { Button } from '$lib/components/ui/button';
 import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 import type { LogLevel } from '$lib/shared/types';
+import { toastError } from '$lib/utils/toast';
 
 interface Props {
   projectId: string;
@@ -59,9 +60,47 @@ function buildExportUrl(format: 'csv' | 'json'): string {
   return `/api/projects/${projectId}/logs/export?${params}`;
 }
 
-// Reactive URLs that update when filters change
-const csvUrl = $derived(buildExportUrl('csv'));
-const jsonUrl = $derived(buildExportUrl('json'));
+/**
+ * Fetch export and trigger download, or show toast on error
+ */
+async function handleExport(format: 'csv' | 'json') {
+  try {
+    const response = await fetch(buildExportUrl(format));
+
+    if (!response.ok) {
+      let message = `Export failed: ${response.status} ${response.statusText}`;
+      try {
+        const data = (await response.json()) as { message?: string };
+        if (data.message) message = data.message;
+      } catch {
+        // ignore JSON parse error
+      }
+      toastError(message);
+      return;
+    }
+
+    const blob = await response.blob();
+    const blobUrl = window.URL.createObjectURL(blob);
+
+    // Parse filename from Content-Disposition header
+    const contentDisposition = response.headers.get('content-disposition');
+    let filename = `logs-export.${format}`;
+    if (contentDisposition) {
+      const match = contentDisposition.match(/filename="([^"]+)"/);
+      if (match) filename = match[1];
+    }
+
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(blobUrl);
+  } catch {
+    toastError('Export failed. Please try again.');
+  }
+}
 </script>
 
 <DropdownMenu.Root>
@@ -80,21 +119,11 @@ const jsonUrl = $derived(buildExportUrl('json'));
     {/snippet}
   </DropdownMenu.Trigger>
   <DropdownMenu.Content>
-    <a
-      href={csvUrl}
-      download
-      data-testid="export-csv"
-      class="relative flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-    >
+    <DropdownMenu.Item onclick={() => handleExport('csv')} data-testid="export-csv">
       Download CSV
-    </a>
-    <a
-      href={jsonUrl}
-      download
-      data-testid="export-json"
-      class="relative flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-    >
+    </DropdownMenu.Item>
+    <DropdownMenu.Item onclick={() => handleExport('json')} data-testid="export-json">
       Download JSON
-    </a>
+    </DropdownMenu.Item>
   </DropdownMenu.Content>
 </DropdownMenu.Root>

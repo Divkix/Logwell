@@ -29,7 +29,7 @@ const levelColors: Record<LogLevel, string> = {
 <div data-testid="level-filter" class="flex gap-1" role="group" aria-label="Log level filter">
   {#each LOG_LEVELS as level}
     <Button
-      variant={value.includes(level) || value.length === 0 ? 'default' : 'outline'}
+      variant={value.includes(level) ? 'default' : 'outline'}
       size="sm"
       {disabled}
       aria-pressed={value.includes(level)}

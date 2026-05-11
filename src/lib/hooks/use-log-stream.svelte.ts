@@ -221,6 +221,9 @@ export function useLogStream(options: UseLogStreamOptions): UseLogStreamReturn {
         onError?.(_error);
         setConnected(false);
 
+        // Don't reconnect on permanent errors (404)
+        if (_error.message.startsWith('HTTP 404:')) return;
+
         // Schedule reconnection attempt
         scheduleReconnect();
       });
