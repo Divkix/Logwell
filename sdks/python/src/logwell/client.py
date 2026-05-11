@@ -111,9 +111,9 @@ class Logwell:
 
         # Add source location if captured
         if source_file is not None:
-            full_entry["source_file"] = source_file
+            full_entry["sourceFile"] = source_file
         if line_number is not None:
-            full_entry["line_number"] = line_number
+            full_entry["lineNumber"] = line_number
 
         self._queue.add(full_entry)
 

@@ -804,8 +804,8 @@ class TestSourceLocationCapture:
 
         client.info("Test")
 
-        assert "source_file" not in captured[0]
-        assert "line_number" not in captured[0]
+        assert "sourceFile" not in captured[0]
+        assert "lineNumber" not in captured[0]
 
     def test_source_location_captured_when_enabled(
         self, valid_api_key: str, valid_endpoint: str
@@ -821,10 +821,10 @@ class TestSourceLocationCapture:
 
         client.info("Test")
 
-        assert "source_file" in captured[0]
-        assert "line_number" in captured[0]
-        assert isinstance(captured[0]["line_number"], int)
-        assert captured[0]["line_number"] > 0
+        assert "sourceFile" in captured[0]
+        assert "lineNumber" in captured[0]
+        assert isinstance(captured[0]["lineNumber"], int)
+        assert captured[0]["lineNumber"] > 0
 
     def test_source_location_points_to_caller(
         self, valid_api_key: str, valid_endpoint: str
@@ -841,7 +841,7 @@ class TestSourceLocationCapture:
         client.info("Test")  # Line number should point to this line
 
         # Source file should be this test file
-        assert "test_client.py" in captured[0]["source_file"]
+        assert "test_client.py" in captured[0]["sourceFile"]
 
     def test_source_location_for_all_log_methods(
         self, valid_api_key: str, valid_endpoint: str
@@ -862,8 +862,8 @@ class TestSourceLocationCapture:
         client.fatal("fatal")
 
         for entry in captured:
-            assert "source_file" in entry
-            assert "line_number" in entry
+            assert "sourceFile" in entry
+            assert "lineNumber" in entry
 
     def test_child_inherits_source_location_setting(
         self, valid_api_key: str, valid_endpoint: str
@@ -880,8 +880,8 @@ class TestSourceLocationCapture:
 
         child.info("Child log")
 
-        assert "source_file" in captured[0]
-        assert "line_number" in captured[0]
+        assert "sourceFile" in captured[0]
+        assert "lineNumber" in captured[0]
 
 
 # =============================================================================

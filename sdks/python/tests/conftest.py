@@ -345,8 +345,8 @@ def sample_log_entry_full() -> LogEntry:
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "service": "test-service",
         "metadata": {"user_id": "123", "request_id": "abc-def"},
-        "source_file": "/app/main.py",
-        "line_number": 42,
+        "sourceFile": "/app/main.py",
+        "lineNumber": 42,
     }
 
 

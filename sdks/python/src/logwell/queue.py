@@ -136,7 +136,7 @@ class BatchQueue:
             self._queue.append(entry)
 
             # Start timer on first entry
-            timer_future = getattr(self, '_timer_future', None)
+            timer_future = getattr(self, "_timer_future", None)
             if (timer_future is None or timer_future.done()) and not self._stopped:
                 self._start_timer()
 
@@ -276,7 +276,7 @@ class BatchQueue:
 
         Note: Must be called while holding the lock.
         """
-        future = getattr(self, '_timer_future', None)
+        future = getattr(self, "_timer_future", None)
         if future is not None:
             if not future.done():
                 future.cancel()
@@ -284,7 +284,7 @@ class BatchQueue:
 
     async def _timer_coro(self) -> None:
         """Handle timer expiration by triggering a flush."""
-        my_future = getattr(self, '_timer_future', None)
+        my_future = getattr(self, "_timer_future", None)
         try:
             await asyncio.sleep(self._config.flush_interval)
             with self._lock:
@@ -294,5 +294,5 @@ class BatchQueue:
         except asyncio.CancelledError:
             pass
         finally:
-            if getattr(self, '_timer_future', None) is my_future:
+            if getattr(self, "_timer_future", None) is my_future:
                 self._timer_future = None

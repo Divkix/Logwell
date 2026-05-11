@@ -644,9 +644,9 @@ class TestSourceLocation:
 
         # Verify source location is present
         body = json.loads(mock_server.calls.last.request.content)
-        assert "source_file" in body[0]
-        assert "line_number" in body[0]
-        assert body[0]["source_file"].endswith("test_e2e.py")
+        assert "sourceFile" in body[0]
+        assert "lineNumber" in body[0]
+        assert body[0]["sourceFile"].endswith("test_e2e.py")
 
     @pytest.mark.asyncio
     async def test_source_location_not_captured_when_disabled(
@@ -668,8 +668,8 @@ class TestSourceLocation:
 
         # Verify source location is not present
         body = json.loads(mock_server.calls.last.request.content)
-        assert "source_file" not in body[0]
-        assert "line_number" not in body[0]
+        assert "sourceFile" not in body[0]
+        assert "lineNumber" not in body[0]
 
 
 # =============================================================================
