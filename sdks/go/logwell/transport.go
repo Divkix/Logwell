@@ -136,8 +136,7 @@ func (t *httpTransport) isRetryableError(err error) bool {
 // Returns IngestResponse on success, or an Error on failure.
 func (t *httpTransport) send(ctx context.Context, logs []LogEntry) (*IngestResponse, error) {
 	// Build request body
-	reqBody := ingestRequest{Logs: logs}
-	bodyBytes, err := json.Marshal(reqBody)
+	bodyBytes, err := json.Marshal(logs)
 	if err != nil {
 		return nil, NewErrorWithCause(ErrValidationError, "failed to marshal logs", err)
 	}

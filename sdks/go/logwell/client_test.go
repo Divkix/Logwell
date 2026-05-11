@@ -17,7 +17,7 @@ type testServer struct {
 	*httptest.Server
 	mu       sync.Mutex
 	logs     []LogEntry
-	requests []ingestRequest
+	requests [][]LogEntry
 	handler  http.HandlerFunc
 }
 
@@ -25,7 +25,7 @@ type testServer struct {
 func newTestServer() *testServer {
 	ts := &testServer{
 		logs:     make([]LogEntry, 0),
-		requests: make([]ingestRequest, 0),
+		requests: make([][]LogEntry, 0),
 	}
 
 	ts.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -36,7 +36,7 @@ func newTestServer() *testServer {
 		}
 
 		// Default: accept all logs
-		var req ingestRequest
+		var req []LogEntry
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
@@ -45,11 +45,11 @@ func newTestServer() *testServer {
 
 		ts.mu.Lock()
 		ts.requests = append(ts.requests, req)
-		ts.logs = append(ts.logs, req.Logs...)
+		ts.logs = append(ts.logs, req...)
 		ts.mu.Unlock()
 
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(IngestResponse{Accepted: len(req.Logs)})
+		json.NewEncoder(w).Encode(IngestResponse{Accepted: len(req)})
 	}))
 
 	return ts
@@ -65,10 +65,10 @@ func (ts *testServer) getLogs() []LogEntry {
 }
 
 // getRequests returns a copy of received requests.
-func (ts *testServer) getRequests() []ingestRequest {
+func (ts *testServer) getRequests() [][]LogEntry {
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
-	result := make([]ingestRequest, len(ts.requests))
+	result := make([][]LogEntry, len(ts.requests))
 	copy(result, ts.requests)
 	return result
 }

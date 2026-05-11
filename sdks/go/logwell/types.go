@@ -53,11 +53,6 @@ type IngestResponse struct {
 	Errors []string `json:"errors,omitempty"`
 }
 
-// ingestRequest is the internal request structure for the ingest API.
-type ingestRequest struct {
-	Logs []LogEntry `json:"logs"`
-}
-
 // Now returns the current time formatted as ISO8601.
 // Used internally for timestamp generation.
 func now() string {
