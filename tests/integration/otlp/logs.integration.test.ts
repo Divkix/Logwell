@@ -296,6 +296,84 @@ describe('POST /v1/logs (OTLP)', () => {
     expect(infoLogs[0].incidentId).toBeNull();
   });
 
+  it('rejects negative timeUnixNano and falls back to current timestamp', async () => {
+    const project = await seedProject(db);
+
+    const payload = {
+      resourceLogs: [
+        {
+          scopeLogs: [
+            {
+              logRecords: [
+                {
+                  body: { stringValue: 'Negative timestamp test' },
+                  timeUnixNano: '-1000000',
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const request = new Request('http://localhost/v1/logs', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${project.apiKey}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const event = createRequestEvent(request, db);
+    const response = await POST(event as never);
+    expect(response.status).toBe(200);
+
+    const [inserted] = await db.select().from(log).where(eq(log.projectId, project.id));
+    expect(inserted.timeUnixNano).toBeNull();
+    expect(inserted.timestamp).toBeTruthy();
+    const now = new Date();
+    expect(inserted.timestamp!.getTime()).toBeGreaterThanOrEqual(now.getTime() - 5000);
+    expect(inserted.timestamp!.getTime()).toBeLessThanOrEqual(now.getTime() + 5000);
+  });
+
+  it('stores null metadata for empty OTLP attributes', async () => {
+    const project = await seedProject(db);
+
+    const payload = {
+      resourceLogs: [
+        {
+          scopeLogs: [
+            {
+              logRecords: [
+                {
+                  body: { stringValue: 'Empty attributes test' },
+                  attributes: [],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const request = new Request('http://localhost/v1/logs', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${project.apiKey}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const event = createRequestEvent(request, db);
+    const response = await POST(event as never);
+    expect(response.status).toBe(200);
+
+    const [inserted] = await db.select().from(log).where(eq(log.projectId, project.id));
+    expect(inserted.metadata).toBeNull();
+  });
+
   it(`accepts a batch of exactly ${API_CONFIG.BATCH_INSERT_LIMIT} log records`, async () => {
     const project = await seedProject(db);
 

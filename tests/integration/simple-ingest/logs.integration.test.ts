@@ -458,6 +458,31 @@ describe('POST /v1/ingest (Simple API)', () => {
       expect(inserted.userId).toBe('user-456');
       expect(inserted.ipAddress).toBe('192.168.1.1');
     });
+
+    it('stores null metadata for empty metadata object', async () => {
+      const project = await seedProject(db);
+
+      const request = new Request('http://localhost/v1/ingest', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${project.apiKey}`,
+        },
+        body: JSON.stringify({
+          level: 'info',
+          message: 'Empty metadata test',
+          metadata: {},
+        }),
+      });
+
+      const event = createRequestEvent(request, db);
+      const response = await POST(event as never);
+
+      expect(response.status).toBe(200);
+
+      const [inserted] = await db.select().from(log).where(eq(log.projectId, project.id));
+      expect(inserted.metadata).toBeNull();
+    });
   });
 
   describe('Event bus integration', () => {
