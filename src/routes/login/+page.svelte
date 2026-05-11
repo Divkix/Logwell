@@ -104,7 +104,6 @@ async function handleSubmit(event: Event) {
     isLoading = false;
   }
 }
-
 </script>
 
 <svelte:head>
