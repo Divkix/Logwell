@@ -62,7 +62,6 @@ const maxBucketCount = $derived(
         <p>First seen: <span class="font-mono text-foreground">{formatFullDate(new Date(detail.firstSeen))}</span></p>
         <p>Last seen: <span class="font-mono text-foreground">{formatFullDate(new Date(detail.lastSeen))}</span></p>
         <p>Total events: <span class="font-medium text-foreground">{detail.totalEvents.toLocaleString()}</span></p>
-        <p>Reopens: <span class="font-medium text-foreground">{detail.reopenCount.toLocaleString()}</span></p>
       </div>
 
       <section class="space-y-2">

@@ -43,6 +43,13 @@
       "when": 1768600000000,
       "tag": "0005_incident_intelligence",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1768610000000,
+      "tag": "0006_neat_cleanup",
+      "breakpoints": true
     }
   ]
 }

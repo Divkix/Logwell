@@ -14,7 +14,6 @@ export interface ClientIncident {
   firstSeen: string;
   lastSeen: string;
   totalEvents: number;
-  reopenCount: number;
   createdAt: string | null;
   updatedAt: string | null;
 }
