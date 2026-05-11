@@ -1,4 +1,4 @@
-import type { Redirect } from '@sveltejs/kit';
+import type { HttpError } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -44,20 +44,22 @@ function createRequestEvent(
 }
 
 /**
- * Helper to assert that a promise rejects with a SvelteKit redirect
+ * Helper to assert that a promise rejects with a SvelteKit HTTP error
  */
-async function expectRedirect(
+async function expectHttpError(
   promise: Promise<unknown>,
   expectedStatus: number,
-  expectedLocation: string,
+  expectedBody?: Record<string, unknown>,
 ): Promise<void> {
   try {
     await promise;
-    expect.fail('Expected redirect to be thrown');
+    expect.fail('Expected HTTP error to be thrown');
   } catch (error) {
-    const redirect = error as Redirect;
-    expect(redirect.status).toBe(expectedStatus);
-    expect(redirect.location).toBe(expectedLocation);
+    const httpError = error as HttpError;
+    expect(httpError.status).toBe(expectedStatus);
+    if (expectedBody) {
+      expect(httpError.body).toEqual(expectedBody);
+    }
   }
 }
 
@@ -104,7 +106,7 @@ describe('PATCH /api/projects/[id] with retentionDays', () => {
   });
 
   describe('Authentication', () => {
-    it('throws redirect for unauthenticated request', async () => {
+    it('returns 401 for unauthenticated request', async () => {
       const testProject = await seedProject(db, { ownerId: userId });
 
       const request = new Request(`http://localhost/api/projects/${testProject.id}`, {
@@ -116,7 +118,7 @@ describe('PATCH /api/projects/[id] with retentionDays', () => {
       });
 
       const event = createRequestEvent(request, db, {}, { id: testProject.id });
-      await expectRedirect(PATCH(event as never), 303, '/login');
+      await expectHttpError(PATCH(event as never), 401, { message: 'Unauthorized' });
     });
   });
 
@@ -343,7 +345,7 @@ describe('GET /api/projects/[id] retentionDays', () => {
   });
 
   describe('Authentication', () => {
-    it('throws redirect for unauthenticated request', async () => {
+    it('returns 401 for unauthenticated request', async () => {
       const testProject = await seedProject(db, { ownerId: userId });
 
       const request = new Request(`http://localhost/api/projects/${testProject.id}`, {
@@ -351,7 +353,7 @@ describe('GET /api/projects/[id] retentionDays', () => {
       });
 
       const event = createRequestEvent(request, db, {}, { id: testProject.id });
-      await expectRedirect(GET(event as never), 303, '/login');
+      await expectHttpError(GET(event as never), 401, { message: 'Unauthorized' });
     });
   });
 

@@ -1,4 +1,4 @@
-import type { Redirect } from '@sveltejs/kit';
+import type { HttpError } from '@sveltejs/kit';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createAuth } from '$lib/server/auth';
@@ -42,18 +42,23 @@ function createRequestEvent(
   } as unknown;
 }
 
-async function expectRedirect(
+/**
+ * Helper to assert that a promise rejects with a SvelteKit HTTP error
+ */
+async function expectHttpError(
   promise: Promise<unknown>,
   expectedStatus: number,
-  expectedLocation: string,
+  expectedBody?: Record<string, unknown>,
 ): Promise<void> {
   try {
     await promise;
-    expect.fail('Expected redirect to be thrown');
+    expect.fail('Expected HTTP error to be thrown');
   } catch (error) {
-    const redirect = error as Redirect;
-    expect(redirect.status).toBe(expectedStatus);
-    expect(redirect.location).toBe(expectedLocation);
+    const httpError = error as HttpError;
+    expect(httpError.status).toBe(expectedStatus);
+    if (expectedBody) {
+      expect(httpError.body).toEqual(expectedBody);
+    }
   }
 }
 
@@ -95,12 +100,12 @@ describe('Incident APIs', () => {
     await cleanup();
   });
 
-  it('requires authentication for incidents list', async () => {
+  it('returns 401 for unauthenticated request', async () => {
     const project = await seedProject(db, { ownerId: userId });
     const request = new Request(`http://localhost/api/projects/${project.id}/incidents`);
     const event = createRequestEvent(request, db, { id: project.id });
 
-    await expectRedirect(GET_LIST(event as never), 303, '/login');
+    await expectHttpError(GET_LIST(event as never), 401, { message: 'Unauthorized' });
   });
 
   it('lists only open incidents by default', async () => {
