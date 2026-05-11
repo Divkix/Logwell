@@ -115,7 +115,6 @@ export async function backfillProjectIncidents(
           firstSeen: aggregate.firstSeen,
           lastSeen: aggregate.lastSeen,
           totalEvents: aggregate.totalEvents,
-          reopenCount: 0,
           createdAt: now,
           updatedAt: now,
         })

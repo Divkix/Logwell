@@ -1,4 +1,4 @@
-import { and, eq, inArray, lt, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, lt, sql } from 'drizzle-orm';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { RETENTION_CONFIG } from '$lib/server/config';
@@ -85,6 +85,7 @@ export async function cleanupOldLogs(dbClient?: DatabaseClient): Promise<Cleanup
             .select({ id: log.id })
             .from(log)
             .where(and(eq(log.projectId, proj.id), lt(log.timestamp, cutoffDate)))
+            .orderBy(asc(log.id))
             .limit(BATCH_SIZE);
 
           if (logsToDelete.length === 0) {

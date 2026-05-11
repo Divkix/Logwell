@@ -4,6 +4,7 @@ import { env } from '$lib/server/config';
 import { log, project } from '$lib/server/db/schema';
 import { requireAuth } from '$lib/server/utils/auth-guard';
 import { decodeCursor, encodeCursor } from '$lib/server/utils/cursor';
+import { buildSearchQuery } from '$lib/server/utils/search';
 import { LOG_LEVELS, type LogLevel } from '$lib/shared/types';
 import type { PageServerLoad } from './$types';
 
@@ -32,18 +33,6 @@ function parseLevelFilter(levelParam: string | null): LogLevel[] | null {
     .filter((l): l is LogLevel => LOG_LEVELS.includes(l as LogLevel));
 
   return levels.length > 0 ? levels : null;
-}
-
-/**
- * Build the full-text search tsquery from user input
- */
-function buildSearchQuery(searchTerm: string): string {
-  return searchTerm
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((term) => term.replace(/[^a-zA-Z0-9]/g, ''))
-    .filter(Boolean)
-    .join(' & ');
 }
 
 /**

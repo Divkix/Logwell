@@ -7,6 +7,7 @@ import type * as schema from '$lib/server/db/schema';
 import { log } from '$lib/server/db/schema';
 import { serializeToCsv } from '$lib/server/utils/csv-serializer';
 import { isErrorResponse, requireProjectOwnership } from '$lib/server/utils/project-guard';
+import { buildSearchQuery } from '$lib/server/utils/search';
 import { LOG_LEVELS, type LogLevel } from '$lib/shared/types';
 import type { ExportableLog, ExportFormat } from '$lib/types/export';
 import type { RequestEvent } from './$types';
@@ -38,19 +39,6 @@ function parseLevelFilter(levelParam: string | null): LogLevel[] | null {
     .filter((l): l is LogLevel => LOG_LEVELS.includes(l as LogLevel));
 
   return levels.length > 0 ? levels : null;
-}
-
-/**
- * Build the full-text search tsquery from user input
- * Converts space-separated terms to PostgreSQL tsquery format
- */
-function buildSearchQuery(searchTerm: string): string {
-  return searchTerm
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((term) => term.replace(/[^a-zA-Z0-9]/g, ''))
-    .filter(Boolean)
-    .join(' & ');
 }
 
 /**

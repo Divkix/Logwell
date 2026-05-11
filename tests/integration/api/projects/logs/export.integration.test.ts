@@ -1,4 +1,4 @@
-import type { Redirect } from '@sveltejs/kit';
+import type { HttpError } from '@sveltejs/kit';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createAuth } from '$lib/server/auth';
@@ -43,20 +43,22 @@ function createRequestEvent(
 }
 
 /**
- * Helper to assert that a promise rejects with a SvelteKit redirect
+ * Helper to assert that a promise rejects with a SvelteKit HTTP error
  */
-async function expectRedirect(
+async function expectHttpError(
   promise: Promise<unknown>,
   expectedStatus: number,
-  expectedLocation: string,
+  expectedBody?: Record<string, unknown>,
 ): Promise<void> {
   try {
     await promise;
-    expect.fail('Expected redirect to be thrown');
+    expect.fail('Expected HTTP error to be thrown');
   } catch (error) {
-    const redirect = error as Redirect;
-    expect(redirect.status).toBe(expectedStatus);
-    expect(redirect.location).toBe(expectedLocation);
+    const httpError = error as HttpError;
+    expect(httpError.status).toBe(expectedStatus);
+    if (expectedBody) {
+      expect(httpError.body).toEqual(expectedBody);
+    }
   }
 }
 
@@ -104,14 +106,14 @@ describe('GET /api/projects/[id]/logs/export', () => {
   });
 
   describe('Authentication', () => {
-    it('throws redirect for unauthenticated request', async () => {
+    it('returns 401 for unauthenticated request', async () => {
       const testProject = await seedProject(db, { ownerId: userId });
       const request = new Request(`http://localhost/api/projects/${testProject.id}/logs/export`, {
         method: 'GET',
       });
 
       const event = createRequestEvent(request, db, { id: testProject.id });
-      await expectRedirect(GET(event as never), 303, '/login');
+      await expectHttpError(GET(event as never), 401, { message: 'Unauthorized' });
     });
 
     it('returns 200 for authenticated request', async () => {
@@ -287,6 +289,53 @@ describe('GET /api/projects/[id]/logs/export', () => {
 
       expect(Array.isArray(body)).toBe(true);
       expect(body).toHaveLength(0);
+    });
+
+    it('preserves non-special characters in search query', async () => {
+      const testProject = await seedProject(db, { ownerId: userId });
+
+      await seedLog(db, testProject.id, { message: 'Database connection failed' });
+      await seedLog(db, testProject.id, { message: 'Database query succeeded' });
+
+      const request = new Request(
+        `http://localhost/api/projects/${testProject.id}/logs/export?format=json&search=database|connection`,
+        { method: 'GET' },
+      );
+
+      const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+      const response = await GET(event as never);
+
+      expect(response.status).toBe(200);
+      const body = await response.json();
+
+      // Pipe is a tsquery operator; shared utility replaces it with space creating 'database & connection'
+      // Inline buggy version strips it creating 'databaseconnection' which matches nothing
+      expect(body).toHaveLength(1);
+      expect(body[0].message).toBe('Database connection failed');
+    });
+
+    it('preserves hyphens and underscores in search query', async () => {
+      const testProject = await seedProject(db, { ownerId: userId });
+
+      await seedLog(db, testProject.id, {
+        message: 'User profile updated',
+        metadata: { service: 'user-service', error_code: 'USER_PROFILE_404' },
+      });
+
+      const request = new Request(
+        `http://localhost/api/projects/${testProject.id}/logs/export?format=json&search=user-service`,
+        { method: 'GET' },
+      );
+
+      const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+      const response = await GET(event as never);
+
+      expect(response.status).toBe(200);
+      const body = await response.json();
+
+      // Hyphens should be preserved by the shared utility; inline version strips them to 'userservice'
+      expect(body).toHaveLength(1);
+      expect(body[0].metadata).toContain('"service":"user-service"');
     });
   });
 

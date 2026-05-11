@@ -2,10 +2,12 @@ import { json, type RequestHandler } from '@sveltejs/kit';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { nanoid } from 'nanoid';
+import { API_CONFIG } from '$lib/server/config/performance';
 import type * as schema from '$lib/server/db/schema';
 import { log } from '$lib/server/db/schema';
 import { logEventBus } from '$lib/server/events';
 import { ApiKeyError, validateApiKey } from '$lib/server/utils/api-key';
+import { requireJsonContentType } from '$lib/server/utils/content-type';
 import {
   assignIncidentIds,
   prepareLogsForIncidents,
@@ -44,6 +46,10 @@ function buildIngestResponse(accepted: number, rejected: number, errors: string[
  * Uses project API key authentication (Authorization: Bearer lw_xxx).
  */
 export const POST: RequestHandler = async ({ request, locals }) => {
+  // Validate Content-Type
+  const contentTypeError = requireJsonContentType(request);
+  if (contentTypeError) return contentTypeError;
+
   const db = await getDbClient(locals);
 
   let projectId: string;
@@ -77,6 +83,17 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   }
 
   const { records, rejectedLogRecords, errors } = normalized;
+
+  if (records.length > API_CONFIG.BATCH_INSERT_LIMIT) {
+    return json(
+      {
+        error: 'batch_too_large',
+        message: `Batch exceeds maximum limit of ${API_CONFIG.BATCH_INSERT_LIMIT} logs. Received ${records.length} logs.`,
+      },
+      { status: 400 },
+    );
+  }
+
   const preparedLogs = prepareLogsForIncidents(
     records.map((record) => {
       const mapped = mapOtlpAttributesToLogColumns(record.attributes);
