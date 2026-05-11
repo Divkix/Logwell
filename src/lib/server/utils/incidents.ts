@@ -183,18 +183,6 @@ export function getIncidentStatus(
 }
 
 /**
- * Returns true when the incoming event should reopen an incident.
- */
-export function isIncidentReopened(
-  lastSeen: Date,
-  newFirstSeen: Date,
-  autoResolveMinutes: number = INCIDENT_CONFIG.AUTO_RESOLVE_MINUTES,
-): boolean {
-  const thresholdMs = autoResolveMinutes * 60 * 1000;
-  return newFirstSeen.getTime() - lastSeen.getTime() > thresholdMs;
-}
-
-/**
  * Batch-upserts incidents and returns touched incident rows.
  */
 export async function upsertIncidentsForPreparedLogs(
