@@ -590,6 +590,39 @@ describe('GET /api/projects/[id]/logs', () => {
       expect(body).toHaveProperty('has_more', false);
       expect(body.logs).toHaveLength(30);
     });
+
+    it('returns has_more=false when last page equals limit (cursor boundary)', async () => {
+      const testProject = await seedProject(db, { ownerId: userId });
+
+      // Create exactly 200 logs (2 full pages of 100)
+      await seedLogs(db, testProject.id, 200);
+
+      // First page
+      const request1 = new Request(
+        `http://localhost/api/projects/${testProject.id}/logs?limit=100`,
+        { method: 'GET' },
+      );
+      const event1 = createRequestEvent(request1, db, { id: testProject.id }, authenticatedLocals);
+      const response1 = await GET(event1 as never);
+      const body1 = await response1.json();
+
+      expect(body1.logs).toHaveLength(100);
+      expect(body1.has_more).toBe(true);
+      expect(body1.nextCursor).toBeTruthy();
+
+      // Second page (exactly 100 remaining)
+      const request2 = new Request(
+        `http://localhost/api/projects/${testProject.id}/logs?limit=100&cursor=${body1.nextCursor}`,
+        { method: 'GET' },
+      );
+      const event2 = createRequestEvent(request2, db, { id: testProject.id }, authenticatedLocals);
+      const response2 = await GET(event2 as never);
+      const body2 = await response2.json();
+
+      expect(body2.logs).toHaveLength(100);
+      expect(body2.has_more).toBe(false);
+      expect(body2.nextCursor).toBeNull();
+    });
   });
 
   describe('Project Validation', () => {

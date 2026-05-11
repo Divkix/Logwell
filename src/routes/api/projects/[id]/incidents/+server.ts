@@ -96,19 +96,21 @@ export async function GET(event: RequestEvent): Promise<Response> {
     .from(incident)
     .where(whereClause)
     .orderBy(desc(incident.lastSeen), desc(incident.id))
-    .limit(limit);
+    .limit(limit + 1);
 
-  const hasMore = incidents.length === limit;
+  const hasMore = incidents.length > limit;
+  const incidentsToReturn = hasMore ? incidents.slice(0, limit) : incidents;
+
   const nextCursor =
-    hasMore && incidents.length > 0
+    hasMore && incidentsToReturn.length > 0
       ? encodeCursor(
-          incidents[incidents.length - 1].lastSeen as Date,
-          incidents[incidents.length - 1].id,
+          incidentsToReturn[incidentsToReturn.length - 1].lastSeen as Date,
+          incidentsToReturn[incidentsToReturn.length - 1].id,
         )
       : null;
 
   return json({
-    incidents: incidents.map((i) => ({
+    incidents: incidentsToReturn.map((i) => ({
       id: i.id,
       projectId: i.projectId,
       fingerprint: i.fingerprint,
