@@ -91,8 +91,8 @@ export async function GET(event: RequestEvent): Promise<Response> {
       count(*)::int AS count
     FROM ${log}
     WHERE ${whereClause}
-    GROUP BY bucket_index
-    ORDER BY bucket_index
+    GROUP BY 1
+    ORDER BY 1
   `);
 
   // Convert SQL results to bucket map (handle both PGlite Results and postgres-js RowList)
