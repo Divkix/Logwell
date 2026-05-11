@@ -480,6 +480,53 @@ describe('GET /api/projects/[id]/logs', () => {
       // Should match logs containing both "connection" and "failed"
       expect(body.logs.length).toBeGreaterThanOrEqual(1);
     });
+
+    it('preserves non-special characters in search query', async () => {
+      const testProject = await seedProject(db, { ownerId: userId });
+
+      await seedLog(db, testProject.id, { message: 'Database connection failed' });
+      await seedLog(db, testProject.id, { message: 'Database query succeeded' });
+
+      const request = new Request(
+        `http://localhost/api/projects/${testProject.id}/logs?search=database|connection`,
+        { method: 'GET' },
+      );
+
+      const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+      const response = await GET(event as never);
+
+      expect(response.status).toBe(200);
+      const body = await response.json();
+
+      // Pipe is a tsquery operator; shared utility replaces it with space creating 'database & connection'
+      // Inline buggy version strips it creating 'databaseconnection' which matches nothing
+      expect(body.logs).toHaveLength(1);
+      expect(body.logs[0].message).toBe('Database connection failed');
+    });
+
+    it('preserves hyphens and underscores in search query', async () => {
+      const testProject = await seedProject(db, { ownerId: userId });
+
+      await seedLog(db, testProject.id, {
+        message: 'User profile updated',
+        metadata: { service: 'user-service', error_code: 'USER_PROFILE_404' },
+      });
+
+      const request = new Request(
+        `http://localhost/api/projects/${testProject.id}/logs?search=user-service`,
+        { method: 'GET' },
+      );
+
+      const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+      const response = await GET(event as never);
+
+      expect(response.status).toBe(200);
+      const body = await response.json();
+
+      // Hyphens should be preserved by the shared utility; inline version strips them to 'userservice'
+      expect(body.logs).toHaveLength(1);
+      expect(body.logs[0].metadata).toHaveProperty('service', 'user-service');
+    });
   });
 
   describe('Pagination Response', () => {
