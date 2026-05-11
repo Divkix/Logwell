@@ -9,7 +9,7 @@ import (
 
 // Default configuration values.
 const (
-	DefaultBatchSize     = 10
+	DefaultBatchSize     = 50
 	DefaultFlushInterval = 5 * time.Second
 	DefaultMaxQueueSize  = 1000
 	DefaultMaxRetries    = 3
@@ -27,8 +27,8 @@ const (
 	MaxMaxRetries    = 10
 )
 
-// apiKeyRegex matches valid Logwell API keys: lw_ followed by 32+ alphanumeric chars including - and _.
-var apiKeyRegex = regexp.MustCompile(`^lw_[a-zA-Z0-9_-]{32,}$`)
+// apiKeyRegex matches valid Logwell API keys: lw_ followed by exactly 32 alphanumeric chars including - and _.
+var apiKeyRegex = regexp.MustCompile(`^lw_[a-zA-Z0-9_-]{32}$`)
 
 // Config holds all configuration options for the Logwell client.
 type Config struct {
@@ -195,7 +195,7 @@ func validateAPIKey(apiKey string) error {
 	}
 
 	if !apiKeyRegex.MatchString(apiKey) {
-		return NewError(ErrInvalidConfig, "apiKey format invalid: must match lw_[a-zA-Z0-9_-]{32,}")
+		return NewError(ErrInvalidConfig, "apiKey format invalid: must match lw_[a-zA-Z0-9_-]{32}")
 	}
 
 	return nil

@@ -341,14 +341,14 @@ func TestTransport_BackoffCalculation(t *testing.T) {
 		minExpected  time.Duration
 		maxExpected  time.Duration
 	}{
-		// Attempt 1: 100ms * 2^1 = 200ms, +/- 30% = [140ms, 260ms]
-		{1, 200 * time.Millisecond, 140 * time.Millisecond, 260 * time.Millisecond},
-		// Attempt 2: 100ms * 2^2 = 400ms, +/- 30% = [280ms, 520ms]
-		{2, 400 * time.Millisecond, 280 * time.Millisecond, 520 * time.Millisecond},
-		// Attempt 3: 100ms * 2^3 = 800ms, +/- 30% = [560ms, 1040ms]
-		{3, 800 * time.Millisecond, 560 * time.Millisecond, 1040 * time.Millisecond},
-		// Attempt 10: capped at 10s, +/- 30% = [7s, 13s]
-		{10, 10 * time.Second, 7 * time.Second, 13 * time.Second},
+		// Attempt 1: 100ms * 2^1 = 200ms, +0-30% jitter = [200ms, 260ms]
+		{1, 200 * time.Millisecond, 200 * time.Millisecond, 260 * time.Millisecond},
+		// Attempt 2: 100ms * 2^2 = 400ms, +0-30% jitter = [400ms, 520ms]
+		{2, 400 * time.Millisecond, 400 * time.Millisecond, 520 * time.Millisecond},
+		// Attempt 3: 100ms * 2^3 = 800ms, +0-30% jitter = [800ms, 1040ms]
+		{3, 800 * time.Millisecond, 800 * time.Millisecond, 1040 * time.Millisecond},
+		// Attempt 10: capped at 10s, +0-30% jitter = [10s, 13s]
+		{10, 10 * time.Second, 10 * time.Second, 13 * time.Second},
 	}
 
 	for _, tc := range testCases {

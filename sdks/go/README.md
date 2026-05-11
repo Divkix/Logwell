@@ -73,7 +73,7 @@ Configure the client using functional options:
 |--------|------|---------|-------------|
 | `WithService(s)` | `string` | `""` | Service name attached to all logs |
 | `WithMetadata(m)` | `map[string]any` | `nil` | Default metadata for all logs |
-| `WithBatchSize(n)` | `int` | `10` | Logs per batch (1-500) |
+| `WithBatchSize(n)` | `int` | `50` | Logs per batch (1-500) |
 | `WithFlushInterval(d)` | `time.Duration` | `5s` | Auto-flush interval (100ms-60s) |
 | `WithMaxQueueSize(n)` | `int` | `1000` | Max queue size before dropping oldest (1-10000) |
 | `WithMaxRetries(n)` | `int` | `3` | Retry attempts for failed requests (0-10) |
