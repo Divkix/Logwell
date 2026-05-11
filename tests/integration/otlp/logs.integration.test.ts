@@ -171,12 +171,45 @@ describe('POST /v1/logs (OTLP)', () => {
 
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body).toEqual({
-      partialSuccess: {
-        rejectedLogRecords: '1',
-        errorMessage: '1 log record(s) were rejected during ingestion.',
+    expect(body.accepted).toBe(1);
+    expect(body.rejected).toBe(1);
+    expect(body.errors).toHaveLength(1);
+    expect(body.errors[0]).toContain('rejected');
+  });
+
+  it('returns accepted count in unified response shape on full success', async () => {
+    const project = await seedProject(db);
+
+    const payload = {
+      resourceLogs: [
+        {
+          resource: {
+            attributes: [{ key: 'service.name', value: { stringValue: 'api' } }],
+          },
+          scopeLogs: [
+            {
+              logRecords: [{ body: { stringValue: 'Log 1' } }, { body: { stringValue: 'Log 2' } }],
+            },
+          ],
+        },
+      ],
+    };
+
+    const request = new Request('http://localhost/v1/logs', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${project.apiKey}`,
       },
+      body: JSON.stringify(payload),
     });
+
+    const event = createRequestEvent(request, db);
+    const response = await POST(event as never);
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toEqual({ accepted: 2 });
   });
 
   it('creates incidents for error/fatal OTLP logs', async () => {

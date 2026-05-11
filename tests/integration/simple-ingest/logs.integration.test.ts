@@ -354,6 +354,39 @@ describe('POST /v1/ingest (Simple API)', () => {
     });
   });
 
+  describe('Metadata extraction', () => {
+    it('extracts requestId, userId, ipAddress from metadata into dedicated columns', async () => {
+      const project = await seedProject(db);
+
+      const request = new Request('http://localhost/v1/ingest', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${project.apiKey}`,
+        },
+        body: JSON.stringify({
+          level: 'error',
+          message: 'Database connection failed',
+          metadata: {
+            'request.id': 'req-123',
+            'enduser.id': 'user-456',
+            'client.address': '192.168.1.1',
+          },
+        }),
+      });
+
+      const event = createRequestEvent(request, db);
+      const response = await POST(event as never);
+
+      expect(response.status).toBe(200);
+
+      const [inserted] = await db.select().from(log).where(eq(log.projectId, project.id));
+      expect(inserted.requestId).toBe('req-123');
+      expect(inserted.userId).toBe('user-456');
+      expect(inserted.ipAddress).toBe('192.168.1.1');
+    });
+  });
+
   describe('Event bus integration', () => {
     it('emits logs to event bus for real-time streaming', async () => {
       const project = await seedProject(db);

@@ -131,9 +131,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
               scopeSchemaUrl: null,
               sourceFile: record.sourceFile,
               lineNumber: record.lineNumber,
-              requestId: null,
-              userId: null,
-              ipAddress: null,
+              requestId: record.requestId,
+              userId: record.userId,
+              ipAddress: record.ipAddress,
             };
           });
 

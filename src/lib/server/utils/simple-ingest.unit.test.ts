@@ -234,6 +234,59 @@ describe('parseSimpleIngestRequest', () => {
     });
   });
 
+  describe('metadata extraction', () => {
+    it('extracts requestId from metadata using OTLP attribute keys', () => {
+      const result = parseSimpleIngestRequest({
+        ...validEntry,
+        metadata: { 'request.id': 'req-123' },
+      });
+      expect(result.records[0].requestId).toBe('req-123');
+    });
+
+    it('extracts userId from metadata using OTLP attribute keys', () => {
+      const result = parseSimpleIngestRequest({
+        ...validEntry,
+        metadata: { 'enduser.id': 'user-456' },
+      });
+      expect(result.records[0].userId).toBe('user-456');
+    });
+
+    it('extracts ipAddress from metadata using OTLP attribute keys', () => {
+      const result = parseSimpleIngestRequest({
+        ...validEntry,
+        metadata: { 'client.address': '192.168.1.1' },
+      });
+      expect(result.records[0].ipAddress).toBe('192.168.1.1');
+    });
+
+    it('falls back to alternate metadata keys', () => {
+      const result = parseSimpleIngestRequest({
+        ...validEntry,
+        metadata: { request_id: 'req-789', user_id: 'user-999', ip_address: '10.0.0.1' },
+      });
+      expect(result.records[0].requestId).toBe('req-789');
+      expect(result.records[0].userId).toBe('user-999');
+      expect(result.records[0].ipAddress).toBe('10.0.0.1');
+    });
+
+    it('returns null for missing metadata fields', () => {
+      const result = parseSimpleIngestRequest(validEntry);
+      expect(result.records[0].requestId).toBeNull();
+      expect(result.records[0].userId).toBeNull();
+      expect(result.records[0].ipAddress).toBeNull();
+    });
+
+    it('returns null for empty metadata', () => {
+      const result = parseSimpleIngestRequest({
+        ...validEntry,
+        metadata: {},
+      });
+      expect(result.records[0].requestId).toBeNull();
+      expect(result.records[0].userId).toBeNull();
+      expect(result.records[0].ipAddress).toBeNull();
+    });
+  });
+
   describe('batch processing', () => {
     it('correctly counts accepted and rejected', () => {
       const entries = [
