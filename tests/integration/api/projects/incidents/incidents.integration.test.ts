@@ -9,7 +9,7 @@ import { getSession } from '$lib/server/session';
 import { GET as GET_LIST } from '../../../../../src/routes/api/projects/[id]/incidents/+server';
 import { GET as GET_DETAIL } from '../../../../../src/routes/api/projects/[id]/incidents/[incidentId]/+server';
 import { GET as GET_TIMELINE } from '../../../../../src/routes/api/projects/[id]/incidents/[incidentId]/timeline/+server';
-import { seedLog, seedProject } from '../../../../fixtures/db';
+import { seedLog, seedLogs, seedProject } from '../../../../fixtures/db';
 
 function createRequestEvent(
   request: Request,
@@ -334,5 +334,223 @@ describe('Incident APIs', () => {
 
     const body = await response.json();
     expect(body).toHaveProperty('error', 'not_found');
+  });
+
+  describe('Incident Detail Aggregation', () => {
+    it('limits rootCauseCandidates to top 5 by count', async () => {
+      const project = await seedProject(db, { ownerId: userId });
+      const [createdIncident] = await db
+        .insert(incident)
+        .values({
+          id: 'inc-many-sources',
+          projectId: project.id,
+          fingerprint: 'fp-many',
+          title: 'Many sources',
+          normalizedMessage: 'many sources',
+          serviceName: 'api',
+          sourceFile: 'src/main.ts',
+          lineNumber: 1,
+          highestLevel: 'error',
+          firstSeen: new Date(Date.now() - 20 * 60 * 1000),
+          lastSeen: new Date(Date.now() - 5 * 60 * 1000),
+          totalEvents: 20,
+          reopenCount: 0,
+        })
+        .returning();
+
+      // Create 7 distinct source locations with varying counts
+      for (let i = 0; i < 7; i++) {
+        await seedLogs(db, project.id, i + 1, {
+          incidentId: createdIncident.id,
+          fingerprint: createdIncident.fingerprint,
+          level: 'error',
+          message: 'Error',
+          sourceFile: `src/file-${i}.ts`,
+          lineNumber: i + 1,
+        });
+      }
+
+      const request = new Request(
+        `http://localhost/api/projects/${project.id}/incidents/${createdIncident.id}`,
+      );
+      const event = createRequestEvent(
+        request,
+        db,
+        { id: project.id, incidentId: createdIncident.id },
+        authenticatedLocals,
+        '/api/projects/[id]/incidents/[incidentId]',
+      );
+      const response = await GET_DETAIL(event as never);
+      expect(response.status).toBe(200);
+
+      const body = await response.json();
+      expect(body.rootCauseCandidates).toHaveLength(5);
+      // Highest count should be first (file-6 has 7 logs)
+      expect(body.rootCauseCandidates[0].sourceFile).toBe('src/file-6.ts');
+      expect(body.rootCauseCandidates[0].count).toBe(7);
+    });
+
+    it('limits topRequestIds and topTraceIds to top 10', async () => {
+      const project = await seedProject(db, { ownerId: userId });
+      const [createdIncident] = await db
+        .insert(incident)
+        .values({
+          id: 'inc-many-ids',
+          projectId: project.id,
+          fingerprint: 'fp-ids',
+          title: 'Many IDs',
+          normalizedMessage: 'many ids',
+          serviceName: 'api',
+          sourceFile: 'src/ids.ts',
+          lineNumber: 1,
+          highestLevel: 'error',
+          firstSeen: new Date(Date.now() - 20 * 60 * 1000),
+          lastSeen: new Date(Date.now() - 5 * 60 * 1000),
+          totalEvents: 15,
+          reopenCount: 0,
+        })
+        .returning();
+
+      // Create 12 distinct request IDs with varying counts
+      for (let i = 0; i < 12; i++) {
+        await seedLogs(db, project.id, i + 1, {
+          incidentId: createdIncident.id,
+          fingerprint: createdIncident.fingerprint,
+          level: 'error',
+          message: 'Error',
+          requestId: `req-${i}`,
+          traceId: `trace-${i}`,
+        });
+      }
+
+      const request = new Request(
+        `http://localhost/api/projects/${project.id}/incidents/${createdIncident.id}`,
+      );
+      const event = createRequestEvent(
+        request,
+        db,
+        { id: project.id, incidentId: createdIncident.id },
+        authenticatedLocals,
+        '/api/projects/[id]/incidents/[incidentId]',
+      );
+      const response = await GET_DETAIL(event as never);
+      expect(response.status).toBe(200);
+
+      const body = await response.json();
+      expect(body.correlations.topRequestIds).toHaveLength(10);
+      expect(body.correlations.topTraceIds).toHaveLength(10);
+      // Highest count should be first (req-11 has 12 logs)
+      expect(body.correlations.topRequestIds[0].requestId).toBe('req-11');
+      expect(body.correlations.topRequestIds[0].count).toBe(12);
+    });
+
+    it('ignores null requestId and traceId in correlations', async () => {
+      const project = await seedProject(db, { ownerId: userId });
+      const [createdIncident] = await db
+        .insert(incident)
+        .values({
+          id: 'inc-null-ids',
+          projectId: project.id,
+          fingerprint: 'fp-null',
+          title: 'Null IDs',
+          normalizedMessage: 'null ids',
+          serviceName: 'api',
+          sourceFile: 'src/null.ts',
+          lineNumber: 1,
+          highestLevel: 'error',
+          firstSeen: new Date(Date.now() - 20 * 60 * 1000),
+          lastSeen: new Date(Date.now() - 5 * 60 * 1000),
+          totalEvents: 5,
+          reopenCount: 0,
+        })
+        .returning();
+
+      // Logs with null requestId/traceId should not appear in correlations
+      await seedLogs(db, project.id, 3, {
+        incidentId: createdIncident.id,
+        fingerprint: createdIncident.fingerprint,
+        level: 'error',
+        message: 'Error',
+        requestId: null,
+        traceId: null,
+      });
+      await seedLogs(db, project.id, 2, {
+        incidentId: createdIncident.id,
+        fingerprint: createdIncident.fingerprint,
+        level: 'error',
+        message: 'Error',
+        requestId: 'req-1',
+        traceId: 'trace-1',
+      });
+
+      const request = new Request(
+        `http://localhost/api/projects/${project.id}/incidents/${createdIncident.id}`,
+      );
+      const event = createRequestEvent(
+        request,
+        db,
+        { id: project.id, incidentId: createdIncident.id },
+        authenticatedLocals,
+        '/api/projects/[id]/incidents/[incidentId]',
+      );
+      const response = await GET_DETAIL(event as never);
+      expect(response.status).toBe(200);
+
+      const body = await response.json();
+      expect(body.correlations.topRequestIds).toHaveLength(1);
+      expect(body.correlations.topRequestIds[0]).toEqual({ requestId: 'req-1', count: 2 });
+      expect(body.correlations.topTraceIds).toHaveLength(1);
+      expect(body.correlations.topTraceIds[0]).toEqual({ traceId: 'trace-1', count: 2 });
+    });
+  });
+
+  describe('Incident Timeline Aggregation', () => {
+    it('aggregates many logs in the same timeline bucket', async () => {
+      const project = await seedProject(db, { ownerId: userId });
+      const [createdIncident] = await db
+        .insert(incident)
+        .values({
+          id: 'inc-timeline-aggr',
+          projectId: project.id,
+          fingerprint: 'fp-timeline-aggr',
+          title: 'Timeline aggregation',
+          normalizedMessage: 'timeline aggregation',
+          serviceName: 'api',
+          sourceFile: 'src/timeline-aggr.ts',
+          lineNumber: 1,
+          highestLevel: 'error',
+          firstSeen: new Date(Date.now() - 50 * 60 * 1000),
+          lastSeen: new Date(Date.now() - 5 * 60 * 1000),
+          totalEvents: 0,
+          reopenCount: 0,
+        })
+        .returning();
+
+      const targetTime = new Date(Date.now() - 20 * 60 * 1000);
+      await seedLogs(db, project.id, 50, {
+        incidentId: createdIncident.id,
+        level: 'error',
+        message: 'err',
+        timestamp: targetTime,
+      });
+
+      const request = new Request(
+        `http://localhost/api/projects/${project.id}/incidents/${createdIncident.id}/timeline?range=1h`,
+      );
+      const event = createRequestEvent(
+        request,
+        db,
+        { id: project.id, incidentId: createdIncident.id },
+        authenticatedLocals,
+        '/api/projects/[id]/incidents/[incidentId]/timeline',
+      );
+      const response = await GET_TIMELINE(event as never);
+      expect(response.status).toBe(200);
+
+      const body = await response.json();
+      expect(body.range).toBe('1h');
+      expect(body.peakBucket).not.toBeNull();
+      expect(body.peakBucket.count).toBe(50);
+    });
   });
 });

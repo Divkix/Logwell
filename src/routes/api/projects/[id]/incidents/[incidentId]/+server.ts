@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import type * as schema from '$lib/server/db/schema';
@@ -36,51 +36,58 @@ export async function GET(event: RequestEvent): Promise<Response> {
     return json({ error: 'not_found', message: 'Incident not found' }, { status: 404 });
   }
 
-  const incidentLogs = await db
-    .select({
-      sourceFile: log.sourceFile,
-      lineNumber: log.lineNumber,
-      requestId: log.requestId,
-      traceId: log.traceId,
-    })
-    .from(log)
-    .where(and(eq(log.projectId, projectId), eq(log.incidentId, incidentId)));
+  const whereClause = and(eq(log.projectId, projectId), eq(log.incidentId, incidentId));
 
-  const sourceFrequency = new Map<
-    string,
-    { sourceFile: string | null; lineNumber: number | null; count: number }
-  >();
-  const requestCounts = new Map<string, number>();
-  const traceCounts = new Map<string, number>();
+  // Aggregate source file frequencies in SQL
+  const sourceResults = await db.execute(sql`
+    SELECT ${log.sourceFile} AS source_file, ${log.lineNumber} AS line_number, count(*)::int AS count
+    FROM ${log}
+    WHERE ${whereClause}
+    GROUP BY ${log.sourceFile}, ${log.lineNumber}
+    ORDER BY count DESC
+    LIMIT 5
+  `);
 
-  for (const entry of incidentLogs) {
-    const sourceKey = `${entry.sourceFile ?? 'unknown'}:${entry.lineNumber ?? 0}`;
-    const current = sourceFrequency.get(sourceKey);
-    sourceFrequency.set(sourceKey, {
-      sourceFile: entry.sourceFile,
-      lineNumber: entry.lineNumber,
-      count: (current?.count ?? 0) + 1,
-    });
+  // Aggregate request IDs in SQL
+  const requestResults = await db.execute(sql`
+    SELECT ${log.requestId} AS request_id, count(*)::int AS count
+    FROM ${log}
+    WHERE ${whereClause} AND ${log.requestId} IS NOT NULL
+    GROUP BY ${log.requestId}
+    ORDER BY count DESC
+    LIMIT 10
+  `);
 
-    if (entry.requestId) {
-      requestCounts.set(entry.requestId, (requestCounts.get(entry.requestId) ?? 0) + 1);
-    }
-    if (entry.traceId) {
-      traceCounts.set(entry.traceId, (traceCounts.get(entry.traceId) ?? 0) + 1);
-    }
-  }
+  // Aggregate trace IDs in SQL
+  const traceResults = await db.execute(sql`
+    SELECT ${log.traceId} AS trace_id, count(*)::int AS count
+    FROM ${log}
+    WHERE ${whereClause} AND ${log.traceId} IS NOT NULL
+    GROUP BY ${log.traceId}
+    ORDER BY count DESC
+    LIMIT 10
+  `);
 
-  const rootCauseCandidates = [...sourceFrequency.values()]
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 5);
-  const topRequestIds = [...requestCounts.entries()]
-    .map(([requestId, count]) => ({ requestId, count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 10);
-  const topTraceIds = [...traceCounts.entries()]
-    .map(([traceId, count]) => ({ traceId, count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 10);
+  // Handle both PGlite Results and postgres-js RowList
+  const sourceRows = 'rows' in sourceResults ? sourceResults.rows : Array.from(sourceResults);
+  const requestRows = 'rows' in requestResults ? requestResults.rows : Array.from(requestResults);
+  const traceRows = 'rows' in traceResults ? traceResults.rows : Array.from(traceResults);
+
+  const rootCauseCandidates = sourceRows.map((row) => ({
+    sourceFile: row.source_file as string | null,
+    lineNumber: row.line_number as number | null,
+    count: row.count as number,
+  }));
+
+  const topRequestIds = requestRows.map((row) => ({
+    requestId: row.request_id as string,
+    count: row.count as number,
+  }));
+
+  const topTraceIds = traceRows.map((row) => ({
+    traceId: row.trace_id as string,
+    count: row.count as number,
+  }));
 
   return json({
     id: incidentRow.id,

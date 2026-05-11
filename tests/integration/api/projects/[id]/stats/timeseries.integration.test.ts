@@ -342,6 +342,55 @@ describe('GET /api/projects/[id]/stats/timeseries', () => {
     });
   });
 
+  describe('SQL Aggregation', () => {
+    it('correctly aggregates many logs in the same bucket', async () => {
+      const testProject = await seedProject(db, { ownerId: userId });
+      const now = new Date();
+      const targetTime = new Date(now.getTime() - 5 * 60 * 1000); // 5 minutes ago
+
+      // Seed 50 logs at exactly the same time — should all land in one bucket
+      await seedLogs(db, testProject.id, 50, { timestamp: targetTime });
+
+      const request = new Request(
+        `http://localhost/api/projects/${testProject.id}/stats/timeseries?range=1h`,
+        { method: 'GET' },
+      );
+
+      const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+      const response = await GET(event as never);
+      const data = await response.json();
+
+      expect(data.totalCount).toBe(50);
+      const nonZeroBuckets = data.buckets.filter((b: { count: number }) => b.count > 0);
+      expect(nonZeroBuckets).toHaveLength(1);
+      expect(nonZeroBuckets[0].count).toBe(50);
+    });
+
+    it('returns accurate totalCount for a large number of logs', async () => {
+      const testProject = await seedProject(db, { ownerId: userId });
+      const now = new Date();
+
+      // Seed logs spread across the 24h range
+      await seedLogs(db, testProject.id, 100, {
+        timestamp: new Date(now.getTime() - 2 * 60 * 60 * 1000), // 2 hours ago
+      });
+      await seedLogs(db, testProject.id, 200, {
+        timestamp: new Date(now.getTime() - 12 * 60 * 60 * 1000), // 12 hours ago
+      });
+
+      const request = new Request(
+        `http://localhost/api/projects/${testProject.id}/stats/timeseries?range=24h`,
+        { method: 'GET' },
+      );
+
+      const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+      const response = await GET(event as never);
+      const data = await response.json();
+
+      expect(data.totalCount).toBe(300);
+    });
+  });
+
   describe('Time Range Boundary', () => {
     it('excludes logs outside the time range', async () => {
       const testProject = await seedProject(db, { ownerId: userId });
