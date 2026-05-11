@@ -175,7 +175,6 @@ describe('Incident APIs', () => {
         firstSeen: new Date(now - 10 * 60 * 1000),
         lastSeen: new Date(now - 5 * 60 * 1000),
         totalEvents: 1,
-        reopenCount: 0,
       });
     }
     await db.insert(incident).values(incidents);
