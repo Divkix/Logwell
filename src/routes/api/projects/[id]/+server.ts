@@ -155,6 +155,7 @@ export async function PATCH(event: RequestEvent): Promise<Response> {
   }
 
   const { name, retentionDays } = result.data;
+  const { project: currentProject } = authResult;
 
   // Check for duplicate name (if name is being updated)
   if (name) {
@@ -169,10 +170,20 @@ export async function PATCH(event: RequestEvent): Promise<Response> {
     }
   }
 
+  // Empty payload is a no-op; return current project without touching updatedAt
+  if (name === undefined && retentionDays === undefined) {
+    return json({
+      id: currentProject.id,
+      name: currentProject.name,
+      apiKey: currentProject.apiKey,
+      retentionDays: currentProject.retentionDays,
+      createdAt: currentProject.createdAt?.toISOString(),
+      updatedAt: currentProject.updatedAt?.toISOString(),
+    });
+  }
+
   // Build update object dynamically to only include provided fields
-  const updateData: { name?: string; retentionDays?: number | null; updatedAt: Date } = {
-    updatedAt: new Date(),
-  };
+  const updateData: { name?: string; retentionDays?: number | null; updatedAt?: Date } = {};
 
   if (name !== undefined) {
     updateData.name = name;
@@ -180,6 +191,10 @@ export async function PATCH(event: RequestEvent): Promise<Response> {
 
   if (retentionDays !== undefined) {
     updateData.retentionDays = retentionDays;
+  }
+
+  if (updateData.name !== undefined || updateData.retentionDays !== undefined) {
+    updateData.updatedAt = new Date();
   }
 
   // Update project (ownership already verified)

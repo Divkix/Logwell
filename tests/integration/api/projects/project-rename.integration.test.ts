@@ -306,6 +306,7 @@ describe('PATCH /api/projects/[id]', () => {
 
     it('accepts empty body (no updates)', async () => {
       const testProject = await seedProject(db, { name: 'my-project', ownerId: userId });
+      const originalUpdatedAt = testProject.updatedAt;
 
       const request = new Request(`http://localhost/api/projects/${testProject.id}`, {
         method: 'PATCH',
@@ -321,6 +322,13 @@ describe('PATCH /api/projects/[id]', () => {
       expect(response.status).toBe(200);
       const body = await response.json();
       expect(body).toHaveProperty('name', 'my-project');
+      expect(new Date(body.updatedAt).getTime()).toBe(originalUpdatedAt?.getTime());
+
+      const [unchangedProject] = await db
+        .select()
+        .from(project)
+        .where(eq(project.id, testProject.id));
+      expect(unchangedProject.updatedAt?.getTime()).toBe(originalUpdatedAt?.getTime());
     });
 
     it('returns 400 for malformed JSON body', async () => {
