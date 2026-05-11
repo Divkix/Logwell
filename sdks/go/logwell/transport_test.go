@@ -26,12 +26,12 @@ func TestTransport_SuccessfulRequest(t *testing.T) {
 		}
 
 		// Verify request body
-		var req ingestRequest
+		var req []LogEntry
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			t.Errorf("failed to decode request body: %v", err)
 		}
-		if len(req.Logs) != 1 {
-			t.Errorf("len(Logs) = %d, want 1", len(req.Logs))
+		if len(req) != 1 {
+			t.Errorf("len(req) = %d, want 1", len(req))
 		}
 
 		w.WriteHeader(http.StatusOK)
@@ -466,14 +466,14 @@ func TestTransport_ErrorMessageParsing(t *testing.T) {
 
 // TestTransport_RequestBody tests that the request body is correctly formatted.
 func TestTransport_RequestBody(t *testing.T) {
-	var receivedBody ingestRequest
+	var receivedBody []LogEntry
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := json.NewDecoder(r.Body).Decode(&receivedBody); err != nil {
 			t.Errorf("failed to decode body: %v", err)
 		}
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(IngestResponse{Accepted: len(receivedBody.Logs)})
+		json.NewEncoder(w).Encode(IngestResponse{Accepted: len(receivedBody)})
 	}))
 	defer server.Close()
 
@@ -492,20 +492,20 @@ func TestTransport_RequestBody(t *testing.T) {
 		t.Errorf("Accepted = %d, want 2", resp.Accepted)
 	}
 
-	if len(receivedBody.Logs) != 2 {
-		t.Fatalf("len(receivedBody.Logs) = %d, want 2", len(receivedBody.Logs))
+	if len(receivedBody) != 2 {
+		t.Fatalf("len(receivedBody) = %d, want 2", len(receivedBody))
 	}
 
 	// Verify first log
-	if receivedBody.Logs[0].Message != "message 1" {
-		t.Errorf("Logs[0].Message = %q, want %q", receivedBody.Logs[0].Message, "message 1")
+	if receivedBody[0].Message != "message 1" {
+		t.Errorf("receivedBody[0].Message = %q, want %q", receivedBody[0].Message, "message 1")
 	}
-	if receivedBody.Logs[0].Service != "svc1" {
-		t.Errorf("Logs[0].Service = %q, want %q", receivedBody.Logs[0].Service, "svc1")
+	if receivedBody[0].Service != "svc1" {
+		t.Errorf("receivedBody[0].Service = %q, want %q", receivedBody[0].Service, "svc1")
 	}
 
 	// Verify second log
-	if receivedBody.Logs[1].Level != LevelError {
-		t.Errorf("Logs[1].Level = %q, want %q", receivedBody.Logs[1].Level, LevelError)
+	if receivedBody[1].Level != LevelError {
+		t.Errorf("receivedBody[1].Level = %q, want %q", receivedBody[1].Level, LevelError)
 	}
 }
