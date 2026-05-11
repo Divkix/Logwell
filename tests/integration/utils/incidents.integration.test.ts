@@ -3,7 +3,10 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type * as schema from '../../../src/lib/server/db/schema';
 import { incident } from '../../../src/lib/server/db/schema';
 import { setupTestDatabase } from '../../../src/lib/server/db/test-db';
-import { type PreparedIncidentLog, upsertIncidentsForPreparedLogs } from '../../../src/lib/server/utils/incidents';
+import {
+  type PreparedIncidentLog,
+  upsertIncidentsForPreparedLogs,
+} from '../../../src/lib/server/utils/incidents';
 import { seedProject } from '../../fixtures/db';
 
 describe('upsertIncidentsForPreparedLogs', () => {
@@ -54,7 +57,9 @@ describe('upsertIncidentsForPreparedLogs', () => {
       incidentId: null,
     };
 
-    const { touchedIncidents } = await upsertIncidentsForPreparedLogs(db, project.id, [preparedLog]);
+    const { touchedIncidents } = await upsertIncidentsForPreparedLogs(db, project.id, [
+      preparedLog,
+    ]);
 
     expect(touchedIncidents).toHaveLength(1);
     expect(touchedIncidents[0].reopenCount).toBe(0);
