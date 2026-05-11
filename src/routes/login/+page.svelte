@@ -105,14 +105,6 @@ async function handleSubmit(event: Event) {
   }
 }
 
-/**
- * Handle Enter key press in form fields
- */
-function handleKeyDown(event: KeyboardEvent) {
-  if (event.key === 'Enter') {
-    handleSubmit(event);
-  }
-}
 </script>
 
 <svelte:head>
@@ -141,7 +133,6 @@ function handleKeyDown(event: KeyboardEvent) {
             disabled={isLoading}
             aria-invalid={!!usernameError}
             aria-describedby={usernameError ? 'username-error' : undefined}
-            onkeydown={handleKeyDown}
           />
           {#if usernameError}
             <p id="username-error" class="text-destructive text-sm">{usernameError}</p>
@@ -160,7 +151,6 @@ function handleKeyDown(event: KeyboardEvent) {
             disabled={isLoading}
             aria-invalid={!!passwordError}
             aria-describedby={passwordError ? 'password-error' : undefined}
-            onkeydown={handleKeyDown}
           />
           {#if passwordError}
             <p id="password-error" class="text-destructive text-sm">{passwordError}</p>
