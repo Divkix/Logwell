@@ -2,6 +2,7 @@ import { json, type RequestHandler } from '@sveltejs/kit';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { nanoid } from 'nanoid';
+import { API_CONFIG } from '$lib/server/config/performance';
 import type * as schema from '$lib/server/db/schema';
 import { log } from '$lib/server/db/schema';
 import { logEventBus } from '$lib/server/events';
@@ -77,6 +78,17 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   }
 
   const { records, rejectedLogRecords, errors } = normalized;
+
+  if (records.length > API_CONFIG.BATCH_INSERT_LIMIT) {
+    return json(
+      {
+        error: 'batch_too_large',
+        message: `Batch exceeds maximum limit of ${API_CONFIG.BATCH_INSERT_LIMIT} logs. Received ${records.length} logs.`,
+      },
+      { status: 400 },
+    );
+  }
+
   const preparedLogs = prepareLogsForIncidents(
     records.map((record) => {
       const mapped = mapOtlpAttributesToLogColumns(record.attributes);

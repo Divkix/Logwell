@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { API_CONFIG } from '../../../src/lib/server/config/performance';
 import type * as schema from '../../../src/lib/server/db/schema';
 import { incident, log } from '../../../src/lib/server/db/schema';
 import { setupTestDatabase } from '../../../src/lib/server/db/test-db';
@@ -241,6 +242,57 @@ describe('POST /v1/ingest (Simple API)', () => {
 
       const insertedLogs = await db.select().from(log).where(eq(log.projectId, project.id));
       expect(insertedLogs.length).toBe(3);
+    });
+
+    it(`accepts a batch of exactly ${API_CONFIG.BATCH_INSERT_LIMIT} logs`, async () => {
+      const project = await seedProject(db);
+
+      const logs = Array.from({ length: API_CONFIG.BATCH_INSERT_LIMIT }, (_, i) => ({
+        level: 'info',
+        message: `Log ${i}`,
+      }));
+
+      const request = new Request('http://localhost/v1/ingest', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${project.apiKey}`,
+        },
+        body: JSON.stringify(logs),
+      });
+
+      const event = createRequestEvent(request, db);
+      const response = await POST(event as never);
+
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.accepted).toBe(API_CONFIG.BATCH_INSERT_LIMIT);
+    });
+
+    it(`rejects a batch exceeding ${API_CONFIG.BATCH_INSERT_LIMIT} logs`, async () => {
+      const project = await seedProject(db);
+
+      const logs = Array.from({ length: API_CONFIG.BATCH_INSERT_LIMIT + 1 }, (_, i) => ({
+        level: 'info',
+        message: `Log ${i}`,
+      }));
+
+      const request = new Request('http://localhost/v1/ingest', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${project.apiKey}`,
+        },
+        body: JSON.stringify(logs),
+      });
+
+      const event = createRequestEvent(request, db);
+      const response = await POST(event as never);
+
+      expect(response.status).toBe(400);
+      const body = await response.json();
+      expect(body.error).toBe('batch_too_large');
+      expect(body.message).toContain(API_CONFIG.BATCH_INSERT_LIMIT.toString());
     });
   });
 
