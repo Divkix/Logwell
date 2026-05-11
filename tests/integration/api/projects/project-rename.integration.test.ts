@@ -325,6 +325,26 @@ describe('PATCH /api/projects/[id]', () => {
       expect(body).toHaveProperty('name', 'my-project');
     });
 
+    it('returns 415 for non-JSON Content-Type', async () => {
+      const testProject = await seedProject(db, { name: 'my-project', ownerId: userId });
+
+      const request = new Request(`http://localhost/api/projects/${testProject.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'name=new-name',
+      });
+
+      const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+      const response = await PATCH(event as never);
+
+      expect(response.status).toBe(415);
+      const body = await response.json();
+      expect(body).toHaveProperty('error', 'unsupported_media_type');
+      expect(body).toHaveProperty('message', 'Content-Type must be application/json');
+    });
+
     it('returns 400 for malformed JSON body', async () => {
       const testProject = await seedProject(db, { name: 'my-project', ownerId: userId });
 

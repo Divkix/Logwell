@@ -6,6 +6,7 @@ import type * as schema from '$lib/server/db/schema';
 import { log } from '$lib/server/db/schema';
 import { logEventBus } from '$lib/server/events';
 import { ApiKeyError, validateApiKey } from '$lib/server/utils/api-key';
+import { requireJsonContentType } from '$lib/server/utils/content-type';
 import {
   assignIncidentIds,
   prepareLogsForIncidents,
@@ -36,6 +37,10 @@ async function getDbClient(
  * [{ "level": "info", "message": "Log 1" }, { "level": "error", "message": "Log 2" }]
  */
 export const POST: RequestHandler = async ({ request, locals }) => {
+  // Validate Content-Type
+  const contentTypeError = requireJsonContentType(request);
+  if (contentTypeError) return contentTypeError;
+
   const db = await getDbClient(locals);
 
   // Validate API key

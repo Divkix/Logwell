@@ -6,6 +6,7 @@ import type * as schema from '$lib/server/db/schema';
 import { log } from '$lib/server/db/schema';
 import { logEventBus } from '$lib/server/events';
 import { ApiKeyError, validateApiKey } from '$lib/server/utils/api-key';
+import { requireJsonContentType } from '$lib/server/utils/content-type';
 import {
   assignIncidentIds,
   prepareLogsForIncidents,
@@ -44,6 +45,10 @@ function buildIngestResponse(accepted: number, rejected: number, errors: string[
  * Uses project API key authentication (Authorization: Bearer lw_xxx).
  */
 export const POST: RequestHandler = async ({ request, locals }) => {
+  // Validate Content-Type
+  const contentTypeError = requireJsonContentType(request);
+  if (contentTypeError) return contentTypeError;
+
   const db = await getDbClient(locals);
 
   let projectId: string;
