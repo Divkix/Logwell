@@ -153,7 +153,34 @@ $effect(() => {
 });
 
 // Combined logs: streamed + server-loaded + loaded more (with proper Date conversion)
-const allLogs = $derived([...streamedLogs, ...data.logs.map(parseLogTimestamp), ...loadedMoreLogs]);
+// Deduplicate by ID so the same log never appears twice; streamed logs win on collisions
+const allLogs = $derived.by(() => {
+  const seen = new Set<string>();
+  const result: Log[] = [];
+
+  for (const log of streamedLogs) {
+    if (!seen.has(log.id)) {
+      seen.add(log.id);
+      result.push(log);
+    }
+  }
+
+  for (const log of data.logs.map(parseLogTimestamp)) {
+    if (!seen.has(log.id)) {
+      seen.add(log.id);
+      result.push(log);
+    }
+  }
+
+  for (const log of loadedMoreLogs) {
+    if (!seen.has(log.id)) {
+      seen.add(log.id);
+      result.push(log);
+    }
+  }
+
+  return result;
+});
 
 function handleSearch(value: string) {
   searchValue = value;

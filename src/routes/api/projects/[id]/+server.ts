@@ -5,6 +5,7 @@ import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import type * as schema from '$lib/server/db/schema';
 import { log, project } from '$lib/server/db/schema';
 import { invalidateApiKeyCache } from '$lib/server/utils/api-key';
+import { checkCsrfOrigin } from '$lib/server/utils/csrf';
 import { isErrorResponse, requireProjectOwnership } from '$lib/server/utils/project-guard';
 import { projectUpdatePayloadSchema } from '$lib/shared/schemas/project';
 import type { RequestEvent } from './$types';
@@ -127,6 +128,10 @@ export async function GET(event: RequestEvent): Promise<Response> {
  * - 404 not_found: Project does not exist or not owned by user
  */
 export async function PATCH(event: RequestEvent): Promise<Response> {
+  // CSRF protection for state-changing request
+  const csrfError = checkCsrfOrigin(event);
+  if (csrfError) return csrfError;
+
   // Require authentication and project ownership
   const authResult = await requireProjectOwnership(event, event.params.id);
   if (isErrorResponse(authResult)) return authResult;
@@ -208,6 +213,10 @@ export async function PATCH(event: RequestEvent): Promise<Response> {
  * - 404 not_found: Project does not exist or not owned by user
  */
 export async function DELETE(event: RequestEvent): Promise<Response> {
+  // CSRF protection for state-changing request
+  const csrfError = checkCsrfOrigin(event);
+  if (csrfError) return csrfError;
+
   // Require authentication and project ownership
   const authResult = await requireProjectOwnership(event, event.params.id);
   if (isErrorResponse(authResult)) return authResult;

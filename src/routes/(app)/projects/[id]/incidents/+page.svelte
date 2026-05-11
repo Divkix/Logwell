@@ -38,6 +38,7 @@ let detail = $state<IncidentDetail | null>(null);
 let timeline = $state<IncidentTimelineResponse | null>(null);
 let detailLoading = $state(false);
 let refreshTimeout = $state<ReturnType<typeof setTimeout> | null>(null);
+let pendingIncidentUpdates = $state<ClientIncident[]>([]);
 
 function computeStatus(lastSeenIso: string): IncidentStatus {
   const thresholdMs = 30 * 60 * 1000;
@@ -84,11 +85,13 @@ const incidentStream = useIncidentStream({
   projectId,
   enabled: false,
   onIncidents: (updates) => {
+    pendingIncidentUpdates = [...pendingIncidentUpdates, ...updates];
     if (refreshTimeout) {
       clearTimeout(refreshTimeout);
     }
     refreshTimeout = setTimeout(() => {
-      mergeIncidentUpdates(updates);
+      mergeIncidentUpdates(pendingIncidentUpdates);
+      pendingIncidentUpdates = [];
       refreshTimeout = null;
     }, 300);
   },
@@ -99,6 +102,7 @@ $effect(() => {
   return () => {
     incidentStream.disconnect();
     if (refreshTimeout) clearTimeout(refreshTimeout);
+    pendingIncidentUpdates = [];
   };
 });
 

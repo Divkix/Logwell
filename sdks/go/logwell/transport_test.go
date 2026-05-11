@@ -3,12 +3,32 @@ package logwell
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
 	"testing"
 	"time"
 )
+
+// decodeRequestBody validates the request body against the real server format
+// using generic map decoding so any JSON tag mismatch in LogEntry is caught.
+func decodeRequestBody(t *testing.T, r *http.Request) []LogEntry {
+	var raw []map[string]any
+	if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
+		t.Fatalf("failed to decode request body: %v", err)
+	}
+
+	var entries []LogEntry
+	for _, item := range raw {
+		entry, err := mapToLogEntry(item)
+		if err != nil {
+			t.Fatalf("invalid request body item: %v", err)
+		}
+		entries = append(entries, entry)
+	}
+	return entries
+}
 
 // TestTransport_SuccessfulRequest tests that a 200 response succeeds without retry.
 func TestTransport_SuccessfulRequest(t *testing.T) {
@@ -25,13 +45,10 @@ func TestTransport_SuccessfulRequest(t *testing.T) {
 			t.Errorf("Content-Type header = %q, want %q", got, "application/json")
 		}
 
-		// Verify request body
-		var req []LogEntry
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			t.Errorf("failed to decode request body: %v", err)
-		}
-		if len(req) != 1 {
-			t.Errorf("len(req) = %d, want 1", len(req))
+		// Verify request body format against real server expectations
+		entries := decodeRequestBody(t, r)
+		if len(entries) != 1 {
+			t.Errorf("len(entries) = %d, want 1", len(entries))
 		}
 
 		w.WriteHeader(http.StatusOK)
@@ -466,7 +483,7 @@ func TestTransport_ErrorMessageParsing(t *testing.T) {
 
 // TestTransport_RequestBody tests that the request body is correctly formatted.
 func TestTransport_RequestBody(t *testing.T) {
-	var receivedBody []LogEntry
+	var receivedBody []map[string]any
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := json.NewDecoder(r.Body).Decode(&receivedBody); err != nil {
@@ -496,16 +513,25 @@ func TestTransport_RequestBody(t *testing.T) {
 		t.Fatalf("len(receivedBody) = %d, want 2", len(receivedBody))
 	}
 
-	// Verify first log
-	if receivedBody[0].Message != "message 1" {
-		t.Errorf("receivedBody[0].Message = %q, want %q", receivedBody[0].Message, "message 1")
+	// Verify first log using raw map keys (catches JSON tag mismatches)
+	if got, want := fmt.Sprintf("%v", receivedBody[0]["message"]), "message 1"; got != want {
+		t.Errorf("receivedBody[0][\"message\"] = %v, want %v", got, want)
 	}
-	if receivedBody[0].Service != "svc1" {
-		t.Errorf("receivedBody[0].Service = %q, want %q", receivedBody[0].Service, "svc1")
+	if got, want := fmt.Sprintf("%v", receivedBody[0]["service"]), "svc1"; got != want {
+		t.Errorf("receivedBody[0][\"service\"] = %v, want %v", got, want)
 	}
 
 	// Verify second log
-	if receivedBody[1].Level != LevelError {
-		t.Errorf("receivedBody[1].Level = %q, want %q", receivedBody[1].Level, LevelError)
+	if got, want := fmt.Sprintf("%v", receivedBody[1]["level"]), string(LevelError); got != want {
+		t.Errorf("receivedBody[1][\"level\"] = %v, want %v", got, want)
+	}
+
+	// Verify metadata object is present
+	meta, ok := receivedBody[1]["metadata"].(map[string]any)
+	if !ok {
+		t.Fatalf("receivedBody[1][\"metadata\"] is not an object")
+	}
+	if meta["key"] != "value" {
+		t.Errorf("receivedBody[1][\"metadata\"][\"key\"] = %v, want %v", meta["key"], "value")
 	}
 }
