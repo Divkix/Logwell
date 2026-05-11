@@ -78,7 +78,7 @@ func (t *httpTransport) sendWithRetry(ctx context.Context, logs []LogEntry) (*In
 }
 
 // calculateBackoff computes delay with exponential backoff + jitter.
-// Formula: min(baseDelay * 2^attempt, maxDelay) + 30% jitter
+// Formula: min(baseDelay * 2^attempt, maxDelay) + 0-30% jitter
 func (t *httpTransport) calculateBackoff(attempt int) time.Duration {
 	// Exponential: baseDelay * 2^attempt
 	delay := baseRetryDelay * (1 << attempt)
@@ -88,14 +88,9 @@ func (t *httpTransport) calculateBackoff(attempt int) time.Duration {
 		delay = maxRetryDelay
 	}
 
-	// Add jitter: +/- 30%
-	jitter := time.Duration(float64(delay) * jitterFactor * (rand.Float64()*2 - 1))
+	// Add jitter: 0-30% positive-only (aligned with TS/Python SDKs)
+	jitter := time.Duration(float64(delay) * jitterFactor * rand.Float64())
 	delay += jitter
-
-	// Ensure non-negative
-	if delay < 0 {
-		delay = 0
-	}
 
 	return delay
 }

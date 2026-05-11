@@ -952,6 +952,160 @@ func TestClientFullFlow(t *testing.T) {
 	}
 }
 
+// TestClientRequeueOnFailure tests that entries are re-queued when transport fails.
+func TestClientRequeueOnFailure(t *testing.T) {
+	var errorCount int32
+
+	ts := newTestServer()
+	defer ts.Close()
+
+	// Set handler to always return 500
+	ts.setHandler(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "test error"})
+	})
+
+	client, err := New(
+		ts.URL,
+		validAPIKey(),
+		WithBatchSize(100), // Large batch to prevent auto-flush
+		WithFlushInterval(1*time.Minute),
+		WithMaxRetries(0), // No retries to speed up test
+		WithOnError(func(e *Error) {
+			atomic.AddInt32(&errorCount, 1)
+		}),
+	)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	defer client.Shutdown(context.Background())
+
+	// Log entries
+	client.Info("message 1")
+	client.Info("message 2")
+	client.Info("message 3")
+
+	// Verify entries are queued
+	if client.queue.size() != 3 {
+		t.Fatalf("expected 3 entries in queue, got %d", client.queue.size())
+	}
+
+	// Flush should fail
+	err = client.Flush(context.Background())
+	if err == nil {
+		t.Fatal("Flush() expected error")
+	}
+
+	// Entries should be re-queued, not lost
+	if client.queue.size() != 3 {
+		t.Fatalf("expected 3 entries re-queued after failure, got %d", client.queue.size())
+	}
+
+	// OnError should have been called
+	if atomic.LoadInt32(&errorCount) != 1 {
+		t.Fatalf("expected OnError to be called once, got %d", atomic.LoadInt32(&errorCount))
+	}
+
+	// Now make server accept logs
+	ts.setHandler(nil)
+
+	// Flush again should succeed and send all re-queued entries
+	err = client.Flush(context.Background())
+	if err != nil {
+		t.Fatalf("second Flush() error = %v", err)
+	}
+
+	// Verify all logs were sent
+	logs := ts.getLogs()
+	if len(logs) != 3 {
+		t.Fatalf("expected 3 logs after recovery, got %d", len(logs))
+	}
+
+	// Queue should be empty
+	if client.queue.size() != 0 {
+		t.Fatalf("expected queue to be empty after successful flush, got %d", client.queue.size())
+	}
+}
+
+// TestClientRequeueOrderOnFailure tests that entries maintain order when re-queued.
+func TestClientRequeueOrderOnFailure(t *testing.T) {
+	ts := newTestServer()
+	defer ts.Close()
+
+	// Set handler to fail first request, then succeed
+	requestCount := 0
+	ts.setHandler(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		if requestCount == 1 {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]string{"error": "first attempt fails"})
+			return
+		}
+		// Default handler for subsequent requests
+		var raw []map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		var entries []LogEntry
+		for _, item := range raw {
+			entry, err := mapToLogEntry(item)
+			if err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			entries = append(entries, entry)
+		}
+		ts.mu.Lock()
+		ts.requests = append(ts.requests, entries)
+		ts.logs = append(ts.logs, entries...)
+		ts.mu.Unlock()
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(IngestResponse{Accepted: len(entries)})
+	})
+
+	client, err := New(
+		ts.URL,
+		validAPIKey(),
+		WithBatchSize(100),
+		WithFlushInterval(1*time.Minute),
+		WithMaxRetries(0),
+	)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	defer client.Shutdown(context.Background())
+
+	// Log entries in specific order
+	client.Info("first")
+	client.Info("second")
+	client.Info("third")
+
+	// First flush fails, entries re-queued
+	_ = client.Flush(context.Background())
+
+	// Second flush succeeds
+	err = client.Flush(context.Background())
+	if err != nil {
+		t.Fatalf("second Flush() error = %v", err)
+	}
+
+	// Verify order is preserved
+	logs := ts.getLogs()
+	if len(logs) != 3 {
+		t.Fatalf("expected 3 logs, got %d", len(logs))
+	}
+	if logs[0].Message != "first" {
+		t.Errorf("first log message = %q, want %q", logs[0].Message, "first")
+	}
+	if logs[1].Message != "second" {
+		t.Errorf("second log message = %q, want %q", logs[1].Message, "second")
+	}
+	if logs[2].Message != "third" {
+		t.Errorf("third log message = %q, want %q", logs[2].Message, "third")
+	}
+}
+
 // TestClientTimerFlush tests timer-based auto-flush.
 func TestClientTimerFlush(t *testing.T) {
 	ts := newTestServer()

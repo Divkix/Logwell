@@ -47,8 +47,8 @@ func TestNewDefaultConfig(t *testing.T) {
 	})
 
 	t.Run("default values match constants", func(t *testing.T) {
-		if DefaultBatchSize != 10 {
-			t.Errorf("DefaultBatchSize = %d, want 10", DefaultBatchSize)
+		if DefaultBatchSize != 50 {
+			t.Errorf("DefaultBatchSize = %d, want 50", DefaultBatchSize)
 		}
 		if DefaultFlushInterval != 5*time.Second {
 			t.Errorf("DefaultFlushInterval = %v, want 5s", DefaultFlushInterval)
@@ -96,17 +96,12 @@ func TestConfigValidateAPIKey(t *testing.T) {
 		},
 		{
 			name:      "valid with mixed special chars",
-			apiKey:    "lw_abc-def_ghi-jkl_mno-pqr_stu-vwx12",
+			apiKey:    "lw_abc-def_ghi-jkl_mno-pqr_stu-vw12",
 			wantError: false,
 		},
 		{
 			name:      "valid with exactly 32 chars after prefix",
 			apiKey:    "lw_12345678901234567890123456789012",
-			wantError: false,
-		},
-		{
-			name:      "valid with more than 32 chars after prefix",
-			apiKey:    "lw_1234567890123456789012345678901234567890",
 			wantError: false,
 		},
 
@@ -134,6 +129,11 @@ func TestConfigValidateAPIKey(t *testing.T) {
 		{
 			name:      "too short (31 chars after prefix)",
 			apiKey:    "lw_1234567890123456789012345678901",
+			wantError: true,
+		},
+		{
+			name:      "too long (33 chars after prefix)",
+			apiKey:    "lw_123456789012345678901234567890123",
 			wantError: true,
 		},
 		{
@@ -309,7 +309,7 @@ func TestConfigValidateBatchSize(t *testing.T) {
 		{"minimum valid (1)", 1, false},
 		{"maximum valid (500)", 500, false},
 		{"mid range (100)", 100, false},
-		{"default value (10)", 10, false},
+		{"default value (50)", 50, false},
 
 		// Invalid values
 		{"zero", 0, true},

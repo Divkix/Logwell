@@ -1,11 +1,14 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
+import { eq } from 'drizzle-orm';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { nanoid } from 'nanoid';
+import { API_CONFIG } from '$lib/server/config/performance';
 import type * as schema from '$lib/server/db/schema';
-import { log } from '$lib/server/db/schema';
+import { log, project } from '$lib/server/db/schema';
 import { logEventBus } from '$lib/server/events';
 import { ApiKeyError, validateApiKey } from '$lib/server/utils/api-key';
+import { requireJsonContentType } from '$lib/server/utils/content-type';
 import {
   assignIncidentIds,
   prepareLogsForIncidents,
@@ -36,12 +39,25 @@ async function getDbClient(
  * [{ "level": "info", "message": "Log 1" }, { "level": "error", "message": "Log 2" }]
  */
 export const POST: RequestHandler = async ({ request, locals }) => {
+  // Validate Content-Type
+  const contentTypeError = requireJsonContentType(request);
+  if (contentTypeError) return contentTypeError;
+
   const db = await getDbClient(locals);
 
   // Validate API key
   let projectId: string;
   try {
     projectId = await validateApiKey(request, db);
+
+    // Re-verify project exists to prevent stale cache (multi-process) from causing FK violations
+    const [projectRow] = await db
+      .select({ id: project.id })
+      .from(project)
+      .where(eq(project.id, projectId));
+    if (!projectRow) {
+      throw new ApiKeyError(401, 'Invalid API key');
+    }
   } catch (err) {
     if (err instanceof ApiKeyError) {
       return json({ error: 'unauthorized', message: err.message }, { status: err.status });
@@ -72,6 +88,16 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   }
 
   const { records, accepted, rejected, errors } = result;
+
+  if (records.length > API_CONFIG.BATCH_INSERT_LIMIT) {
+    return json(
+      {
+        error: 'batch_too_large',
+        message: `Batch exceeds maximum limit of ${API_CONFIG.BATCH_INSERT_LIMIT} logs. Received ${records.length} logs.`,
+      },
+      { status: 400 },
+    );
+  }
 
   const preparedLogs = prepareLogsForIncidents(
     records.map((record) => ({

@@ -148,4 +148,34 @@ describe('Login Page Navigation', () => {
       expect(mockGoto).toHaveBeenCalledWith('/');
     });
   });
+
+  describe('Enter key submission', () => {
+    it('should submit via form submission and not keydown handler', async () => {
+      render(LoginPage);
+
+      const usernameInput = screen.getByLabelText(/username/i);
+      const passwordInput = screen.getByLabelText(/password/i);
+      const form = passwordInput.closest('form');
+
+      expect(form).toBeTruthy();
+      if (!form) {
+        throw new Error('Login form not found');
+      }
+
+      await user.clear(usernameInput);
+      await user.type(usernameInput, 'admin');
+      await user.type(passwordInput, 'password123');
+
+      passwordInput.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }),
+      );
+      expect(authClient.signIn.username).not.toHaveBeenCalled();
+
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+
+      await waitFor(() => {
+        expect(authClient.signIn.username).toHaveBeenCalledTimes(1);
+      });
+    });
+  });
 });

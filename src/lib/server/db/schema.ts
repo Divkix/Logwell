@@ -70,7 +70,6 @@ export const incident = pgTable(
     firstSeen: timestamp('first_seen', { withTimezone: true }).notNull(),
     lastSeen: timestamp('last_seen', { withTimezone: true }).notNull(),
     totalEvents: integer('total_events').notNull().default(0),
-    reopenCount: integer('reopen_count').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
   },

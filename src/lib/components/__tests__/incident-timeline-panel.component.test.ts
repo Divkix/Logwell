@@ -16,7 +16,6 @@ const detail: IncidentDetail = {
   firstSeen: new Date().toISOString(),
   lastSeen: new Date().toISOString(),
   totalEvents: 5,
-  reopenCount: 1,
   status: 'open',
   rootCauseCandidates: [{ sourceFile: 'src/db.ts', lineNumber: 42, count: 5 }],
   correlations: {
@@ -44,6 +43,7 @@ describe('IncidentTimelinePanel', () => {
   it('renders incident detail and correlation sections', () => {
     render(IncidentTimelinePanel, { props: { detail, timeline } });
     expect(screen.getByText('Incident Timeline')).toBeInTheDocument();
+    expect(screen.queryByText(/Reopens:/i)).not.toBeInTheDocument();
     expect(screen.getByText('Root-Cause Candidates')).toBeInTheDocument();
     expect(screen.getByText('Correlated Request IDs')).toBeInTheDocument();
   });

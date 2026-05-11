@@ -163,6 +163,11 @@ describe('parseSimpleIngestRequest', () => {
         const result = parseSimpleIngestRequest({ ...validEntry, metadata: null });
         expect(result.records[0].metadata).toBeNull();
       });
+
+      it('returns null metadata for empty object metadata', () => {
+        const result = parseSimpleIngestRequest({ ...validEntry, metadata: {} });
+        expect(result.records[0].metadata).toBeNull();
+      });
     });
   });
 

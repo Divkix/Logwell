@@ -1,4 +1,4 @@
-import type { Redirect, RequestEvent } from '@sveltejs/kit';
+import type { HttpError, Redirect, RequestEvent } from '@sveltejs/kit';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createAuth } from '$lib/server/auth';
@@ -25,6 +25,26 @@ async function expectRedirect(
   }
 }
 
+/**
+ * Helper to assert that a promise rejects with a SvelteKit HTTP error
+ */
+async function expectHttpError(
+  promise: Promise<unknown>,
+  expectedStatus: number,
+  expectedBody?: Record<string, unknown>,
+): Promise<void> {
+  try {
+    await promise;
+    expect.fail('Expected HTTP error to be thrown');
+  } catch (error) {
+    const httpError = error as HttpError;
+    expect(httpError.status).toBe(expectedStatus);
+    if (expectedBody) {
+      expect(httpError.body).toEqual(expectedBody);
+    }
+  }
+}
+
 describe('Auth Guard - requireAuth', () => {
   let db: PgliteDatabase<typeof schema>;
   let auth: ReturnType<typeof createAuth>;
@@ -35,7 +55,7 @@ describe('Auth Guard - requireAuth', () => {
     auth = createAuth(db);
   });
 
-  it('throws redirect for unauthenticated request', async () => {
+  it('throws redirect for unauthenticated page route request', async () => {
     // Create mock event with no session
     const mockRequest = new Request('http://localhost:5173/dashboard');
     const mockEvent = {
@@ -48,6 +68,40 @@ describe('Auth Guard - requireAuth', () => {
 
     // requireAuth should throw a redirect to /login
     await expectRedirect(requireAuth(mockEvent), 303, '/login');
+  });
+
+  it('throws JSON 401 for unauthenticated API route request', async () => {
+    const mockRequest = new Request('http://localhost:5173/api/projects', {
+      headers: { Accept: 'application/json' },
+    });
+    const mockEvent = {
+      request: mockRequest,
+      locals: {},
+      url: new URL('http://localhost:5173/api/projects'),
+      params: {},
+      route: { id: '/api/projects' },
+    } as unknown as RequestEvent;
+
+    await expectHttpError(requireAuth(mockEvent), 401, {
+      message: 'Unauthorized',
+    });
+  });
+
+  it('throws JSON 401 for nested API route request', async () => {
+    const mockRequest = new Request('http://localhost:5173/api/projects/123/logs', {
+      headers: { Accept: 'application/json' },
+    });
+    const mockEvent = {
+      request: mockRequest,
+      locals: {},
+      url: new URL('http://localhost:5173/api/projects/123/logs'),
+      params: { id: '123' },
+      route: { id: '/api/projects/[id]/logs' },
+    } as unknown as RequestEvent;
+
+    await expectHttpError(requireAuth(mockEvent), 401, {
+      message: 'Unauthorized',
+    });
   });
 
   it('throws redirect when session is missing but user exists', async () => {

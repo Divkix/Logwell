@@ -1,11 +1,12 @@
 import { eq } from 'drizzle-orm';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { API_CONFIG } from '../../../src/lib/server/config/performance';
 import type * as schema from '../../../src/lib/server/db/schema';
-import { incident, log } from '../../../src/lib/server/db/schema';
+import { incident, log, project as projectTable } from '../../../src/lib/server/db/schema';
 import { setupTestDatabase } from '../../../src/lib/server/db/test-db';
 import { logEventBus } from '../../../src/lib/server/events';
-import { clearApiKeyCache } from '../../../src/lib/server/utils/api-key';
+import { clearApiKeyCache, validateApiKey } from '../../../src/lib/server/utils/api-key';
 import { POST } from '../../../src/routes/v1/ingest/+server';
 import { seedProject } from '../../fixtures/db';
 
@@ -242,9 +243,81 @@ describe('POST /v1/ingest (Simple API)', () => {
       const insertedLogs = await db.select().from(log).where(eq(log.projectId, project.id));
       expect(insertedLogs.length).toBe(3);
     });
+
+    it(`accepts a batch of exactly ${API_CONFIG.BATCH_INSERT_LIMIT} logs`, async () => {
+      const project = await seedProject(db);
+
+      const logs = Array.from({ length: API_CONFIG.BATCH_INSERT_LIMIT }, (_, i) => ({
+        level: 'info',
+        message: `Log ${i}`,
+      }));
+
+      const request = new Request('http://localhost/v1/ingest', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${project.apiKey}`,
+        },
+        body: JSON.stringify(logs),
+      });
+
+      const event = createRequestEvent(request, db);
+      const response = await POST(event as never);
+
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.accepted).toBe(API_CONFIG.BATCH_INSERT_LIMIT);
+    });
+
+    it(`rejects a batch exceeding ${API_CONFIG.BATCH_INSERT_LIMIT} logs`, async () => {
+      const project = await seedProject(db);
+
+      const logs = Array.from({ length: API_CONFIG.BATCH_INSERT_LIMIT + 1 }, (_, i) => ({
+        level: 'info',
+        message: `Log ${i}`,
+      }));
+
+      const request = new Request('http://localhost/v1/ingest', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${project.apiKey}`,
+        },
+        body: JSON.stringify(logs),
+      });
+
+      const event = createRequestEvent(request, db);
+      const response = await POST(event as never);
+
+      expect(response.status).toBe(400);
+      const body = await response.json();
+      expect(body.error).toBe('batch_too_large');
+      expect(body.message).toContain(API_CONFIG.BATCH_INSERT_LIMIT.toString());
+    });
   });
 
   describe('Validation errors', () => {
+    it('returns 415 for non-JSON Content-Type', async () => {
+      const project = await seedProject(db);
+
+      const request = new Request('http://localhost/v1/ingest', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain',
+          Authorization: `Bearer ${project.apiKey}`,
+        },
+        body: JSON.stringify({ level: 'info', message: 'test' }),
+      });
+
+      const event = createRequestEvent(request, db);
+      const response = await POST(event as never);
+
+      expect(response.status).toBe(415);
+      const body = await response.json();
+      expect(body.error).toBe('unsupported_media_type');
+      expect(body.message).toBe('Content-Type must be application/json');
+    });
+
     it('returns 400 for invalid JSON', async () => {
       const project = await seedProject(db);
 
@@ -385,6 +458,31 @@ describe('POST /v1/ingest (Simple API)', () => {
       expect(inserted.userId).toBe('user-456');
       expect(inserted.ipAddress).toBe('192.168.1.1');
     });
+
+    it('stores null metadata for empty metadata object', async () => {
+      const project = await seedProject(db);
+
+      const request = new Request('http://localhost/v1/ingest', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${project.apiKey}`,
+        },
+        body: JSON.stringify({
+          level: 'info',
+          message: 'Empty metadata test',
+          metadata: {},
+        }),
+      });
+
+      const event = createRequestEvent(request, db);
+      const response = await POST(event as never);
+
+      expect(response.status).toBe(200);
+
+      const [inserted] = await db.select().from(log).where(eq(log.projectId, project.id));
+      expect(inserted.metadata).toBeNull();
+    });
   });
 
   describe('Event bus integration', () => {
@@ -471,6 +569,41 @@ describe('POST /v1/ingest (Simple API)', () => {
       expect(infoLogs).toHaveLength(1);
       expect(infoLogs[0].incidentId).toBeNull();
       expect(infoLogs[0].fingerprint).toBeNull();
+    });
+  });
+
+  describe('Stale cache handling', () => {
+    it('returns 401 instead of 500 when project is deleted after API key is cached', async () => {
+      const project = await seedProject(db);
+
+      // Populate cache by validating the API key
+      const apiKeyRequest = new Request('http://localhost', {
+        headers: {
+          Authorization: `Bearer ${project.apiKey}`,
+        },
+      });
+      await validateApiKey(apiKeyRequest, db);
+
+      // Simulate cross-process deletion: remove project from DB without clearing local cache
+      await db.delete(projectTable).where(eq(projectTable.id, project.id));
+
+      // Attempt to ingest with cached (now stale) API key
+      const request = new Request('http://localhost/v1/ingest', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${project.apiKey}`,
+        },
+        body: JSON.stringify({ level: 'info', message: 'test' }),
+      });
+
+      const event = createRequestEvent(request, db);
+      const response = await POST(event as never);
+
+      // Should return 401 (unauthorized), not 500 (internal server error from FK violation)
+      expect(response.status).toBe(401);
+      const body = await response.json();
+      expect(body.error).toBe('unauthorized');
     });
   });
 });

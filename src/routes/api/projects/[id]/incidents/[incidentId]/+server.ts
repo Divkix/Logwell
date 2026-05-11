@@ -95,7 +95,6 @@ export async function GET(event: RequestEvent): Promise<Response> {
     firstSeen: incidentRow.firstSeen.toISOString(),
     lastSeen: incidentRow.lastSeen.toISOString(),
     totalEvents: incidentRow.totalEvents,
-    reopenCount: incidentRow.reopenCount,
     status: getIncidentStatus(incidentRow.lastSeen),
     rootCauseCandidates,
     correlations: {

@@ -47,8 +47,15 @@
     {
       "idx": 6,
       "version": "7",
+      "when": 1768610000000,
+      "tag": "0006_neat_cleanup",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
       "when": 1778493600000,
-      "tag": "0006_per_user_project_names",
+      "tag": "0007_per_user_project_names",
       "breakpoints": true
     }
   ]
