@@ -255,6 +255,10 @@ export async function upsertIncidentsForPreparedLogs(
       .update(incident)
       .set({
         highestLevel: maxIncidentLevel(existing.highestLevel, aggregate.highestLevel),
+        firstSeen:
+          aggregate.firstSeen < (existing.firstSeen as Date)
+            ? aggregate.firstSeen
+            : existing.firstSeen,
         lastSeen:
           aggregate.lastSeen > (existing.lastSeen as Date) ? aggregate.lastSeen : existing.lastSeen,
         totalEvents: existing.totalEvents + aggregate.totalEvents,
