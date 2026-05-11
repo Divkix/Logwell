@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling<1.27.0"]
 build-backend = "hatchling.build"
 
 [project]
@@ -7,7 +7,7 @@ name = "logwell"
 version = "1.0.3"
 description = "Official Python SDK for Logwell logging platform"
 readme = "README.md"
-license = "MIT"
+license = {text = "MIT"}
 authors = [{ name = "Divkix", email = "divkix@divkix.me" }]
 keywords = ["logging", "logs", "observability", "logwell", "python"]
 classifiers = [
@@ -47,7 +47,7 @@ Issues = "https://github.com/Divkix/Logwell/issues"
 packages = ["src/logwell"]
 
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.10"
 strict = true
 warn_return_any = true
 warn_unused_configs = true
