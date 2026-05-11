@@ -24,8 +24,8 @@ class LogEntry(TypedDict, total=False):
         timestamp: ISO8601 timestamp (auto-generated if not provided)
         service: Service name for this log
         metadata: Arbitrary key-value metadata
-        source_file: Source file path where log was called
-        line_number: Line number where log was called
+        sourceFile: Source file path where log was called
+        lineNumber: Line number where log was called
     """
 
     level: Required[LogLevel]
@@ -33,8 +33,8 @@ class LogEntry(TypedDict, total=False):
     timestamp: str
     service: str
     metadata: dict[str, Any]
-    source_file: str
-    line_number: int
+    sourceFile: str
+    lineNumber: int
 
 
 class LogwellConfig(TypedDict, total=False):
