@@ -158,6 +158,9 @@ describe('Login Page Navigation', () => {
       const form = passwordInput.closest('form');
 
       expect(form).toBeTruthy();
+      if (!form) {
+        throw new Error('Login form not found');
+      }
 
       await user.clear(usernameInput);
       await user.type(usernameInput, 'admin');
@@ -168,7 +171,7 @@ describe('Login Page Navigation', () => {
       );
       expect(authClient.signIn.username).not.toHaveBeenCalled();
 
-      form?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
 
       await waitFor(() => {
         expect(authClient.signIn.username).toHaveBeenCalledTimes(1);
