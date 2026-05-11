@@ -250,7 +250,7 @@ export async function upsertIncidentsForPreparedLogs(
       continue;
     }
 
-    const shouldReopen = isIncidentReopened(existing.lastSeen as Date, aggregate.firstSeen);
+    const shouldReopen = isIncidentReopened(existing.lastSeen as Date, existing.firstSeen as Date);
     const [updated] = await db
       .update(incident)
       .set({
