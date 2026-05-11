@@ -3,6 +3,7 @@ package logwell
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -35,21 +36,33 @@ func newTestServer() *testServer {
 			return
 		}
 
-		// Default: accept all logs
-		var req []LogEntry
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		// Default: accept all logs — validate against real server format using generic
+		// map decode so any JSON tag mismatch in LogEntry is caught.
+		var raw []map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 			return
 		}
 
+		var entries []LogEntry
+		for _, item := range raw {
+			entry, err := mapToLogEntry(item)
+			if err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+				return
+			}
+			entries = append(entries, entry)
+		}
+
 		ts.mu.Lock()
-		ts.requests = append(ts.requests, req)
-		ts.logs = append(ts.logs, req...)
+		ts.requests = append(ts.requests, entries)
+		ts.logs = append(ts.logs, entries...)
 		ts.mu.Unlock()
 
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(IngestResponse{Accepted: len(req)})
+		json.NewEncoder(w).Encode(IngestResponse{Accepted: len(entries)})
 	}))
 
 	return ts
@@ -71,6 +84,42 @@ func (ts *testServer) getRequests() [][]LogEntry {
 	result := make([][]LogEntry, len(ts.requests))
 	copy(result, ts.requests)
 	return result
+}
+
+// mapToLogEntry converts a generic JSON-decoded map to a LogEntry,
+// validating that the real server keys (level, message, service, etc.) are present.
+func mapToLogEntry(m map[string]any) (LogEntry, error) {
+	var entry LogEntry
+
+	lvl, ok := m["level"].(string)
+	if !ok {
+		return entry, fmt.Errorf("missing or invalid 'level' field")
+	}
+	entry.Level = LogLevel(lvl)
+
+	msg, ok := m["message"].(string)
+	if !ok {
+		return entry, fmt.Errorf("missing or invalid 'message' field")
+	}
+	entry.Message = msg
+
+	if ts, ok := m["timestamp"].(string); ok {
+		entry.Timestamp = ts
+	}
+	if svc, ok := m["service"].(string); ok {
+		entry.Service = svc
+	}
+	if meta, ok := m["metadata"].(map[string]any); ok {
+		entry.Metadata = meta
+	}
+	if sf, ok := m["sourceFile"].(string); ok {
+		entry.SourceFile = sf
+	}
+	if ln, ok := m["lineNumber"].(float64); ok {
+		entry.LineNumber = int(ln)
+	}
+
+	return entry, nil
 }
 
 // setHandler sets a custom handler for the server.

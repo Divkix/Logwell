@@ -7,6 +7,7 @@ import type * as schema from '$lib/server/db/schema';
 import { log, project } from '$lib/server/db/schema';
 import { generateApiKey } from '$lib/server/utils/api-key';
 import { requireAuth } from '$lib/server/utils/auth-guard';
+import { checkCsrfOrigin } from '$lib/server/utils/csrf';
 import { projectCreatePayloadSchema } from '$lib/shared/schemas/project';
 import type { RequestEvent } from './$types';
 
@@ -108,6 +109,10 @@ export async function GET(event: RequestEvent): Promise<Response> {
  * - 400 duplicate_name: Project name already exists
  */
 export async function POST(event: RequestEvent): Promise<Response> {
+  // CSRF protection for state-changing request
+  const csrfError = checkCsrfOrigin(event);
+  if (csrfError) return csrfError;
+
   // Require session authentication
   const { user } = await requireAuth(event);
 

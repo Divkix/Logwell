@@ -51,10 +51,16 @@ export async function POST(event: RequestEvent): Promise<Response> {
 
       /**
        * Send an SSE event to the client
+       * Checks desiredSize to apply backpressure on slow consumers
        */
       const sendEvent = (eventName: string, data: string): boolean => {
         if (isClosed) return false;
         try {
+          const size = (controller as ReadableStreamDefaultController).desiredSize;
+          if (size !== null && size <= 0) {
+            // Stream backpressure: slow consumer, drop the event
+            return false;
+          }
           controller.enqueue(encoder.encode(formatSSEEvent(eventName, data)));
           return true;
         } catch {

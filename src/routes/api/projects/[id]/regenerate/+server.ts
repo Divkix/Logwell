@@ -5,6 +5,7 @@ import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import type * as schema from '$lib/server/db/schema';
 import { project } from '$lib/server/db/schema';
 import { generateApiKey, invalidateApiKeyCache } from '$lib/server/utils/api-key';
+import { checkCsrfOrigin } from '$lib/server/utils/csrf';
 import { isErrorResponse, requireProjectOwnership } from '$lib/server/utils/project-guard';
 import type { RequestEvent } from './$types';
 
@@ -38,6 +39,10 @@ async function getDbClient(locals: App.Locals): Promise<DatabaseClient> {
  * - 404 not_found: Project does not exist or not owned by user
  */
 export async function POST(event: RequestEvent): Promise<Response> {
+  // CSRF protection for state-changing request
+  const csrfError = checkCsrfOrigin(event);
+  if (csrfError) return csrfError;
+
   // Require authentication and project ownership
   const authResult = await requireProjectOwnership(event, event.params.id);
   if (isErrorResponse(authResult)) return authResult;
