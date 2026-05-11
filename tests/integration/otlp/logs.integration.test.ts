@@ -3,10 +3,10 @@ import type { PgliteDatabase } from 'drizzle-orm/pglite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { API_CONFIG } from '../../../src/lib/server/config/performance';
 import type * as schema from '../../../src/lib/server/db/schema';
-import { incident, log } from '../../../src/lib/server/db/schema';
+import { incident, log, project as projectTable } from '../../../src/lib/server/db/schema';
 import { setupTestDatabase } from '../../../src/lib/server/db/test-db';
 import { logEventBus } from '../../../src/lib/server/events';
-import { clearApiKeyCache } from '../../../src/lib/server/utils/api-key';
+import { clearApiKeyCache, validateApiKey } from '../../../src/lib/server/utils/api-key';
 import { POST } from '../../../src/routes/v1/logs/+server';
 import { seedProject } from '../../fixtures/db';
 
@@ -445,5 +445,52 @@ describe('POST /v1/logs (OTLP)', () => {
     const body = await response.json();
     expect(body.error).toBe('batch_too_large');
     expect(body.message).toContain(API_CONFIG.BATCH_INSERT_LIMIT.toString());
+  });
+
+  describe('Stale cache handling', () => {
+    it('returns 401 instead of 500 when project is deleted after API key is cached', async () => {
+      const project = await seedProject(db);
+
+      // Populate cache by validating the API key
+      const apiKeyRequest = new Request('http://localhost', {
+        headers: {
+          Authorization: `Bearer ${project.apiKey}`,
+        },
+      });
+      await validateApiKey(apiKeyRequest, db);
+
+      // Simulate cross-process deletion: remove project from DB without clearing local cache
+      await db.delete(projectTable).where(eq(projectTable.id, project.id));
+
+      // Attempt to ingest with cached (now stale) API key
+      const payload = {
+        resourceLogs: [
+          {
+            scopeLogs: [
+              {
+                logRecords: [{ body: { stringValue: 'test' } }],
+              },
+            ],
+          },
+        ],
+      };
+
+      const request = new Request('http://localhost/v1/logs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${project.apiKey}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const event = createRequestEvent(request, db);
+      const response = await POST(event as never);
+
+      // Should return 401 (unauthorized), not 500 (internal server error from FK violation)
+      expect(response.status).toBe(401);
+      const body = await response.json();
+      expect(body.error).toBe('unauthorized');
+    });
   });
 });
