@@ -17,7 +17,6 @@ function sampleIncident(overrides: Partial<IncidentListItem> = {}): IncidentList
     firstSeen: new Date().toISOString(),
     lastSeen: new Date().toISOString(),
     totalEvents: 3,
-    reopenCount: 0,
     status: 'open',
     ...overrides,
   };

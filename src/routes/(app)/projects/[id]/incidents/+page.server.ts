@@ -116,7 +116,6 @@ export const load: PageServerLoad = async (event) => {
       firstSeen: i.firstSeen.toISOString(),
       lastSeen: i.lastSeen.toISOString(),
       totalEvents: i.totalEvents,
-      reopenCount: i.reopenCount,
       status: getIncidentStatus(i.lastSeen),
     })),
     pagination: {

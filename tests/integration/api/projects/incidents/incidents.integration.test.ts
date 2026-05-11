@@ -126,7 +126,6 @@ describe('Incident APIs', () => {
         firstSeen: new Date(now - 10 * 60 * 1000),
         lastSeen: new Date(now - 5 * 60 * 1000),
         totalEvents: 4,
-        reopenCount: 0,
       },
       {
         id: 'inc-resolved',
@@ -141,7 +140,6 @@ describe('Incident APIs', () => {
         firstSeen: new Date(now - 3 * 60 * 60 * 1000),
         lastSeen: new Date(now - 2 * 60 * 60 * 1000),
         totalEvents: 2,
-        reopenCount: 1,
       },
     ]);
 
@@ -154,6 +152,7 @@ describe('Incident APIs', () => {
     expect(body.incidents).toHaveLength(1);
     expect(body.incidents[0].id).toBe('inc-open');
     expect(body.incidents[0].status).toBe('open');
+    expect(body.incidents[0]).not.toHaveProperty('reopenCount');
   });
 
   it('returns detail with source candidates and correlations', async () => {
@@ -173,7 +172,6 @@ describe('Incident APIs', () => {
         firstSeen: new Date(Date.now() - 20 * 60 * 1000),
         lastSeen: new Date(Date.now() - 5 * 60 * 1000),
         totalEvents: 3,
-        reopenCount: 0,
       })
       .returning();
 
@@ -223,6 +221,7 @@ describe('Incident APIs', () => {
 
     const body = await response.json();
     expect(body.id).toBe(createdIncident.id);
+    expect(body).not.toHaveProperty('reopenCount');
     expect(body.rootCauseCandidates[0].sourceFile).toBe('src/db.ts');
     expect(body.correlations.topRequestIds[0]).toEqual({ requestId: 'req-1', count: 2 });
     expect(body.correlations.topTraceIds[0]).toEqual({
@@ -248,7 +247,6 @@ describe('Incident APIs', () => {
         firstSeen: new Date(Date.now() - 50 * 60 * 1000),
         lastSeen: new Date(Date.now() - 5 * 60 * 1000),
         totalEvents: 0,
-        reopenCount: 0,
       })
       .returning();
 
@@ -320,7 +318,6 @@ describe('Incident APIs', () => {
         firstSeen: new Date(),
         lastSeen: new Date(),
         totalEvents: 1,
-        reopenCount: 0,
       })
       .returning();
 

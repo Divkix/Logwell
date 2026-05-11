@@ -47,7 +47,6 @@ export interface IncidentListItem {
   firstSeen: string;
   lastSeen: string;
   totalEvents: number;
-  reopenCount: number;
   status: IncidentStatus;
 }
 

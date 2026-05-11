@@ -52,7 +52,6 @@ describe('Log Event Bus', () => {
     firstSeen: new Date(),
     lastSeen: new Date(),
     totalEvents: 5,
-    reopenCount: 0,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
