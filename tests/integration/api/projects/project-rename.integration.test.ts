@@ -322,5 +322,25 @@ describe('PATCH /api/projects/[id]', () => {
       const body = await response.json();
       expect(body).toHaveProperty('name', 'my-project');
     });
+
+    it('returns 400 for malformed JSON body', async () => {
+      const testProject = await seedProject(db, { name: 'my-project', ownerId: userId });
+
+      const request = new Request(`http://localhost/api/projects/${testProject.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: '{ invalid json',
+      });
+
+      const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+      const response = await PATCH(event as never);
+
+      expect(response.status).toBe(400);
+      const body = await response.json();
+      expect(body).toHaveProperty('error', 'invalid_json');
+      expect(body).toHaveProperty('message', 'Invalid JSON body');
+    });
   });
 });
