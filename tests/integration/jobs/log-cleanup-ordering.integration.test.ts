@@ -33,7 +33,7 @@ describe('cleanupOldLogs batch selection', () => {
       }),
     };
 
-    const result = await cleanupOldLogs(db as never);
+    const result = await cleanupOldLogs(db as unknown as Parameters<typeof cleanupOldLogs>[0]);
 
     expect(orderByCalled).toBe(true);
     expect(result.errors).toEqual([]);
