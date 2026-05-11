@@ -139,8 +139,15 @@ export async function PATCH(event: RequestEvent): Promise<Response> {
   const db = await getDbClient(event.locals);
   const projectId = event.params.id;
 
+  // Parse request body
+  let body: unknown;
+  try {
+    body = await event.request.json();
+  } catch {
+    return json({ error: 'invalid_json', message: 'Invalid JSON body' }, { status: 400 });
+  }
+
   // Validate request body
-  const body = await event.request.json();
   const result = projectUpdatePayloadSchema.safeParse(body);
   if (!result.success) {
     const errorMessage = result.error.issues?.[0]?.message || 'Validation failed';
