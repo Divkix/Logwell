@@ -6,10 +6,7 @@ import { LOG_LEVELS, type LogLevel } from './log';
  */
 export const INCIDENT_STATUSES = ['open', 'resolved'] as const;
 
-/**
- * Incident status schema.
- */
-export const incidentStatusSchema = z.enum(INCIDENT_STATUSES);
+const incidentStatusSchema = z.enum(INCIDENT_STATUSES);
 
 /**
  * Incident status type.
@@ -21,10 +18,7 @@ export type IncidentStatus = z.infer<typeof incidentStatusSchema>;
  */
 export const INCIDENT_RANGES = ['15m', '1h', '24h', '7d'] as const;
 
-/**
- * Incident range schema.
- */
-export const incidentRangeSchema = z.enum(INCIDENT_RANGES);
+const incidentRangeSchema = z.enum(INCIDENT_RANGES);
 
 /**
  * Incident range type.
@@ -50,19 +44,13 @@ export interface IncidentListItem {
   status: IncidentStatus;
 }
 
-/**
- * Source location frequency used to identify likely root cause.
- */
-export interface IncidentSourceFrequency {
+interface IncidentSourceFrequency {
   sourceFile: string | null;
   lineNumber: number | null;
   count: number;
 }
 
-/**
- * Correlated request / trace summary.
- */
-export interface IncidentCorrelationSummary {
+interface IncidentCorrelationSummary {
   topRequestIds: Array<{ requestId: string; count: number }>;
   topTraceIds: Array<{ traceId: string; count: number }>;
 }
@@ -75,10 +63,7 @@ export interface IncidentDetail extends IncidentListItem {
   correlations: IncidentCorrelationSummary;
 }
 
-/**
- * Incident timeline point.
- */
-export interface IncidentTimelinePoint {
+interface IncidentTimelinePoint {
   timestamp: string;
   count: number;
 }
@@ -93,10 +78,7 @@ export interface IncidentTimelineResponse {
   peakBucket: IncidentTimelinePoint | null;
 }
 
-/**
- * Valid log levels that are eligible for incident grouping.
- */
-export const INCIDENT_GROUPED_LEVELS: readonly LogLevel[] = ['error', 'fatal'] as const;
+const INCIDENT_GROUPED_LEVELS: readonly LogLevel[] = ['error', 'fatal'] as const;
 
 /**
  * Type guard for grouped levels.

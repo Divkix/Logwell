@@ -13,7 +13,7 @@ BEGIN
   END IF;
 END $$;--> statement-breakpoint
 
--- Also drop the auto-generated unique constraint name if it exists
+-- Step 1 continued: Also drop the auto-generated unique constraint name if it exists
 DO $$
 BEGIN
   IF EXISTS (

@@ -28,7 +28,7 @@ func main() {
 	apiKey := os.Getenv("LOGWELL_API_KEY")
 	if apiKey == "" {
 		// Demo key that matches the validation regex (lw_ + 32 chars)
-		apiKey = "lw_demo1234567890abcdefghijklmnopqr"
+		apiKey = "lw_00000000000000000000000000000000"
 	}
 
 	// Create a new Logwell client with options

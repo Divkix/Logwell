@@ -181,6 +181,28 @@ function generateCreateTableSQL(table: PgTable): string {
     }
   }
 
+  // Process unique indexes as table-level unique constraints
+  // (PGlite needs actual unique constraints for ON CONFLICT to work)
+  if (config.indexes) {
+    for (const [_, index] of Object.entries(config.indexes)) {
+      const indexConfig = (
+        index as unknown as { config?: { unique?: boolean; columns?: unknown[] } }
+      ).config;
+      if (indexConfig?.unique && indexConfig.columns && indexConfig.columns.length > 0) {
+        const columnNames = indexConfig.columns
+          .map((col) => {
+            const colName = (col as { name: string }).name;
+            return colName ? `"${colName}"` : null;
+          })
+          .filter((name): name is string => name !== null)
+          .join(', ');
+        if (columnNames) {
+          uniqueConstraints.push(`UNIQUE(${columnNames})`);
+        }
+      }
+    }
+  }
+
   // Combine column definitions, unique constraints, and foreign keys
   const allConstraints = [...columns, ...uniqueConstraints, ...foreignKeys];
 
@@ -216,11 +238,11 @@ function generateIndexSQL(table: PgTable): string[] {
           .join(', ');
 
         if (columnNames) {
-          // Detect unique indexes (uniqueIndex() in Drizzle schema)
-          const isUnique =
-            (index as unknown as { config?: { unique?: boolean } }).config?.unique === true;
-          const uniqueKeyword = isUnique ? 'UNIQUE ' : '';
-          const indexSQL = `CREATE ${uniqueKeyword}INDEX IF NOT EXISTS "${indexName}" ON "${tableName}" (${columnNames})`;
+          const isUnique = (index as unknown as { config?: { unique?: boolean } }).config?.unique;
+          // Skip unique indexes — they are created as UNIQUE constraints in generateCreateTableSQL
+          // so PGlite can resolve ON CONFLICT against them.
+          if (isUnique) continue;
+          const indexSQL = `CREATE INDEX IF NOT EXISTS "${indexName}" ON "${tableName}" (${columnNames})`;
           indexSQLs.push(indexSQL);
         }
       }

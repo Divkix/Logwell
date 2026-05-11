@@ -8,7 +8,7 @@ import (
 
 // validAPIKey returns a valid API key for testing.
 func validAPIKey() string {
-	return "lw_" + "abcdefghijklmnopqrstuvwxyz123456" // 32 chars after lw_
+	return "lw_" + "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" // 32 chars after lw_
 }
 
 // validEndpoint returns a valid endpoint for testing.
@@ -71,37 +71,37 @@ func TestConfigValidateAPIKey(t *testing.T) {
 		// Valid API keys
 		{
 			name:      "valid with lowercase alphanumeric",
-			apiKey:    "lw_abcdefghijklmnopqrstuvwxyz123456",
+			apiKey:    "lw_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0",
 			wantError: false,
 		},
 		{
 			name:      "valid with uppercase",
-			apiKey:    "lw_ABCDEFGHIJKLMNOPQRSTUVWXYZ123456",
+			apiKey:    "lw_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA0",
 			wantError: false,
 		},
 		{
 			name:      "valid with mixed case",
-			apiKey:    "lw_AbCdEfGhIjKlMnOpQrStUvWxYz123456",
+			apiKey:    "lw_AaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAa",
 			wantError: false,
 		},
 		{
 			name:      "valid with hyphens",
-			apiKey:    "lw_abcdefghij-klmnopqrst-uvwxyz1234",
+			apiKey:    "lw_a-a-a-a-a-a-a-a-a-a-a-a-a-a-a-a-",
 			wantError: false,
 		},
 		{
 			name:      "valid with underscores",
-			apiKey:    "lw_abcdefghij_klmnopqrst_uvwxyz1234",
+			apiKey:    "lw_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_",
 			wantError: false,
 		},
 		{
 			name:      "valid with mixed special chars",
-			apiKey:    "lw_abc-def_ghi-jkl_mno-pqr_stu-vw12",
+			apiKey:    "lw_a-a_a-a_a-a_a-a_a-a_a-a_a-a_a-a_",
 			wantError: false,
 		},
 		{
 			name:      "valid with exactly 32 chars after prefix",
-			apiKey:    "lw_12345678901234567890123456789012",
+			apiKey:    "lw_00000000000000000000000000000000",
 			wantError: false,
 		},
 
@@ -113,27 +113,27 @@ func TestConfigValidateAPIKey(t *testing.T) {
 		},
 		{
 			name:      "wrong prefix lx_",
-			apiKey:    "lx_abcdefghijklmnopqrstuvwxyz123456",
+			apiKey:    "lx_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			wantError: true,
 		},
 		{
 			name:      "wrong prefix LW_",
-			apiKey:    "LW_abcdefghijklmnopqrstuvwxyz123456",
+			apiKey:    "LW_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			wantError: true,
 		},
 		{
 			name:      "missing prefix",
-			apiKey:    "abcdefghijklmnopqrstuvwxyz123456",
+			apiKey:    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			wantError: true,
 		},
 		{
 			name:      "too short (31 chars after prefix)",
-			apiKey:    "lw_1234567890123456789012345678901",
+			apiKey:    "lw_0000000000000000000000000000000",
 			wantError: true,
 		},
 		{
 			name:      "too long (33 chars after prefix)",
-			apiKey:    "lw_123456789012345678901234567890123",
+			apiKey:    "lw_000000000000000000000000000000000",
 			wantError: true,
 		},
 		{
@@ -148,22 +148,22 @@ func TestConfigValidateAPIKey(t *testing.T) {
 		},
 		{
 			name:      "invalid char space",
-			apiKey:    "lw_abcdefghijklmnopqrstuvwxyz12345 ",
+			apiKey:    "lw_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ",
 			wantError: true,
 		},
 		{
 			name:      "invalid char exclamation",
-			apiKey:    "lw_abcdefghijklmnopqrstuvwxyz12345!",
+			apiKey:    "lw_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!",
 			wantError: true,
 		},
 		{
 			name:      "invalid char at sign",
-			apiKey:    "lw_abcdefghijklmnopqrstuvwxyz12345@",
+			apiKey:    "lw_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@",
 			wantError: true,
 		},
 		{
 			name:      "invalid char dot",
-			apiKey:    "lw_abcdefghijklmnopqrstuvwxyz.12345",
+			apiKey:    "lw_aaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaa",
 			wantError: true,
 		},
 	}

@@ -50,7 +50,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   try {
     projectId = await validateApiKey(request, db);
 
-    // Re-verify project exists to prevent stale cache (multi-process) from causing FK violations
+    // Re-verify project exists to prevent stale cache (multi-process) from causing FK violations.
+    // This intentionally adds one DB read per ingest request for correctness across processes.
     const [projectRow] = await db
       .select({ id: project.id })
       .from(project)

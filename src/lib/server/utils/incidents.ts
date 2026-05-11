@@ -1,4 +1,4 @@
-import { and, eq, inArray } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { nanoid } from 'nanoid';
@@ -198,63 +198,49 @@ export async function upsertIncidentsForPreparedLogs(
     };
   }
 
-  const fingerprints = aggregates.map((a) => a.fingerprint);
-  const existingRows = await db
-    .select()
-    .from(incident)
-    .where(and(eq(incident.projectId, projectId), inArray(incident.fingerprint, fingerprints)));
-
-  const existingByFingerprint = new Map(existingRows.map((row) => [row.fingerprint, row]));
   const incidentByFingerprint = new Map<string, Incident>();
   const touchedIncidents: Incident[] = [];
 
   for (const aggregate of aggregates) {
-    const existing = existingByFingerprint.get(aggregate.fingerprint);
-    if (!existing) {
-      const now = new Date();
-      const [created] = await db
-        .insert(incident)
-        .values({
-          id: nanoid(),
-          projectId,
-          fingerprint: aggregate.fingerprint,
-          title: aggregate.title,
-          normalizedMessage: aggregate.normalizedMessage,
-          serviceName: aggregate.serviceName,
-          sourceFile: aggregate.sourceFile,
-          lineNumber: aggregate.lineNumber,
-          highestLevel: aggregate.highestLevel,
-          firstSeen: aggregate.firstSeen,
-          lastSeen: aggregate.lastSeen,
-          totalEvents: aggregate.totalEvents,
-          createdAt: now,
-          updatedAt: now,
-        })
-        .returning();
-
-      incidentByFingerprint.set(aggregate.fingerprint, created);
-      touchedIncidents.push(created);
-      continue;
-    }
-
-    const [updated] = await db
-      .update(incident)
-      .set({
-        highestLevel: maxIncidentLevel(existing.highestLevel, aggregate.highestLevel),
-        firstSeen:
-          aggregate.firstSeen < (existing.firstSeen as Date)
-            ? aggregate.firstSeen
-            : existing.firstSeen,
-        lastSeen:
-          aggregate.lastSeen > (existing.lastSeen as Date) ? aggregate.lastSeen : existing.lastSeen,
-        totalEvents: existing.totalEvents + aggregate.totalEvents,
-        updatedAt: new Date(),
+    const now = new Date();
+    const [result] = await db
+      .insert(incident)
+      .values({
+        id: nanoid(),
+        projectId,
+        fingerprint: aggregate.fingerprint,
+        title: aggregate.title,
+        normalizedMessage: aggregate.normalizedMessage,
+        serviceName: aggregate.serviceName,
+        sourceFile: aggregate.sourceFile,
+        lineNumber: aggregate.lineNumber,
+        highestLevel: aggregate.highestLevel,
+        firstSeen: aggregate.firstSeen,
+        lastSeen: aggregate.lastSeen,
+        totalEvents: aggregate.totalEvents,
+        createdAt: now,
+        updatedAt: now,
       })
-      .where(eq(incident.id, existing.id))
+      .onConflictDoUpdate({
+        target: [incident.projectId, incident.fingerprint],
+        set: {
+          highestLevel: sql`(
+            CASE
+              WHEN ${incident.highestLevel}::text = 'fatal' OR excluded.highest_level::text = 'fatal'
+                THEN 'fatal'
+              ELSE 'error'
+            END
+          )::log_level`,
+          firstSeen: sql`LEAST(${incident.firstSeen}, excluded.first_seen)`,
+          lastSeen: sql`GREATEST(${incident.lastSeen}, excluded.last_seen)`,
+          totalEvents: sql`${incident.totalEvents} + excluded.total_events`,
+          updatedAt: now,
+        },
+      })
       .returning();
 
-    incidentByFingerprint.set(aggregate.fingerprint, updated);
-    touchedIncidents.push(updated);
+    incidentByFingerprint.set(aggregate.fingerprint, result);
+    touchedIncidents.push(result);
   }
 
   return { incidentByFingerprint, touchedIncidents };
