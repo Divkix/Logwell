@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { count, desc, eq } from 'drizzle-orm';
+import { and, count, desc, eq } from 'drizzle-orm';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { nanoid } from 'nanoid';
@@ -144,11 +144,11 @@ export async function POST(event: RequestEvent): Promise<Response> {
 
   const { name } = validation.data;
 
-  // Check for duplicate name
+  // Check for duplicate name scoped to the current user
   const [existing] = await db
     .select({ id: project.id })
     .from(project)
-    .where(eq(project.name, name));
+    .where(and(eq(project.name, name), eq(project.ownerId, user.id)));
 
   if (existing) {
     return json(

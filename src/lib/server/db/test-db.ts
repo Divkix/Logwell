@@ -216,7 +216,11 @@ function generateIndexSQL(table: PgTable): string[] {
           .join(', ');
 
         if (columnNames) {
-          const indexSQL = `CREATE INDEX IF NOT EXISTS "${indexName}" ON "${tableName}" (${columnNames})`;
+          // Detect unique indexes (uniqueIndex() in Drizzle schema)
+          const isUnique =
+            (index as unknown as { config?: { unique?: boolean } }).config?.unique === true;
+          const uniqueKeyword = isUnique ? 'UNIQUE ' : '';
+          const indexSQL = `CREATE ${uniqueKeyword}INDEX IF NOT EXISTS "${indexName}" ON "${tableName}" (${columnNames})`;
           indexSQLs.push(indexSQL);
         }
       }

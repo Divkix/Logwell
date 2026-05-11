@@ -162,10 +162,14 @@ export async function PATCH(event: RequestEvent): Promise<Response> {
   const { name, retentionDays } = result.data;
   const { project: currentProject } = authResult;
 
-  // Check for duplicate name (if name is being updated)
+  // Check for duplicate name scoped to the current user (if name is being updated)
   if (name) {
     const existing = await db.query.project.findFirst({
-      where: and(eq(project.name, name), ne(project.id, projectId)),
+      where: and(
+        eq(project.name, name),
+        ne(project.id, projectId),
+        eq(project.ownerId, authResult.user.id),
+      ),
     });
     if (existing) {
       return json(
