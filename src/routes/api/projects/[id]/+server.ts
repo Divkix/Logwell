@@ -252,11 +252,11 @@ export async function DELETE(event: RequestEvent): Promise<Response> {
   const db = await getDbClient(event.locals);
   const projectId = event.params.id;
 
+  // Invalidate API key cache BEFORE deleting project to close TOCTOU window
+  invalidateApiKeyCache(projectData.apiKey);
+
   // Delete project (logs will cascade delete via FK constraint)
   await db.delete(project).where(eq(project.id, projectId));
-
-  // Invalidate API key cache
-  invalidateApiKeyCache(projectData.apiKey);
 
   return json({
     success: true,
