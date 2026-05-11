@@ -224,7 +224,13 @@ export async function upsertIncidentsForPreparedLogs(
       .onConflictDoUpdate({
         target: [incident.projectId, incident.fingerprint],
         set: {
-          highestLevel: sql`CASE WHEN ${incident.highestLevel} = 'fatal' OR excluded.highest_level = 'fatal' THEN 'fatal' ELSE 'error' END`,
+          highestLevel: sql`(
+            CASE
+              WHEN ${incident.highestLevel}::text = 'fatal' OR excluded.highest_level::text = 'fatal'
+                THEN 'fatal'
+              ELSE 'error'
+            END
+          )::log_level`,
           firstSeen: sql`LEAST(${incident.firstSeen}, excluded.first_seen)`,
           lastSeen: sql`GREATEST(${incident.lastSeen}, excluded.last_seen)`,
           totalEvents: sql`${incident.totalEvents} + excluded.total_events`,
