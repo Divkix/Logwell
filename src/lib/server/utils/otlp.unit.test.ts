@@ -4,6 +4,7 @@ import {
   normalizeSpanId,
   normalizeTraceId,
   parseOtlpAnyValue,
+  parseUint64String,
   severityNumberToLogLevel,
 } from './otlp';
 
@@ -139,6 +140,143 @@ describe('severityNumberToLogLevel', () => {
     expect(severityNumberToLogLevel(14)).toBe('warn');
     expect(severityNumberToLogLevel(18)).toBe('error');
     expect(severityNumberToLogLevel(21)).toBe('fatal');
+  });
+});
+
+describe('parseUint64String', () => {
+  it('accepts valid non-negative integer strings', () => {
+    expect(parseUint64String('0')).toBe('0');
+    expect(parseUint64String('1700000000000000000')).toBe('1700000000000000000');
+    expect(parseUint64String('  42  ')).toBe('42');
+  });
+
+  it('rejects negative string values', () => {
+    expect(parseUint64String('-1')).toBeNull();
+    expect(parseUint64String('-1000000')).toBeNull();
+    expect(parseUint64String('  -42  ')).toBeNull();
+  });
+
+  it('rejects negative number values', () => {
+    expect(parseUint64String(-1)).toBeNull();
+    expect(parseUint64String(-1000000)).toBeNull();
+  });
+
+  it('rejects non-integer number values', () => {
+    expect(parseUint64String(1.5)).toBeNull();
+    expect(parseUint64String(-1.5)).toBeNull();
+  });
+
+  it('rejects non-numeric strings', () => {
+    expect(parseUint64String('abc')).toBeNull();
+    expect(parseUint64String('1.5')).toBeNull();
+    expect(parseUint64String('')).toBeNull();
+    expect(parseUint64String(' ')).toBeNull();
+  });
+
+  it('accepts non-negative integer numbers', () => {
+    expect(parseUint64String(0)).toBe('0');
+    expect(parseUint64String(42)).toBe('42');
+  });
+});
+
+describe('normalizeOtlpLogsRequest edge cases', () => {
+  it('rejects negative timeUnixNano and falls back to current timestamp', () => {
+    const payload = {
+      resourceLogs: [
+        {
+          scopeLogs: [
+            {
+              logRecords: [
+                {
+                  timeUnixNano: '-1000000',
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const { records } = normalizeOtlpLogsRequest(payload);
+    expect(records).toHaveLength(1);
+    expect(records[0].timeUnixNano).toBeNull();
+    const now = new Date();
+    expect(records[0].timestamp.getTime()).toBeGreaterThanOrEqual(now.getTime() - 5000);
+    expect(records[0].timestamp.getTime()).toBeLessThanOrEqual(now.getTime() + 5000);
+  });
+
+  it('rejects negative observedTimeUnixNano and falls back to current timestamp', () => {
+    const payload = {
+      resourceLogs: [
+        {
+          scopeLogs: [
+            {
+              logRecords: [
+                {
+                  observedTimeUnixNano: '-1000000',
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const { records } = normalizeOtlpLogsRequest(payload);
+    expect(records).toHaveLength(1);
+    expect(records[0].observedTimeUnixNano).toBeNull();
+    const now = new Date();
+    expect(records[0].timestamp.getTime()).toBeGreaterThanOrEqual(now.getTime() - 5000);
+    expect(records[0].timestamp.getTime()).toBeLessThanOrEqual(now.getTime() + 5000);
+  });
+
+  it('normalizes empty attributes to null', () => {
+    const payload = {
+      resourceLogs: [
+        {
+          scopeLogs: [
+            {
+              logRecords: [
+                {
+                  timeUnixNano: '1700000000000000000',
+                  attributes: [],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const { records } = normalizeOtlpLogsRequest(payload);
+    expect(records).toHaveLength(1);
+    expect(records[0].attributes).toBeNull();
+  });
+
+  it('handles extremely large timeUnixNano without producing Invalid Date', () => {
+    const payload = {
+      resourceLogs: [
+        {
+          scopeLogs: [
+            {
+              logRecords: [
+                {
+                  timeUnixNano: '999999999999999999999999999999',
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const { records } = normalizeOtlpLogsRequest(payload);
+    expect(records).toHaveLength(1);
+    expect(records[0].timeUnixNano).toBe('999999999999999999999999999999');
+    expect(Number.isNaN(records[0].timestamp.getTime())).toBe(false);
+    const now = new Date();
+    expect(records[0].timestamp.getTime()).toBeGreaterThanOrEqual(now.getTime() - 5000);
+    expect(records[0].timestamp.getTime()).toBeLessThanOrEqual(now.getTime() + 5000);
   });
 });
 
