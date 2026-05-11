@@ -169,7 +169,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
 
   const total = countResult?.count ?? 0;
 
-  // Fetch logs with pagination
+  // Fetch logs with pagination (query one extra to detect hasMore)
   const logs = await db
     .select({
       id: log.id,
@@ -190,20 +190,26 @@ export async function GET(event: RequestEvent): Promise<Response> {
     .from(log)
     .where(whereClause)
     .orderBy(desc(log.timestamp), desc(log.id))
-    .limit(limit)
+    .limit(limit + 1)
     .offset(cursorParam ? 0 : offset); // Only use offset if cursor is not provided
 
-  // Determine if there are more logs
-  const hasMore = cursorParam ? logs.length === limit : offset + logs.length < total;
+  // Determine if there are more logs from the overflow row
+  const hasMore = logs.length > limit;
+
+  // Slice to the requested limit before returning
+  const logsToReturn = hasMore ? logs.slice(0, limit) : logs;
 
   // Compute next cursor if there are more logs
   const nextCursor =
-    hasMore && logs.length > 0
-      ? encodeCursor(logs[logs.length - 1].timestamp as Date, logs[logs.length - 1].id)
+    hasMore && logsToReturn.length > 0
+      ? encodeCursor(
+          logsToReturn[logsToReturn.length - 1].timestamp as Date,
+          logsToReturn[logsToReturn.length - 1].id,
+        )
       : null;
 
   return json({
-    logs: logs.map((l) => ({
+    logs: logsToReturn.map((l) => ({
       ...l,
       timestamp: l.timestamp?.toISOString(),
     })),

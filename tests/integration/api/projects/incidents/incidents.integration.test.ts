@@ -155,6 +155,42 @@ describe('Incident APIs', () => {
     expect(body.incidents[0]).not.toHaveProperty('reopenCount');
   });
 
+  it('returns has_more=false when total equals limit (boundary)', async () => {
+    const project = await seedProject(db, { ownerId: userId });
+    const now = Date.now();
+
+    // Create exactly 50 open incidents (default limit)
+    const incidents = [];
+    for (let i = 0; i < 50; i++) {
+      incidents.push({
+        id: `inc-boundary-${i}`,
+        projectId: project.id,
+        fingerprint: `fp-${i}`,
+        title: `Incident ${i}`,
+        normalizedMessage: `incident ${i}`,
+        serviceName: 'api',
+        sourceFile: 'src/a.ts',
+        lineNumber: 10,
+        highestLevel: 'error' as const,
+        firstSeen: new Date(now - 10 * 60 * 1000),
+        lastSeen: new Date(now - 5 * 60 * 1000),
+        totalEvents: 1,
+        reopenCount: 0,
+      });
+    }
+    await db.insert(incident).values(incidents);
+
+    const request = new Request(`http://localhost/api/projects/${project.id}/incidents`);
+    const event = createRequestEvent(request, db, { id: project.id }, authenticatedLocals);
+    const response = await GET_LIST(event as never);
+    expect(response.status).toBe(200);
+
+    const body = await response.json();
+    expect(body.incidents).toHaveLength(50);
+    expect(body.has_more).toBe(false);
+    expect(body.nextCursor).toBeNull();
+  });
+
   it('returns detail with source candidates and correlations', async () => {
     const project = await seedProject(db, { ownerId: userId });
     const [createdIncident] = await db
