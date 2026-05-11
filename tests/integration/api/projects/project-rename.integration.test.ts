@@ -1,4 +1,4 @@
-import type { Redirect } from '@sveltejs/kit';
+import type { HttpError } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -45,20 +45,22 @@ function createRequestEvent(
 }
 
 /**
- * Helper to assert that a promise rejects with a SvelteKit redirect
+ * Helper to assert that a promise rejects with a SvelteKit HTTP error
  */
-async function expectRedirect(
+async function expectHttpError(
   promise: Promise<unknown>,
   expectedStatus: number,
-  expectedLocation: string,
+  expectedBody?: Record<string, unknown>,
 ): Promise<void> {
   try {
     await promise;
-    expect.fail('Expected redirect to be thrown');
+    expect.fail('Expected HTTP error to be thrown');
   } catch (error) {
-    const redirect = error as Redirect;
-    expect(redirect.status).toBe(expectedStatus);
-    expect(redirect.location).toBe(expectedLocation);
+    const httpError = error as HttpError;
+    expect(httpError.status).toBe(expectedStatus);
+    if (expectedBody) {
+      expect(httpError.body).toEqual(expectedBody);
+    }
   }
 }
 
@@ -106,7 +108,7 @@ describe('PATCH /api/projects/[id]', () => {
   });
 
   describe('Authentication', () => {
-    it('throws redirect for unauthenticated request', async () => {
+    it('returns 401 for unauthenticated request', async () => {
       const testProject = await seedProject(db, { ownerId: userId });
       const request = new Request(`http://localhost/api/projects/${testProject.id}`, {
         method: 'PATCH',
@@ -117,7 +119,7 @@ describe('PATCH /api/projects/[id]', () => {
       });
 
       const event = createRequestEvent(request, db, { id: testProject.id });
-      await expectRedirect(PATCH(event as never), 303, '/login');
+      await expectHttpError(PATCH(event as never), 401, { message: 'Unauthorized' });
     });
   });
 
@@ -306,6 +308,7 @@ describe('PATCH /api/projects/[id]', () => {
 
     it('accepts empty body (no updates)', async () => {
       const testProject = await seedProject(db, { name: 'my-project', ownerId: userId });
+      const originalUpdatedAt = testProject.updatedAt;
 
       const request = new Request(`http://localhost/api/projects/${testProject.id}`, {
         method: 'PATCH',
@@ -321,6 +324,33 @@ describe('PATCH /api/projects/[id]', () => {
       expect(response.status).toBe(200);
       const body = await response.json();
       expect(body).toHaveProperty('name', 'my-project');
+      expect(new Date(body.updatedAt).getTime()).toBe(originalUpdatedAt?.getTime());
+
+      const [unchangedProject] = await db
+        .select()
+        .from(project)
+        .where(eq(project.id, testProject.id));
+      expect(unchangedProject.updatedAt?.getTime()).toBe(originalUpdatedAt?.getTime());
+    });
+
+    it('returns 415 for non-JSON Content-Type', async () => {
+      const testProject = await seedProject(db, { name: 'my-project', ownerId: userId });
+
+      const request = new Request(`http://localhost/api/projects/${testProject.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'name=new-name',
+      });
+
+      const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+      const response = await PATCH(event as never);
+
+      expect(response.status).toBe(415);
+      const body = await response.json();
+      expect(body).toHaveProperty('error', 'unsupported_media_type');
+      expect(body).toHaveProperty('message', 'Content-Type must be application/json');
     });
 
     it('returns 400 for malformed JSON body', async () => {

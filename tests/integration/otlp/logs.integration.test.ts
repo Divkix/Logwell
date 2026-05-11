@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { API_CONFIG } from '../../../src/lib/server/config/performance';
 import type * as schema from '../../../src/lib/server/db/schema';
 import { incident, log } from '../../../src/lib/server/db/schema';
 import { setupTestDatabase } from '../../../src/lib/server/db/test-db';
@@ -64,6 +65,27 @@ describe('POST /v1/logs (OTLP)', () => {
     const response = await POST(event as never);
 
     expect(response.status).toBe(401);
+  });
+
+  it('returns 415 for non-JSON Content-Type', async () => {
+    const project = await seedProject(db);
+
+    const request = new Request('http://localhost/v1/logs', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Authorization: `Bearer ${project.apiKey}`,
+      },
+      body: 'resourceLogs=[]',
+    });
+
+    const event = createRequestEvent(request, db);
+    const response = await POST(event as never);
+
+    expect(response.status).toBe(415);
+    const body = await response.json();
+    expect(body.error).toBe('unsupported_media_type');
+    expect(body.message).toBe('Content-Type must be application/json');
   });
 
   it('ingests OTLP log records and maps core fields', async () => {
@@ -272,5 +294,78 @@ describe('POST /v1/logs (OTLP)', () => {
     expect(errorLogs.every((entry) => entry.incidentId === incidents[0].id)).toBe(true);
     expect(errorLogs.every((entry) => entry.serviceName === 'api')).toBe(true);
     expect(infoLogs[0].incidentId).toBeNull();
+  });
+
+  it(`accepts a batch of exactly ${API_CONFIG.BATCH_INSERT_LIMIT} log records`, async () => {
+    const project = await seedProject(db);
+
+    const logRecords = Array.from({ length: API_CONFIG.BATCH_INSERT_LIMIT }, (_, i) => ({
+      body: { stringValue: `Log ${i}` },
+    }));
+
+    const payload = {
+      resourceLogs: [
+        {
+          scopeLogs: [
+            {
+              logRecords,
+            },
+          ],
+        },
+      ],
+    };
+
+    const request = new Request('http://localhost/v1/logs', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${project.apiKey}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const event = createRequestEvent(request, db);
+    const response = await POST(event as never);
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.accepted).toBe(API_CONFIG.BATCH_INSERT_LIMIT);
+  });
+
+  it(`rejects a batch exceeding ${API_CONFIG.BATCH_INSERT_LIMIT} log records`, async () => {
+    const project = await seedProject(db);
+
+    const logRecords = Array.from({ length: API_CONFIG.BATCH_INSERT_LIMIT + 1 }, (_, i) => ({
+      body: { stringValue: `Log ${i}` },
+    }));
+
+    const payload = {
+      resourceLogs: [
+        {
+          scopeLogs: [
+            {
+              logRecords,
+            },
+          ],
+        },
+      ],
+    };
+
+    const request = new Request('http://localhost/v1/logs', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${project.apiKey}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const event = createRequestEvent(request, db);
+    const response = await POST(event as never);
+
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toBe('batch_too_large');
+    expect(body.message).toContain(API_CONFIG.BATCH_INSERT_LIMIT.toString());
   });
 });

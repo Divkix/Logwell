@@ -1,0 +1,16 @@
+import { json } from '@sveltejs/kit';
+
+/**
+ * Validates that the request Content-Type is application/json.
+ * Returns a 415 Unsupported Media Type response if not.
+ */
+export function requireJsonContentType(request: Request): Response | null {
+  const contentType = request.headers.get('content-type') ?? '';
+  if (!contentType.startsWith('application/json')) {
+    return json(
+      { error: 'unsupported_media_type', message: 'Content-Type must be application/json' },
+      { status: 415 },
+    );
+  }
+  return null;
+}

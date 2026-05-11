@@ -1,4 +1,4 @@
-import type { Redirect } from '@sveltejs/kit';
+import type { HttpError } from '@sveltejs/kit';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createAuth } from '$lib/server/auth';
@@ -43,20 +43,22 @@ function createRequestEvent(
 }
 
 /**
- * Helper to assert that a promise rejects with a SvelteKit redirect
+ * Helper to assert that a promise rejects with a SvelteKit HTTP error
  */
-async function expectRedirect(
+async function expectHttpError(
   promise: Promise<unknown>,
   expectedStatus: number,
-  expectedLocation: string,
+  expectedBody?: Record<string, unknown>,
 ): Promise<void> {
   try {
     await promise;
-    expect.fail('Expected redirect to be thrown');
+    expect.fail('Expected HTTP error to be thrown');
   } catch (error) {
-    const redirect = error as Redirect;
-    expect(redirect.status).toBe(expectedStatus);
-    expect(redirect.location).toBe(expectedLocation);
+    const httpError = error as HttpError;
+    expect(httpError.status).toBe(expectedStatus);
+    if (expectedBody) {
+      expect(httpError.body).toEqual(expectedBody);
+    }
   }
 }
 
@@ -104,14 +106,14 @@ describe('GET /api/projects/[id]/logs', () => {
   });
 
   describe('Authentication', () => {
-    it('throws redirect for unauthenticated request', async () => {
+    it('returns 401 for unauthenticated request', async () => {
       const testProject = await seedProject(db, { ownerId: userId });
       const request = new Request(`http://localhost/api/projects/${testProject.id}/logs`, {
         method: 'GET',
       });
 
       const event = createRequestEvent(request, db, { id: testProject.id });
-      await expectRedirect(GET(event as never), 303, '/login');
+      await expectHttpError(GET(event as never), 401, { message: 'Unauthorized' });
     });
   });
 
@@ -589,6 +591,39 @@ describe('GET /api/projects/[id]/logs', () => {
       expect(body).toHaveProperty('total', 30);
       expect(body).toHaveProperty('has_more', false);
       expect(body.logs).toHaveLength(30);
+    });
+
+    it('returns has_more=false when last page equals limit (cursor boundary)', async () => {
+      const testProject = await seedProject(db, { ownerId: userId });
+
+      // Create exactly 200 logs (2 full pages of 100)
+      await seedLogs(db, testProject.id, 200);
+
+      // First page
+      const request1 = new Request(
+        `http://localhost/api/projects/${testProject.id}/logs?limit=100`,
+        { method: 'GET' },
+      );
+      const event1 = createRequestEvent(request1, db, { id: testProject.id }, authenticatedLocals);
+      const response1 = await GET(event1 as never);
+      const body1 = await response1.json();
+
+      expect(body1.logs).toHaveLength(100);
+      expect(body1.has_more).toBe(true);
+      expect(body1.nextCursor).toBeTruthy();
+
+      // Second page (exactly 100 remaining)
+      const request2 = new Request(
+        `http://localhost/api/projects/${testProject.id}/logs?limit=100&cursor=${body1.nextCursor}`,
+        { method: 'GET' },
+      );
+      const event2 = createRequestEvent(request2, db, { id: testProject.id }, authenticatedLocals);
+      const response2 = await GET(event2 as never);
+      const body2 = await response2.json();
+
+      expect(body2.logs).toHaveLength(100);
+      expect(body2.has_more).toBe(false);
+      expect(body2.nextCursor).toBeNull();
     });
   });
 

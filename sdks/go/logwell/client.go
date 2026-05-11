@@ -252,6 +252,8 @@ func (c *Client) flush() {
 
 	// Call callbacks (non-blocking)
 	if err != nil {
+		// Re-queue failed entries at the front for retry
+		c.queue.prepend(entries)
 		if c.config.OnError != nil {
 			if logwellErr, ok := err.(*Error); ok {
 				c.config.OnError(logwellErr)
@@ -282,6 +284,8 @@ func (c *Client) Flush(ctx context.Context) error {
 
 	// Call callbacks (non-blocking)
 	if err != nil {
+		// Re-queue failed entries at the front for retry
+		c.queue.prepend(entries)
 		if c.config.OnError != nil {
 			if logwellErr, ok := err.(*Error); ok {
 				c.config.OnError(logwellErr)
