@@ -152,7 +152,7 @@ describe('PATCH /api/projects/[id]', () => {
       expect(updatedProject.name).toBe('new-name');
     });
 
-    it('rejects duplicate project name', async () => {
+    it('rejects duplicate project name for same user', async () => {
       await seedProject(db, { name: 'existing-project', ownerId: userId });
       const testProject = await seedProject(db, { name: 'my-project', ownerId: userId });
 
@@ -178,6 +178,56 @@ describe('PATCH /api/projects/[id]', () => {
         .from(project)
         .where(eq(project.id, testProject.id));
       expect(unchangedProject.name).toBe('my-project');
+    });
+
+    it('allows renaming to a name used by another user', async () => {
+      // Create a project for the first user
+      await seedProject(db, { name: 'shared-project-name', ownerId: userId });
+
+      // Create a second user with a project using the same name
+      const signUpResult2 = await auth.api.signUpEmail({
+        body: {
+          email: 'other@example.com',
+          password: 'SecureP@ssw0rd123',
+          name: 'Other User',
+        },
+      });
+
+      const mockRequest2 = new Request('http://localhost:5173', {
+        headers: {
+          cookie: `better-auth.session_token=${signUpResult2.token}`,
+        },
+      });
+
+      const sessionData2 = await getSession(mockRequest2.headers, db);
+      if (!sessionData2) throw new Error('Session data should not be null');
+      const otherUserId = sessionData2.user.id;
+
+      const otherProject = await seedProject(db, {
+        name: 'other-project',
+        ownerId: otherUserId,
+      });
+
+      const otherUserLocals = {
+        user: sessionData2.user,
+        session: sessionData2.session,
+      };
+
+      // Second user renames their project to the same name as first user's project
+      const request = new Request(`http://localhost/api/projects/${otherProject.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name: 'shared-project-name' }),
+      });
+
+      const event = createRequestEvent(request, db, { id: otherProject.id }, otherUserLocals);
+      const response = await PATCH(event as never);
+
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body).toHaveProperty('name', 'shared-project-name');
     });
 
     it('validates name format - empty string', async () => {

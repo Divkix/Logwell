@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
 import { nanoid } from 'nanoid';
 import { beforeEach, describe, expect, it } from 'vitest';
-import type * as schema from '../../../src/lib/server/db/schema';
+import * as schema from '../../../src/lib/server/db/schema';
 import { project } from '../../../src/lib/server/db/schema';
 import { setupTestDatabase } from '../../../src/lib/server/db/test-db';
 import { getOrCreateDefaultUser } from '../../fixtures/db';
@@ -48,12 +48,12 @@ describe('Project Table Schema', () => {
     expect(createdProject.updatedAt).toBeInstanceOf(Date);
   });
 
-  it('should enforce unique project names', async () => {
+  it('should enforce unique project names per owner', async () => {
     const projectName = 'duplicate-name';
     const apiKey1 = generateApiKey();
     const apiKey2 = generateApiKey();
 
-    // Create first project
+    // Create first project for user1
     await db.insert(project).values({
       id: nanoid(),
       name: projectName,
@@ -61,7 +61,7 @@ describe('Project Table Schema', () => {
       ownerId: userId,
     });
 
-    // Attempt to create second project with same name should fail
+    // Attempt to create second project with same name for same user should fail
     await expect(
       db.insert(project).values({
         id: nanoid(),
@@ -70,6 +70,31 @@ describe('Project Table Schema', () => {
         ownerId: userId,
       }),
     ).rejects.toThrow();
+
+    // Create a different user
+    const otherUserId = nanoid();
+    await db.insert(schema.user).values({
+      id: otherUserId,
+      name: 'Other User',
+      email: `other-${otherUserId}@example.com`,
+      emailVerified: false,
+    });
+
+    // Same project name for different user should succeed
+    const apiKey3 = generateApiKey();
+    const [otherProject] = await db
+      .insert(project)
+      .values({
+        id: nanoid(),
+        name: projectName,
+        apiKey: apiKey3,
+        ownerId: otherUserId,
+      })
+      .returning();
+
+    expect(otherProject).toBeDefined();
+    expect(otherProject.name).toBe(projectName);
+    expect(otherProject.ownerId).toBe(otherUserId);
   });
 
   it('should find project by API key', async () => {
