@@ -44,30 +44,35 @@ async function postOtlpLogs(
   }
 }
 
+const MAX_BATCH_SIZE = 100;
+
 export async function ingestOtlpLogs(
   page: Page,
   apiKey: string,
   logs: Array<{ level: LogLevel; message: string; attributes?: Record<string, unknown> }>,
 ): Promise<void> {
-  const logRecords = logs.map((log) => ({
-    severityNumber: SEVERITY_NUMBER_BY_LEVEL[log.level],
-    severityText: log.level.toUpperCase(),
-    body: { stringValue: log.message },
-    attributes: toOtlpAttributes(log.attributes),
-  }));
+  for (let i = 0; i < logs.length; i += MAX_BATCH_SIZE) {
+    const batch = logs.slice(i, i + MAX_BATCH_SIZE);
+    const logRecords = batch.map((log) => ({
+      severityNumber: SEVERITY_NUMBER_BY_LEVEL[log.level],
+      severityText: log.level.toUpperCase(),
+      body: { stringValue: log.message },
+      attributes: toOtlpAttributes(log.attributes),
+    }));
 
-  const payload = {
-    resourceLogs: [
-      {
-        scopeLogs: [
-          {
-            scope: { name: 'logwell-e2e' },
-            logRecords,
-          },
-        ],
-      },
-    ],
-  };
+    const payload = {
+      resourceLogs: [
+        {
+          scopeLogs: [
+            {
+              scope: { name: 'logwell-e2e' },
+              logRecords,
+            },
+          ],
+        },
+      ],
+    };
 
-  await postOtlpLogs(page.request, apiKey, payload);
+    await postOtlpLogs(page.request, apiKey, payload);
+  }
 }
