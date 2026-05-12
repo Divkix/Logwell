@@ -61,10 +61,12 @@ export async function GET(event: RequestEvent): Promise<Response> {
   const bucketSeconds = config.intervalMs / 1000;
   const logTimestampExpression = sql`"log"."timestamp"`;
   const bucketStartExpression = sql<Date>`to_timestamp(
-    floor(
+    (
+      floor(
       (extract(epoch from ${logTimestampExpression}) - extract(epoch from ${rangeStart}::timestamptz)) / ${bucketSeconds}
-    ) * ${bucketSeconds}
-    + extract(epoch from ${rangeStart}::timestamptz)
+      ) * ${bucketSeconds}
+      + extract(epoch from ${rangeStart}::timestamptz)
+    )::double precision
   )`;
 
   const aggregatedRows = await db
