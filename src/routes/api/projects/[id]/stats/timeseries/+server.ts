@@ -87,7 +87,12 @@ export async function GET(event: RequestEvent): Promise<Response> {
   // Aggregate counts in SQL using time buckets relative to rangeStart
   const bucketResults = await db.execute(sql`
     SELECT
-      floor(extract(epoch from (${log.timestamp} - ${rangeStart})) / ${intervalSeconds})::int AS bucket_index,
+      floor(
+        (
+          extract(epoch from ${log.timestamp}) -
+          extract(epoch from ${rangeStart}::timestamptz)
+        ) / ${intervalSeconds}
+      )::int AS bucket_index,
       count(*)::int AS count
     FROM ${log}
     WHERE ${whereClause}
