@@ -37,7 +37,7 @@
     "@biomejs/biome": "^2.4.15",
     "@electric-sql/pglite": "^0.4.5",
     "@internationalized/date": "^3.12.1",
-    "@playwright/test": "^1.59.1",
+    "@playwright/test": "^1.60.0",
     "@sveltejs/kit": "^2.59.1",
     "@sveltejs/vite-plugin-svelte": "^7.1.2",
     "@tailwindcss/vite": "^4.3.0",
@@ -46,9 +46,9 @@
     "@testing-library/user-event": "^14.6.1",
     "@types/d3-scale": "^4.0.9",
     "@types/node": "^25.6.2",
-    "@vitest/browser": "^4.1.5",
-    "@vitest/coverage-v8": "^4.1.5",
-    "@vitest/ui": "^4.1.5",
+    "@vitest/browser": "^4.1.6",
+    "@vitest/coverage-v8": "^4.1.6",
+    "@vitest/ui": "^4.1.6",
     "bits-ui": "^2.18.1",
     "drizzle-kit": "^0.31.10",
     "drizzle-orm": "^0.45.2",
@@ -62,7 +62,7 @@
     "tailwindcss": "^4.3.0",
     "typescript": "^6.0.3",
     "vite": "^8.0.11",
-    "vitest": "^4.1.5"
+    "vitest": "^4.1.6"
   },
   "dependencies": {
     "@lucide/svelte": "^1.14.0",
