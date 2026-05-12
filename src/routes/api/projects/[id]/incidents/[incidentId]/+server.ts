@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { and, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, isNotNull, sql } from 'drizzle-orm';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import type * as schema from '$lib/server/db/schema';
@@ -36,51 +36,51 @@ export async function GET(event: RequestEvent): Promise<Response> {
     return json({ error: 'not_found', message: 'Incident not found' }, { status: 404 });
   }
 
-  const incidentLogs = await db
+  const sourceCountExpression = sql<number>`count(*)::int`;
+  const requestCountExpression = sql<number>`count(*)::int`;
+  const traceCountExpression = sql<number>`count(*)::int`;
+  const incidentLogCondition = and(eq(log.projectId, projectId), eq(log.incidentId, incidentId));
+
+  const rootCauseCandidates = await db
     .select({
       sourceFile: log.sourceFile,
       lineNumber: log.lineNumber,
-      requestId: log.requestId,
-      traceId: log.traceId,
+      count: sourceCountExpression,
     })
     .from(log)
-    .where(and(eq(log.projectId, projectId), eq(log.incidentId, incidentId)));
+    .where(incidentLogCondition)
+    .groupBy(log.sourceFile, log.lineNumber)
+    .orderBy(desc(sourceCountExpression), asc(log.sourceFile), asc(log.lineNumber))
+    .limit(5);
 
-  const sourceFrequency = new Map<
-    string,
-    { sourceFile: string | null; lineNumber: number | null; count: number }
-  >();
-  const requestCounts = new Map<string, number>();
-  const traceCounts = new Map<string, number>();
+  const topRequestIdRows = await db
+    .select({
+      requestId: log.requestId,
+      count: requestCountExpression,
+    })
+    .from(log)
+    .where(and(incidentLogCondition, isNotNull(log.requestId)))
+    .groupBy(log.requestId)
+    .orderBy(desc(requestCountExpression), asc(log.requestId))
+    .limit(10);
 
-  for (const entry of incidentLogs) {
-    const sourceKey = `${entry.sourceFile ?? 'unknown'}:${entry.lineNumber ?? 0}`;
-    const current = sourceFrequency.get(sourceKey);
-    sourceFrequency.set(sourceKey, {
-      sourceFile: entry.sourceFile,
-      lineNumber: entry.lineNumber,
-      count: (current?.count ?? 0) + 1,
-    });
+  const topTraceIdRows = await db
+    .select({
+      traceId: log.traceId,
+      count: traceCountExpression,
+    })
+    .from(log)
+    .where(and(incidentLogCondition, isNotNull(log.traceId)))
+    .groupBy(log.traceId)
+    .orderBy(desc(traceCountExpression), asc(log.traceId))
+    .limit(10);
 
-    if (entry.requestId) {
-      requestCounts.set(entry.requestId, (requestCounts.get(entry.requestId) ?? 0) + 1);
-    }
-    if (entry.traceId) {
-      traceCounts.set(entry.traceId, (traceCounts.get(entry.traceId) ?? 0) + 1);
-    }
-  }
-
-  const rootCauseCandidates = [...sourceFrequency.values()]
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 5);
-  const topRequestIds = [...requestCounts.entries()]
-    .map(([requestId, count]) => ({ requestId, count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 10);
-  const topTraceIds = [...traceCounts.entries()]
-    .map(([traceId, count]) => ({ traceId, count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 10);
+  const topRequestIds = topRequestIdRows.flatMap((row) =>
+    row.requestId ? [{ requestId: row.requestId, count: Number(row.count ?? 0) }] : [],
+  );
+  const topTraceIds = topTraceIdRows.flatMap((row) =>
+    row.traceId ? [{ traceId: row.traceId, count: Number(row.count ?? 0) }] : [],
+  );
 
   return json({
     id: incidentRow.id,
@@ -96,7 +96,11 @@ export async function GET(event: RequestEvent): Promise<Response> {
     lastSeen: incidentRow.lastSeen.toISOString(),
     totalEvents: incidentRow.totalEvents,
     status: getIncidentStatus(incidentRow.lastSeen),
-    rootCauseCandidates,
+    rootCauseCandidates: rootCauseCandidates.map((candidate) => ({
+      sourceFile: candidate.sourceFile,
+      lineNumber: candidate.lineNumber,
+      count: Number(candidate.count ?? 0),
+    })),
     correlations: {
       topRequestIds,
       topTraceIds,

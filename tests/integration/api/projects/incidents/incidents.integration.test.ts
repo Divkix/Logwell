@@ -265,6 +265,83 @@ describe('Incident APIs', () => {
     });
   });
 
+  it('does not merge distinct source file/line combinations that stringify similarly', async () => {
+    const project = await seedProject(db, { ownerId: userId });
+    const [createdIncident] = await db
+      .insert(incident)
+      .values({
+        id: 'inc-detail-collision',
+        projectId: project.id,
+        fingerprint: 'fp-detail-collision',
+        title: 'Collision check',
+        normalizedMessage: 'collision check',
+        serviceName: 'api',
+        sourceFile: null,
+        lineNumber: null,
+        highestLevel: 'error',
+        firstSeen: new Date(Date.now() - 20 * 60 * 1000),
+        lastSeen: new Date(Date.now() - 5 * 60 * 1000),
+        totalEvents: 4,
+      })
+      .returning();
+
+    await seedLog(db, project.id, {
+      incidentId: createdIncident.id,
+      fingerprint: createdIncident.fingerprint,
+      level: 'error',
+      message: 'null source',
+      sourceFile: null,
+      lineNumber: null,
+    });
+    await seedLog(db, project.id, {
+      incidentId: createdIncident.id,
+      fingerprint: createdIncident.fingerprint,
+      level: 'error',
+      message: 'literal unknown source',
+      sourceFile: 'unknown',
+      lineNumber: 0,
+    });
+    await seedLog(db, project.id, {
+      incidentId: createdIncident.id,
+      fingerprint: createdIncident.fingerprint,
+      level: 'error',
+      message: 'line null',
+      sourceFile: 'src/collision.ts',
+      lineNumber: null,
+    });
+    await seedLog(db, project.id, {
+      incidentId: createdIncident.id,
+      fingerprint: createdIncident.fingerprint,
+      level: 'error',
+      message: 'line zero',
+      sourceFile: 'src/collision.ts',
+      lineNumber: 0,
+    });
+
+    const request = new Request(
+      `http://localhost/api/projects/${project.id}/incidents/${createdIncident.id}`,
+    );
+    const event = createRequestEvent(
+      request,
+      db,
+      { id: project.id, incidentId: createdIncident.id },
+      authenticatedLocals,
+      '/api/projects/[id]/incidents/[incidentId]',
+    );
+    const response = await GET_DETAIL(event as never);
+    expect(response.status).toBe(200);
+
+    const body = await response.json();
+    expect(body.rootCauseCandidates).toEqual(
+      expect.arrayContaining([
+        { sourceFile: null, lineNumber: null, count: 1 },
+        { sourceFile: 'unknown', lineNumber: 0, count: 1 },
+        { sourceFile: 'src/collision.ts', lineNumber: null, count: 1 },
+        { sourceFile: 'src/collision.ts', lineNumber: 0, count: 1 },
+      ]),
+    );
+  });
+
   it('returns timeline buckets with peak data', async () => {
     const project = await seedProject(db, { ownerId: userId });
     const [createdIncident] = await db

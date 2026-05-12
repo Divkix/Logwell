@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { and, eq, gte, lte, type SQL } from 'drizzle-orm';
+import { and, count, eq, gte, lte, type SQL, sql } from 'drizzle-orm';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import type { TimeRange } from '$lib/components/time-range-picker.svelte';
@@ -7,7 +7,7 @@ import type * as schema from '$lib/server/db/schema';
 import { log } from '$lib/server/db/schema';
 import { isErrorResponse, requireProjectOwnership } from '$lib/server/utils/project-guard';
 import { getTimeRangeStart } from '$lib/utils/format';
-import { bucketTimestamps, fillMissingBuckets, getTimeBucketConfig } from '$lib/utils/timeseries';
+import { fillMissingBuckets, getTimeBucketConfig } from '$lib/utils/timeseries';
 import type { RequestEvent } from './$types';
 
 type DatabaseClient = PostgresJsDatabase<typeof schema> | PgliteDatabase<typeof schema>;
@@ -82,19 +82,42 @@ export async function GET(event: RequestEvent): Promise<Response> {
   ];
 
   const whereClause = and(...conditions);
+  const bucketSeconds = config.intervalMs / 1000;
+  const logTimestampExpression = sql`"log"."timestamp"`;
+  const bucketStartExpression = sql<Date>`to_timestamp(
+    floor(
+      (extract(epoch from ${logTimestampExpression}) - extract(epoch from ${rangeStart}::timestamptz)) / ${bucketSeconds}
+    ) * ${bucketSeconds}
+    + extract(epoch from ${rangeStart}::timestamptz)
+  )`;
 
-  // Fetch log timestamps in range
-  const logs = await db.select({ timestamp: log.timestamp }).from(log).where(whereClause);
+  const aggregatedRows = await db
+    .select({
+      bucketStart: bucketStartExpression,
+      count: count(),
+    })
+    .from(log)
+    .where(whereClause)
+    .groupBy(sql`1`)
+    .orderBy(sql`1`);
 
-  // Convert to Date objects (filter nulls)
-  const timestamps = logs.map((l) => l.timestamp).filter((ts): ts is Date => ts !== null);
+  const bucketCounts: Record<number, number> = {};
+  let totalCount = 0;
+  for (const row of aggregatedRows) {
+    if (!row.bucketStart) continue;
+    const bucketStart =
+      row.bucketStart instanceof Date ? row.bucketStart : new Date(row.bucketStart);
+    const bucketIndex = Math.floor(
+      (bucketStart.getTime() - rangeStart.getTime()) / config.intervalMs,
+    );
+    const rowCount = Number(row.count ?? 0);
+    totalCount += rowCount;
 
-  // Bucket the timestamps
-  const bucketCounts = bucketTimestamps(timestamps, config, rangeStart);
+    if (bucketIndex >= 0 && bucketIndex < config.expectedBuckets) {
+      bucketCounts[bucketIndex] = (bucketCounts[bucketIndex] ?? 0) + rowCount;
+    }
+  }
   const buckets = fillMissingBuckets(bucketCounts, config, rangeStart, rangeEnd);
-
-  // Calculate total
-  const totalCount = timestamps.length;
 
   return json({
     buckets,
