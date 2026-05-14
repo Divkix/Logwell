@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import type * as schema from '$lib/server/db/schema';
@@ -9,6 +9,28 @@ import { isErrorResponse, requireProjectOwnership } from '$lib/server/utils/proj
 import type { RequestEvent } from './$types';
 
 type DatabaseClient = PostgresJsDatabase<typeof schema> | PgliteDatabase<typeof schema>;
+
+type SourceFrequencyRow = {
+  sourceFile: string | null;
+  lineNumber: number | null;
+  count: number;
+};
+
+type RequestFrequencyRow = {
+  requestId: string;
+  count: number;
+};
+
+type TraceFrequencyRow = {
+  traceId: string;
+  count: number;
+};
+
+type QueryRows<T> = T[] | { rows: T[] };
+
+function getQueryRows<T>(result: QueryRows<T>): T[] {
+  return Array.isArray(result) ? result : result.rows;
+}
 
 async function getDbClient(locals: App.Locals): Promise<DatabaseClient> {
   if (locals.db) return locals.db as DatabaseClient;
@@ -36,51 +58,55 @@ export async function GET(event: RequestEvent): Promise<Response> {
     return json({ error: 'not_found', message: 'Incident not found' }, { status: 404 });
   }
 
-  const incidentLogs = await db
-    .select({
-      sourceFile: log.sourceFile,
-      lineNumber: log.lineNumber,
-      requestId: log.requestId,
-      traceId: log.traceId,
-    })
-    .from(log)
-    .where(and(eq(log.projectId, projectId), eq(log.incidentId, incidentId)));
+  const logWhereClause = and(eq(log.projectId, projectId), eq(log.incidentId, incidentId));
 
-  const sourceFrequency = new Map<
-    string,
-    { sourceFile: string | null; lineNumber: number | null; count: number }
-  >();
-  const requestCounts = new Map<string, number>();
-  const traceCounts = new Map<string, number>();
+  const [sourceResult, requestResult, traceResult] = await Promise.all([
+    db.execute(sql<SourceFrequencyRow>`
+      select
+        ${log.sourceFile} as "sourceFile",
+        ${log.lineNumber} as "lineNumber",
+        count(*)::int as "count"
+      from ${log}
+      where ${logWhereClause}
+      group by ${log.sourceFile}, ${log.lineNumber}
+      order by "count" desc, ${log.sourceFile} asc nulls last, ${log.lineNumber} asc nulls last
+      limit 5
+    `),
+    db.execute(sql<RequestFrequencyRow>`
+      select
+        ${log.requestId} as "requestId",
+        count(*)::int as "count"
+      from ${log}
+      where ${logWhereClause} and ${log.requestId} is not null and ${log.requestId} <> ''
+      group by ${log.requestId}
+      order by "count" desc, ${log.requestId} asc
+      limit 10
+    `),
+    db.execute(sql<TraceFrequencyRow>`
+      select
+        ${log.traceId} as "traceId",
+        count(*)::int as "count"
+      from ${log}
+      where ${logWhereClause} and ${log.traceId} is not null and ${log.traceId} <> ''
+      group by ${log.traceId}
+      order by "count" desc, ${log.traceId} asc
+      limit 10
+    `),
+  ]);
 
-  for (const entry of incidentLogs) {
-    const sourceKey = `${entry.sourceFile ?? 'unknown'}:${entry.lineNumber ?? 0}`;
-    const current = sourceFrequency.get(sourceKey);
-    sourceFrequency.set(sourceKey, {
-      sourceFile: entry.sourceFile,
-      lineNumber: entry.lineNumber,
-      count: (current?.count ?? 0) + 1,
-    });
-
-    if (entry.requestId) {
-      requestCounts.set(entry.requestId, (requestCounts.get(entry.requestId) ?? 0) + 1);
-    }
-    if (entry.traceId) {
-      traceCounts.set(entry.traceId, (traceCounts.get(entry.traceId) ?? 0) + 1);
-    }
-  }
-
-  const rootCauseCandidates = [...sourceFrequency.values()]
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 5);
-  const topRequestIds = [...requestCounts.entries()]
-    .map(([requestId, count]) => ({ requestId, count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 10);
-  const topTraceIds = [...traceCounts.entries()]
-    .map(([traceId, count]) => ({ traceId, count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 10);
+  const rootCauseCandidates = getQueryRows(sourceResult).map((row) => ({
+    sourceFile: row.sourceFile,
+    lineNumber: row.lineNumber,
+    count: Number(row.count),
+  }));
+  const topRequestIds = getQueryRows(requestResult).map((row) => ({
+    requestId: row.requestId,
+    count: Number(row.count),
+  }));
+  const topTraceIds = getQueryRows(traceResult).map((row) => ({
+    traceId: row.traceId,
+    count: Number(row.count),
+  }));
 
   return json({
     id: incidentRow.id,
