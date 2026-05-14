@@ -1,6 +1,6 @@
 import type { HttpError } from '@sveltejs/kit';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createAuth } from '$lib/server/auth';
 import type * as schema from '$lib/server/db/schema';
 import { incident } from '$lib/server/db/schema';
@@ -9,7 +9,7 @@ import { getSession } from '$lib/server/session';
 import { GET as GET_LIST } from '../../../../../src/routes/api/projects/[id]/incidents/+server';
 import { GET as GET_DETAIL } from '../../../../../src/routes/api/projects/[id]/incidents/[incidentId]/+server';
 import { GET as GET_TIMELINE } from '../../../../../src/routes/api/projects/[id]/incidents/[incidentId]/timeline/+server';
-import { seedLog, seedProject } from '../../../../fixtures/db';
+import { seedLog, seedLogs, seedProject } from '../../../../fixtures/db';
 
 function createRequestEvent(
   request: Request,
@@ -265,6 +265,73 @@ describe('Incident APIs', () => {
     });
   });
 
+  it('aggregates incident detail counts in SQL instead of selecting every incident log', async () => {
+    const project = await seedProject(db, { ownerId: userId });
+    const [createdIncident] = await db
+      .insert(incident)
+      .values({
+        id: 'inc-sql-detail',
+        projectId: project.id,
+        fingerprint: 'fp-sql-detail',
+        title: 'SQL detail',
+        normalizedMessage: 'sql detail',
+        serviceName: 'api',
+        sourceFile: 'src/detail.ts',
+        lineNumber: 1,
+        highestLevel: 'error',
+        firstSeen: new Date(Date.now() - 20 * 60 * 1000),
+        lastSeen: new Date(Date.now() - 5 * 60 * 1000),
+        totalEvents: 20,
+      })
+      .returning();
+
+    await seedLogs(db, project.id, 20, {
+      incidentId: createdIncident.id,
+      fingerprint: createdIncident.fingerprint,
+      level: 'error',
+      message: 'SQL detail',
+      sourceFile: 'src/detail.ts',
+      lineNumber: 1,
+      requestId: 'req-sql',
+      traceId: 'trace-sql',
+    });
+
+    const originalSelect = db.select.bind(db);
+    vi.spyOn(db, 'select').mockImplementation(((fields?: unknown) => {
+      if (
+        fields &&
+        typeof fields === 'object' &&
+        ['sourceFile', 'lineNumber', 'requestId', 'traceId'].every((key) => key in fields)
+      ) {
+        throw new Error('incident detail must aggregate log counts in SQL');
+      }
+
+      return originalSelect(fields as never);
+    }) as typeof db.select);
+
+    const request = new Request(
+      `http://localhost/api/projects/${project.id}/incidents/${createdIncident.id}`,
+    );
+    const event = createRequestEvent(
+      request,
+      db,
+      { id: project.id, incidentId: createdIncident.id },
+      authenticatedLocals,
+      '/api/projects/[id]/incidents/[incidentId]',
+    );
+    const response = await GET_DETAIL(event as never);
+    expect(response.status).toBe(200);
+
+    const body = await response.json();
+    expect(body.rootCauseCandidates[0]).toEqual({
+      sourceFile: 'src/detail.ts',
+      lineNumber: 1,
+      count: 20,
+    });
+    expect(body.correlations.topRequestIds[0]).toEqual({ requestId: 'req-sql', count: 20 });
+    expect(body.correlations.topTraceIds[0]).toEqual({ traceId: 'trace-sql', count: 20 });
+  });
+
   it('returns timeline buckets with peak data', async () => {
     const project = await seedProject(db, { ownerId: userId });
     const [createdIncident] = await db
@@ -321,6 +388,65 @@ describe('Incident APIs', () => {
     expect(body.range).toBe('1h');
     expect(body.buckets.length).toBeGreaterThan(0);
     expect(body.peakBucket).not.toBeNull();
+  });
+
+  it('aggregates incident timeline buckets in SQL instead of selecting every timestamp', async () => {
+    const project = await seedProject(db, { ownerId: userId });
+    const [createdIncident] = await db
+      .insert(incident)
+      .values({
+        id: 'inc-sql-timeline',
+        projectId: project.id,
+        fingerprint: 'fp-sql-timeline',
+        title: 'SQL timeline',
+        normalizedMessage: 'sql timeline',
+        serviceName: 'api',
+        sourceFile: 'src/timeline.ts',
+        lineNumber: 1,
+        highestLevel: 'error',
+        firstSeen: new Date(Date.now() - 50 * 60 * 1000),
+        lastSeen: new Date(Date.now() - 5 * 60 * 1000),
+        totalEvents: 30,
+      })
+      .returning();
+
+    await seedLogs(db, project.id, 30, {
+      incidentId: createdIncident.id,
+      fingerprint: createdIncident.fingerprint,
+      level: 'error',
+      message: 'SQL timeline',
+      timestamp: new Date(Date.now() - 20 * 60 * 1000),
+    });
+
+    const originalSelect = db.select.bind(db);
+    vi.spyOn(db, 'select').mockImplementation(((fields?: unknown) => {
+      if (
+        fields &&
+        typeof fields === 'object' &&
+        Object.keys(fields).length === 1 &&
+        'timestamp' in fields
+      ) {
+        throw new Error('incident timeline must aggregate timestamps in SQL');
+      }
+
+      return originalSelect(fields as never);
+    }) as typeof db.select);
+
+    const request = new Request(
+      `http://localhost/api/projects/${project.id}/incidents/${createdIncident.id}/timeline?range=1h`,
+    );
+    const event = createRequestEvent(
+      request,
+      db,
+      { id: project.id, incidentId: createdIncident.id },
+      authenticatedLocals,
+      '/api/projects/[id]/incidents/[incidentId]/timeline',
+    );
+    const response = await GET_TIMELINE(event as never);
+    expect(response.status).toBe(200);
+
+    const body = await response.json();
+    expect(body.peakBucket?.count).toBe(30);
   });
 
   it("returns 404 when user accesses another user's incident", async () => {

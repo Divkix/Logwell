@@ -1,13 +1,14 @@
 import { json } from '@sveltejs/kit';
-import { and, eq, gte, lte, type SQL } from 'drizzle-orm';
+import { and, eq, gte, lte, type SQL, sql } from 'drizzle-orm';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import type { TimeRange } from '$lib/components/time-range-picker.svelte';
 import type * as schema from '$lib/server/db/schema';
 import { log } from '$lib/server/db/schema';
+import { type BucketCountRow, getQueryRows } from '$lib/server/utils/db-helpers';
 import { isErrorResponse, requireProjectOwnership } from '$lib/server/utils/project-guard';
 import { getTimeRangeStart } from '$lib/utils/format';
-import { bucketTimestamps, fillMissingBuckets, getTimeBucketConfig } from '$lib/utils/timeseries';
+import { fillMissingBuckets, getTimeBucketConfig } from '$lib/utils/timeseries';
 import type { RequestEvent } from './$types';
 
 type DatabaseClient = PostgresJsDatabase<typeof schema> | PgliteDatabase<typeof schema>;
@@ -82,19 +83,33 @@ export async function GET(event: RequestEvent): Promise<Response> {
   ];
 
   const whereClause = and(...conditions);
+  const intervalSeconds = config.intervalMs / 1000;
+  const rangeStartEpochSeconds = rangeStart.getTime() / 1000;
 
-  // Fetch log timestamps in range
-  const logs = await db.select({ timestamp: log.timestamp }).from(log).where(whereClause);
+  const bucketResult = await db.execute(sql<BucketCountRow>`
+    select
+      floor(
+        (extract(epoch from ${log.timestamp}) - ${rangeStartEpochSeconds}) / ${intervalSeconds}
+      )::int as "bucketIndex",
+      count(*)::int as "count"
+    from ${log}
+    where ${whereClause}
+    group by 1
+    order by 1
+  `);
 
-  // Convert to Date objects (filter nulls)
-  const timestamps = logs.map((l) => l.timestamp).filter((ts): ts is Date => ts !== null);
+  const bucketCounts: Record<number, number> = {};
+  let totalCount = 0;
+  for (const row of getQueryRows(bucketResult)) {
+    const bucketIndex = Number(row.bucketIndex);
+    const count = Number(row.count);
+    if (bucketIndex >= 0 && bucketIndex < config.expectedBuckets) {
+      bucketCounts[bucketIndex] = count;
+      totalCount += count;
+    }
+  }
 
-  // Bucket the timestamps
-  const bucketCounts = bucketTimestamps(timestamps, config, rangeStart);
   const buckets = fillMissingBuckets(bucketCounts, config, rangeStart, rangeEnd);
-
-  // Calculate total
-  const totalCount = timestamps.length;
 
   return json({
     buckets,

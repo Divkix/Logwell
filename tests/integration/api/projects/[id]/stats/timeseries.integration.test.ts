@@ -1,6 +1,6 @@
 import type { HttpError } from '@sveltejs/kit';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createAuth } from '$lib/server/auth';
 import type * as schema from '$lib/server/db/schema';
 import { setupTestDatabase } from '$lib/server/db/test-db';
@@ -233,6 +233,41 @@ describe('GET /api/projects/[id]/stats/timeseries', () => {
   });
 
   describe('Log Counting', () => {
+    it('does not select every matching log timestamp into memory', async () => {
+      const testProject = await seedProject(db, { ownerId: userId });
+      const now = new Date();
+      await seedLogs(db, testProject.id, 25, {
+        timestamp: new Date(now.getTime() - 30 * 60 * 1000),
+      });
+
+      const originalSelect = db.select.bind(db);
+      const selectSpy = vi.spyOn(db, 'select').mockImplementation(((fields?: unknown) => {
+        if (
+          fields &&
+          typeof fields === 'object' &&
+          Object.keys(fields).length === 1 &&
+          'timestamp' in fields
+        ) {
+          throw new Error('timeseries must aggregate timestamps in SQL');
+        }
+
+        return originalSelect(fields as never);
+      }) as typeof db.select);
+
+      const request = new Request(
+        `http://localhost/api/projects/${testProject.id}/stats/timeseries?range=1h`,
+        { method: 'GET' },
+      );
+
+      const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+      const response = await GET(event as never);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.totalCount).toBe(25);
+      expect(selectSpy).not.toHaveBeenCalledWith({ timestamp: expect.anything() });
+    });
+
     it('returns correct count per bucket', async () => {
       const testProject = await seedProject(db, { ownerId: userId });
       const now = new Date();
