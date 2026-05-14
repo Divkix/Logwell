@@ -94,14 +94,12 @@ export async function GET(event: RequestEvent): Promise<Response> {
 
   const whereClause = and(...conditions);
   const intervalSeconds = config.intervalMs / 1000;
+  const rangeStartEpochSeconds = rangeStart.getTime() / 1000;
 
   const bucketResult = await db.execute(sql<BucketCountRow>`
     select
       floor(
-        (
-          extract(epoch from ${log.timestamp}) -
-          extract(epoch from ${rangeStart}::timestamptz)
-        ) / ${intervalSeconds}
+        (extract(epoch from ${log.timestamp}) - ${rangeStartEpochSeconds}) / ${intervalSeconds}
       )::int as "bucketIndex",
       count(*)::int as "count"
     from ${log}
