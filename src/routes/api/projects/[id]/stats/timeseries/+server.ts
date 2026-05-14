@@ -5,6 +5,7 @@ import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import type { TimeRange } from '$lib/components/time-range-picker.svelte';
 import type * as schema from '$lib/server/db/schema';
 import { log } from '$lib/server/db/schema';
+import { type BucketCountRow, getQueryRows } from '$lib/server/utils/db-helpers';
 import { isErrorResponse, requireProjectOwnership } from '$lib/server/utils/project-guard';
 import { getTimeRangeStart } from '$lib/utils/format';
 import { fillMissingBuckets, getTimeBucketConfig } from '$lib/utils/timeseries';
@@ -25,17 +26,6 @@ async function getDbClient(locals: App.Locals): Promise<DatabaseClient> {
 }
 
 const VALID_RANGES: TimeRange[] = ['15m', '1h', '24h', '7d'];
-
-type BucketCountRow = {
-  bucketIndex: number;
-  count: number;
-};
-
-type QueryRows<T> = T[] | { rows: T[] };
-
-function getQueryRows<T>(result: QueryRows<T>): T[] {
-  return Array.isArray(result) ? result : result.rows;
-}
 
 /**
  * GET /api/projects/[id]/stats/timeseries

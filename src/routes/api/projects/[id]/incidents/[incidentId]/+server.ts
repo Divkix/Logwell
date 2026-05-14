@@ -4,6 +4,7 @@ import type { PgliteDatabase } from 'drizzle-orm/pglite';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import type * as schema from '$lib/server/db/schema';
 import { incident, log } from '$lib/server/db/schema';
+import { getQueryRows } from '$lib/server/utils/db-helpers';
 import { getIncidentStatus } from '$lib/server/utils/incidents';
 import { isErrorResponse, requireProjectOwnership } from '$lib/server/utils/project-guard';
 import type { RequestEvent } from './$types';
@@ -25,12 +26,6 @@ type TraceFrequencyRow = {
   traceId: string;
   count: number;
 };
-
-type QueryRows<T> = T[] | { rows: T[] };
-
-function getQueryRows<T>(result: QueryRows<T>): T[] {
-  return Array.isArray(result) ? result : result.rows;
-}
 
 async function getDbClient(locals: App.Locals): Promise<DatabaseClient> {
   if (locals.db) return locals.db as DatabaseClient;
