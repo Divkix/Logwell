@@ -55,7 +55,7 @@
     "jsdom": "^29.1.1",
     "knip": "^6.12.2",
     "mode-watcher": "^1.1.0",
-    "svelte": "^5.55.5",
+    "svelte": "^5.55.7",
     "svelte-adapter-bun": "^1.0.1",
     "svelte-check": "^4.4.8",
     "svelte-sonner": "^1.1.1",
