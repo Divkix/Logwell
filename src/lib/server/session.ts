@@ -1,11 +1,7 @@
 import { eq } from 'drizzle-orm';
-import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { session as sessionTable, user as userTable } from '$lib/server/db/schema';
 import type { Session, User } from './auth';
-import type * as schema from './db/schema';
-
-type Database = PostgresJsDatabase<typeof schema> | PgliteDatabase<typeof schema>;
+import type { DatabaseClient } from './db/db';
 
 /**
  * Extracts session token from request headers
@@ -32,7 +28,7 @@ function getSessionToken(headers: Headers): string | null {
  */
 export async function getSession(
   headers: Headers,
-  database?: Database,
+  database?: DatabaseClient,
 ): Promise<{ user: User; session: Session } | null> {
   // Lazy-load production database if not provided
   const db = database || (await import('$lib/server/db')).db;

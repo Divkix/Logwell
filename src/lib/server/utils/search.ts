@@ -1,13 +1,6 @@
 import { desc, sql } from 'drizzle-orm';
-import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-import type * as schema from '../db/schema';
+import type { DatabaseClient } from '$lib/server/db/db';
 import { type Log, log } from '../db/schema';
-
-/**
- * Database client type union for testing and production
- */
-type DatabaseClient = PgliteDatabase<typeof schema> | PostgresJsDatabase<typeof schema>;
 
 /**
  * Builds a PostgreSQL tsquery string from a search term

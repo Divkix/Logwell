@@ -1,30 +1,14 @@
 import { json, type RequestEvent } from '@sveltejs/kit';
 import { and, eq } from 'drizzle-orm';
-import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-import type * as schema from '$lib/server/db/schema';
+import { getDbClient } from '$lib/server/db/db';
 import { type Project, project } from '$lib/server/db/schema';
 import { type AuthenticatedSession, requireAuth } from './auth-guard';
-
-type DatabaseClient = PostgresJsDatabase<typeof schema> | PgliteDatabase<typeof schema>;
 
 /**
  * Result of successful project ownership check
  */
 export interface AuthorizedProject extends AuthenticatedSession {
   project: Project;
-}
-
-/**
- * Helper to get database client from locals or production db
- * Supports test injection via locals.db
- */
-async function getDbClient(locals: App.Locals): Promise<DatabaseClient> {
-  if (locals.db) {
-    return locals.db as DatabaseClient;
-  }
-  const { db } = await import('$lib/server/db');
-  return db;
 }
 
 /**

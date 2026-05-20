@@ -1,8 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { and, count, desc, eq, gte, inArray, lt, lte, or, type SQL, sql } from 'drizzle-orm';
-import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-import type * as schema from '$lib/server/db/schema';
+import { getDbClient } from '$lib/server/db/db';
 import { log } from '$lib/server/db/schema';
 import { decodeCursor, encodeCursor } from '$lib/server/utils/cursor';
 import { isErrorResponse, requireProjectOwnership } from '$lib/server/utils/project-guard';
@@ -10,24 +8,10 @@ import { buildSearchQuery } from '$lib/server/utils/search';
 import { LOG_LEVELS, type LogLevel } from '$lib/shared/types';
 import type { RequestEvent } from './$types';
 
-type DatabaseClient = PostgresJsDatabase<typeof schema> | PgliteDatabase<typeof schema>;
-
 // Constants for pagination limits
 const DEFAULT_LIMIT = 100;
 const MIN_LIMIT = 100;
 const MAX_LIMIT = 500;
-
-/**
- * Helper to get database client from locals or production db
- * Supports test injection via locals.db
- */
-async function getDbClient(locals: App.Locals): Promise<DatabaseClient> {
-  if (locals.db) {
-    return locals.db as DatabaseClient;
-  }
-  const { db } = await import('$lib/server/db');
-  return db;
-}
 
 /**
  * Clamp a number within a range

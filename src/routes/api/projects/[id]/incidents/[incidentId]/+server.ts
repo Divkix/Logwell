@@ -1,15 +1,10 @@
 import { json } from '@sveltejs/kit';
 import { and, eq, sql } from 'drizzle-orm';
-import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-import type * as schema from '$lib/server/db/schema';
+import { getDbClient, getQueryRows } from '$lib/server/db/db';
 import { incident, log } from '$lib/server/db/schema';
-import { getQueryRows } from '$lib/server/utils/db-helpers';
 import { getIncidentStatus } from '$lib/server/utils/incidents';
 import { isErrorResponse, requireProjectOwnership } from '$lib/server/utils/project-guard';
 import type { RequestEvent } from './$types';
-
-type DatabaseClient = PostgresJsDatabase<typeof schema> | PgliteDatabase<typeof schema>;
 
 type SourceFrequencyRow = {
   sourceFile: string | null;
@@ -26,12 +21,6 @@ type TraceFrequencyRow = {
   traceId: string;
   count: number;
 };
-
-async function getDbClient(locals: App.Locals): Promise<DatabaseClient> {
-  if (locals.db) return locals.db as DatabaseClient;
-  const { db } = await import('$lib/server/db');
-  return db;
-}
 
 /**
  * GET /api/projects/[id]/incidents/[incidentId]

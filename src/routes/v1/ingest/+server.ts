@@ -1,10 +1,8 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
-import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { nanoid } from 'nanoid';
 import { API_CONFIG } from '$lib/server/config/performance';
-import type * as schema from '$lib/server/db/schema';
+import { getDbClient } from '$lib/server/db/db';
 import { log, project } from '$lib/server/db/schema';
 import { logEventBus } from '$lib/server/events';
 import { ApiKeyError, validateApiKey } from '$lib/server/utils/api-key';
@@ -15,16 +13,6 @@ import {
   upsertIncidentsForPreparedLogs,
 } from '$lib/server/utils/incidents';
 import { parseSimpleIngestRequest, SimpleIngestError } from '$lib/server/utils/simple-ingest';
-
-async function getDbClient(
-  locals: App.Locals,
-): Promise<PgliteDatabase<typeof schema> | PostgresJsDatabase<typeof schema>> {
-  if (locals.db) {
-    return locals.db;
-  }
-  const { db } = await import('$lib/server/db');
-  return db;
-}
 
 /**
  * POST /v1/ingest (Simple JSON API)
@@ -114,11 +102,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
   const { insertedLogs, touchedIncidents } =
     preparedLogs.length > 0
-      ? await (
-          db as {
-            transaction: <T>(fn: (tx: typeof db) => Promise<T>) => Promise<T>;
-          }
-        ).transaction(async (tx) => {
+      ? await db.transaction(async (tx) => {
           const { incidentByFingerprint, touchedIncidents } = await upsertIncidentsForPreparedLogs(
             tx,
             projectId,

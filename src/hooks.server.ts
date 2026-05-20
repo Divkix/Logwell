@@ -2,6 +2,7 @@ import type { Handle, HandleServerError } from '@sveltejs/kit';
 import { svelteKitHandler } from 'better-auth/svelte-kit';
 import { building } from '$app/environment';
 import { auth, initAuth } from '$lib/server/auth';
+import { db } from '$lib/server/db';
 import { createErrorHandler } from '$lib/server/error-handler';
 import { startCleanupScheduler } from '$lib/server/jobs/cleanup-scheduler';
 
@@ -47,6 +48,8 @@ export const handle: Handle = async ({ event, resolve }) => {
     event.locals.session = session.session;
     event.locals.user = session.user;
   }
+
+  event.locals.db = db;
 
   // Use better-auth's SvelteKit handler for proper routing
   return svelteKitHandler({ event, resolve, auth, building });

@@ -1,33 +1,14 @@
 import { json } from '@sveltejs/kit';
 import { sql } from 'drizzle-orm';
-import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-import type * as schema from '$lib/server/db/schema';
+import { type DatabaseClient, getDbClient } from '$lib/server/db/db';
 import type { RequestEvent } from './$types';
-
-type DatabaseClient = PostgresJsDatabase<typeof schema> | PgliteDatabase<typeof schema>;
 
 // Track server start time for uptime calculation
 const serverStartTime = Date.now();
 
 /**
- * Helper to get database client from locals or production db
- * Supports test injection via locals.db
- */
-async function getDbClient(locals: App.Locals): Promise<DatabaseClient | null> {
-  if (locals.db) {
-    return locals.db as DatabaseClient;
-  }
-  try {
-    const { db } = await import('$lib/server/db');
-    return db;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Check database connectivity by executing a simple query
+ * Check database connectivity by executing a simple query.
+ * Returns `null` when the client could not be constructed (e.g. missing env).
  */
 async function checkDatabase(
   db: DatabaseClient | null,
@@ -35,7 +16,6 @@ async function checkDatabase(
   if (!db) {
     return { connected: false, error: 'Database client not available' };
   }
-
   try {
     // Execute a simple query to verify connectivity
     await db.execute(sql`SELECT 1`);
@@ -79,7 +59,12 @@ interface HealthResponse {
  * }
  */
 export async function GET(event: RequestEvent): Promise<Response> {
-  const db = await getDbClient(event.locals);
+  let db: DatabaseClient | null = null;
+  try {
+    db = await getDbClient(event.locals);
+  } catch {
+    // Production singleton failed to load (e.g. missing DATABASE_URL)
+  }
   const dbStatus = await checkDatabase(db);
 
   const isHealthy = dbStatus.connected;

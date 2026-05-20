@@ -1,9 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { and, count, desc, eq, gte, lt, or, type SQL } from 'drizzle-orm';
-import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { INCIDENT_CONFIG } from '$lib/server/config';
-import type * as schema from '$lib/server/db/schema';
+import { getDbClient } from '$lib/server/db/db';
 import { incident } from '$lib/server/db/schema';
 import { decodeCursor, encodeCursor } from '$lib/server/utils/cursor';
 import { getIncidentStatus } from '$lib/server/utils/incidents';
@@ -12,17 +10,9 @@ import { INCIDENT_RANGES, INCIDENT_STATUSES, type IncidentRange } from '$lib/sha
 import { getTimeRangeStart } from '$lib/utils/format';
 import type { RequestEvent } from './$types';
 
-type DatabaseClient = PostgresJsDatabase<typeof schema> | PgliteDatabase<typeof schema>;
-
 const DEFAULT_LIMIT = 50;
 const MIN_LIMIT = 20;
 const MAX_LIMIT = 200;
-
-async function getDbClient(locals: App.Locals): Promise<DatabaseClient> {
-  if (locals.db) return locals.db as DatabaseClient;
-  const { db } = await import('$lib/server/db');
-  return db;
-}
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);

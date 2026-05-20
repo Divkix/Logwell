@@ -1,14 +1,10 @@
 import { sql } from 'drizzle-orm';
-import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { nanoid } from 'nanoid';
+import type { DatabaseClient } from '$lib/server/db/db';
 import { type IncidentStatus, isIncidentGroupedLevel, maxIncidentLevel } from '../../shared/types';
 import { INCIDENT_CONFIG } from '../config';
-import type * as schema from '../db/schema';
 import { type Incident, incident, type LogLevel } from '../db/schema';
 import { buildIncidentFingerprint } from './incident-fingerprint';
-
-type DatabaseClient = PostgresJsDatabase<typeof schema> | PgliteDatabase<typeof schema>;
 
 /**
  * Log input shape needed for incident grouping.

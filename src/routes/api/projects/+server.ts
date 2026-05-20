@@ -1,9 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { and, count, desc, eq } from 'drizzle-orm';
-import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { nanoid } from 'nanoid';
-import type * as schema from '$lib/server/db/schema';
+import { getDbClient } from '$lib/server/db/db';
 import { log, project } from '$lib/server/db/schema';
 import { generateApiKey } from '$lib/server/utils/api-key';
 import { requireAuth } from '$lib/server/utils/auth-guard';
@@ -11,20 +9,6 @@ import { requireJsonContentType } from '$lib/server/utils/content-type';
 import { checkCsrfOrigin } from '$lib/server/utils/csrf';
 import { projectCreatePayloadSchema } from '$lib/shared/schemas/project';
 import type { RequestEvent } from './$types';
-
-type DatabaseClient = PostgresJsDatabase<typeof schema> | PgliteDatabase<typeof schema>;
-
-/**
- * Helper to get database client from locals or production db
- * Supports test injection via locals.db
- */
-async function getDbClient(locals: App.Locals): Promise<DatabaseClient> {
-  if (locals.db) {
-    return locals.db as DatabaseClient;
-  }
-  const { db } = await import('$lib/server/db');
-  return db;
-}
 
 /**
  * GET /api/projects

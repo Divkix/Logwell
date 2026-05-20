@@ -1,17 +1,12 @@
 import { json } from '@sveltejs/kit';
 import { and, eq, gte, lte, type SQL, sql } from 'drizzle-orm';
-import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-import type * as schema from '$lib/server/db/schema';
+import { type BucketCountRow, getDbClient, getQueryRows } from '$lib/server/db/db';
 import { incident, log } from '$lib/server/db/schema';
-import { type BucketCountRow, getQueryRows } from '$lib/server/utils/db-helpers';
 import { isErrorResponse, requireProjectOwnership } from '$lib/server/utils/project-guard';
 import { INCIDENT_RANGES, type IncidentRange } from '$lib/shared/types';
 import { getTimeRangeStart } from '$lib/utils/format';
 import { fillMissingBuckets, getTimeBucketConfig } from '$lib/utils/timeseries';
 import type { RequestEvent } from './$types';
-
-type DatabaseClient = PostgresJsDatabase<typeof schema> | PgliteDatabase<typeof schema>;
 
 /**
  * GET /api/projects/[id]/incidents/[incidentId]/timeline
@@ -93,10 +88,4 @@ export async function GET(event: RequestEvent): Promise<Response> {
       lastSeen: incidentRow.lastSeen.toISOString(),
     },
   });
-}
-
-async function getDbClient(locals: App.Locals): Promise<DatabaseClient> {
-  if (locals.db) return locals.db as DatabaseClient;
-  const { db } = await import('$lib/server/db');
-  return db;
 }
