@@ -1,8 +1,6 @@
 import { eq } from 'drizzle-orm';
-import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { nanoid } from 'nanoid';
-import type * as schema from '../db/schema';
+import type { DatabaseClient } from '$lib/server/db/db';
 import { project } from '../db/schema';
 
 /**
@@ -87,10 +85,7 @@ export function validateApiKeyFormat(key: string): boolean {
  * @returns Project ID associated with the API key
  * @throws ApiKeyError(401) if Authorization header missing, malformed, invalid format, or key not found
  */
-export async function validateApiKey(
-  request: Request,
-  dbClient?: PgliteDatabase<typeof schema> | PostgresJsDatabase<typeof schema>,
-): Promise<string> {
+export async function validateApiKey(request: Request, dbClient?: DatabaseClient): Promise<string> {
   // Extract Authorization header
   const authHeader = request.headers.get('Authorization');
   if (!authHeader?.startsWith('Bearer ')) {
@@ -112,8 +107,7 @@ export async function validateApiKey(
   }
 
   // Lazy load default db only when needed (avoids issues in unit tests)
-  const db =
-    dbClient ?? ((await import('../db').then((m) => m.db)) as PostgresJsDatabase<typeof schema>);
+  const db = dbClient ?? (await import('$lib/server/db')).db;
 
   // Query database
   const [result] = await db

@@ -1,12 +1,7 @@
 import { and, asc, eq, inArray, lt, sql } from 'drizzle-orm';
-import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { RETENTION_CONFIG } from '$lib/server/config';
+import type { DatabaseClient } from '$lib/server/db/db';
 import { log, project } from '$lib/server/db/schema';
-
-type DatabaseClient =
-  | PostgresJsDatabase<typeof import('$lib/server/db/schema')>
-  | PgliteDatabase<typeof import('$lib/server/db/schema')>;
 
 export interface CleanupResult {
   projectsProcessed: number;

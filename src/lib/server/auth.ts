@@ -1,17 +1,13 @@
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { username } from 'better-auth/plugins';
-import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-import type * as schema from './db/schema';
+import type { DatabaseClient } from './db/db';
 
 /**
  * Creates a better-auth instance with the provided database
  * @param database - Drizzle database instance (postgres-js or PGlite)
  */
-export function createAuth(
-  database: PostgresJsDatabase<typeof schema> | PgliteDatabase<typeof schema>,
-) {
+export function createAuth(database: DatabaseClient) {
   return betterAuth({
     database: drizzleAdapter(database, {
       provider: 'pg',

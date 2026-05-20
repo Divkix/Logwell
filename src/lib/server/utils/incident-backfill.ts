@@ -1,8 +1,6 @@
 import { and, eq, gte, inArray } from 'drizzle-orm';
-import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { nanoid } from 'nanoid';
-import type * as schema from '$lib/server/db/schema';
+import type { DatabaseClient } from '$lib/server/db/db';
 import { type Incident, incident, type LogLevel, log } from '$lib/server/db/schema';
 import {
   assignIncidentIds,
@@ -10,8 +8,6 @@ import {
   groupPreparedLogsByFingerprint,
   prepareLogsForIncidents,
 } from './incidents';
-
-type DatabaseClient = PostgresJsDatabase<typeof schema> | PgliteDatabase<typeof schema>;
 
 const GROUPED_LEVELS: LogLevel[] = ['error', 'fatal'];
 
@@ -62,11 +58,7 @@ export async function backfillProjectIncidents(
     };
   }
 
-  return await (
-    db as {
-      transaction: <T>(fn: (tx: DatabaseClient) => Promise<T>) => Promise<T>;
-    }
-  ).transaction(async (tx) => {
+  return await db.transaction(async (tx) => {
     const prepared = prepareLogsForIncidents(
       logs.map((entry) => ({
         level: entry.level,

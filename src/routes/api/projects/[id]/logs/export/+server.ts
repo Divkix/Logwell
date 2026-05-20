@@ -1,9 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { and, count, desc, eq, gte, inArray, lte, type SQL, sql } from 'drizzle-orm';
-import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { EXPORT_CONFIG } from '$lib/server/config/performance';
-import type * as schema from '$lib/server/db/schema';
+import { getDbClient } from '$lib/server/db/db';
 import { log } from '$lib/server/db/schema';
 import { serializeToCsv } from '$lib/server/utils/csv-serializer';
 import { isErrorResponse, requireProjectOwnership } from '$lib/server/utils/project-guard';
@@ -11,20 +9,6 @@ import { buildSearchQuery } from '$lib/server/utils/search';
 import { LOG_LEVELS, type LogLevel } from '$lib/shared/types';
 import type { ExportableLog, ExportFormat } from '$lib/types/export';
 import type { RequestEvent } from './$types';
-
-type DatabaseClient = PostgresJsDatabase<typeof schema> | PgliteDatabase<typeof schema>;
-
-/**
- * Helper to get database client from locals or production db
- * Supports test injection via locals.db
- */
-async function getDbClient(locals: App.Locals): Promise<DatabaseClient> {
-  if (locals.db) {
-    return locals.db as DatabaseClient;
-  }
-  const { db } = await import('$lib/server/db');
-  return db;
-}
 
 /**
  * Parse and validate level filter from query string

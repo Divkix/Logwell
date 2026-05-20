@@ -1,29 +1,12 @@
 import { json } from '@sveltejs/kit';
 import { and, eq, gte, lte, type SQL, sql } from 'drizzle-orm';
-import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import type { TimeRange } from '$lib/components/time-range-picker.svelte';
-import type * as schema from '$lib/server/db/schema';
+import { type BucketCountRow, getDbClient, getQueryRows } from '$lib/server/db/db';
 import { log } from '$lib/server/db/schema';
-import { type BucketCountRow, getQueryRows } from '$lib/server/utils/db-helpers';
 import { isErrorResponse, requireProjectOwnership } from '$lib/server/utils/project-guard';
 import { getTimeRangeStart } from '$lib/utils/format';
 import { fillMissingBuckets, getTimeBucketConfig } from '$lib/utils/timeseries';
 import type { RequestEvent } from './$types';
-
-type DatabaseClient = PostgresJsDatabase<typeof schema> | PgliteDatabase<typeof schema>;
-
-/**
- * Helper to get database client from locals or production db
- * Supports test injection via locals.db
- */
-async function getDbClient(locals: App.Locals): Promise<DatabaseClient> {
-  if (locals.db) {
-    return locals.db as DatabaseClient;
-  }
-  const { db } = await import('$lib/server/db');
-  return db;
-}
 
 const VALID_RANGES: TimeRange[] = ['15m', '1h', '24h', '7d'];
 
