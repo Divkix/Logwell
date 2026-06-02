@@ -34,9 +34,9 @@
     "sdk:version": "bun run --cwd sdks/typescript npm version"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.15",
-    "@electric-sql/pglite": "^0.4.5",
-    "@internationalized/date": "^3.12.1",
+    "@biomejs/biome": "^2.4.16",
+    "@electric-sql/pglite": "^0.5.1",
+    "@internationalized/date": "^3.12.2",
     "@playwright/test": "^1.60.0",
     "@sveltejs/kit": "^2.60.1",
     "@sveltejs/vite-plugin-svelte": "^7.1.2",
@@ -53,7 +53,7 @@
     "drizzle-kit": "^0.31.10",
     "drizzle-orm": "^0.45.2",
     "jsdom": "^29.1.1",
-    "knip": "^6.14.1",
+    "knip": "^6.15.0",
     "mode-watcher": "^1.1.0",
     "svelte": "^5.55.8",
     "svelte-adapter-bun": "^1.0.1",
@@ -61,12 +61,12 @@
     "svelte-sonner": "^1.1.1",
     "tailwindcss": "^4.3.0",
     "typescript": "^6.0.3",
-    "vite": "^8.0.13",
+    "vite": "^8.0.16",
     "vitest": "^4.1.6"
   },
   "dependencies": {
-    "@lucide/svelte": "^1.16.0",
-    "better-auth": "^1.6.11",
+    "@lucide/svelte": "^1.17.0",
+    "better-auth": "^1.6.14",
     "clsx": "^2.1.1",
     "layerchart": "^1.0.13",
     "nanoid": "^5.1.11",
