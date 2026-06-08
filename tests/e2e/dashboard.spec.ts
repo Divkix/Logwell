@@ -224,7 +224,7 @@ test.describe("Dashboard - Create Project Modal", () => {
 
     // The one-time API key reveal modal appears with the new plaintext key
     await expect(page.getByTestId("api-key-reveal-content")).toBeVisible();
-    await expect(page.getByTestId("api-key-reveal-value")).toContainText("lw_");
+    await expect(page.getByTestId("api-key-reveal-value")).toHaveText(/^lw_[a-zA-Z0-9]{32}$/);
     await page.getByTestId("api-key-reveal-close").click();
     await expect(page.getByTestId("api-key-reveal-content")).not.toBeVisible();
 
