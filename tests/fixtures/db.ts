@@ -1,7 +1,7 @@
-import { createHash } from 'node:crypto';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
 import { nanoid } from 'nanoid';
 import * as schema from '../../src/lib/server/db/schema';
+import { hashApiKey } from '../../src/lib/server/utils/api-key';
 
 /**
  * Type for project creation/selection
@@ -75,7 +75,7 @@ export function createProjectFactory(
   // unless the caller provides an explicit apiKeyHash. apiKeyHash is applied
   // after the spread so overrides can't leave it inconsistent.
   const apiKeyHash =
-    overrides.apiKeyHash ?? createHash('sha256').update(generateApiKey()).digest('hex');
+    overrides.apiKeyHash ?? hashApiKey(generateApiKey());
   return {
     id: nanoid(),
     name: `test-project-${nanoid(8)}`,
@@ -149,7 +149,7 @@ export async function seedProjectWithApiKey(
   overrides: Omit<Partial<ProjectInsert>, 'apiKeyHash'> = {},
 ): Promise<ProjectSelect & { apiKey: string }> {
   const apiKey = generateApiKey();
-  const apiKeyHash = createHash('sha256').update(apiKey).digest('hex');
+  const apiKeyHash = hashApiKey(apiKey);
   const result = await seedProject(db, { ...overrides, apiKeyHash });
   return { ...result, apiKey };
 }

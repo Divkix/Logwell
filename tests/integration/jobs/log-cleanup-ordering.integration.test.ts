@@ -1,6 +1,6 @@
 import { asc, eq } from 'drizzle-orm';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type * as schema from '../../../src/lib/server/db/schema';
 import { log } from '../../../src/lib/server/db/schema';
 import { setupTestDatabase } from '../../../src/lib/server/db/test-db';
@@ -11,10 +11,17 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 describe('cleanupOldLogs batch selection', () => {
   let db: PgliteDatabase<typeof schema>;
+  let setup: { db: PgliteDatabase<typeof schema>; cleanup: () => Promise<void> };
 
   beforeEach(async () => {
-    const setup = await setupTestDatabase();
+    setup = await setupTestDatabase();
     db = setup.db;
+  });
+
+  afterEach(async () => {
+    if (setup?.cleanup) {
+      await setup.cleanup();
+    }
   });
 
   it('deletes only logs older than retention, keeping the most recent', async () => {

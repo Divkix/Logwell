@@ -43,6 +43,7 @@ jobs:
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: "1.2.15"
+          no-cache: true
 
       - name: Get bun cache directory
         id: bun-cache-dir
@@ -83,6 +84,7 @@ jobs:
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: "1.2.15"
+          no-cache: true
 
       - name: Get bun cache directory
         id: bun-cache-dir
@@ -126,6 +128,7 @@ jobs:
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: "1.2.15"
+          no-cache: true
 
       - name: Get bun cache directory
         id: bun-cache-dir
@@ -178,6 +181,7 @@ jobs:
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: "1.2.15"
+          no-cache: true
 
       - name: Get bun cache directory
         id: bun-cache-dir
@@ -259,6 +263,7 @@ jobs:
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: "1.2.15"
+          no-cache: true
 
       - name: Get bun cache directory
         id: bun-cache-dir
@@ -317,6 +322,7 @@ jobs:
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: "1.2.15"
+          no-cache: true
 
       - name: Install deps
         run: bun install --frozen-lockfile

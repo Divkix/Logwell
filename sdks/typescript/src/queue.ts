@@ -32,6 +32,7 @@ export class BatchQueue {
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
   private flushing = false;
   private stopped = false;
+  private _flushPromise: Promise<IngestResponse | null> | null = null;
 
   constructor(
     private sendBatch: SendBatchFn,
@@ -95,45 +96,49 @@ export class BatchQueue {
     this.flushing = true;
     this.stopTimer();
 
-    // Snapshot current queue length so concurrent adds during flush are deferred
-    const snapshotLength = this.queue.length;
-    let sent = 0;
-    let lastResponse: IngestResponse | null = null;
-    try {
-      // Send in chunks bounded by batchSize, up to the snapshot count
-      while (sent < snapshotLength) {
-        const remaining = snapshotLength - sent;
-        const chunkSize = Math.min(this.config.batchSize, remaining);
-        const batch = this.queue.splice(0, chunkSize);
-        sent += batch.length;
-        try {
-          const response = await this.sendBatch(batch);
-          this.config.onFlush?.(batch.length);
-          lastResponse = response;
-        } catch (error) {
-          // Re-queue failed batch at front, respect maxQueueSize
-          const requeued = [...batch, ...this.queue];
-          this.queue.length = 0;
-          this.queue.push(...requeued.slice(0, this.config.maxQueueSize));
-          if (requeued.length > this.config.maxQueueSize) {
-            this.config.onError?.(
-              new LogwellError(
-                `Queue overflow: dropped ${requeued.length - this.config.maxQueueSize} logs`,
-                'QUEUE_OVERFLOW',
-              ),
-            );
+    this._flushPromise = (async () => {
+      // Snapshot current queue length so concurrent adds during flush are deferred
+      const snapshotLength = this.queue.length;
+      let sent = 0;
+      let lastResponse: IngestResponse | null = null;
+      try {
+        // Send in chunks bounded by batchSize, up to the snapshot count
+        while (sent < snapshotLength) {
+          const remaining = snapshotLength - sent;
+          const chunkSize = Math.min(this.config.batchSize, remaining);
+          const batch = this.queue.splice(0, chunkSize);
+          sent += batch.length;
+          try {
+            const response = await this.sendBatch(batch);
+            this.config.onFlush?.(batch.length);
+            lastResponse = response;
+          } catch (error) {
+            // Re-queue failed batch at front, respect maxQueueSize
+            const requeued = [...batch, ...this.queue];
+            this.queue.length = 0;
+            this.queue.push(...requeued.slice(0, this.config.maxQueueSize));
+            if (requeued.length > this.config.maxQueueSize) {
+              this.config.onError?.(
+                new LogwellError(
+                  `Queue overflow: dropped ${requeued.length - this.config.maxQueueSize} logs`,
+                  'QUEUE_OVERFLOW',
+                ),
+              );
+            }
+            this.config.onError?.(error as Error);
+            break; // stop flushing on error
           }
-          this.config.onError?.(error as Error);
-          break; // stop flushing on error
+        }
+      } finally {
+        this.flushing = false;
+        if (this.queue.length > 0 && !this.stopped) {
+          this.startTimer();
         }
       }
-    } finally {
-      this.flushing = false;
-      if (this.queue.length > 0 && !this.stopped) {
-        this.startTimer();
-      }
-    }
-    return lastResponse;
+      return lastResponse;
+    })();
+
+    return this._flushPromise;
   }
 
   /**
@@ -151,6 +156,10 @@ export class BatchQueue {
 
     this.stopped = true;
     this.stopTimer();
+
+    if (this._flushPromise) {
+      await this._flushPromise.catch(() => {});
+    }
 
     if (this.queue.length === 0) {
       return null;
