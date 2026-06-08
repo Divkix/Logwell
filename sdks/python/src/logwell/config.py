@@ -132,6 +132,13 @@ def validate_config(config: LogwellConfig) -> LogwellConfig:
             LogwellErrorCode.INVALID_CONFIG,
         )
 
+    if "batch_size" in config and config["batch_size"] > 100:
+        raise LogwellError(
+            f"Invalid batch_size: {config['batch_size']}. "
+            "batch_size must not exceed 100 (the server's per-request limit).",
+            LogwellErrorCode.INVALID_CONFIG,
+        )
+
     if "flush_interval" in config and config["flush_interval"] <= 0:
         raise LogwellError(
             f"Invalid flush_interval: {config['flush_interval']}. "

@@ -125,15 +125,20 @@ export class HttpTransport {
     let response: Response;
 
     try {
+      const body = JSON.stringify(logs);
+      // The Fetch spec caps keepalive request bodies at 64 KiB; enabling it for
+      // larger payloads makes the request fail outright in browsers and undici.
+      // Only opt in under that limit so large batches still send reliably.
+      const useKeepalive = new TextEncoder().encode(body).length < 60_000;
       response = await fetch(this.ingestUrl, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${this.config.apiKey}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(logs),
+        body,
         signal: AbortSignal.timeout(this.config.timeout ?? 30000),
-        keepalive: true,
+        keepalive: useKeepalive,
       });
     } catch (error) {
       // Timeout error (AbortError or TimeoutError)

@@ -144,6 +144,13 @@ $effect(() => {
 
   return () => {
     logStream.disconnect();
+  };
+});
+
+// Clear highlight-removal timers only on component unmount — not on every
+// live-mode toggle, which would otherwise strand the "new log" highlight.
+$effect(() => {
+  return () => {
     for (const t of highlightTimers) clearTimeout(t);
     highlightTimers.length = 0;
   };

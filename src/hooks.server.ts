@@ -5,6 +5,7 @@ import { auth, initAuth } from "$lib/server/auth";
 import { db } from "$lib/server/db";
 import { createErrorHandler } from "$lib/server/error-handler";
 import { startCleanupScheduler, stopCleanupScheduler } from "$lib/server/jobs/cleanup-scheduler";
+import { checkRateLimit, LOGIN_RPM } from "$lib/server/utils/rate-limit";
 
 // Initialize on server startup
 let initialized = false;
@@ -52,8 +53,25 @@ export const handle: Handle = async ({ event, resolve }) => {
   // Test injection seam — tests override this with a PGlite client via locals.db.
   event.locals.db = db;
 
-  // Skip session lookup for paths that never need auth
   const pathname = event.url.pathname;
+
+  // Brute-force protection: rate limit login attempts per client IP.
+  if (event.request.method === "POST" && pathname.startsWith("/api/auth/sign-in")) {
+    if (!checkRateLimit(`login:${event.getClientAddress()}`, LOGIN_RPM)) {
+      return new Response(
+        JSON.stringify({
+          error: "rate_limited",
+          message: "Too many login attempts. Retry in 60 seconds.",
+        }),
+        {
+          status: 429,
+          headers: { "Content-Type": "application/json", "Retry-After": "60" },
+        },
+      );
+    }
+  }
+
+  // Skip session lookup for paths that never need auth
   if (
     pathname.startsWith("/v1/") ||
     pathname === "/api/health" ||
