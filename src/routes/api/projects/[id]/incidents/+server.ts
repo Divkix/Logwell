@@ -1,15 +1,15 @@
-import { json } from '@sveltejs/kit';
-import { and, count, desc, eq, gte, lt, or, type SQL } from 'drizzle-orm';
-import { INCIDENT_CONFIG } from '$lib/server/config';
-import { getDbClient } from '$lib/server/db/db';
-import { incident } from '$lib/server/db/schema';
-import { apiError } from '$lib/server/utils/api-error';
-import { decodeCursor, encodeCursor } from '$lib/server/utils/cursor';
-import { getIncidentStatus } from '$lib/server/utils/incidents';
-import { isErrorResponse, requireProjectOwnership } from '$lib/server/utils/project-guard';
-import { INCIDENT_RANGES, INCIDENT_STATUSES, type IncidentRange } from '$lib/shared/types';
-import { getTimeRangeStart } from '$lib/utils/format';
-import type { RequestEvent } from './$types';
+import { json } from "@sveltejs/kit";
+import { and, count, desc, eq, gte, lt, or, type SQL } from "drizzle-orm";
+import { INCIDENT_CONFIG } from "$lib/server/config";
+import { getDbClient } from "$lib/server/db/db";
+import { incident } from "$lib/server/db/schema";
+import { apiError } from "$lib/server/utils/api-error";
+import { decodeCursor, encodeCursor } from "$lib/server/utils/cursor";
+import { getIncidentStatus } from "$lib/server/utils/incidents";
+import { isErrorResponse, requireProjectOwnership } from "$lib/server/utils/project-guard";
+import { INCIDENT_RANGES, INCIDENT_STATUSES, type IncidentRange } from "$lib/shared/types";
+import { getTimeRangeStart } from "$lib/utils/format";
+import type { RequestEvent } from "./$types";
 
 const DEFAULT_LIMIT = 50;
 const MIN_LIMIT = 20;
@@ -31,30 +31,30 @@ export async function GET(event: RequestEvent): Promise<Response> {
 
   const params = event.url.searchParams;
   const limit = clamp(
-    params.get('limit')
-      ? Number.parseInt(params.get('limit') || '', 10) || DEFAULT_LIMIT
+    params.get("limit")
+      ? Number.parseInt(params.get("limit") || "", 10) || DEFAULT_LIMIT
       : DEFAULT_LIMIT,
     MIN_LIMIT,
     MAX_LIMIT,
   );
-  const cursorParam = params.get('cursor');
-  const statusParam = params.get('status') || 'open';
+  const cursorParam = params.get("cursor");
+  const statusParam = params.get("status") || "open";
   const status = INCIDENT_STATUSES.includes(statusParam as (typeof INCIDENT_STATUSES)[number])
     ? (statusParam as (typeof INCIDENT_STATUSES)[number])
-    : 'open';
+    : "open";
 
-  const rangeParam = params.get('range') || '24h';
+  const rangeParam = params.get("range") || "24h";
   const range: IncidentRange = INCIDENT_RANGES.includes(rangeParam as IncidentRange)
     ? (rangeParam as IncidentRange)
-    : '24h';
+    : "24h";
   const rangeStart = getTimeRangeStart(range);
   const resolvedThreshold = new Date(Date.now() - INCIDENT_CONFIG.AUTO_RESOLVE_MINUTES * 60 * 1000);
 
   const conditions: SQL[] = [eq(incident.projectId, projectId), gte(incident.lastSeen, rangeStart)];
 
-  if (status === 'open') {
+  if (status === "open") {
     conditions.push(gte(incident.lastSeen, resolvedThreshold));
-  } else if (status === 'resolved') {
+  } else if (status === "resolved") {
     conditions.push(lt(incident.lastSeen, resolvedThreshold));
   }
 
@@ -70,8 +70,8 @@ export async function GET(event: RequestEvent): Promise<Response> {
     } catch (error) {
       return apiError(
         400,
-        'invalid_cursor',
-        error instanceof Error ? error.message : 'Invalid cursor',
+        "invalid_cursor",
+        error instanceof Error ? error.message : "Invalid cursor",
       );
     }
   }

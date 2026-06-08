@@ -1,8 +1,8 @@
-import { json, type RequestEvent } from '@sveltejs/kit';
-import { and, eq } from 'drizzle-orm';
-import { getDbClient } from '$lib/server/db/db';
-import { type Project, project } from '$lib/server/db/schema';
-import { type AuthenticatedSession, requireAuth } from './auth-guard';
+import { json, type RequestEvent } from "@sveltejs/kit";
+import { and, eq } from "drizzle-orm";
+import { getDbClient } from "$lib/server/db/db";
+import { type Project, project } from "$lib/server/db/schema";
+import { type AuthenticatedSession, requireAuth } from "./auth-guard";
 
 /**
  * Result of successful project ownership check
@@ -49,7 +49,7 @@ export async function requireProjectOwnership(
 
   if (!projectData) {
     // Return 404 to hide existence from non-owners
-    return json({ error: 'not_found', message: 'Project not found' }, { status: 404 });
+    return json({ error: "not_found", message: "Project not found" }, { status: 404 });
   }
 
   return { project: projectData, user, session };

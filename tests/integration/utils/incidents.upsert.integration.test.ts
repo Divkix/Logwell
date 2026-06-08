@@ -1,55 +1,55 @@
-import { and, eq } from 'drizzle-orm';
-import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import { beforeEach, describe, expect, it } from 'vitest';
-import * as schema from '$lib/server/db/schema';
-import { setupTestDatabase } from '$lib/server/db/test-db';
+import { and, eq } from "drizzle-orm";
+import type { PgliteDatabase } from "drizzle-orm/pglite";
+import { beforeEach, describe, expect, it } from "vite-plus/test";
+import * as schema from "$lib/server/db/schema";
+import { setupTestDatabase } from "$lib/server/db/test-db";
 import {
   type PreparedIncidentLog,
   upsertIncidentsForPreparedLogs,
-} from '$lib/server/utils/incidents';
-import { seedProject } from '../../fixtures/db';
+} from "$lib/server/utils/incidents";
+import { seedProject } from "../../fixtures/db";
 
-describe('Incident upsert race condition', () => {
+describe("Incident upsert race condition", () => {
   let db: PgliteDatabase<typeof schema>;
   beforeEach(async () => {
     const setup = await setupTestDatabase();
     db = setup.db;
   });
 
-  it('handles concurrent upserts for the same new fingerprint without error', async () => {
+  it("handles concurrent upserts for the same new fingerprint without error", async () => {
     const project = await seedProject(db);
     const now = new Date();
 
     const logsA: PreparedIncidentLog[] = [
       {
-        level: 'error',
-        message: 'Database connection timeout',
+        level: "error",
+        message: "Database connection timeout",
         timestamp: now,
-        sourceFile: 'src/db.ts',
+        sourceFile: "src/db.ts",
         lineNumber: 42,
         resourceAttributes: null,
         metadata: null,
-        serviceName: 'api',
-        fingerprint: 'db-timeout-fp',
-        normalizedMessage: 'database connection timeout',
-        incidentTitle: 'Database connection timeout',
+        serviceName: "api",
+        fingerprint: "db-timeout-fp",
+        normalizedMessage: "database connection timeout",
+        incidentTitle: "Database connection timeout",
         incidentId: null,
       },
     ];
 
     const logsB: PreparedIncidentLog[] = [
       {
-        level: 'error',
-        message: 'Database connection timeout (retry)',
+        level: "error",
+        message: "Database connection timeout (retry)",
         timestamp: new Date(now.getTime() + 1000),
-        sourceFile: 'src/db.ts',
+        sourceFile: "src/db.ts",
         lineNumber: 42,
         resourceAttributes: null,
         metadata: null,
-        serviceName: 'api',
-        fingerprint: 'db-timeout-fp',
-        normalizedMessage: 'database connection timeout',
-        incidentTitle: 'Database connection timeout (retry)',
+        serviceName: "api",
+        fingerprint: "db-timeout-fp",
+        normalizedMessage: "database connection timeout",
+        incidentTitle: "Database connection timeout (retry)",
         incidentId: null,
       },
     ];
@@ -72,7 +72,7 @@ describe('Incident upsert race condition', () => {
       .where(
         and(
           eq(schema.incident.projectId, project.id),
-          eq(schema.incident.fingerprint, 'db-timeout-fp'),
+          eq(schema.incident.fingerprint, "db-timeout-fp"),
         ),
       );
 
@@ -86,40 +86,40 @@ describe('Incident upsert race condition', () => {
     expect(incidentRow.lastSeen.getTime()).toBeGreaterThanOrEqual(now.getTime() + 1000);
   });
 
-  it('handles concurrent upsert when one batch has multiple new fingerprints', async () => {
+  it("handles concurrent upsert when one batch has multiple new fingerprints", async () => {
     const project = await seedProject(db);
     const now = new Date();
 
     const logsA: PreparedIncidentLog[] = [
       {
-        level: 'error',
-        message: 'Error A',
+        level: "error",
+        message: "Error A",
         timestamp: now,
-        sourceFile: 'src/a.ts',
+        sourceFile: "src/a.ts",
         lineNumber: 1,
         resourceAttributes: null,
         metadata: null,
-        serviceName: 'svc-a',
-        fingerprint: 'fp-a',
-        normalizedMessage: 'error a',
-        incidentTitle: 'Error A',
+        serviceName: "svc-a",
+        fingerprint: "fp-a",
+        normalizedMessage: "error a",
+        incidentTitle: "Error A",
         incidentId: null,
       },
     ];
 
     const logsB: PreparedIncidentLog[] = [
       {
-        level: 'fatal',
-        message: 'Error B',
+        level: "fatal",
+        message: "Error B",
         timestamp: new Date(now.getTime() + 500),
-        sourceFile: 'src/b.ts',
+        sourceFile: "src/b.ts",
         lineNumber: 2,
         resourceAttributes: null,
         metadata: null,
-        serviceName: 'svc-b',
-        fingerprint: 'fp-b',
-        normalizedMessage: 'error b',
-        incidentTitle: 'Error B',
+        serviceName: "svc-b",
+        fingerprint: "fp-b",
+        normalizedMessage: "error b",
+        incidentTitle: "Error B",
         incidentId: null,
       },
     ];

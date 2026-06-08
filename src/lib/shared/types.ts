@@ -12,5 +12,5 @@ export {
   type IncidentTimelineResponse,
   isIncidentGroupedLevel,
   maxIncidentLevel,
-} from './schemas/incident';
-export { LOG_LEVELS, type LogLevel } from './schemas/log';
+} from "./schemas/incident";
+export { LOG_LEVELS, type LogLevel } from "./schemas/log";

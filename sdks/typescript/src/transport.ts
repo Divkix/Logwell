@@ -1,5 +1,5 @@
-import { LogwellError } from './errors';
-import type { IngestResponse, LogEntry } from './types';
+import { LogwellError } from "./errors";
+import type { IngestResponse, LogEntry } from "./types";
 
 /**
  * Transport configuration
@@ -66,7 +66,7 @@ export class HttpTransport {
   private readonly ingestUrl: string;
 
   constructor(private config: TransportConfig) {
-    const cleanEndpoint = config.endpoint.replace(/\/$/, '');
+    const cleanEndpoint = config.endpoint.replace(/\/$/, "");
     this.ingestUrl = `${cleanEndpoint}/v1/ingest`;
   }
 
@@ -79,8 +79,8 @@ export class HttpTransport {
    */
   async send(logs: LogEntry[]): Promise<IngestResponse> {
     let lastError: LogwellError = new LogwellError(
-      'Max retries exceeded',
-      'NETWORK_ERROR',
+      "Max retries exceeded",
+      "NETWORK_ERROR",
       undefined,
       true,
     );
@@ -94,7 +94,7 @@ export class HttpTransport {
         } else {
           lastError = new LogwellError(
             `Unexpected error: ${(error as Error).message}`,
-            'NETWORK_ERROR',
+            "NETWORK_ERROR",
             undefined,
             true,
           );
@@ -126,10 +126,10 @@ export class HttpTransport {
 
     try {
       response = await fetch(this.ingestUrl, {
-        method: 'POST',
+        method: "POST",
         headers: {
           Authorization: `Bearer ${this.config.apiKey}`,
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(logs),
         signal: AbortSignal.timeout(this.config.timeout ?? 30000),
@@ -139,14 +139,14 @@ export class HttpTransport {
       // Timeout error (AbortError or TimeoutError)
       if (
         error instanceof Error &&
-        (error.name === 'AbortError' || error.name === 'TimeoutError')
+        (error.name === "AbortError" || error.name === "TimeoutError")
       ) {
-        throw new LogwellError('Request timed out', 'NETWORK_ERROR', undefined, true);
+        throw new LogwellError("Request timed out", "NETWORK_ERROR", undefined, true);
       }
       // Network error (fetch failed)
       throw new LogwellError(
         `Network error: ${(error as Error).message}`,
-        'NETWORK_ERROR',
+        "NETWORK_ERROR",
         undefined,
         true,
       );
@@ -165,7 +165,7 @@ export class HttpTransport {
   private async tryParseError(response: Response): Promise<string> {
     try {
       const body = await response.json();
-      return body.message || body.error || 'Unknown error';
+      return body.message || body.error || "Unknown error";
     } catch {
       return `HTTP ${response.status}`;
     }
@@ -174,10 +174,10 @@ export class HttpTransport {
   private createErrorWithRetryAfter(response: Response, message: string): LogwellError {
     const { status } = response;
     if (status === 429) {
-      const retryAfterMs = parseRetryAfter(response.headers.get('Retry-After'));
+      const retryAfterMs = parseRetryAfter(response.headers.get("Retry-After"));
       return new LogwellError(
         `Rate limited: ${message}`,
-        'RATE_LIMITED',
+        "RATE_LIMITED",
         status,
         true,
         retryAfterMs,
@@ -189,16 +189,16 @@ export class HttpTransport {
   private createError(status: number, message: string): LogwellError {
     switch (status) {
       case 401:
-        return new LogwellError(`Unauthorized: ${message}`, 'UNAUTHORIZED', status, false);
+        return new LogwellError(`Unauthorized: ${message}`, "UNAUTHORIZED", status, false);
       case 400:
-        return new LogwellError(`Validation error: ${message}`, 'VALIDATION_ERROR', status, false);
+        return new LogwellError(`Validation error: ${message}`, "VALIDATION_ERROR", status, false);
       case 429:
-        return new LogwellError(`Rate limited: ${message}`, 'RATE_LIMITED', status, true);
+        return new LogwellError(`Rate limited: ${message}`, "RATE_LIMITED", status, true);
       default:
         if (status >= 500) {
-          return new LogwellError(`Server error: ${message}`, 'SERVER_ERROR', status, true);
+          return new LogwellError(`Server error: ${message}`, "SERVER_ERROR", status, true);
         }
-        return new LogwellError(`HTTP error ${status}: ${message}`, 'SERVER_ERROR', status, false);
+        return new LogwellError(`HTTP error ${status}: ${message}`, "SERVER_ERROR", status, false);
     }
   }
 }

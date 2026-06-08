@@ -25,13 +25,13 @@ export interface FocusTrapOptions {
 }
 
 const FOCUSABLE_SELECTOR = [
-  'button:not([disabled])',
-  '[href]',
-  'input:not([disabled])',
-  'select:not([disabled])',
-  'textarea:not([disabled])',
+  "button:not([disabled])",
+  "[href]",
+  "input:not([disabled])",
+  "select:not([disabled])",
+  "textarea:not([disabled])",
   '[tabindex]:not([tabindex="-1"])',
-].join(', ');
+].join(", ");
 
 /**
  * Gets all focusable elements within a container.
@@ -41,7 +41,7 @@ function getFocusableElements(container: HTMLElement): HTMLElement[] {
   return Array.from(elements).filter((el) => {
     // Check if element is visible
     const style = window.getComputedStyle(el);
-    return style.display !== 'none' && style.visibility !== 'hidden' && el.offsetParent !== null;
+    return style.display !== "none" && style.visibility !== "hidden" && el.offsetParent !== null;
   });
 }
 
@@ -56,7 +56,7 @@ function createFocusTrap(container: HTMLElement, options: FocusTrapOptions = {})
   const previouslyFocused = (returnFocus || document.activeElement) as HTMLElement | null;
 
   function handleKeyDown(event: KeyboardEvent) {
-    if (event.key !== 'Tab') return;
+    if (event.key !== "Tab") return;
 
     const focusableElements = getFocusableElements(container);
     if (focusableElements.length === 0) return;
@@ -90,7 +90,7 @@ function createFocusTrap(container: HTMLElement, options: FocusTrapOptions = {})
 
     let elementToFocus: HTMLElement | null = null;
 
-    if (typeof initialFocus === 'string') {
+    if (typeof initialFocus === "string") {
       elementToFocus = container.querySelector(initialFocus);
     } else if (initialFocus instanceof HTMLElement) {
       elementToFocus = initialFocus;
@@ -109,7 +109,7 @@ function createFocusTrap(container: HTMLElement, options: FocusTrapOptions = {})
   }
 
   // Activate the trap
-  container.addEventListener('keydown', handleKeyDown);
+  container.addEventListener("keydown", handleKeyDown);
   setInitialFocus();
 
   // Return cleanup and restore focus functions
@@ -118,8 +118,8 @@ function createFocusTrap(container: HTMLElement, options: FocusTrapOptions = {})
      * Deactivates the focus trap and restores focus to the previously focused element.
      */
     deactivate() {
-      container.removeEventListener('keydown', handleKeyDown);
-      if (previouslyFocused && typeof previouslyFocused.focus === 'function') {
+      container.removeEventListener("keydown", handleKeyDown);
+      if (previouslyFocused && typeof previouslyFocused.focus === "function") {
         previouslyFocused.focus();
       }
     },
@@ -151,27 +151,27 @@ export function focusTrap(node: HTMLElement, options: FocusTrapOptions = {}) {
  */
 export function announceToScreenReader(
   message: string,
-  priority: 'polite' | 'assertive' = 'polite',
+  priority: "polite" | "assertive" = "polite",
 ) {
   // Look for existing live region or create one
-  let liveRegion = document.getElementById('sr-announcer');
+  let liveRegion = document.getElementById("sr-announcer");
 
   if (!liveRegion) {
-    liveRegion = document.createElement('div');
-    liveRegion.id = 'sr-announcer';
-    liveRegion.setAttribute('aria-live', priority);
-    liveRegion.setAttribute('aria-atomic', 'true');
-    liveRegion.className = 'sr-only';
+    liveRegion = document.createElement("div");
+    liveRegion.id = "sr-announcer";
+    liveRegion.setAttribute("aria-live", priority);
+    liveRegion.setAttribute("aria-atomic", "true");
+    liveRegion.className = "sr-only";
     liveRegion.style.cssText =
-      'position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;';
+      "position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;";
     document.body.appendChild(liveRegion);
   }
 
   // Update priority if needed
-  liveRegion.setAttribute('aria-live', priority);
+  liveRegion.setAttribute("aria-live", priority);
 
   // Clear and set message (necessary for repeat announcements)
-  liveRegion.textContent = '';
+  liveRegion.textContent = "";
   requestAnimationFrame(() => {
     if (liveRegion) {
       liveRegion.textContent = message;

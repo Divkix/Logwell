@@ -1,12 +1,12 @@
-import { createHash } from 'node:crypto';
-import { eq } from 'drizzle-orm';
-import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import { nanoid } from 'nanoid';
-import { beforeEach, describe, expect, it } from 'vitest';
-import * as schema from '../../../src/lib/server/db/schema';
-import { project } from '../../../src/lib/server/db/schema';
-import { setupTestDatabase } from '../../../src/lib/server/db/test-db';
-import { getOrCreateDefaultUser } from '../../fixtures/db';
+import { createHash } from "node:crypto";
+import { eq } from "drizzle-orm";
+import type { PgliteDatabase } from "drizzle-orm/pglite";
+import { nanoid } from "nanoid";
+import { beforeEach, describe, expect, it } from "vite-plus/test";
+import * as schema from "../../../src/lib/server/db/schema";
+import { project } from "../../../src/lib/server/db/schema";
+import { setupTestDatabase } from "../../../src/lib/server/db/test-db";
+import { getOrCreateDefaultUser } from "../../fixtures/db";
 
 /**
  * Generates a unique API key in the format: lw_<32-random-chars>
@@ -16,10 +16,10 @@ function generateApiKey(): string {
 }
 
 function hashApiKey(key: string): string {
-  return createHash('sha256').update(key).digest('hex');
+  return createHash("sha256").update(key).digest("hex");
 }
 
-describe('Project Table Schema', () => {
+describe("Project Table Schema", () => {
   let db: PgliteDatabase<typeof schema>;
   let userId: string;
 
@@ -30,10 +30,10 @@ describe('Project Table Schema', () => {
     userId = user.id;
   });
 
-  it('should create a project with API key', async () => {
+  it("should create a project with API key", async () => {
     const projectId = nanoid();
     const apiKey = generateApiKey();
-    const projectName = 'test-project';
+    const projectName = "test-project";
 
     const [createdProject] = await db
       .insert(project)
@@ -53,8 +53,8 @@ describe('Project Table Schema', () => {
     expect(createdProject!.updatedAt).toBeInstanceOf(Date);
   });
 
-  it('should enforce unique project names per owner', async () => {
-    const projectName = 'duplicate-name';
+  it("should enforce unique project names per owner", async () => {
+    const projectName = "duplicate-name";
     const apiKey1 = generateApiKey();
     const apiKey2 = generateApiKey();
 
@@ -80,7 +80,7 @@ describe('Project Table Schema', () => {
     const otherUserId = nanoid();
     await db.insert(schema.user).values({
       id: otherUserId,
-      name: 'Other User',
+      name: "Other User",
       email: `other-${otherUserId}@example.com`,
       emailVerified: false,
     });
@@ -102,10 +102,10 @@ describe('Project Table Schema', () => {
     expect(otherProject!.ownerId).toBe(otherUserId);
   });
 
-  it('should find project by API key', async () => {
+  it("should find project by API key", async () => {
     const projectId = nanoid();
     const apiKey = generateApiKey();
-    const projectName = 'api-key-test';
+    const projectName = "api-key-test";
 
     // Create project
     await db.insert(project).values({

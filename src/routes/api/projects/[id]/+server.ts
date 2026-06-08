@@ -1,13 +1,13 @@
-import { json } from '@sveltejs/kit';
-import { and, count, eq, ne } from 'drizzle-orm';
-import { getDbClient } from '$lib/server/db/db';
-import { log, project } from '$lib/server/db/schema';
-import { invalidateApiKeyCacheByHash } from '$lib/server/utils/api-key';
-import { requireJsonContentType } from '$lib/server/utils/content-type';
-import { checkCsrfOrigin } from '$lib/server/utils/csrf';
-import { isErrorResponse, requireProjectOwnership } from '$lib/server/utils/project-guard';
-import { projectUpdatePayloadSchema } from '$lib/shared/schemas/project';
-import type { RequestEvent } from './$types';
+import { json } from "@sveltejs/kit";
+import { and, count, eq, ne } from "drizzle-orm";
+import { getDbClient } from "$lib/server/db/db";
+import { log, project } from "$lib/server/db/schema";
+import { invalidateApiKeyCacheByHash } from "$lib/server/utils/api-key";
+import { requireJsonContentType } from "$lib/server/utils/content-type";
+import { checkCsrfOrigin } from "$lib/server/utils/csrf";
+import { isErrorResponse, requireProjectOwnership } from "$lib/server/utils/project-guard";
+import { projectUpdatePayloadSchema } from "$lib/shared/schemas/project";
+import type { RequestEvent } from "./$types";
 
 /**
  * GET /api/projects/[id]
@@ -130,14 +130,14 @@ export async function PATCH(event: RequestEvent): Promise<Response> {
   try {
     body = await event.request.json();
   } catch {
-    return json({ error: 'invalid_json', message: 'Invalid JSON body' }, { status: 400 });
+    return json({ error: "invalid_json", message: "Invalid JSON body" }, { status: 400 });
   }
 
   // Validate request body
   const result = projectUpdatePayloadSchema.safeParse(body);
   if (!result.success) {
-    const errorMessage = result.error.issues?.[0]?.message || 'Validation failed';
-    return json({ code: 'validation_error', message: errorMessage }, { status: 400 });
+    const errorMessage = result.error.issues?.[0]?.message || "Validation failed";
+    return json({ code: "validation_error", message: errorMessage }, { status: 400 });
   }
 
   const { name, retentionDays } = result.data;
@@ -154,7 +154,7 @@ export async function PATCH(event: RequestEvent): Promise<Response> {
     });
     if (existing) {
       return json(
-        { code: 'duplicate_name', message: 'A project with this name already exists' },
+        { code: "duplicate_name", message: "A project with this name already exists" },
         { status: 400 },
       );
     }
@@ -194,7 +194,7 @@ export async function PATCH(event: RequestEvent): Promise<Response> {
     .returning();
 
   if (!updated) {
-    return json({ code: 'not_found', message: 'Project not found' }, { status: 404 });
+    return json({ code: "not_found", message: "Project not found" }, { status: 404 });
   }
 
   return json({

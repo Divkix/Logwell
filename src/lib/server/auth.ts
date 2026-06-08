@@ -1,8 +1,8 @@
-import { betterAuth } from 'better-auth';
-import { drizzleAdapter } from 'better-auth/adapters/drizzle';
-import { username } from 'better-auth/plugins';
-import { env } from '$lib/server/config/env';
-import type { DatabaseClient } from './db/db';
+import { betterAuth } from "better-auth";
+import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { username } from "better-auth/plugins";
+import { env } from "$lib/server/config/env";
+import type { DatabaseClient } from "./db/db";
 
 /**
  * Creates a better-auth instance with the provided database
@@ -11,7 +11,7 @@ import type { DatabaseClient } from './db/db';
 export function createAuth(database: DatabaseClient) {
   return betterAuth({
     database: drizzleAdapter(database, {
-      provider: 'pg',
+      provider: "pg",
     }),
     emailAndPassword: {
       enabled: true,
@@ -40,7 +40,7 @@ async function initAuth(): Promise<void> {
   if (_initPromise) return _initPromise;
 
   _initPromise = (async () => {
-    const { db } = await import('./db');
+    const { db } = await import("./db");
     _auth = createAuth(db);
   })();
 
@@ -52,7 +52,7 @@ export const auth = new Proxy({} as ReturnType<typeof createAuth>, {
     if (!_auth) {
       // For synchronous access, we need to throw if not initialized
       // The hooks.server.ts should call initAuth() first
-      throw new Error('Auth not initialized. Call initAuth() before accessing auth properties.');
+      throw new Error("Auth not initialized. Call initAuth() before accessing auth properties.");
     }
     return _auth[prop as keyof typeof _auth];
   },
@@ -63,5 +63,5 @@ export { initAuth };
 /**
  * Type exports for better-auth session and user
  */
-export type Session = ReturnType<typeof createAuth>['$Infer']['Session']['session'];
-export type User = ReturnType<typeof createAuth>['$Infer']['Session']['user'];
+export type Session = ReturnType<typeof createAuth>["$Infer"]["Session"]["session"];
+export type User = ReturnType<typeof createAuth>["$Infer"]["Session"]["user"];

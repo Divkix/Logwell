@@ -1,8 +1,8 @@
-import { type ResolvedConfig, validateConfig } from './config';
-import { BatchQueue, type QueueConfig } from './queue';
-import { captureSourceLocation } from './source-location';
-import { HttpTransport } from './transport';
-import type { IngestResponse, LogEntry, LogwellConfig } from './types';
+import { type ResolvedConfig, validateConfig } from "./config";
+import { BatchQueue, type QueueConfig } from "./queue";
+import { captureSourceLocation } from "./source-location";
+import { HttpTransport } from "./transport";
+import type { IngestResponse, LogEntry, LogwellConfig } from "./types";
 
 /**
  * Child logger options
@@ -120,35 +120,35 @@ export class Logwell {
    * Log a debug message
    */
   debug(message: string, metadata?: Record<string, unknown>): void {
-    this._addLog({ level: 'debug', message, metadata }, 2);
+    this._addLog({ level: "debug", message, metadata }, 2);
   }
 
   /**
    * Log an info message
    */
   info(message: string, metadata?: Record<string, unknown>): void {
-    this._addLog({ level: 'info', message, metadata }, 2);
+    this._addLog({ level: "info", message, metadata }, 2);
   }
 
   /**
    * Log a warning message
    */
   warn(message: string, metadata?: Record<string, unknown>): void {
-    this._addLog({ level: 'warn', message, metadata }, 2);
+    this._addLog({ level: "warn", message, metadata }, 2);
   }
 
   /**
    * Log an error message
    */
   error(message: string, metadata?: Record<string, unknown>): void {
-    this._addLog({ level: 'error', message, metadata }, 2);
+    this._addLog({ level: "error", message, metadata }, 2);
   }
 
   /**
    * Log a fatal error message
    */
   fatal(message: string, metadata?: Record<string, unknown>): void {
-    this._addLog({ level: 'fatal', message, metadata }, 2);
+    this._addLog({ level: "fatal", message, metadata }, 2);
   }
 
   /**

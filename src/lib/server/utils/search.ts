@@ -1,6 +1,6 @@
-import { desc, sql } from 'drizzle-orm';
-import type { DatabaseClient } from '$lib/server/db/db';
-import { type Log, log } from '../db/schema';
+import { desc, sql } from "drizzle-orm";
+import type { DatabaseClient } from "$lib/server/db/db";
+import { type Log, log } from "../db/schema";
 
 /**
  * Builds a PostgreSQL tsquery string from a search term
@@ -19,8 +19,8 @@ import { type Log, log } from '../db/schema';
  * // Returns: 'error & warning'
  */
 export function buildSearchQuery(searchTerm: string): string {
-  if (!searchTerm || typeof searchTerm !== 'string') {
-    return '';
+  if (!searchTerm || typeof searchTerm !== "string") {
+    return "";
   }
 
   // PostgreSQL tsquery special characters that need to be removed
@@ -28,12 +28,12 @@ export function buildSearchQuery(searchTerm: string): string {
   const specialCharsRegex = /[&|!():*\\'"<>]/g;
 
   // Remove special characters, then split on whitespace
-  const sanitized = searchTerm.replace(specialCharsRegex, ' ');
+  const sanitized = searchTerm.replace(specialCharsRegex, " ");
 
   // Split on whitespace, filter empty strings, and join with ' & '
   const terms = sanitized.split(/\s+/).filter((term) => term.length > 0);
 
-  return terms.join(' & ');
+  return terms.join(" & ");
 }
 
 /**

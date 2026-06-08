@@ -1,15 +1,15 @@
-import { json } from '@sveltejs/kit';
-import { and, count, desc, eq } from 'drizzle-orm';
-import { nanoid } from 'nanoid';
-import { getDbClient } from '$lib/server/db/db';
-import { log, project } from '$lib/server/db/schema';
-import { apiError } from '$lib/server/utils/api-error';
-import { generateApiKey, hashApiKey } from '$lib/server/utils/api-key';
-import { requireAuth } from '$lib/server/utils/auth-guard';
-import { requireJsonContentType } from '$lib/server/utils/content-type';
-import { checkCsrfOrigin } from '$lib/server/utils/csrf';
-import { projectCreatePayloadSchema } from '$lib/shared/schemas/project';
-import type { RequestEvent } from './$types';
+import { json } from "@sveltejs/kit";
+import { and, count, desc, eq } from "drizzle-orm";
+import { nanoid } from "nanoid";
+import { getDbClient } from "$lib/server/db/db";
+import { log, project } from "$lib/server/db/schema";
+import { apiError } from "$lib/server/utils/api-error";
+import { generateApiKey, hashApiKey } from "$lib/server/utils/api-key";
+import { requireAuth } from "$lib/server/utils/auth-guard";
+import { requireJsonContentType } from "$lib/server/utils/content-type";
+import { checkCsrfOrigin } from "$lib/server/utils/csrf";
+import { projectCreatePayloadSchema } from "$lib/shared/schemas/project";
+import type { RequestEvent } from "./$types";
 
 /**
  * GET /api/projects
@@ -113,7 +113,7 @@ export async function POST(event: RequestEvent): Promise<Response> {
   try {
     body = await event.request.json();
   } catch {
-    return apiError(400, 'invalid_json', 'Invalid JSON body');
+    return apiError(400, "invalid_json", "Invalid JSON body");
   }
 
   // Validate request body
@@ -121,10 +121,10 @@ export async function POST(event: RequestEvent): Promise<Response> {
   if (!validation.success) {
     const issues = validation.error.issues ?? [];
     const firstError = issues[0];
-    const field = firstError?.path.join('.') || 'name';
-    const message = firstError?.message || 'Validation failed';
+    const field = firstError?.path.join(".") || "name";
+    const message = firstError?.message || "Validation failed";
 
-    return apiError(400, 'validation_error', `${field}: ${message}`);
+    return apiError(400, "validation_error", `${field}: ${message}`);
   }
 
   const { name } = validation.data;
@@ -136,7 +136,7 @@ export async function POST(event: RequestEvent): Promise<Response> {
     .where(and(eq(project.name, name), eq(project.ownerId, user.id)));
 
   if (existing) {
-    return apiError(400, 'duplicate_name', 'A project with this name already exists');
+    return apiError(400, "duplicate_name", "A project with this name already exists");
   }
 
   // Generate new project with current user as owner. The plaintext key is
@@ -151,7 +151,7 @@ export async function POST(event: RequestEvent): Promise<Response> {
 
   // Insert project
   const [created] = await db.insert(project).values(newProject).returning();
-  if (!created) return apiError(500, 'internal_error', 'Failed to create project');
+  if (!created) return apiError(500, "internal_error", "Failed to create project");
 
   return json(
     {

@@ -1,4 +1,4 @@
-import type { Incident, Log } from './db/schema';
+import type { Incident, Log } from "./db/schema";
 
 export type LogListener = (log: Log) => void;
 export type IncidentListener = (incident: Incident) => void;
@@ -48,7 +48,7 @@ class LogEventBus {
         try {
           listener(log);
         } catch (e) {
-          console.error('[events] listener error:', e);
+          console.error("[events] listener error:", e);
         }
       }
     }
@@ -90,7 +90,7 @@ class LogEventBus {
         try {
           listener(incident);
         } catch (e) {
-          console.error('[events] listener error:', e);
+          console.error("[events] listener error:", e);
         }
       }
     }

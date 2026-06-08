@@ -1,14 +1,14 @@
-import { json } from '@sveltejs/kit';
-import { and, eq, gte, lte, type SQL, sql } from 'drizzle-orm';
-import type { TimeRange } from '$lib/components/time-range-picker.svelte';
-import { type BucketCountRow, getDbClient, getQueryRows } from '$lib/server/db/db';
-import { log } from '$lib/server/db/schema';
-import { isErrorResponse, requireProjectOwnership } from '$lib/server/utils/project-guard';
-import { getTimeRangeStart } from '$lib/utils/format';
-import { fillMissingBuckets, getTimeBucketConfig } from '$lib/utils/timeseries';
-import type { RequestEvent } from './$types';
+import { json } from "@sveltejs/kit";
+import { and, eq, gte, lte, type SQL, sql } from "drizzle-orm";
+import type { TimeRange } from "$lib/components/time-range-picker.svelte";
+import { type BucketCountRow, getDbClient, getQueryRows } from "$lib/server/db/db";
+import { log } from "$lib/server/db/schema";
+import { isErrorResponse, requireProjectOwnership } from "$lib/server/utils/project-guard";
+import { getTimeRangeStart } from "$lib/utils/format";
+import { fillMissingBuckets, getTimeBucketConfig } from "$lib/utils/timeseries";
+import type { RequestEvent } from "./$types";
 
-const VALID_RANGES: TimeRange[] = ['15m', '1h', '24h', '7d'];
+const VALID_RANGES: TimeRange[] = ["15m", "1h", "24h", "7d"];
 
 /**
  * GET /api/projects/[id]/stats/timeseries
@@ -43,13 +43,13 @@ export async function GET(event: RequestEvent): Promise<Response> {
   const projectId = event.params.id;
 
   // Parse range parameter (default to 24h)
-  const rangeParam = event.url.searchParams.get('range') || '24h';
+  const rangeParam = event.url.searchParams.get("range") || "24h";
   const range: TimeRange = VALID_RANGES.includes(rangeParam as TimeRange)
     ? (rangeParam as TimeRange)
-    : '24h';
+    : "24h";
 
   // Parse optional from parameter (to sync with page server's time range)
-  const fromParam = event.url.searchParams.get('from');
+  const fromParam = event.url.searchParams.get("from");
 
   // Calculate time boundaries
   // If 'from' is provided, use it to ensure consistency with page server

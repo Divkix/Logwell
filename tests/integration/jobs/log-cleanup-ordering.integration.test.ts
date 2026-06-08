@@ -1,15 +1,15 @@
-import { asc, eq } from 'drizzle-orm';
-import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type * as schema from '../../../src/lib/server/db/schema';
-import { log } from '../../../src/lib/server/db/schema';
-import { setupTestDatabase } from '../../../src/lib/server/db/test-db';
-import { cleanupOldLogs } from '../../../src/lib/server/jobs/log-cleanup';
-import { seedLog, seedProject } from '../../fixtures/db';
+import { asc, eq } from "drizzle-orm";
+import type { PgliteDatabase } from "drizzle-orm/pglite";
+import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
+import type * as schema from "../../../src/lib/server/db/schema";
+import { log } from "../../../src/lib/server/db/schema";
+import { setupTestDatabase } from "../../../src/lib/server/db/test-db";
+import { cleanupOldLogs } from "../../../src/lib/server/jobs/log-cleanup";
+import { seedLog, seedProject } from "../../fixtures/db";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-describe('cleanupOldLogs batch selection', () => {
+describe("cleanupOldLogs batch selection", () => {
   let db: PgliteDatabase<typeof schema>;
   let setup: { db: PgliteDatabase<typeof schema>; cleanup: () => Promise<void> };
 
@@ -24,7 +24,7 @@ describe('cleanupOldLogs batch selection', () => {
     }
   });
 
-  it('deletes only logs older than retention, keeping the most recent', async () => {
+  it("deletes only logs older than retention, keeping the most recent", async () => {
     const project1 = await seedProject(db, { retentionDays: 7 });
 
     const now = new Date();
@@ -54,7 +54,7 @@ describe('cleanupOldLogs batch selection', () => {
       .orderBy(asc(log.timestamp));
 
     expect(remaining).toHaveLength(3);
-    expect(remaining.map((l) => l.message)).toEqual(['log-5d', 'log-3d', 'log-1d']);
+    expect(remaining.map((l) => l.message)).toEqual(["log-5d", "log-3d", "log-1d"]);
 
     // Every surviving log must be newer than the 7-day cutoff.
     const cutoff = new Date(now.getTime() - 7 * DAY_MS);
@@ -63,7 +63,7 @@ describe('cleanupOldLogs batch selection', () => {
     }
   });
 
-  it('deletes the correct logs per project when retention differs', async () => {
+  it("deletes the correct logs per project when retention differs", async () => {
     const project1 = await seedProject(db, { retentionDays: 7 });
     const project2 = await seedProject(db, { retentionDays: 30 });
 
@@ -72,12 +72,12 @@ describe('cleanupOldLogs batch selection', () => {
     const fortyDaysAgo = new Date(now.getTime() - 40 * DAY_MS);
 
     // project1 (7d): 10-day-old log is deleted.
-    await seedLog(db, project1.id, { message: 'p1-old', timestamp: tenDaysAgo });
-    await seedLog(db, project1.id, { message: 'p1-fresh', timestamp: now });
+    await seedLog(db, project1.id, { message: "p1-old", timestamp: tenDaysAgo });
+    await seedLog(db, project1.id, { message: "p1-fresh", timestamp: now });
 
     // project2 (30d): 10-day-old kept, 40-day-old deleted.
-    await seedLog(db, project2.id, { message: 'p2-recent', timestamp: tenDaysAgo });
-    await seedLog(db, project2.id, { message: 'p2-old', timestamp: fortyDaysAgo });
+    await seedLog(db, project2.id, { message: "p2-recent", timestamp: tenDaysAgo });
+    await seedLog(db, project2.id, { message: "p2-old", timestamp: fortyDaysAgo });
 
     const result = await cleanupOldLogs(db);
 
@@ -86,9 +86,9 @@ describe('cleanupOldLogs batch selection', () => {
     expect(result.projectsProcessed).toBe(2);
 
     const p1Remaining = await db.select().from(log).where(eq(log.projectId, project1.id));
-    expect(p1Remaining.map((l) => l.message)).toEqual(['p1-fresh']);
+    expect(p1Remaining.map((l) => l.message)).toEqual(["p1-fresh"]);
 
     const p2Remaining = await db.select().from(log).where(eq(log.projectId, project2.id));
-    expect(p2Remaining.map((l) => l.message)).toEqual(['p2-recent']);
+    expect(p2Remaining.map((l) => l.message)).toEqual(["p2-recent"]);
   });
 });

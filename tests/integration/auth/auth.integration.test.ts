@@ -1,12 +1,12 @@
-import { eq } from 'drizzle-orm';
-import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import { beforeEach, describe, expect, it } from 'vitest';
-import { createAuth } from '../../../src/lib/server/auth';
-import type * as schema from '../../../src/lib/server/db/schema';
-import { session, user } from '../../../src/lib/server/db/schema';
-import { setupTestDatabase } from '../../../src/lib/server/db/test-db';
+import { eq } from "drizzle-orm";
+import type { PgliteDatabase } from "drizzle-orm/pglite";
+import { beforeEach, describe, expect, it } from "vite-plus/test";
+import { createAuth } from "../../../src/lib/server/auth";
+import type * as schema from "../../../src/lib/server/db/schema";
+import { session, user } from "../../../src/lib/server/db/schema";
+import { setupTestDatabase } from "../../../src/lib/server/db/test-db";
 
-describe('better-auth Integration', () => {
+describe("better-auth Integration", () => {
   let db: PgliteDatabase<typeof schema>;
   let auth: ReturnType<typeof createAuth>;
 
@@ -16,11 +16,11 @@ describe('better-auth Integration', () => {
     auth = createAuth(db);
   });
 
-  describe('User signup and authentication', () => {
-    it('should create user via signUpEmail', async () => {
-      const email = 'test@example.com';
-      const password = 'SecureP@ssw0rd123';
-      const name = 'Test User';
+  describe("User signup and authentication", () => {
+    it("should create user via signUpEmail", async () => {
+      const email = "test@example.com";
+      const password = "SecureP@ssw0rd123";
+      const name = "Test User";
 
       // Sign up user
       const result = await auth.api.signUpEmail({
@@ -44,10 +44,10 @@ describe('better-auth Integration', () => {
       expect(createdUser!.name).toBe(name);
     });
 
-    it('should sign in with valid credentials and create session', async () => {
-      const email = 'signin@example.com';
-      const password = 'SecureP@ssw0rd123';
-      const name = 'Sign In User';
+    it("should sign in with valid credentials and create session", async () => {
+      const email = "signin@example.com";
+      const password = "SecureP@ssw0rd123";
+      const name = "Sign In User";
 
       // Create user first
       await auth.api.signUpEmail({
@@ -81,11 +81,11 @@ describe('better-auth Integration', () => {
       expect(sessions[0]!.token).toBe(result.token);
     });
 
-    it('should fail to sign in with invalid password', async () => {
-      const email = 'invalid@example.com';
-      const password = 'CorrectP@ssw0rd123';
-      const wrongPassword = 'WrongP@ssw0rd123';
-      const name = 'Invalid User';
+    it("should fail to sign in with invalid password", async () => {
+      const email = "invalid@example.com";
+      const password = "CorrectP@ssw0rd123";
+      const wrongPassword = "WrongP@ssw0rd123";
+      const name = "Invalid User";
 
       // Create user
       await auth.api.signUpEmail({
@@ -107,10 +107,10 @@ describe('better-auth Integration', () => {
       ).rejects.toThrow();
     });
 
-    it('should prevent duplicate email registration', async () => {
-      const email = 'duplicate@example.com';
-      const password = 'SecureP@ssw0rd123';
-      const name = 'Duplicate User';
+    it("should prevent duplicate email registration", async () => {
+      const email = "duplicate@example.com";
+      const password = "SecureP@ssw0rd123";
+      const name = "Duplicate User";
 
       // Create first user
       await auth.api.signUpEmail({
@@ -126,17 +126,17 @@ describe('better-auth Integration', () => {
         auth.api.signUpEmail({
           body: {
             email,
-            password: 'DifferentP@ssw0rd123',
-            name: 'Another Name',
+            password: "DifferentP@ssw0rd123",
+            name: "Another Name",
           },
         }),
       ).rejects.toThrow();
     });
 
-    it('should create session on signup with autoSignIn', async () => {
-      const email = 'autosignin@example.com';
-      const password = 'SecureP@ssw0rd123';
-      const name = 'Auto Sign In User';
+    it("should create session on signup with autoSignIn", async () => {
+      const email = "autosignin@example.com";
+      const password = "SecureP@ssw0rd123";
+      const name = "Auto Sign In User";
 
       const result = await auth.api.signUpEmail({
         body: {
@@ -156,11 +156,11 @@ describe('better-auth Integration', () => {
     });
   });
 
-  describe('Session management via database', () => {
-    it('should create session in database on sign in', async () => {
-      const email = 'session-db@example.com';
-      const password = 'SecureP@ssw0rd123';
-      const name = 'Session DB User';
+  describe("Session management via database", () => {
+    it("should create session in database on sign in", async () => {
+      const email = "session-db@example.com";
+      const password = "SecureP@ssw0rd123";
+      const name = "Session DB User";
 
       // Create user
       const signUpResult = await auth.api.signUpEmail({
@@ -182,10 +182,10 @@ describe('better-auth Integration', () => {
       expect(sessions[0]!.expiresAt).toBeInstanceOf(Date);
     });
 
-    it('should store session with expiration date', async () => {
-      const email = 'expiry@example.com';
-      const password = 'SecureP@ssw0rd123';
-      const name = 'Expiry User';
+    it("should store session with expiration date", async () => {
+      const email = "expiry@example.com";
+      const password = "SecureP@ssw0rd123";
+      const name = "Expiry User";
 
       const result = await auth.api.signUpEmail({
         body: {
@@ -207,11 +207,11 @@ describe('better-auth Integration', () => {
     });
   });
 
-  describe('Database schema validation', () => {
-    it('should have user table with correct structure', async () => {
-      const email = 'schema@example.com';
-      const password = 'SecureP@ssw0rd123';
-      const name = 'Schema User';
+  describe("Database schema validation", () => {
+    it("should have user table with correct structure", async () => {
+      const email = "schema@example.com";
+      const password = "SecureP@ssw0rd123";
+      const name = "Schema User";
 
       await auth.api.signUpEmail({
         body: {
@@ -224,7 +224,7 @@ describe('better-auth Integration', () => {
       const [createdUser] = await db.select().from(user).where(eq(user.email, email));
 
       expect(createdUser!.id).toBeDefined();
-      expect(typeof createdUser!.id).toBe('string');
+      expect(typeof createdUser!.id).toBe("string");
       expect(createdUser!.name).toBe(name);
       expect(createdUser!.email).toBe(email);
       expect(createdUser!.emailVerified).toBe(false);
@@ -232,13 +232,13 @@ describe('better-auth Integration', () => {
       expect(createdUser!.updatedAt).toBeInstanceOf(Date);
     });
 
-    it('should enforce email uniqueness constraint', async () => {
-      const email = 'unique@example.com';
+    it("should enforce email uniqueness constraint", async () => {
+      const email = "unique@example.com";
 
       // Insert user directly to database
       await db.insert(user).values({
-        id: 'test-user-1',
-        name: 'First User',
+        id: "test-user-1",
+        name: "First User",
         email,
         emailVerified: false,
       });
@@ -246,18 +246,18 @@ describe('better-auth Integration', () => {
       // Try to insert another user with same email
       await expect(
         db.insert(user).values({
-          id: 'test-user-2',
-          name: 'Second User',
+          id: "test-user-2",
+          name: "Second User",
           email,
           emailVerified: false,
         }),
       ).rejects.toThrow();
     });
 
-    it('should have session table with foreign key to user', async () => {
-      const email = 'fk-test@example.com';
-      const password = 'SecureP@ssw0rd123';
-      const name = 'FK Test User';
+    it("should have session table with foreign key to user", async () => {
+      const email = "fk-test@example.com";
+      const password = "SecureP@ssw0rd123";
+      const name = "FK Test User";
 
       const result = await auth.api.signUpEmail({
         body: {

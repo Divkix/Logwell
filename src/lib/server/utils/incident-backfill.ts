@@ -1,15 +1,15 @@
-import { and, eq, gte, inArray, sql } from 'drizzle-orm';
-import { nanoid } from 'nanoid';
-import type { DatabaseClient } from '$lib/server/db/db';
-import { type Incident, incident, type LogLevel, log } from '$lib/server/db/schema';
+import { and, eq, gte, inArray, sql } from "drizzle-orm";
+import { nanoid } from "nanoid";
+import type { DatabaseClient } from "$lib/server/db/db";
+import { type Incident, incident, type LogLevel, log } from "$lib/server/db/schema";
 import {
   assignIncidentIds,
   buildIncidentTitle,
   groupPreparedLogsByFingerprint,
   prepareLogsForIncidents,
-} from './incidents';
+} from "./incidents";
 
-const GROUPED_LEVELS: LogLevel[] = ['error', 'fatal'];
+const GROUPED_LEVELS: LogLevel[] = ["error", "fatal"];
 
 export interface BackfillProjectResult {
   processedLogs: number;

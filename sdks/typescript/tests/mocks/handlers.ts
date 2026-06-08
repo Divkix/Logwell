@@ -1,6 +1,6 @@
-import { delay, HttpResponse, http } from 'msw';
+import { delay, HttpResponse, http } from "msw";
 
-const BASE_URL = 'https://test.logwell.io';
+const BASE_URL = "https://test.logwell.io";
 
 /**
  * Default MSW handlers for Logwell API
@@ -8,12 +8,12 @@ const BASE_URL = 'https://test.logwell.io';
 export const handlers = [
   // Success response for /v1/ingest
   http.post(`${BASE_URL}/v1/ingest`, async ({ request }) => {
-    const authHeader = request.headers.get('Authorization');
+    const authHeader = request.headers.get("Authorization");
 
     // Check authentication
-    if (!authHeader?.startsWith('Bearer lw_')) {
+    if (!authHeader?.startsWith("Bearer lw_")) {
       return HttpResponse.json(
-        { error: 'unauthorized', message: 'Missing or invalid authorization header' },
+        { error: "unauthorized", message: "Missing or invalid authorization header" },
         { status: 401 },
       );
     }
@@ -24,7 +24,7 @@ export const handlers = [
       body = await request.json();
     } catch {
       return HttpResponse.json(
-        { error: 'invalid_json', message: 'Request body must be valid JSON' },
+        { error: "invalid_json", message: "Request body must be valid JSON" },
         { status: 400 },
       );
     }
@@ -42,22 +42,22 @@ export const handlers = [
  */
 export const errorHandlers = {
   unauthorized: http.post(`${BASE_URL}/v1/ingest`, () =>
-    HttpResponse.json({ error: 'unauthorized', message: 'Invalid API key' }, { status: 401 }),
+    HttpResponse.json({ error: "unauthorized", message: "Invalid API key" }, { status: 401 }),
   ),
 
   serverError: http.post(`${BASE_URL}/v1/ingest`, () =>
-    HttpResponse.json({ error: 'internal_error' }, { status: 500 }),
+    HttpResponse.json({ error: "internal_error" }, { status: 500 }),
   ),
 
   timeout: http.post(`${BASE_URL}/v1/ingest`, async () => {
-    await delay('infinite');
+    await delay("infinite");
     return HttpResponse.json({});
   }),
 
   rateLimited: http.post(`${BASE_URL}/v1/ingest`, () =>
     HttpResponse.json(
-      { error: 'rate_limited', message: 'Too many requests' },
-      { status: 429, headers: { 'Retry-After': '5' } },
+      { error: "rate_limited", message: "Too many requests" },
+      { status: 429, headers: { "Retry-After": "5" } },
     ),
   ),
 
@@ -65,13 +65,13 @@ export const errorHandlers = {
     HttpResponse.json({
       accepted: 2,
       rejected: 1,
-      errors: ['Entry at index 2: invalid level'],
+      errors: ["Entry at index 2: invalid level"],
     }),
   ),
 
   validationError: http.post(`${BASE_URL}/v1/ingest`, () =>
     HttpResponse.json(
-      { error: 'validation_error', message: 'Invalid log format' },
+      { error: "validation_error", message: "Invalid log format" },
       { status: 400 },
     ),
   ),

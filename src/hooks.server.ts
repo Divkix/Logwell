@@ -1,10 +1,10 @@
-import type { Handle, HandleServerError } from '@sveltejs/kit';
-import { svelteKitHandler } from 'better-auth/svelte-kit';
-import { building } from '$app/environment';
-import { auth, initAuth } from '$lib/server/auth';
-import { db } from '$lib/server/db';
-import { createErrorHandler } from '$lib/server/error-handler';
-import { startCleanupScheduler, stopCleanupScheduler } from '$lib/server/jobs/cleanup-scheduler';
+import type { Handle, HandleServerError } from "@sveltejs/kit";
+import { svelteKitHandler } from "better-auth/svelte-kit";
+import { building } from "$app/environment";
+import { auth, initAuth } from "$lib/server/auth";
+import { db } from "$lib/server/db";
+import { createErrorHandler } from "$lib/server/error-handler";
+import { startCleanupScheduler, stopCleanupScheduler } from "$lib/server/jobs/cleanup-scheduler";
 
 // Initialize on server startup
 let initialized = false;
@@ -32,8 +32,8 @@ function gracefulShutdown(signal: string) {
   // Give in-flight requests ~5s then exit
   setTimeout(() => process.exit(0), 5000);
 }
-process.once('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.once('SIGINT', () => gracefulShutdown('SIGINT'));
+process.once("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.once("SIGINT", () => gracefulShutdown("SIGINT"));
 
 /**
  * Combined SvelteKit handle hook for better-auth
@@ -55,9 +55,9 @@ export const handle: Handle = async ({ event, resolve }) => {
   // Skip session lookup for paths that never need auth
   const pathname = event.url.pathname;
   if (
-    pathname.startsWith('/v1/') ||
-    pathname === '/api/health' ||
-    pathname.startsWith('/static/')
+    pathname.startsWith("/v1/") ||
+    pathname === "/api/health" ||
+    pathname.startsWith("/static/")
   ) {
     return resolve(event);
   }
@@ -90,7 +90,7 @@ export const handleError: HandleServerError = ({ error, event, status, message }
     error,
     url: event.url.href,
     method: event.request.method,
-    route: event.route?.id ?? 'unknown',
+    route: event.route?.id ?? "unknown",
     status,
     message,
   });

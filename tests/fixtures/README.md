@@ -13,7 +13,7 @@ Provides helper functions for creating and seeding test data in PGlite test data
 Creates a user object with default values that can be overridden.
 
 ```typescript
-import { createUserFactory } from '../fixtures/db';
+import { createUserFactory } from "../fixtures/db";
 
 // Default values
 const user = createUserFactory(); // { age: 25 }
@@ -29,8 +29,8 @@ const customUser = createUserFactory({ age: 30 }); // { age: 30 }
 Seeds a single user into the database.
 
 ```typescript
-import { setupTestDatabase } from '../../src/lib/server/db/test-db';
-import { seedUser } from '../fixtures/db';
+import { setupTestDatabase } from "../../src/lib/server/db/test-db";
+import { seedUser } from "../fixtures/db";
 
 const { db, cleanup } = await setupTestDatabase();
 const user = await seedUser(db, { age: 35 });
@@ -41,7 +41,7 @@ const user = await seedUser(db, { age: 35 });
 Seeds multiple users with auto-incrementing ages (default: 3 users starting at age 20).
 
 ```typescript
-import { seedUsers } from '../fixtures/db';
+import { seedUsers } from "../fixtures/db";
 
 // Default: 3 users with ages 20, 25, 30
 const users = await seedUsers(db);
@@ -58,7 +58,7 @@ const customUsers = await seedUsers(db, 2, { age: 40 });
 Seeds users with specific ages.
 
 ```typescript
-import { seedUsersWithAges } from '../fixtures/db';
+import { seedUsersWithAges } from "../fixtures/db";
 
 const users = await seedUsersWithAges(db, [18, 25, 30, 45, 60]);
 // Creates 5 users with exactly these ages
@@ -69,27 +69,23 @@ const users = await seedUsersWithAges(db, [18, 25, 30, 45, 60]);
 Generic seeder that accepts a data object with optional arrays for each table.
 
 ```typescript
-import { seedTestData } from '../fixtures/db';
+import { seedTestData } from "../fixtures/db";
 
 await seedTestData(db, {
-  users: [
-    { age: 20 },
-    { age: 30 },
-    { age: 40 },
-  ],
+  users: [{ age: 20 }, { age: 30 }, { age: 40 }],
 });
 ```
 
 ## Usage in Tests
 
 ```typescript
-import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import * as schema from '../../src/lib/server/db/schema';
-import { setupTestDatabase } from '../../src/lib/server/db/test-db';
-import { seedUser, seedUsers } from '../fixtures/db';
+import type { PgliteDatabase } from "drizzle-orm/pglite";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import * as schema from "../../src/lib/server/db/schema";
+import { setupTestDatabase } from "../../src/lib/server/db/test-db";
+import { seedUser, seedUsers } from "../fixtures/db";
 
-describe('My Test Suite', () => {
+describe("My Test Suite", () => {
   let db: PgliteDatabase<typeof schema>;
   let cleanup: () => Promise<void>;
 
@@ -103,7 +99,7 @@ describe('My Test Suite', () => {
     await cleanup();
   });
 
-  it('should work with pre-seeded data', async () => {
+  it("should work with pre-seeded data", async () => {
     // Seed test data
     const user = await seedUser(db, { age: 25 });
 
@@ -119,7 +115,7 @@ describe('My Test Suite', () => {
 - `UserSelect` - Type for a selected user from database (inferred from schema)
 
 ```typescript
-import type { UserInsert, UserSelect } from '../fixtures/db';
+import type { UserInsert, UserSelect } from "../fixtures/db";
 
 const insert: UserInsert = { age: 25 };
 const selected: UserSelect = { id: 1, age: 25 };
@@ -143,8 +139,8 @@ export type PostSelect = typeof schema.posts.$inferSelect;
 
 export function createPostFactory(overrides: Partial<PostInsert> = {}): PostInsert {
   return {
-    title: 'Default Title',
-    content: 'Default content',
+    title: "Default Title",
+    content: "Default content",
     ...overrides,
   };
 }

@@ -6,7 +6,7 @@
 /**
  * Form elements that should block keyboard shortcuts when focused.
  */
-export const FORM_ELEMENTS = ['INPUT', 'TEXTAREA', 'SELECT'] as const;
+export const FORM_ELEMENTS = ["INPUT", "TEXTAREA", "SELECT"] as const;
 
 /**
  * Shortcut definition for the help modal.
@@ -14,7 +14,7 @@ export const FORM_ELEMENTS = ['INPUT', 'TEXTAREA', 'SELECT'] as const;
 interface ShortcutDefinition {
   key: string;
   description: string;
-  group: 'navigation' | 'search' | 'other';
+  group: "navigation" | "search" | "other";
 }
 
 /**
@@ -23,17 +23,17 @@ interface ShortcutDefinition {
  */
 export const SHORTCUTS: ShortcutDefinition[] = [
   // Navigation shortcuts
-  { key: 'j', description: 'Select next log', group: 'navigation' },
-  { key: 'k', description: 'Select previous log', group: 'navigation' },
-  { key: 'Enter', description: 'Open log details', group: 'navigation' },
+  { key: "j", description: "Select next log", group: "navigation" },
+  { key: "k", description: "Select previous log", group: "navigation" },
+  { key: "Enter", description: "Open log details", group: "navigation" },
 
   // Search shortcuts
-  { key: '/', description: 'Focus search', group: 'search' },
-  { key: 'Esc', description: 'Blur search / Close modal', group: 'search' },
+  { key: "/", description: "Focus search", group: "search" },
+  { key: "Esc", description: "Blur search / Close modal", group: "search" },
 
   // Other shortcuts
-  { key: 'l', description: 'Toggle live mode', group: 'other' },
-  { key: '?', description: 'Show keyboard shortcuts', group: 'other' },
+  { key: "l", description: "Toggle live mode", group: "other" },
+  { key: "?", description: "Show keyboard shortcuts", group: "other" },
 ];
 
 /**

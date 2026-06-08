@@ -5,6 +5,7 @@ This project follows the Testing Trophy methodology, prioritizing integration te
 ## Test Structure
 
 ### Unit Tests (`.unit.test.ts`)
+
 Located alongside source files in `src/`. Tests pure functions and utilities in isolation.
 
 ```bash
@@ -12,6 +13,7 @@ bun run test:unit
 ```
 
 ### Integration Tests (`.integration.test.ts`)
+
 Located in `tests/integration/`. Tests server-side code with database interactions using PGlite.
 
 ```bash
@@ -19,6 +21,7 @@ bun run test:integration
 ```
 
 ### Browser Tests (`.browser.test.ts`)
+
 Tests Svelte components in a real browser environment using Playwright.
 
 ```bash
@@ -26,6 +29,7 @@ bun run test:browser
 ```
 
 ### E2E Tests
+
 Located in `tests/e2e/`. Full end-to-end tests using Playwright across multiple browsers.
 
 ```bash
@@ -66,12 +70,12 @@ Integration tests use PGlite, an in-memory PostgreSQL database. Test utilities a
 ### Example Integration Test
 
 ```typescript
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { setupTestDatabase } from '../../src/lib/server/db/test-utils';
-import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import * as schema from '../../src/lib/server/db/schema';
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { setupTestDatabase } from "../../src/lib/server/db/test-utils";
+import type { PgliteDatabase } from "drizzle-orm/pglite";
+import * as schema from "../../src/lib/server/db/schema";
 
-describe('My Integration Test', () => {
+describe("My Integration Test", () => {
   let db: PgliteDatabase<typeof schema>;
   let cleanup: () => Promise<void>;
 
@@ -85,7 +89,7 @@ describe('My Integration Test', () => {
     await cleanup();
   });
 
-  it('should test database interaction', async () => {
+  it("should test database interaction", async () => {
     // Your test here
   });
 });
@@ -94,6 +98,7 @@ describe('My Integration Test', () => {
 ## Coverage Thresholds
 
 The project maintains the following coverage thresholds:
+
 - Lines: 75%
 - Functions: 75%
 - Branches: 65%

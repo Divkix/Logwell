@@ -1,9 +1,9 @@
-import { SSE_CONFIG } from '$lib/server/config/performance';
-import type { Incident } from '$lib/server/db/schema';
-import { logEventBus } from '$lib/server/events';
-import { checkCsrfOrigin } from '$lib/server/utils/csrf';
-import { isErrorResponse, requireProjectOwnership } from '$lib/server/utils/project-guard';
-import type { RequestEvent } from './$types';
+import { SSE_CONFIG } from "$lib/server/config/performance";
+import type { Incident } from "$lib/server/db/schema";
+import { logEventBus } from "$lib/server/events";
+import { checkCsrfOrigin } from "$lib/server/utils/csrf";
+import { isErrorResponse, requireProjectOwnership } from "$lib/server/utils/project-guard";
+import type { RequestEvent } from "./$types";
 
 const { BATCH_WINDOW_MS, MAX_BATCH_SIZE, HEARTBEAT_INTERVAL_MS } = SSE_CONFIG;
 
@@ -35,26 +35,26 @@ export async function POST(event: RequestEvent): Promise<Response> {
       let flushTimeout: ReturnType<typeof setTimeout> | null = null;
       let isClosed = false;
 
-      const sendEvent = (eventName: string, data: string): 'sent' | 'backpressure' | 'closed' => {
-        if (isClosed) return 'closed';
+      const sendEvent = (eventName: string, data: string): "sent" | "backpressure" | "closed" => {
+        if (isClosed) return "closed";
         try {
           const size = (controller as ReadableStreamDefaultController).desiredSize;
           if (size !== null && size <= 0) {
             // Stream backpressure: slow consumer — drop this event but keep the stream open
-            return 'backpressure';
+            return "backpressure";
           }
           controller.enqueue(encoder.encode(formatSSEEvent(eventName, data)));
-          return 'sent';
+          return "sent";
         } catch {
           // Controller closed
-          return 'closed';
+          return "closed";
         }
       };
 
       const flushBatch = () => {
         if (batch.length > 0) {
           // Only a closed controller is terminal; backpressure just drops this event.
-          if (sendEvent('incidents', JSON.stringify(batch)) === 'closed') cleanup();
+          if (sendEvent("incidents", JSON.stringify(batch)) === "closed") cleanup();
           batch = [];
         }
         flushTimeout = null;
@@ -79,7 +79,7 @@ export async function POST(event: RequestEvent): Promise<Response> {
 
       const unsubscribe = logEventBus.onIncident(projectId, handleIncident);
       const heartbeatInterval = setInterval(() => {
-        if (sendEvent('heartbeat', JSON.stringify({ ts: Date.now() })) === 'closed') cleanup();
+        if (sendEvent("heartbeat", JSON.stringify({ ts: Date.now() })) === "closed") cleanup();
       }, HEARTBEAT_INTERVAL_MS);
 
       const cleanup = () => {
@@ -105,9 +105,9 @@ export async function POST(event: RequestEvent): Promise<Response> {
   return new Response(stream, {
     status: 200,
     headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
     },
   });
 }

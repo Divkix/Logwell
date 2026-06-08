@@ -1,8 +1,8 @@
-import { createHash } from 'node:crypto';
-import { eq } from 'drizzle-orm';
-import { nanoid } from 'nanoid';
-import type { DatabaseClient } from '$lib/server/db/db';
-import { project } from '../db/schema';
+import { createHash } from "node:crypto";
+import { eq } from "drizzle-orm";
+import { nanoid } from "nanoid";
+import type { DatabaseClient } from "$lib/server/db/db";
+import { project } from "../db/schema";
 
 /**
  * Custom error class for API key validation errors
@@ -14,7 +14,7 @@ export class ApiKeyError extends Error {
 
   constructor(status: number, message: string) {
     super(message);
-    this.name = 'ApiKeyError';
+    this.name = "ApiKeyError";
     this.status = status;
     this.body = { message };
   }
@@ -78,7 +78,7 @@ const API_KEY_REGEX = /^lw_[A-Za-z0-9_-]{32}$/;
  * Hash an API key using SHA-256
  */
 export function hashApiKey(key: string): string {
-  return createHash('sha256').update(key).digest('hex');
+  return createHash("sha256").update(key).digest("hex");
 }
 
 /**
@@ -99,7 +99,7 @@ export function generateApiKey(): string {
  * @returns true if key matches format, false otherwise
  */
 export function validateApiKeyFormat(key: string): boolean {
-  if (!key || typeof key !== 'string') {
+  if (!key || typeof key !== "string") {
     return false;
   }
   return API_KEY_REGEX.test(key);
@@ -154,9 +154,9 @@ function setNegativeCache(keyHash: string): void {
  */
 export async function validateApiKey(request: Request, dbClient?: DatabaseClient): Promise<string> {
   // Extract Authorization header
-  const authHeader = request.headers.get('Authorization');
-  if (!authHeader?.startsWith('Bearer ')) {
-    throw new ApiKeyError(401, 'Missing or invalid authorization header');
+  const authHeader = request.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    throw new ApiKeyError(401, "Missing or invalid authorization header");
   }
 
   // Extract API key from Bearer token
@@ -164,7 +164,7 @@ export async function validateApiKey(request: Request, dbClient?: DatabaseClient
 
   // Validate format first (fast fail)
   if (!validateApiKeyFormat(apiKey)) {
-    throw new ApiKeyError(401, 'Invalid API key format');
+    throw new ApiKeyError(401, "Invalid API key format");
   }
 
   const keyHash = hashApiKey(apiKey);
@@ -173,7 +173,7 @@ export async function validateApiKey(request: Request, dbClient?: DatabaseClient
   const negCached = NEGATIVE_CACHE.get(keyHash);
   if (negCached) {
     if (negCached.expiresAt > Date.now()) {
-      throw new ApiKeyError(401, 'Invalid API key');
+      throw new ApiKeyError(401, "Invalid API key");
     }
     NEGATIVE_CACHE.delete(keyHash);
   }
@@ -185,7 +185,7 @@ export async function validateApiKey(request: Request, dbClient?: DatabaseClient
   }
 
   // Lazy load default db only when needed (avoids issues in unit tests)
-  const db = dbClient ?? (await import('$lib/server/db')).db;
+  const db = dbClient ?? (await import("$lib/server/db")).db;
 
   // Query database by key hash
   const [result] = await db
@@ -196,7 +196,7 @@ export async function validateApiKey(request: Request, dbClient?: DatabaseClient
   if (!result) {
     // Store in negative cache (bounded + prunes expired)
     setNegativeCache(keyHash);
-    throw new ApiKeyError(401, 'Invalid API key');
+    throw new ApiKeyError(401, "Invalid API key");
   }
 
   // Evict if at capacity before inserting

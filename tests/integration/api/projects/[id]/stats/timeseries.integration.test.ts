@@ -1,13 +1,13 @@
-import type { HttpError } from '@sveltejs/kit';
-import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createAuth } from '$lib/server/auth';
-import type * as schema from '$lib/server/db/schema';
-import { setupTestDatabase } from '$lib/server/db/test-db';
-import { getSession } from '$lib/server/session';
-import { clearApiKeyCache } from '$lib/server/utils/api-key';
-import { GET } from '../../../../../../src/routes/api/projects/[id]/stats/timeseries/+server';
-import { seedLogs, seedProject } from '../../../../../fixtures/db';
+import type { HttpError } from "@sveltejs/kit";
+import type { PgliteDatabase } from "drizzle-orm/pglite";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { createAuth } from "$lib/server/auth";
+import type * as schema from "$lib/server/db/schema";
+import { setupTestDatabase } from "$lib/server/db/test-db";
+import { getSession } from "$lib/server/session";
+import { clearApiKeyCache } from "$lib/server/utils/api-key";
+import { GET } from "../../../../../../src/routes/api/projects/[id]/stats/timeseries/+server";
+import { seedLogs, seedProject } from "../../../../../fixtures/db";
 
 /**
  * Helper to create a mock SvelteKit RequestEvent for [id]/stats/timeseries routes
@@ -24,7 +24,7 @@ function createRequestEvent(
     params,
     url: new URL(request.url),
     platform: undefined,
-    route: { id: '/api/projects/[id]/stats/timeseries' },
+    route: { id: "/api/projects/[id]/stats/timeseries" },
     isDataRequest: false,
     isSubRequest: false,
     isRemoteRequest: false,
@@ -34,10 +34,10 @@ function createRequestEvent(
       getAll: () => [],
       set: () => {},
       delete: () => {},
-      serialize: () => '',
+      serialize: () => "",
     },
     fetch: globalThis.fetch,
-    getClientAddress: () => '127.0.0.1',
+    getClientAddress: () => "127.0.0.1",
     setHeaders: () => {},
   } as unknown;
 }
@@ -52,7 +52,7 @@ async function expectHttpError(
 ): Promise<void> {
   try {
     await promise;
-    expect.fail('Expected HTTP error to be thrown');
+    expect.fail("Expected HTTP error to be thrown");
   } catch (error) {
     const httpError = error as HttpError;
     expect(httpError.status).toBe(expectedStatus);
@@ -62,7 +62,7 @@ async function expectHttpError(
   }
 }
 
-describe('GET /api/projects/[id]/stats/timeseries', () => {
+describe("GET /api/projects/[id]/stats/timeseries", () => {
   let db: PgliteDatabase<typeof schema>;
   let cleanup: () => Promise<void>;
   let auth: ReturnType<typeof createAuth>;
@@ -79,20 +79,20 @@ describe('GET /api/projects/[id]/stats/timeseries', () => {
     // Create authenticated user
     const signUpResult = await auth.api.signUpEmail({
       body: {
-        email: 'test@example.com',
-        password: 'SecureP@ssw0rd123',
-        name: 'Test User',
+        email: "test@example.com",
+        password: "SecureP@ssw0rd123",
+        name: "Test User",
       },
     });
 
-    const mockRequest = new Request('http://localhost:5173', {
+    const mockRequest = new Request("http://localhost:5173", {
       headers: {
         cookie: `better-auth.session_token=${signUpResult.token}`,
       },
     });
 
     const sessionData = await getSession(mockRequest.headers, db);
-    if (!sessionData) throw new Error('Session data should not be null');
+    if (!sessionData) throw new Error("Session data should not be null");
     userId = sessionData.user.id;
 
     authenticatedLocals = {
@@ -105,42 +105,42 @@ describe('GET /api/projects/[id]/stats/timeseries', () => {
     await cleanup();
   });
 
-  describe('Authentication', () => {
-    it('returns 401 for unauthenticated request', async () => {
+  describe("Authentication", () => {
+    it("returns 401 for unauthenticated request", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/stats/timeseries`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id });
-      await expectHttpError(GET(event as never), 401, { message: 'Unauthorized' });
+      await expectHttpError(GET(event as never), 401, { message: "Unauthorized" });
     });
   });
 
-  describe('Project Validation', () => {
-    it('returns 404 for non-existent project', async () => {
+  describe("Project Validation", () => {
+    it("returns 404 for non-existent project", async () => {
       const request = new Request(
-        'http://localhost/api/projects/non-existent-id/stats/timeseries',
-        { method: 'GET' },
+        "http://localhost/api/projects/non-existent-id/stats/timeseries",
+        { method: "GET" },
       );
 
-      const event = createRequestEvent(request, db, { id: 'non-existent-id' }, authenticatedLocals);
+      const event = createRequestEvent(request, db, { id: "non-existent-id" }, authenticatedLocals);
       const response = await GET(event as never);
 
       expect(response.status).toBe(404);
       const body = await response.json();
-      expect(body).toHaveProperty('error', 'not_found');
-      expect(body).toHaveProperty('message', 'Project not found');
+      expect(body).toHaveProperty("error", "not_found");
+      expect(body).toHaveProperty("message", "Project not found");
     });
   });
 
-  describe('Default Behavior', () => {
-    it('defaults to 24h range when not specified', async () => {
+  describe("Default Behavior", () => {
+    it("defaults to 24h range when not specified", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/stats/timeseries`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
@@ -148,15 +148,15 @@ describe('GET /api/projects/[id]/stats/timeseries', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data.range).toBe('24h');
+      expect(data.range).toBe("24h");
       expect(data.buckets).toHaveLength(24);
     });
 
-    it('returns buckets for 15m range with minute granularity', async () => {
+    it("returns buckets for 15m range with minute granularity", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/stats/timeseries?range=15m`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
@@ -164,14 +164,14 @@ describe('GET /api/projects/[id]/stats/timeseries', () => {
       const data = await response.json();
 
       expect(data.buckets).toHaveLength(15);
-      expect(data.range).toBe('15m');
+      expect(data.range).toBe("15m");
     });
 
-    it('returns buckets for 1h range with 5-minute granularity', async () => {
+    it("returns buckets for 1h range with 5-minute granularity", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/stats/timeseries?range=1h`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
@@ -179,14 +179,14 @@ describe('GET /api/projects/[id]/stats/timeseries', () => {
       const data = await response.json();
 
       expect(data.buckets).toHaveLength(12);
-      expect(data.range).toBe('1h');
+      expect(data.range).toBe("1h");
     });
 
-    it('returns buckets for 7d range with 6-hour granularity', async () => {
+    it("returns buckets for 7d range with 6-hour granularity", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/stats/timeseries?range=7d`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
@@ -194,33 +194,33 @@ describe('GET /api/projects/[id]/stats/timeseries', () => {
       const data = await response.json();
 
       expect(data.buckets).toHaveLength(28);
-      expect(data.range).toBe('7d');
+      expect(data.range).toBe("7d");
     });
 
-    it('falls back to 24h for invalid range parameter', async () => {
+    it("falls back to 24h for invalid range parameter", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/stats/timeseries?range=invalid`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
       const response = await GET(event as never);
       const data = await response.json();
 
-      expect(data.range).toBe('24h');
+      expect(data.range).toBe("24h");
       expect(data.buckets).toHaveLength(24);
     });
   });
 
-  describe('Empty State', () => {
-    it('returns all zero counts when no logs in range', async () => {
+  describe("Empty State", () => {
+    it("returns all zero counts when no logs in range", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
       // Don't seed any logs
 
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/stats/timeseries?range=24h`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
@@ -232,8 +232,8 @@ describe('GET /api/projects/[id]/stats/timeseries', () => {
     });
   });
 
-  describe('Log Counting', () => {
-    it('does not select every matching log timestamp into memory', async () => {
+  describe("Log Counting", () => {
+    it("does not select every matching log timestamp into memory", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
       const now = new Date();
       await seedLogs(db, testProject.id, 25, {
@@ -241,14 +241,14 @@ describe('GET /api/projects/[id]/stats/timeseries', () => {
       });
 
       const originalSelect = db.select.bind(db);
-      const selectSpy = vi.spyOn(db, 'select').mockImplementation(((fields?: unknown) => {
+      const selectSpy = vi.spyOn(db, "select").mockImplementation(((fields?: unknown) => {
         if (
           fields &&
-          typeof fields === 'object' &&
+          typeof fields === "object" &&
           Object.keys(fields).length === 1 &&
-          'timestamp' in fields
+          "timestamp" in fields
         ) {
-          throw new Error('timeseries must aggregate timestamps in SQL');
+          throw new Error("timeseries must aggregate timestamps in SQL");
         }
 
         return originalSelect(fields as never);
@@ -256,7 +256,7 @@ describe('GET /api/projects/[id]/stats/timeseries', () => {
 
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/stats/timeseries?range=1h`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
@@ -268,7 +268,7 @@ describe('GET /api/projects/[id]/stats/timeseries', () => {
       expect(selectSpy).not.toHaveBeenCalledWith({ timestamp: expect.anything() });
     });
 
-    it('returns correct count per bucket', async () => {
+    it("returns correct count per bucket", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
       const now = new Date();
 
@@ -278,7 +278,7 @@ describe('GET /api/projects/[id]/stats/timeseries', () => {
 
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/stats/timeseries?range=1h`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
@@ -292,7 +292,7 @@ describe('GET /api/projects/[id]/stats/timeseries', () => {
       expect(data.totalCount).toBe(7);
     });
 
-    it('returns buckets with logs at different times', async () => {
+    it("returns buckets with logs at different times", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
       const now = new Date();
 
@@ -306,7 +306,7 @@ describe('GET /api/projects/[id]/stats/timeseries', () => {
 
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/stats/timeseries?range=24h`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
@@ -319,12 +319,12 @@ describe('GET /api/projects/[id]/stats/timeseries', () => {
     });
   });
 
-  describe('Bucket Order', () => {
-    it('returns buckets in chronological order', async () => {
+  describe("Bucket Order", () => {
+    it("returns buckets in chronological order", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/stats/timeseries?range=24h`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
@@ -339,11 +339,11 @@ describe('GET /api/projects/[id]/stats/timeseries', () => {
       expect(timestamps).toEqual(sorted);
     });
 
-    it('returns buckets with valid ISO timestamps', async () => {
+    it("returns buckets with valid ISO timestamps", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/stats/timeseries?range=24h`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
@@ -357,10 +357,10 @@ describe('GET /api/projects/[id]/stats/timeseries', () => {
     });
   });
 
-  describe('Project Isolation', () => {
-    it('respects projectId filter (no cross-project leakage)', async () => {
-      const project1 = await seedProject(db, { name: 'Project 1', ownerId: userId });
-      const project2 = await seedProject(db, { name: 'Project 2', ownerId: userId });
+  describe("Project Isolation", () => {
+    it("respects projectId filter (no cross-project leakage)", async () => {
+      const project1 = await seedProject(db, { name: "Project 1", ownerId: userId });
+      const project2 = await seedProject(db, { name: "Project 2", ownerId: userId });
 
       const now = new Date();
       await seedLogs(db, project1.id, 10, { timestamp: now });
@@ -368,7 +368,7 @@ describe('GET /api/projects/[id]/stats/timeseries', () => {
 
       const request = new Request(
         `http://localhost/api/projects/${project1.id}/stats/timeseries?range=24h`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: project1.id }, authenticatedLocals);
@@ -379,8 +379,8 @@ describe('GET /api/projects/[id]/stats/timeseries', () => {
     });
   });
 
-  describe('Time Range Boundary', () => {
-    it('excludes logs outside the time range', async () => {
+  describe("Time Range Boundary", () => {
+    it("excludes logs outside the time range", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
       const now = new Date();
 
@@ -395,7 +395,7 @@ describe('GET /api/projects/[id]/stats/timeseries', () => {
 
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/stats/timeseries?range=24h`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);

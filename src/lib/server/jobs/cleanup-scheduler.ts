@@ -1,5 +1,5 @@
-import { RETENTION_CONFIG } from '$lib/server/config';
-import { cleanupOldLogs } from './log-cleanup';
+import { RETENTION_CONFIG } from "$lib/server/config";
+import { cleanupOldLogs } from "./log-cleanup";
 
 let cleanupStarted = false;
 let cleanupIntervalId: ReturnType<typeof setInterval> | null = null;
@@ -83,11 +83,11 @@ async function runCleanup(): Promise<void> {
     }
 
     if (result.errors.length > 0) {
-      console.error('[cleanup-scheduler] Errors during cleanup:', result.errors);
+      console.error("[cleanup-scheduler] Errors during cleanup:", result.errors);
     }
   } catch (error) {
     console.error(
-      '[cleanup-scheduler] Fatal error during cleanup:',
+      "[cleanup-scheduler] Fatal error during cleanup:",
       error instanceof Error ? error.message : String(error),
     );
   }

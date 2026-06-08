@@ -1,28 +1,28 @@
-import { and, count, desc, eq, gte, inArray, lt, lte, or, type SQL, sql } from 'drizzle-orm';
-import { EXPORT_CONFIG } from '$lib/server/config/performance';
-import { getDbClient } from '$lib/server/db/db';
-import { log } from '$lib/server/db/schema';
-import { apiError } from '$lib/server/utils/api-error';
-import { escapeCSVField } from '$lib/server/utils/csv-serializer';
-import { isErrorResponse, requireProjectOwnership } from '$lib/server/utils/project-guard';
-import { buildSearchQuery } from '$lib/server/utils/search';
-import { LOG_LEVELS, type LogLevel } from '$lib/shared/types';
-import type { ExportFormat } from '$lib/types/export';
-import type { RequestEvent } from './$types';
+import { and, count, desc, eq, gte, inArray, lt, lte, or, type SQL, sql } from "drizzle-orm";
+import { EXPORT_CONFIG } from "$lib/server/config/performance";
+import { getDbClient } from "$lib/server/db/db";
+import { log } from "$lib/server/db/schema";
+import { apiError } from "$lib/server/utils/api-error";
+import { escapeCSVField } from "$lib/server/utils/csv-serializer";
+import { isErrorResponse, requireProjectOwnership } from "$lib/server/utils/project-guard";
+import { buildSearchQuery } from "$lib/server/utils/search";
+import { LOG_LEVELS, type LogLevel } from "$lib/shared/types";
+import type { ExportFormat } from "$lib/types/export";
+import type { RequestEvent } from "./$types";
 
 const EXPORT_BATCH_SIZE = 500;
 
 const CSV_HEADERS = [
-  'id',
-  'timestamp',
-  'level',
-  'message',
-  'metadata',
-  'sourceFile',
-  'lineNumber',
-  'requestId',
-  'userId',
-  'ipAddress',
+  "id",
+  "timestamp",
+  "level",
+  "message",
+  "metadata",
+  "sourceFile",
+  "lineNumber",
+  "requestId",
+  "userId",
+  "ipAddress",
 ] as const;
 
 // TODO: deduplicate with logs/+server.ts parseLevelFilter (RT-10)
@@ -30,7 +30,7 @@ function parseLevelFilter(levelParam: string | null): LogLevel[] | null {
   if (!levelParam) return null;
 
   const levels = levelParam
-    .split(',')
+    .split(",")
     .map((l) => l.trim().toLowerCase())
     .filter((l): l is LogLevel => LOG_LEVELS.includes(l as LogLevel));
 
@@ -41,10 +41,10 @@ function parseLevelFilter(levelParam: string | null): LogLevel[] | null {
  * Validate export format parameter
  */
 function validateFormat(formatParam: string | null): ExportFormat | null {
-  if (!formatParam) return 'json'; // Default to JSON
+  if (!formatParam) return "json"; // Default to JSON
 
   const format = formatParam.toLowerCase();
-  if (format === 'csv' || format === 'json') {
+  if (format === "csv" || format === "json") {
     return format as ExportFormat;
   }
 
@@ -55,8 +55,8 @@ function validateFormat(formatParam: string | null): ExportFormat | null {
  * Generate filename for export with timestamp
  */
 function generateFilename(projectName: string, format: ExportFormat): string {
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
-  const sanitizedName = projectName.replace(/[^a-zA-Z0-9-_]/g, '-');
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-").split("T")[0];
+  const sanitizedName = projectName.replace(/[^a-zA-Z0-9-_]/g, "-");
   return `logs-${sanitizedName}-${timestamp}.${format}`;
 }
 
@@ -94,16 +94,16 @@ export async function GET(event: RequestEvent): Promise<Response> {
 
   // Parse query parameters
   const url = event.url;
-  const formatParam = url.searchParams.get('format');
-  const levelParam = url.searchParams.get('level');
-  const searchParam = url.searchParams.get('search');
-  const fromParam = url.searchParams.get('from');
-  const toParam = url.searchParams.get('to');
+  const formatParam = url.searchParams.get("format");
+  const levelParam = url.searchParams.get("level");
+  const searchParam = url.searchParams.get("search");
+  const fromParam = url.searchParams.get("from");
+  const toParam = url.searchParams.get("to");
 
   // Validate format
   const format = validateFormat(formatParam);
   if (!format) {
-    return apiError(400, 'invalid_format', 'Invalid format parameter. Must be "csv" or "json".');
+    return apiError(400, "invalid_format", 'Invalid format parameter. Must be "csv" or "json".');
   }
 
   // Parse level filter
@@ -146,7 +146,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
   if (total > EXPORT_CONFIG.MAX_LOGS) {
     return apiError(
       400,
-      'export_too_large',
+      "export_too_large",
       `Export exceeds maximum limit of ${EXPORT_CONFIG.MAX_LOGS} logs. Please use filters to reduce the result set.`,
     );
   }
@@ -156,11 +156,11 @@ export async function GET(event: RequestEvent): Promise<Response> {
 
   const encoder = new TextEncoder();
 
-  if (format === 'csv') {
+  if (format === "csv") {
     const stream = new ReadableStream({
       async start(ctrl) {
         try {
-          ctrl.enqueue(encoder.encode(`${CSV_HEADERS.join(',')}\n`));
+          ctrl.enqueue(encoder.encode(`${CSV_HEADERS.join(",")}\n`));
 
           // Cursor-based pagination to avoid loading all rows at once
           let cursorTimestamp: Date | null = null;
@@ -201,7 +201,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
             for (const l of batch) {
               const values: unknown[] = [
                 l.id,
-                l.timestamp?.toISOString() ?? '',
+                l.timestamp?.toISOString() ?? "",
                 l.level,
                 l.message,
                 l.metadata ? JSON.stringify(l.metadata) : null,
@@ -211,7 +211,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
                 l.userId,
                 l.ipAddress,
               ];
-              ctrl.enqueue(encoder.encode(`${values.map(escapeCSVField).join(',')}\n`));
+              ctrl.enqueue(encoder.encode(`${values.map(escapeCSVField).join(",")}\n`));
             }
 
             fetched += batch.length;
@@ -232,8 +232,8 @@ export async function GET(event: RequestEvent): Promise<Response> {
     return new Response(stream, {
       status: 200,
       headers: {
-        'content-type': 'text/csv; charset=utf-8',
-        'content-disposition': `attachment; filename="${filename}"`,
+        "content-type": "text/csv; charset=utf-8",
+        "content-disposition": `attachment; filename="${filename}"`,
       },
     });
   }
@@ -242,7 +242,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
   const stream = new ReadableStream({
     async start(ctrl) {
       try {
-        ctrl.enqueue(encoder.encode('['));
+        ctrl.enqueue(encoder.encode("["));
 
         let cursorTimestamp: Date | null = null;
         let cursorId: string | null = null;
@@ -285,7 +285,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
               id: l.id,
               level: l.level,
               message: l.message,
-              timestamp: l.timestamp?.toISOString() ?? '',
+              timestamp: l.timestamp?.toISOString() ?? "",
               metadata: l.metadata ? JSON.stringify(l.metadata) : null,
               sourceFile: l.sourceFile,
               lineNumber: l.lineNumber,
@@ -293,7 +293,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
               userId: l.userId,
               ipAddress: l.ipAddress,
             };
-            ctrl.enqueue(encoder.encode(`${first ? '' : ','}${JSON.stringify(exportable)}`));
+            ctrl.enqueue(encoder.encode(`${first ? "" : ","}${JSON.stringify(exportable)}`));
             first = false;
           }
 
@@ -305,7 +305,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
           if (batch.length < EXPORT_BATCH_SIZE) break;
         }
 
-        ctrl.enqueue(encoder.encode(']'));
+        ctrl.enqueue(encoder.encode("]"));
         ctrl.close();
       } catch (err) {
         ctrl.error(err);
@@ -316,8 +316,8 @@ export async function GET(event: RequestEvent): Promise<Response> {
   return new Response(stream, {
     status: 200,
     headers: {
-      'content-type': 'application/json',
-      'content-disposition': `attachment; filename="${filename}"`,
+      "content-type": "application/json",
+      "content-disposition": `attachment; filename="${filename}"`,
     },
   });
 }

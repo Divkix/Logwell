@@ -1,8 +1,8 @@
-import { count, desc, eq, max } from 'drizzle-orm';
-import { db } from '$lib/server/db';
-import { log, project } from '$lib/server/db/schema';
-import { requireAuth } from '$lib/server/utils/auth-guard';
-import type { PageServerLoad } from './$types';
+import { count, desc, eq, max } from "drizzle-orm";
+import { db } from "$lib/server/db";
+import { log, project } from "$lib/server/db/schema";
+import { requireAuth } from "$lib/server/utils/auth-guard";
+import type { PageServerLoad } from "./$types";
 
 /**
  * Dashboard page server load function.

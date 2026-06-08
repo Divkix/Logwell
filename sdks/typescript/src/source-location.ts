@@ -122,13 +122,13 @@ export function captureSourceLocation(skipFrames: number): SourceLocation | unde
     return undefined;
   }
 
-  const lines = stack.split('\n');
+  const lines = stack.split("\n");
 
   // Detect stack format:
   // - V8 (Node/Bun/Chrome): Has "Error" header line, frames start with "at"
   // - SpiderMonkey/JSC (Firefox/Safari): No header, frames contain "@"
-  const firstLine = lines[0] || '';
-  const hasErrorHeader = !firstLine.includes('@') && !/^\s*at\s/.test(firstLine);
+  const firstLine = lines[0] || "";
+  const hasErrorHeader = !firstLine.includes("@") && !/^\s*at\s/.test(firstLine);
 
   // Calculate target frame index:
   // Skip: header (if present) + captureSourceLocation frame + skipFrames

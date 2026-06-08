@@ -1,5 +1,5 @@
-import { LogwellError } from './errors';
-import type { IngestResponse, LogEntry } from './types';
+import { LogwellError } from "./errors";
+import type { IngestResponse, LogEntry } from "./types";
 
 /**
  * Callback type for sending batched logs
@@ -63,7 +63,7 @@ export class BatchQueue {
       this.config.onError?.(
         new LogwellError(
           `Queue overflow. Dropped log: ${dropped?.message.substring(0, 50)}...`,
-          'QUEUE_OVERFLOW',
+          "QUEUE_OVERFLOW",
         ),
       );
     }
@@ -121,7 +121,7 @@ export class BatchQueue {
               this.config.onError?.(
                 new LogwellError(
                   `Queue overflow: dropped ${requeued.length - this.config.maxQueueSize} logs`,
-                  'QUEUE_OVERFLOW',
+                  "QUEUE_OVERFLOW",
                 ),
               );
             }
@@ -174,7 +174,7 @@ export class BatchQueue {
     if (this.queue.length > 0) {
       throw new LogwellError(
         `Shutdown flush failed: ${this.queue.length} log(s) could not be delivered`,
-        'NETWORK_ERROR',
+        "NETWORK_ERROR",
         undefined,
         false,
       );

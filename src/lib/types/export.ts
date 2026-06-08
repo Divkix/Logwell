@@ -1,4 +1,4 @@
-export type ExportFormat = 'csv' | 'json';
+export type ExportFormat = "csv" | "json";
 
 export interface ExportableLog {
   id: string;

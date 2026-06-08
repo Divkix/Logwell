@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash } from "node:crypto";
 
 /**
  * UUID matcher.
@@ -47,14 +47,14 @@ export function normalizeIncidentMessage(message: string): string {
   const normalized = message
     .toLowerCase()
     .trim()
-    .replace(UUID_REGEX, '{uuid}')
-    .replace(HEX_ID_REGEX, '{hex}')
-    .replace(IPV4_REGEX, '{ip}')
-    .replace(NUMBER_REGEX, '{num}')
-    .replace(WHITESPACE_REGEX, ' ')
+    .replace(UUID_REGEX, "{uuid}")
+    .replace(HEX_ID_REGEX, "{hex}")
+    .replace(IPV4_REGEX, "{ip}")
+    .replace(NUMBER_REGEX, "{num}")
+    .replace(WHITESPACE_REGEX, " ")
     .trim();
 
-  return normalized || 'unknown error';
+  return normalized || "unknown error";
 }
 
 /**
@@ -66,8 +66,8 @@ export function buildIncidentFingerprintSeed(params: {
   lineNumber: number | null;
   normalizedMessage: string;
 }): string {
-  const serviceName = params.serviceName ?? 'unknown-service';
-  const sourceFile = params.sourceFile ?? 'unknown-source';
+  const serviceName = params.serviceName ?? "unknown-service";
+  const sourceFile = params.sourceFile ?? "unknown-source";
   const lineNumber = params.lineNumber ?? 0;
 
   return `${serviceName}|${sourceFile}|${lineNumber}|${params.normalizedMessage}`;
@@ -77,7 +77,7 @@ export function buildIncidentFingerprintSeed(params: {
  * Returns a stable SHA-256 based fingerprint (truncated hex).
  */
 export function hashIncidentFingerprint(seed: string): string {
-  return createHash('sha256').update(seed).digest('hex').slice(0, INCIDENT_FINGERPRINT_LENGTH);
+  return createHash("sha256").update(seed).digest("hex").slice(0, INCIDENT_FINGERPRINT_LENGTH);
 }
 
 /**

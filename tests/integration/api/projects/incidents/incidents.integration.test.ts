@@ -1,22 +1,22 @@
-import type { HttpError } from '@sveltejs/kit';
-import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createAuth } from '$lib/server/auth';
-import type * as schema from '$lib/server/db/schema';
-import { incident } from '$lib/server/db/schema';
-import { setupTestDatabase } from '$lib/server/db/test-db';
-import { getSession } from '$lib/server/session';
-import { GET as GET_LIST } from '../../../../../src/routes/api/projects/[id]/incidents/+server';
-import { GET as GET_DETAIL } from '../../../../../src/routes/api/projects/[id]/incidents/[incidentId]/+server';
-import { GET as GET_TIMELINE } from '../../../../../src/routes/api/projects/[id]/incidents/[incidentId]/timeline/+server';
-import { seedLog, seedLogs, seedProject } from '../../../../fixtures/db';
+import type { HttpError } from "@sveltejs/kit";
+import type { PgliteDatabase } from "drizzle-orm/pglite";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { createAuth } from "$lib/server/auth";
+import type * as schema from "$lib/server/db/schema";
+import { incident } from "$lib/server/db/schema";
+import { setupTestDatabase } from "$lib/server/db/test-db";
+import { getSession } from "$lib/server/session";
+import { GET as GET_LIST } from "../../../../../src/routes/api/projects/[id]/incidents/+server";
+import { GET as GET_DETAIL } from "../../../../../src/routes/api/projects/[id]/incidents/[incidentId]/+server";
+import { GET as GET_TIMELINE } from "../../../../../src/routes/api/projects/[id]/incidents/[incidentId]/timeline/+server";
+import { seedLog, seedLogs, seedProject } from "../../../../fixtures/db";
 
 function createRequestEvent(
   request: Request,
   db: PgliteDatabase<typeof schema>,
   params: Record<string, string>,
   locals: Partial<App.Locals> = {},
-  routeId = '/api/projects/[id]/incidents',
+  routeId = "/api/projects/[id]/incidents",
 ) {
   return {
     request,
@@ -34,10 +34,10 @@ function createRequestEvent(
       getAll: () => [],
       set: () => {},
       delete: () => {},
-      serialize: () => '',
+      serialize: () => "",
     },
     fetch: globalThis.fetch,
-    getClientAddress: () => '127.0.0.1',
+    getClientAddress: () => "127.0.0.1",
     setHeaders: () => {},
   } as unknown;
 }
@@ -52,7 +52,7 @@ async function expectHttpError(
 ): Promise<void> {
   try {
     await promise;
-    expect.fail('Expected HTTP error to be thrown');
+    expect.fail("Expected HTTP error to be thrown");
   } catch (error) {
     const httpError = error as HttpError;
     expect(httpError.status).toBe(expectedStatus);
@@ -62,7 +62,7 @@ async function expectHttpError(
   }
 }
 
-describe('Incident APIs', () => {
+describe("Incident APIs", () => {
   let db: PgliteDatabase<typeof schema>;
   let cleanup: () => Promise<void>;
   let auth: ReturnType<typeof createAuth>;
@@ -77,17 +77,17 @@ describe('Incident APIs', () => {
 
     const signUpResult = await auth.api.signUpEmail({
       body: {
-        email: 'incident-test@example.com',
-        password: 'SecureP@ssw0rd123',
-        name: 'Incident User',
+        email: "incident-test@example.com",
+        password: "SecureP@ssw0rd123",
+        name: "Incident User",
       },
     });
 
-    const mockRequest = new Request('http://localhost:5173', {
+    const mockRequest = new Request("http://localhost:5173", {
       headers: { cookie: `better-auth.session_token=${signUpResult.token}` },
     });
     const sessionData = await getSession(mockRequest.headers, db);
-    if (!sessionData) throw new Error('Session data should not be null');
+    if (!sessionData) throw new Error("Session data should not be null");
 
     userId = sessionData.user.id;
     authenticatedLocals = {
@@ -100,43 +100,43 @@ describe('Incident APIs', () => {
     await cleanup();
   });
 
-  it('returns 401 for unauthenticated request', async () => {
+  it("returns 401 for unauthenticated request", async () => {
     const project = await seedProject(db, { ownerId: userId });
     const request = new Request(`http://localhost/api/projects/${project.id}/incidents`);
     const event = createRequestEvent(request, db, { id: project.id });
 
-    await expectHttpError(GET_LIST(event as never), 401, { message: 'Unauthorized' });
+    await expectHttpError(GET_LIST(event as never), 401, { message: "Unauthorized" });
   });
 
-  it('lists only open incidents by default', async () => {
+  it("lists only open incidents by default", async () => {
     const project = await seedProject(db, { ownerId: userId });
     const now = Date.now();
 
     await db.insert(incident).values([
       {
-        id: 'inc-open',
+        id: "inc-open",
         projectId: project.id,
-        fingerprint: 'fp-open',
-        title: 'Open incident',
-        normalizedMessage: 'open incident',
-        serviceName: 'api',
-        sourceFile: 'src/a.ts',
+        fingerprint: "fp-open",
+        title: "Open incident",
+        normalizedMessage: "open incident",
+        serviceName: "api",
+        sourceFile: "src/a.ts",
         lineNumber: 10,
-        highestLevel: 'error',
+        highestLevel: "error",
         firstSeen: new Date(now - 10 * 60 * 1000),
         lastSeen: new Date(now - 5 * 60 * 1000),
         totalEvents: 4,
       },
       {
-        id: 'inc-resolved',
+        id: "inc-resolved",
         projectId: project.id,
-        fingerprint: 'fp-resolved',
-        title: 'Resolved incident',
-        normalizedMessage: 'resolved incident',
-        serviceName: 'api',
-        sourceFile: 'src/b.ts',
+        fingerprint: "fp-resolved",
+        title: "Resolved incident",
+        normalizedMessage: "resolved incident",
+        serviceName: "api",
+        sourceFile: "src/b.ts",
         lineNumber: 20,
-        highestLevel: 'error',
+        highestLevel: "error",
         firstSeen: new Date(now - 3 * 60 * 60 * 1000),
         lastSeen: new Date(now - 2 * 60 * 60 * 1000),
         totalEvents: 2,
@@ -150,12 +150,12 @@ describe('Incident APIs', () => {
 
     const body = await response.json();
     expect(body.incidents).toHaveLength(1);
-    expect(body.incidents[0]!.id).toBe('inc-open');
-    expect(body.incidents[0]!.status).toBe('open');
-    expect(body.incidents[0]).not.toHaveProperty('reopenCount');
+    expect(body.incidents[0]!.id).toBe("inc-open");
+    expect(body.incidents[0]!.status).toBe("open");
+    expect(body.incidents[0]).not.toHaveProperty("reopenCount");
   });
 
-  it('returns has_more=false when total equals limit (boundary)', async () => {
+  it("returns has_more=false when total equals limit (boundary)", async () => {
     const project = await seedProject(db, { ownerId: userId });
     const now = Date.now();
 
@@ -168,10 +168,10 @@ describe('Incident APIs', () => {
         fingerprint: `fp-${i}`,
         title: `Incident ${i}`,
         normalizedMessage: `incident ${i}`,
-        serviceName: 'api',
-        sourceFile: 'src/a.ts',
+        serviceName: "api",
+        sourceFile: "src/a.ts",
         lineNumber: 10,
-        highestLevel: 'error' as const,
+        highestLevel: "error" as const,
         firstSeen: new Date(now - 10 * 60 * 1000),
         lastSeen: new Date(now - 5 * 60 * 1000),
         totalEvents: 1,
@@ -190,20 +190,20 @@ describe('Incident APIs', () => {
     expect(body.nextCursor).toBeNull();
   });
 
-  it('returns detail with source candidates and correlations', async () => {
+  it("returns detail with source candidates and correlations", async () => {
     const project = await seedProject(db, { ownerId: userId });
     const [createdIncident] = await db
       .insert(incident)
       .values({
-        id: 'inc-detail',
+        id: "inc-detail",
         projectId: project.id,
-        fingerprint: 'fp-detail',
-        title: 'DB timeout',
-        normalizedMessage: 'db timeout {num}',
-        serviceName: 'api',
-        sourceFile: 'src/db.ts',
+        fingerprint: "fp-detail",
+        title: "DB timeout",
+        normalizedMessage: "db timeout {num}",
+        serviceName: "api",
+        sourceFile: "src/db.ts",
         lineNumber: 42,
-        highestLevel: 'error',
+        highestLevel: "error",
         firstSeen: new Date(Date.now() - 20 * 60 * 1000),
         lastSeen: new Date(Date.now() - 5 * 60 * 1000),
         totalEvents: 3,
@@ -213,32 +213,32 @@ describe('Incident APIs', () => {
     await seedLog(db, project.id, {
       incidentId: createdIncident!.id,
       fingerprint: createdIncident!.fingerprint,
-      level: 'error',
-      message: 'DB timeout',
-      sourceFile: 'src/db.ts',
+      level: "error",
+      message: "DB timeout",
+      sourceFile: "src/db.ts",
       lineNumber: 42,
-      requestId: 'req-1',
-      traceId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      requestId: "req-1",
+      traceId: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     });
     await seedLog(db, project.id, {
       incidentId: createdIncident!.id,
       fingerprint: createdIncident!.fingerprint,
-      level: 'error',
-      message: 'DB timeout',
-      sourceFile: 'src/db.ts',
+      level: "error",
+      message: "DB timeout",
+      sourceFile: "src/db.ts",
       lineNumber: 42,
-      requestId: 'req-1',
-      traceId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      requestId: "req-1",
+      traceId: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     });
     await seedLog(db, project.id, {
       incidentId: createdIncident!.id,
       fingerprint: createdIncident!.fingerprint,
-      level: 'error',
-      message: 'DB timeout',
-      sourceFile: 'src/worker.ts',
+      level: "error",
+      message: "DB timeout",
+      sourceFile: "src/worker.ts",
       lineNumber: 9,
-      requestId: 'req-2',
-      traceId: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      requestId: "req-2",
+      traceId: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
     });
 
     const request = new Request(
@@ -249,36 +249,36 @@ describe('Incident APIs', () => {
       db,
       { id: project.id, incidentId: createdIncident!.id },
       authenticatedLocals,
-      '/api/projects/[id]/incidents/[incidentId]',
+      "/api/projects/[id]/incidents/[incidentId]",
     );
     const response = await GET_DETAIL(event as never);
     expect(response.status).toBe(200);
 
     const body = await response.json();
     expect(body.id).toBe(createdIncident!.id);
-    expect(body).not.toHaveProperty('reopenCount');
-    expect(body.rootCauseCandidates[0].sourceFile).toBe('src/db.ts');
-    expect(body.correlations.topRequestIds[0]).toEqual({ requestId: 'req-1', count: 2 });
+    expect(body).not.toHaveProperty("reopenCount");
+    expect(body.rootCauseCandidates[0].sourceFile).toBe("src/db.ts");
+    expect(body.correlations.topRequestIds[0]).toEqual({ requestId: "req-1", count: 2 });
     expect(body.correlations.topTraceIds[0]).toEqual({
-      traceId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      traceId: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       count: 2,
     });
   });
 
-  it('aggregates incident detail counts in SQL instead of selecting every incident log', async () => {
+  it("aggregates incident detail counts in SQL instead of selecting every incident log", async () => {
     const project = await seedProject(db, { ownerId: userId });
     const [createdIncident] = await db
       .insert(incident)
       .values({
-        id: 'inc-sql-detail',
+        id: "inc-sql-detail",
         projectId: project.id,
-        fingerprint: 'fp-sql-detail',
-        title: 'SQL detail',
-        normalizedMessage: 'sql detail',
-        serviceName: 'api',
-        sourceFile: 'src/detail.ts',
+        fingerprint: "fp-sql-detail",
+        title: "SQL detail",
+        normalizedMessage: "sql detail",
+        serviceName: "api",
+        sourceFile: "src/detail.ts",
         lineNumber: 1,
-        highestLevel: 'error',
+        highestLevel: "error",
         firstSeen: new Date(Date.now() - 20 * 60 * 1000),
         lastSeen: new Date(Date.now() - 5 * 60 * 1000),
         totalEvents: 20,
@@ -288,22 +288,22 @@ describe('Incident APIs', () => {
     await seedLogs(db, project.id, 20, {
       incidentId: createdIncident!.id,
       fingerprint: createdIncident!.fingerprint,
-      level: 'error',
-      message: 'SQL detail',
-      sourceFile: 'src/detail.ts',
+      level: "error",
+      message: "SQL detail",
+      sourceFile: "src/detail.ts",
       lineNumber: 1,
-      requestId: 'req-sql',
-      traceId: 'trace-sql',
+      requestId: "req-sql",
+      traceId: "trace-sql",
     });
 
     const originalSelect = db.select.bind(db);
-    vi.spyOn(db, 'select').mockImplementation(((fields?: unknown) => {
+    vi.spyOn(db, "select").mockImplementation(((fields?: unknown) => {
       if (
         fields &&
-        typeof fields === 'object' &&
-        ['sourceFile', 'lineNumber', 'requestId', 'traceId'].every((key) => key in fields)
+        typeof fields === "object" &&
+        ["sourceFile", "lineNumber", "requestId", "traceId"].every((key) => key in fields)
       ) {
-        throw new Error('incident detail must aggregate log counts in SQL');
+        throw new Error("incident detail must aggregate log counts in SQL");
       }
 
       return originalSelect(fields as never);
@@ -317,35 +317,35 @@ describe('Incident APIs', () => {
       db,
       { id: project.id, incidentId: createdIncident!.id },
       authenticatedLocals,
-      '/api/projects/[id]/incidents/[incidentId]',
+      "/api/projects/[id]/incidents/[incidentId]",
     );
     const response = await GET_DETAIL(event as never);
     expect(response.status).toBe(200);
 
     const body = await response.json();
     expect(body.rootCauseCandidates[0]).toEqual({
-      sourceFile: 'src/detail.ts',
+      sourceFile: "src/detail.ts",
       lineNumber: 1,
       count: 20,
     });
-    expect(body.correlations.topRequestIds[0]).toEqual({ requestId: 'req-sql', count: 20 });
-    expect(body.correlations.topTraceIds[0]).toEqual({ traceId: 'trace-sql', count: 20 });
+    expect(body.correlations.topRequestIds[0]).toEqual({ requestId: "req-sql", count: 20 });
+    expect(body.correlations.topTraceIds[0]).toEqual({ traceId: "trace-sql", count: 20 });
   });
 
-  it('returns timeline buckets with peak data', async () => {
+  it("returns timeline buckets with peak data", async () => {
     const project = await seedProject(db, { ownerId: userId });
     const [createdIncident] = await db
       .insert(incident)
       .values({
-        id: 'inc-timeline',
+        id: "inc-timeline",
         projectId: project.id,
-        fingerprint: 'fp-timeline',
-        title: 'Timeline incident',
-        normalizedMessage: 'timeline incident',
-        serviceName: 'api',
-        sourceFile: 'src/timeline.ts',
+        fingerprint: "fp-timeline",
+        title: "Timeline incident",
+        normalizedMessage: "timeline incident",
+        serviceName: "api",
+        sourceFile: "src/timeline.ts",
         lineNumber: 1,
-        highestLevel: 'error',
+        highestLevel: "error",
         firstSeen: new Date(Date.now() - 50 * 60 * 1000),
         lastSeen: new Date(Date.now() - 5 * 60 * 1000),
         totalEvents: 0,
@@ -354,20 +354,20 @@ describe('Incident APIs', () => {
 
     await seedLog(db, project.id, {
       incidentId: createdIncident!.id,
-      level: 'error',
-      message: 'err1',
+      level: "error",
+      message: "err1",
       timestamp: new Date(Date.now() - 20 * 60 * 1000),
     });
     await seedLog(db, project.id, {
       incidentId: createdIncident!.id,
-      level: 'error',
-      message: 'err2',
+      level: "error",
+      message: "err2",
       timestamp: new Date(Date.now() - 20 * 60 * 1000),
     });
     await seedLog(db, project.id, {
       incidentId: createdIncident!.id,
-      level: 'error',
-      message: 'err3',
+      level: "error",
+      message: "err3",
       timestamp: new Date(Date.now() - 10 * 60 * 1000),
     });
 
@@ -379,31 +379,31 @@ describe('Incident APIs', () => {
       db,
       { id: project.id, incidentId: createdIncident!.id },
       authenticatedLocals,
-      '/api/projects/[id]/incidents/[incidentId]/timeline',
+      "/api/projects/[id]/incidents/[incidentId]/timeline",
     );
     const response = await GET_TIMELINE(event as never);
     expect(response.status).toBe(200);
 
     const body = await response.json();
-    expect(body.range).toBe('1h');
+    expect(body.range).toBe("1h");
     expect(body.buckets.length).toBeGreaterThan(0);
     expect(body.peakBucket).not.toBeNull();
   });
 
-  it('aggregates incident timeline buckets in SQL instead of selecting every timestamp', async () => {
+  it("aggregates incident timeline buckets in SQL instead of selecting every timestamp", async () => {
     const project = await seedProject(db, { ownerId: userId });
     const [createdIncident] = await db
       .insert(incident)
       .values({
-        id: 'inc-sql-timeline',
+        id: "inc-sql-timeline",
         projectId: project.id,
-        fingerprint: 'fp-sql-timeline',
-        title: 'SQL timeline',
-        normalizedMessage: 'sql timeline',
-        serviceName: 'api',
-        sourceFile: 'src/timeline.ts',
+        fingerprint: "fp-sql-timeline",
+        title: "SQL timeline",
+        normalizedMessage: "sql timeline",
+        serviceName: "api",
+        sourceFile: "src/timeline.ts",
         lineNumber: 1,
-        highestLevel: 'error',
+        highestLevel: "error",
         firstSeen: new Date(Date.now() - 50 * 60 * 1000),
         lastSeen: new Date(Date.now() - 5 * 60 * 1000),
         totalEvents: 30,
@@ -413,20 +413,20 @@ describe('Incident APIs', () => {
     await seedLogs(db, project.id, 30, {
       incidentId: createdIncident!.id,
       fingerprint: createdIncident!.fingerprint,
-      level: 'error',
-      message: 'SQL timeline',
+      level: "error",
+      message: "SQL timeline",
       timestamp: new Date(Date.now() - 20 * 60 * 1000),
     });
 
     const originalSelect = db.select.bind(db);
-    vi.spyOn(db, 'select').mockImplementation(((fields?: unknown) => {
+    vi.spyOn(db, "select").mockImplementation(((fields?: unknown) => {
       if (
         fields &&
-        typeof fields === 'object' &&
+        typeof fields === "object" &&
         Object.keys(fields).length === 1 &&
-        'timestamp' in fields
+        "timestamp" in fields
       ) {
-        throw new Error('incident timeline must aggregate timestamps in SQL');
+        throw new Error("incident timeline must aggregate timestamps in SQL");
       }
 
       return originalSelect(fields as never);
@@ -440,7 +440,7 @@ describe('Incident APIs', () => {
       db,
       { id: project.id, incidentId: createdIncident!.id },
       authenticatedLocals,
-      '/api/projects/[id]/incidents/[incidentId]/timeline',
+      "/api/projects/[id]/incidents/[incidentId]/timeline",
     );
     const response = await GET_TIMELINE(event as never);
     expect(response.status).toBe(200);
@@ -452,30 +452,30 @@ describe('Incident APIs', () => {
   it("returns 404 when user accesses another user's incident", async () => {
     const otherUser = await auth.api.signUpEmail({
       body: {
-        email: 'other-user@example.com',
-        password: 'SecureP@ssw0rd123',
-        name: 'Other User',
+        email: "other-user@example.com",
+        password: "SecureP@ssw0rd123",
+        name: "Other User",
       },
     });
-    const otherRequest = new Request('http://localhost:5173', {
+    const otherRequest = new Request("http://localhost:5173", {
       headers: { cookie: `better-auth.session_token=${otherUser.token}` },
     });
     const otherSession = await getSession(otherRequest.headers, db);
-    if (!otherSession) throw new Error('Missing other session');
+    if (!otherSession) throw new Error("Missing other session");
 
     const otherProject = await seedProject(db, { ownerId: otherSession.user.id });
     const [otherIncident] = await db
       .insert(incident)
       .values({
-        id: 'inc-private',
+        id: "inc-private",
         projectId: otherProject.id,
-        fingerprint: 'fp-private',
-        title: 'Private incident',
-        normalizedMessage: 'private',
+        fingerprint: "fp-private",
+        title: "Private incident",
+        normalizedMessage: "private",
         serviceName: null,
         sourceFile: null,
         lineNumber: null,
-        highestLevel: 'error',
+        highestLevel: "error",
         firstSeen: new Date(),
         lastSeen: new Date(),
         totalEvents: 1,
@@ -490,12 +490,12 @@ describe('Incident APIs', () => {
       db,
       { id: otherProject.id, incidentId: otherIncident!.id },
       authenticatedLocals,
-      '/api/projects/[id]/incidents/[incidentId]',
+      "/api/projects/[id]/incidents/[incidentId]",
     );
     const response = await GET_DETAIL(event as never);
     expect(response.status).toBe(404);
 
     const body = await response.json();
-    expect(body).toHaveProperty('error', 'not_found');
+    expect(body).toHaveProperty("error", "not_found");
   });
 });

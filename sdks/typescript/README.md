@@ -43,26 +43,26 @@ deno add jsr:@divkix/logwell
 ```
 
 ```typescript
-import { Logwell } from '@divkix/logwell';
+import { Logwell } from "@divkix/logwell";
 ```
 
 ## Quick Start
 
 ```typescript
-import { Logwell } from 'logwell';
+import { Logwell } from "logwell";
 
 const logger = new Logwell({
-  apiKey: 'lw_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-  endpoint: 'https://logs.example.com',
-  service: 'my-app',
+  apiKey: "lw_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  endpoint: "https://logs.example.com",
+  service: "my-app",
 });
 
 // Log at different levels
-logger.debug('Debug message');
-logger.info('User logged in', { userId: '123' });
-logger.warn('Deprecated API called');
-logger.error('Database connection failed', { host: 'db.local' });
-logger.fatal('Unrecoverable error');
+logger.debug("Debug message");
+logger.info("User logged in", { userId: "123" });
+logger.warn("Deprecated API called");
+logger.error("Database connection failed", { host: "db.local" });
+logger.fatal("Unrecoverable error");
 
 // Flush before shutdown
 await logger.shutdown();
@@ -73,19 +73,19 @@ await logger.shutdown();
 ```typescript
 interface LogwellConfig {
   // Required
-  apiKey: string;              // API key (format: lw_[32chars])
-  endpoint: string;            // Logwell server URL
+  apiKey: string; // API key (format: lw_[32chars])
+  endpoint: string; // Logwell server URL
 
   // Optional
-  service?: string;            // Default service name for all logs
-  batchSize?: number;          // Logs per batch (default: 50)
-  flushInterval?: number;      // Auto-flush interval in ms (default: 5000)
-  maxQueueSize?: number;       // Max queue size (default: 1000)
-  maxRetries?: number;         // Retry attempts (default: 3)
+  service?: string; // Default service name for all logs
+  batchSize?: number; // Logs per batch (default: 50)
+  flushInterval?: number; // Auto-flush interval in ms (default: 5000)
+  maxQueueSize?: number; // Max queue size (default: 1000)
+  maxRetries?: number; // Retry attempts (default: 3)
   captureSourceLocation?: boolean; // Capture file/line (default: false)
 
   // Callbacks
-  onError?: (error: Error) => void;  // Called on send failures
+  onError?: (error: Error) => void; // Called on send failures
   onFlush?: (count: number) => void; // Called after successful flush
 }
 ```
@@ -121,12 +121,12 @@ Create child loggers with additional context:
 
 ```typescript
 const requestLogger = logger.child({
-  service: 'api-handler',
+  service: "api-handler",
   metadata: { requestId: req.id },
 });
 
 // All logs include requestId automatically
-requestLogger.info('Request received', { path: req.path });
+requestLogger.info("Request received", { path: req.path });
 ```
 
 ### Properties
@@ -142,12 +142,12 @@ Enable automatic file and line number capture for debugging:
 
 ```typescript
 const logger = new Logwell({
-  apiKey: 'lw_xxx',
-  endpoint: 'https://logs.example.com',
+  apiKey: "lw_xxx",
+  endpoint: "https://logs.example.com",
   captureSourceLocation: true, // opt-in
 });
 
-logger.info('User logged in');
+logger.info("User logged in");
 // Log includes: sourceFile: '/app/src/auth.ts', lineNumber: 42
 ```
 
@@ -158,13 +158,13 @@ logger.info('User logged in');
 ### Express.js Middleware
 
 ```typescript
-import { Logwell } from 'logwell';
-import express from 'express';
+import { Logwell } from "logwell";
+import express from "express";
 
 const logger = new Logwell({
   apiKey: process.env.LOGWELL_API_KEY!,
   endpoint: process.env.LOGWELL_ENDPOINT!,
-  service: 'express-app',
+  service: "express-app",
 });
 
 const app = express();
@@ -174,8 +174,8 @@ app.use((req, res, next) => {
   req.log = logger.child({ metadata: { requestId } });
 
   const start = Date.now();
-  res.on('finish', () => {
-    req.log.info('Request completed', {
+  res.on("finish", () => {
+    req.log.info("Request completed", {
       method: req.method,
       path: req.path,
       status: res.statusCode,
@@ -187,7 +187,7 @@ app.use((req, res, next) => {
 });
 
 // Graceful shutdown
-process.on('SIGTERM', async () => {
+process.on("SIGTERM", async () => {
   await logger.shutdown();
   process.exit(0);
 });
@@ -196,7 +196,7 @@ process.on('SIGTERM', async () => {
 ### Cloudflare Workers
 
 ```typescript
-import { Logwell } from 'logwell';
+import { Logwell } from "logwell";
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -206,14 +206,14 @@ export default {
       batchSize: 1, // Immediate flush for short-lived workers
     });
 
-    logger.info('Worker invoked', { url: request.url });
+    logger.info("Worker invoked", { url: request.url });
 
     try {
       const response = await handleRequest(request);
       await logger.flush();
       return response;
     } catch (error) {
-      logger.error('Worker error', { error: String(error) });
+      logger.error("Worker error", { error: String(error) });
       await logger.flush();
       throw error;
     }
@@ -225,22 +225,22 @@ export default {
 
 ```html
 <script type="module">
-  import { Logwell } from 'https://esm.sh/logwell';
+  import { Logwell } from "https://esm.sh/logwell";
 
   const logger = new Logwell({
-    apiKey: 'lw_xxx',
-    endpoint: 'https://logs.example.com',
+    apiKey: "lw_xxx",
+    endpoint: "https://logs.example.com",
     batchSize: 10,
     flushInterval: 10000,
   });
 
   // Log user actions
-  document.getElementById('submit')?.addEventListener('click', () => {
-    logger.info('Form submitted', { formId: 'signup' });
+  document.getElementById("submit")?.addEventListener("click", () => {
+    logger.info("Form submitted", { formId: "signup" });
   });
 
   // Flush before page unload
-  window.addEventListener('beforeunload', () => logger.flush());
+  window.addEventListener("beforeunload", () => logger.flush());
 </script>
 ```
 
@@ -249,11 +249,11 @@ export default {
 The SDK throws `LogwellError` on failures:
 
 ```typescript
-import { Logwell, LogwellError } from 'logwell';
+import { Logwell, LogwellError } from "logwell";
 
 const logger = new Logwell({
-  apiKey: 'lw_xxx',
-  endpoint: 'https://logs.example.com',
+  apiKey: "lw_xxx",
+  endpoint: "https://logs.example.com",
   onError: (error) => {
     if (error instanceof LogwellError) {
       console.error(`Logwell error [${error.code}]: ${error.message}`);
@@ -266,6 +266,7 @@ const logger = new Logwell({
 ```
 
 Error codes:
+
 - `NETWORK_ERROR` - Network failure (retryable)
 - `UNAUTHORIZED` - Invalid API key
 - `VALIDATION_ERROR` - Invalid log format
@@ -287,7 +288,7 @@ import type {
   IngestResponse,
   LogwellError,
   LogwellErrorCode,
-} from 'logwell';
+} from "logwell";
 ```
 
 ## License

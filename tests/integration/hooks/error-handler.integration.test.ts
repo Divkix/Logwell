@@ -1,12 +1,12 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createErrorHandler, type ErrorContext } from '$lib/server/error-handler';
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { createErrorHandler, type ErrorContext } from "$lib/server/error-handler";
 
-describe('Global Error Handler', () => {
+describe("Global Error Handler", () => {
   let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
   let handleError: ReturnType<typeof createErrorHandler>;
 
   beforeEach(() => {
-    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     handleError = createErrorHandler();
   });
 
@@ -16,32 +16,32 @@ describe('Global Error Handler', () => {
 
   function createErrorContext(overrides: Partial<ErrorContext> = {}): ErrorContext {
     return {
-      error: new Error('Test error'),
-      url: 'http://localhost:5173/api/projects',
-      method: 'POST',
-      route: '/api/projects',
+      error: new Error("Test error"),
+      url: "http://localhost:5173/api/projects",
+      method: "POST",
+      route: "/api/projects",
       status: 500,
-      message: 'Internal server error',
+      message: "Internal server error",
       ...overrides,
     };
   }
 
-  describe('logging', () => {
-    it('logs error with request context', () => {
+  describe("logging", () => {
+    it("logs error with request context", () => {
       const context = createErrorContext();
 
       handleError(context);
 
       expect(consoleErrorSpy).toHaveBeenCalled();
       const loggedArgs = consoleErrorSpy.mock.calls[0];
-      expect(loggedArgs[0]).toContain('[ERROR]');
-      expect(loggedArgs[0]).toContain('/api/projects');
-      expect(loggedArgs[0]).toContain('POST');
+      expect(loggedArgs[0]).toContain("[ERROR]");
+      expect(loggedArgs[0]).toContain("/api/projects");
+      expect(loggedArgs[0]).toContain("POST");
     });
 
-    it('logs error stack trace for debugging', () => {
-      const error = new Error('Test error');
-      error.stack = 'Error: Test error\n    at test.ts:1:1';
+    it("logs error stack trace for debugging", () => {
+      const error = new Error("Test error");
+      error.stack = "Error: Test error\n    at test.ts:1:1";
       const context = createErrorContext({ error });
 
       handleError(context);
@@ -49,7 +49,7 @@ describe('Global Error Handler', () => {
       expect(consoleErrorSpy).toHaveBeenCalled();
     });
 
-    it('includes error ID in log for tracing', () => {
+    it("includes error ID in log for tracing", () => {
       const context = createErrorContext();
 
       const result = handleError(context);
@@ -59,48 +59,48 @@ describe('Global Error Handler', () => {
     });
   });
 
-  describe('error message sanitization', () => {
-    it('returns sanitized error message for 500 errors', () => {
-      const sensitiveError = new Error('Database password: secret123');
+  describe("error message sanitization", () => {
+    it("returns sanitized error message for 500 errors", () => {
+      const sensitiveError = new Error("Database password: secret123");
       const context = createErrorContext({
         error: sensitiveError,
         status: 500,
-        message: 'Internal server error',
+        message: "Internal server error",
       });
 
       const result = handleError(context);
 
       // Should not expose internal error details
-      expect(result.message).not.toContain('secret123');
-      expect(result.message).toBe('Internal server error');
+      expect(result.message).not.toContain("secret123");
+      expect(result.message).toBe("Internal server error");
     });
 
-    it('returns original message for 4xx errors', () => {
+    it("returns original message for 4xx errors", () => {
       const context = createErrorContext({
         status: 400,
-        message: 'Project name already exists',
+        message: "Project name already exists",
       });
 
       const result = handleError(context);
 
       // 4xx errors can show user-friendly messages
-      expect(result.message).toBe('Project name already exists');
+      expect(result.message).toBe("Project name already exists");
     });
 
-    it('returns original message for 404 errors', () => {
+    it("returns original message for 404 errors", () => {
       const context = createErrorContext({
         status: 404,
-        message: 'Project not found',
+        message: "Project not found",
       });
 
       const result = handleError(context);
 
-      expect(result.message).toBe('Project not found');
+      expect(result.message).toBe("Project not found");
     });
   });
 
-  describe('error ID generation', () => {
-    it('generates unique error IDs for tracking', () => {
+  describe("error ID generation", () => {
+    it("generates unique error IDs for tracking", () => {
       const context = createErrorContext();
 
       const result1 = handleError(context);
@@ -111,7 +111,7 @@ describe('Global Error Handler', () => {
       expect(result1.id).not.toBe(result2.id);
     });
 
-    it('generates IDs with consistent format', () => {
+    it("generates IDs with consistent format", () => {
       const context = createErrorContext();
 
       const result = handleError(context);
@@ -123,16 +123,16 @@ describe('Global Error Handler', () => {
     });
   });
 
-  describe('error context preservation', () => {
-    it('includes route information in response', () => {
+  describe("error context preservation", () => {
+    it("includes route information in response", () => {
       const context = createErrorContext({
-        route: '/api/projects/[id]',
+        route: "/api/projects/[id]",
       });
 
       const result = handleError(context);
 
-      expect(result).toHaveProperty('id');
-      expect(result).toHaveProperty('message');
+      expect(result).toHaveProperty("id");
+      expect(result).toHaveProperty("message");
     });
   });
 });

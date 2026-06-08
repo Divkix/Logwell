@@ -1,11 +1,11 @@
-import { json } from '@sveltejs/kit';
-import { eq } from 'drizzle-orm';
-import { getDbClient } from '$lib/server/db/db';
-import { project } from '$lib/server/db/schema';
-import { generateApiKey, hashApiKey, invalidateApiKeyCacheByHash } from '$lib/server/utils/api-key';
-import { checkCsrfOrigin } from '$lib/server/utils/csrf';
-import { isErrorResponse, requireProjectOwnership } from '$lib/server/utils/project-guard';
-import type { RequestEvent } from './$types';
+import { json } from "@sveltejs/kit";
+import { eq } from "drizzle-orm";
+import { getDbClient } from "$lib/server/db/db";
+import { project } from "$lib/server/db/schema";
+import { generateApiKey, hashApiKey, invalidateApiKeyCacheByHash } from "$lib/server/utils/api-key";
+import { checkCsrfOrigin } from "$lib/server/utils/csrf";
+import { isErrorResponse, requireProjectOwnership } from "$lib/server/utils/project-guard";
+import type { RequestEvent } from "./$types";
 
 /**
  * POST /api/projects/[id]/regenerate

@@ -1,10 +1,10 @@
-import { PGlite } from '@electric-sql/pglite';
-import { drizzle } from 'drizzle-orm/pglite';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import * as schema from '$lib/server/db/schema';
-import { GET } from '../../../../src/routes/api/health/+server';
+import { PGlite } from "@electric-sql/pglite";
+import { drizzle } from "drizzle-orm/pglite";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import * as schema from "$lib/server/db/schema";
+import { GET } from "../../../../src/routes/api/health/+server";
 
-describe('Health Check Endpoint', () => {
+describe("Health Check Endpoint", () => {
   let pglite: PGlite;
   let db: ReturnType<typeof drizzle>;
   let mockEvent: Parameters<typeof GET>[0];
@@ -28,8 +28,8 @@ describe('Health Check Endpoint', () => {
     // Create mock event with database
     mockEvent = {
       locals: { db } as unknown as App.Locals,
-      request: new Request('http://localhost/api/health'),
-      url: new URL('http://localhost/api/health'),
+      request: new Request("http://localhost/api/health"),
+      url: new URL("http://localhost/api/health"),
       params: {},
     } as Parameters<typeof GET>[0];
   });
@@ -39,23 +39,23 @@ describe('Health Check Endpoint', () => {
     vi.restoreAllMocks();
   });
 
-  describe('GET /api/health', () => {
-    it('returns 200 OK when database is healthy', async () => {
+  describe("GET /api/health", () => {
+    it("returns 200 OK when database is healthy", async () => {
       const response = await GET(mockEvent);
 
       expect(response.status).toBe(200);
       const body = await response.json();
-      expect(body.status).toBe('healthy');
+      expect(body.status).toBe("healthy");
     });
 
-    it('returns database status as connected', async () => {
+    it("returns database status as connected", async () => {
       const response = await GET(mockEvent);
 
       const body = await response.json();
-      expect(body.database).toBe('connected');
+      expect(body.database).toBe("connected");
     });
 
-    it('returns timestamp in response', async () => {
+    it("returns timestamp in response", async () => {
       const response = await GET(mockEvent);
 
       const body = await response.json();
@@ -63,37 +63,37 @@ describe('Health Check Endpoint', () => {
       expect(new Date(body.timestamp).getTime()).not.toBeNaN();
     });
 
-    it('returns uptime in response', async () => {
+    it("returns uptime in response", async () => {
       const response = await GET(mockEvent);
 
       const body = await response.json();
-      expect(typeof body.uptime).toBe('number');
+      expect(typeof body.uptime).toBe("number");
       expect(body.uptime).toBeGreaterThanOrEqual(0);
     });
 
-    it('returns version in response', async () => {
+    it("returns version in response", async () => {
       const response = await GET(mockEvent);
 
       const body = await response.json();
       expect(body.version).toBeDefined();
-      expect(typeof body.version).toBe('string');
+      expect(typeof body.version).toBe("string");
     });
 
-    it('returns correct content-type header', async () => {
+    it("returns correct content-type header", async () => {
       const response = await GET(mockEvent);
 
-      expect(response.headers.get('content-type')).toContain('application/json');
+      expect(response.headers.get("content-type")).toContain("application/json");
     });
 
-    it('returns cache-control header to prevent caching', async () => {
+    it("returns cache-control header to prevent caching", async () => {
       const response = await GET(mockEvent);
 
-      expect(response.headers.get('cache-control')).toBe('no-cache, no-store, must-revalidate');
+      expect(response.headers.get("cache-control")).toBe("no-cache, no-store, must-revalidate");
     });
   });
 
-  describe('GET /api/health - unhealthy states', () => {
-    it('returns 503 when database connection fails', async () => {
+  describe("GET /api/health - unhealthy states", () => {
+    it("returns 503 when database connection fails", async () => {
       // Create new event without valid db (simulating connection failure)
       const failingEvent = {
         ...mockEvent,
@@ -104,15 +104,15 @@ describe('Health Check Endpoint', () => {
 
       expect(response.status).toBe(503);
       const body = await response.json();
-      expect(body.status).toBe('unhealthy');
-      expect(body.database).toBe('disconnected');
+      expect(body.status).toBe("unhealthy");
+      expect(body.database).toBe("disconnected");
     });
 
-    it('includes error message when database check fails', async () => {
+    it("includes error message when database check fails", async () => {
       // Create event with broken db mock
       const brokenDb = {
         execute: () => {
-          throw new Error('Connection refused');
+          throw new Error("Connection refused");
         },
       };
 
@@ -129,31 +129,31 @@ describe('Health Check Endpoint', () => {
     });
   });
 
-  describe('Health check response format', () => {
-    it('matches expected schema structure', async () => {
+  describe("Health check response format", () => {
+    it("matches expected schema structure", async () => {
       const response = await GET(mockEvent);
       const body = await response.json();
 
       // Verify all expected fields exist
-      expect(body).toHaveProperty('status');
-      expect(body).toHaveProperty('database');
-      expect(body).toHaveProperty('timestamp');
-      expect(body).toHaveProperty('uptime');
-      expect(body).toHaveProperty('version');
+      expect(body).toHaveProperty("status");
+      expect(body).toHaveProperty("database");
+      expect(body).toHaveProperty("timestamp");
+      expect(body).toHaveProperty("uptime");
+      expect(body).toHaveProperty("version");
     });
 
-    it('status is one of healthy or unhealthy', async () => {
+    it("status is one of healthy or unhealthy", async () => {
       const response = await GET(mockEvent);
       const body = await response.json();
 
-      expect(['healthy', 'unhealthy']).toContain(body.status);
+      expect(["healthy", "unhealthy"]).toContain(body.status);
     });
 
-    it('database is one of connected or disconnected', async () => {
+    it("database is one of connected or disconnected", async () => {
       const response = await GET(mockEvent);
       const body = await response.json();
 
-      expect(['connected', 'disconnected']).toContain(body.database);
+      expect(["connected", "disconnected"]).toContain(body.database);
     });
   });
 });

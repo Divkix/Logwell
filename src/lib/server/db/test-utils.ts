@@ -6,8 +6,4 @@
  * from fixtures/db.ts for seeding helpers.
  */
 
-export {
-  cleanDatabase,
-  createTestDatabase,
-  setupTestDatabase,
-} from './test-db';
+export { cleanDatabase, createTestDatabase, setupTestDatabase } from "./test-db";

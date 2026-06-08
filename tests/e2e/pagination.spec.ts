@@ -1,18 +1,18 @@
-import { expect, type Page, test } from '@playwright/test';
-import { ingestOtlpLogs } from './helpers/otlp';
+import { expect, type Page, test } from "@playwright/test";
+import { ingestOtlpLogs } from "./helpers/otlp";
 
 // Test user credentials (matches seeded admin from scripts/seed-admin.ts)
 const TEST_USER = {
-  username: 'admin',
-  password: 'adminpass',
+  username: "admin",
+  password: "adminpass",
 };
 
 /**
  * Helper to perform login
  */
 async function login(page: Page) {
-  await page.goto('/login');
-  await page.waitForSelector('form');
+  await page.goto("/login");
+  await page.waitForSelector("form");
 
   const usernameInput = page.getByLabel(/username/i);
   const passwordInput = page.getByLabel(/password/i);
@@ -25,15 +25,15 @@ async function login(page: Page) {
   await passwordInput.fill(TEST_USER.password);
   await expect(passwordInput).toHaveValue(TEST_USER.password);
 
-  await page.getByRole('button', { name: /sign in/i }).click();
-  await expect(page).toHaveURL('/', { timeout: 15000 });
+  await page.getByRole("button", { name: /sign in/i }).click();
+  await expect(page).toHaveURL("/", { timeout: 15000 });
 }
 
 /**
  * Helper to create a project via API
  */
 async function createProject(page: Page, name: string) {
-  const response = await page.request.post('/api/projects', {
+  const response = await page.request.post("/api/projects", {
     data: { name },
   });
   expect(response.ok()).toBeTruthy();
@@ -55,7 +55,7 @@ async function sendOTLPLogs(
   page: Page,
   apiKey: string,
   count: number,
-  level: 'debug' | 'info' | 'warn' | 'error' | 'fatal' = 'info',
+  level: "debug" | "info" | "warn" | "error" | "fatal" = "info",
 ) {
   const logs = [];
   for (let i = 0; i < count; i++) {
@@ -68,7 +68,7 @@ async function sendOTLPLogs(
   await ingestOtlpLogs(page, apiKey, logs);
 }
 
-test.describe('Cursor-based Pagination', () => {
+test.describe("Cursor-based Pagination", () => {
   test.describe.configure({ retries: 1 });
 
   let testProject: { id: string; name: string; apiKey: string };
@@ -84,9 +84,9 @@ test.describe('Cursor-based Pagination', () => {
     }
   });
 
-  test('shows load more button when more logs exist', async ({ page }) => {
+  test("shows load more button when more logs exist", async ({ page }) => {
     // Create 150 logs (more than default limit of 100)
-    await sendOTLPLogs(page, testProject.apiKey, 150, 'info');
+    await sendOTLPLogs(page, testProject.apiKey, 150, "info");
 
     // Navigate to project page
     await page.goto(`/projects/${testProject.id}`);
@@ -95,17 +95,17 @@ test.describe('Cursor-based Pagination', () => {
     await page.waitForSelector('[data-testid="log-table"]', { timeout: 10000 });
 
     // Should show "more available" text
-    await expect(page.locator('text=more available')).toBeVisible();
+    await expect(page.locator("text=more available")).toBeVisible();
 
     // Load more button should be visible
     const loadMoreButton = page.locator('[data-testid="load-more-button"]');
     await expect(loadMoreButton).toBeVisible();
-    await expect(loadMoreButton).toHaveText('Load More');
+    await expect(loadMoreButton).toHaveText("Load More");
   });
 
-  test('hides load more button when all logs are loaded', async ({ page }) => {
+  test("hides load more button when all logs are loaded", async ({ page }) => {
     // Create only 50 logs (less than default limit)
-    await sendOTLPLogs(page, testProject.apiKey, 50, 'info');
+    await sendOTLPLogs(page, testProject.apiKey, 50, "info");
 
     await page.goto(`/projects/${testProject.id}`);
     await page.waitForSelector('[data-testid="log-table"]', { timeout: 10000 });
@@ -115,12 +115,12 @@ test.describe('Cursor-based Pagination', () => {
     await expect(loadMoreButton).not.toBeVisible();
 
     // Should NOT show "more available" text
-    await expect(page.locator('text=more available')).not.toBeVisible();
+    await expect(page.locator("text=more available")).not.toBeVisible();
   });
 
-  test('loads more logs when clicking load more button', async ({ page }) => {
+  test("loads more logs when clicking load more button", async ({ page }) => {
     // Create 150 logs
-    await sendOTLPLogs(page, testProject.apiKey, 150, 'info');
+    await sendOTLPLogs(page, testProject.apiKey, 150, "info");
 
     await page.goto(`/projects/${testProject.id}`);
     await page.waitForSelector('[data-testid="log-table"]', { timeout: 10000 });
@@ -137,7 +137,7 @@ test.describe('Cursor-based Pagination', () => {
     await loadMoreButton.click();
 
     // Should show loading state
-    await expect(loadMoreButton).toContainText('Loading...');
+    await expect(loadMoreButton).toContainText("Loading...");
 
     // Wait for more logs to load
     await page.waitForTimeout(2000);
@@ -149,7 +149,7 @@ test.describe('Cursor-based Pagination', () => {
     // Button should return to normal state or disappear if all logs loaded
     const buttonVisible = await loadMoreButton.isVisible();
     if (buttonVisible) {
-      await expect(loadMoreButton).toContainText('Load More');
+      await expect(loadMoreButton).toContainText("Load More");
     }
   });
 });

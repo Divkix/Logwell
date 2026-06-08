@@ -1,5 +1,5 @@
-import { usernameClient } from 'better-auth/client/plugins';
-import { createAuthClient } from 'better-auth/svelte';
+import { usernameClient } from "better-auth/client/plugins";
+import { createAuthClient } from "better-auth/svelte";
 
 /**
  * Client-side auth helper for better-auth

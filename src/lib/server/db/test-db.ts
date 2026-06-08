@@ -1,9 +1,9 @@
-import { PGlite } from '@electric-sql/pglite';
-import { is, sql } from 'drizzle-orm';
-import { getTableConfig, PgTable } from 'drizzle-orm/pg-core';
-import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import { drizzle } from 'drizzle-orm/pglite';
-import * as schema from './schema';
+import { PGlite } from "@electric-sql/pglite";
+import { is, sql } from "drizzle-orm";
+import { getTableConfig, PgTable } from "drizzle-orm/pg-core";
+import type { PgliteDatabase } from "drizzle-orm/pglite";
+import { drizzle } from "drizzle-orm/pglite";
+import * as schema from "./schema";
 
 /**
  * Generates CREATE TABLE SQL from Drizzle schema table definition
@@ -21,8 +21,8 @@ function generateCreateTableSQL(table: PgTable): string {
 
     // Handle custom types (like tsvector)
     const columnType = column.columnType;
-    const isCustomType = columnType === 'PgCustomColumn';
-    const isEnumType = columnType === 'PgEnumColumn';
+    const isCustomType = columnType === "PgCustomColumn";
+    const isEnumType = columnType === "PgEnumColumn";
     const isGeneratedColumn = (column as { generated?: unknown }).generated !== undefined;
 
     // Add data type
@@ -33,7 +33,7 @@ function generateCreateTableSQL(table: PgTable): string {
         parts.push(customColumn.getSQLType());
       } else {
         // Fallback for tsvector
-        parts.push('TSVECTOR');
+        parts.push("TSVECTOR");
       }
     } else if (isEnumType) {
       // For enum columns, use the enum type name
@@ -41,48 +41,48 @@ function generateCreateTableSQL(table: PgTable): string {
       if (enumColumn.enumName) {
         parts.push(enumColumn.enumName);
       } else {
-        parts.push('TEXT');
+        parts.push("TEXT");
       }
-    } else if (column.dataType === 'number') {
-      if (column.columnType === 'PgSerial') {
-        parts.push('SERIAL');
+    } else if (column.dataType === "number") {
+      if (column.columnType === "PgSerial") {
+        parts.push("SERIAL");
       } else {
-        parts.push('INTEGER');
+        parts.push("INTEGER");
       }
-    } else if (column.dataType === 'string') {
-      if (column.columnType.includes('Text')) {
-        parts.push('TEXT');
-      } else if (column.columnType.includes('Varchar')) {
+    } else if (column.dataType === "string") {
+      if (column.columnType.includes("Text")) {
+        parts.push("TEXT");
+      } else if (column.columnType.includes("Varchar")) {
         // Extract length if available
-        parts.push('VARCHAR(255)');
+        parts.push("VARCHAR(255)");
       } else {
-        parts.push('TEXT');
+        parts.push("TEXT");
       }
-    } else if (column.dataType === 'boolean') {
-      parts.push('BOOLEAN');
-    } else if (column.dataType === 'date') {
+    } else if (column.dataType === "boolean") {
+      parts.push("BOOLEAN");
+    } else if (column.dataType === "date") {
       // Check if it's a timestamp with timezone
-      if (column.columnType === 'PgTimestamp') {
+      if (column.columnType === "PgTimestamp") {
         const withTimezone = (column as unknown as { withTimezone?: boolean }).withTimezone;
         if (withTimezone) {
-          parts.push('TIMESTAMPTZ');
+          parts.push("TIMESTAMPTZ");
         } else {
-          parts.push('TIMESTAMP');
+          parts.push("TIMESTAMP");
         }
       } else {
-        parts.push('TIMESTAMP');
+        parts.push("TIMESTAMP");
       }
-    } else if (column.dataType === 'json') {
-      parts.push('JSONB');
+    } else if (column.dataType === "json") {
+      parts.push("JSONB");
     } else {
       // Default fallback
-      parts.push('TEXT');
+      parts.push("TEXT");
     }
 
     // Handle generated columns
     if (isGeneratedColumn) {
       const generated = (column as { generated?: { as: unknown; type?: string } }).generated;
-      if (generated && generated.type === 'stored') {
+      if (generated && generated.type === "stored") {
         // Skip generated columns in PGlite as it has limited support
         // We'll handle full-text search via triggers
         continue;
@@ -91,29 +91,29 @@ function generateCreateTableSQL(table: PgTable): string {
 
     // Add constraints
     if (column.notNull) {
-      parts.push('NOT NULL');
+      parts.push("NOT NULL");
     }
 
     if (column.primary) {
-      parts.push('PRIMARY KEY');
+      parts.push("PRIMARY KEY");
     }
 
     // Handle default values - check hasDefault first
     if (column.hasDefault && !isGeneratedColumn) {
       // For timestamp columns with defaultNow(), we need to check the actual default
-      if (column.dataType === 'date') {
+      if (column.dataType === "date") {
         // Check if the column has a default function
         const defaultFn = (column as unknown as { default?: unknown }).default;
         if (defaultFn) {
-          parts.push('DEFAULT NOW()');
+          parts.push("DEFAULT NOW()");
         }
-      } else if (column.dataType === 'boolean') {
+      } else if (column.dataType === "boolean") {
         // Handle boolean defaults
         const defaultValue = (column as unknown as { default?: unknown }).default;
         if (defaultValue !== undefined) {
           // Check if it's a simple value or wrapped
           const value =
-            typeof defaultValue === 'object' && defaultValue !== null && 'value' in defaultValue
+            typeof defaultValue === "object" && defaultValue !== null && "value" in defaultValue
               ? (defaultValue as { value: unknown }).value
               : defaultValue;
           parts.push(`DEFAULT ${value}`);
@@ -121,18 +121,18 @@ function generateCreateTableSQL(table: PgTable): string {
       } else if (column.default !== undefined) {
         const rawDefault = column.default;
         const defaultValue =
-          typeof rawDefault === 'object' && rawDefault !== null && 'value' in rawDefault
+          typeof rawDefault === "object" && rawDefault !== null && "value" in rawDefault
             ? (rawDefault as { value?: unknown }).value
             : rawDefault;
-        if (defaultValue && typeof defaultValue === 'object' && 'sql' in defaultValue) {
+        if (defaultValue && typeof defaultValue === "object" && "sql" in defaultValue) {
           // Handle SQL default expressions
           const sqlValue = (defaultValue as { sql?: string }).sql;
           parts.push(`DEFAULT ${sqlValue}`);
-        } else if (typeof defaultValue === 'string') {
+        } else if (typeof defaultValue === "string") {
           parts.push(`DEFAULT '${defaultValue}'`);
-        } else if (typeof defaultValue === 'number') {
+        } else if (typeof defaultValue === "number") {
           parts.push(`DEFAULT ${defaultValue}`);
-        } else if (typeof defaultValue === 'boolean') {
+        } else if (typeof defaultValue === "boolean") {
           parts.push(`DEFAULT ${defaultValue}`);
         }
       }
@@ -143,7 +143,7 @@ function generateCreateTableSQL(table: PgTable): string {
       uniqueConstraints.push(`UNIQUE("${column.name}")`);
     }
 
-    columns.push(parts.join(' '));
+    columns.push(parts.join(" "));
   }
 
   // Process foreign keys from table config
@@ -159,8 +159,8 @@ function generateCreateTableSQL(table: PgTable): string {
           foreignTable: PgTable;
         };
 
-        const localColumns = refDetails.columns.map((c) => `"${c.name}"`).join(', ');
-        const foreignColumns = refDetails.foreignColumns.map((c) => `"${c.name}"`).join(', ');
+        const localColumns = refDetails.columns.map((c) => `"${c.name}"`).join(", ");
+        const foreignColumns = refDetails.foreignColumns.map((c) => `"${c.name}"`).join(", ");
 
         // Get the foreign table name
         const foreignTableConfig = getTableConfig(refDetails.foreignTable);
@@ -180,7 +180,7 @@ function generateCreateTableSQL(table: PgTable): string {
 
         foreignKeys.push(fkConstraint);
       } catch (error) {
-        console.warn('Could not process foreign key:', error);
+        console.warn("Could not process foreign key:", error);
       }
     }
   }
@@ -199,7 +199,7 @@ function generateCreateTableSQL(table: PgTable): string {
             return colName ? `"${colName}"` : null;
           })
           .filter((name): name is string => name !== null)
-          .join(', ');
+          .join(", ");
         if (columnNames) {
           uniqueConstraints.push(`UNIQUE(${columnNames})`);
         }
@@ -211,7 +211,7 @@ function generateCreateTableSQL(table: PgTable): string {
   const allConstraints = [...columns, ...uniqueConstraints, ...foreignKeys];
 
   // Create table SQL
-  const createTableSQL = `CREATE TABLE IF NOT EXISTS "${tableName}" (${allConstraints.join(', ')})`;
+  const createTableSQL = `CREATE TABLE IF NOT EXISTS "${tableName}" (${allConstraints.join(", ")})`;
 
   return createTableSQL;
 }
@@ -233,13 +233,13 @@ function generateIndexSQL(table: PgTable): string[] {
           .map((col) => {
             const colName = (col as { name: string }).name;
             // Skip tsvector search column in PGlite
-            if (colName === 'search') {
+            if (colName === "search") {
               return null;
             }
             return `"${colName}"`;
           })
           .filter((name) => name !== null)
-          .join(', ');
+          .join(", ");
 
         if (columnNames) {
           const isUnique = (index as unknown as { config?: { unique?: boolean } }).config?.unique;
@@ -273,7 +273,7 @@ async function createEnumTypes(db: PgliteDatabase<typeof schema>): Promise<void>
     );
   } catch (error) {
     // Enum might already exist, ignore error
-    console.warn('Could not create log_level enum:', error);
+    console.warn("Could not create log_level enum:", error);
   }
 }
 
@@ -308,7 +308,7 @@ async function createTriggers(db: PgliteDatabase<typeof schema>): Promise<void> 
     );
   } catch (error) {
     // Trigger might already exist, ignore error
-    console.warn('Could not create log search trigger:', error);
+    console.warn("Could not create log search trigger:", error);
   }
 }
 
@@ -325,13 +325,13 @@ export async function createTestDatabase(): Promise<PgliteDatabase<typeof schema
   // Create tables in dependency order to handle foreign keys
   // Order: user -> project/session/account/verification -> log
   const tableOrder = [
-    'user', // No dependencies
-    'project', // No dependencies
-    'incident', // Depends on project
-    'session', // Depends on user
-    'account', // Depends on user
-    'verification', // No dependencies
-    'log', // Depends on project + incident
+    "user", // No dependencies
+    "project", // No dependencies
+    "incident", // Depends on project
+    "session", // Depends on user
+    "account", // Depends on user
+    "verification", // No dependencies
+    "log", // Depends on project + incident
   ];
 
   const tables = Object.values(schema).filter((item) => is(item, PgTable));

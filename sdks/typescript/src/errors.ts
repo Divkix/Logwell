@@ -2,13 +2,13 @@
  * Error codes for Logwell SDK errors
  */
 export type LogwellErrorCode =
-  | 'NETWORK_ERROR'
-  | 'UNAUTHORIZED'
-  | 'VALIDATION_ERROR'
-  | 'RATE_LIMITED'
-  | 'SERVER_ERROR'
-  | 'QUEUE_OVERFLOW'
-  | 'INVALID_CONFIG';
+  | "NETWORK_ERROR"
+  | "UNAUTHORIZED"
+  | "VALIDATION_ERROR"
+  | "RATE_LIMITED"
+  | "SERVER_ERROR"
+  | "QUEUE_OVERFLOW"
+  | "INVALID_CONFIG";
 
 /**
  * Custom error class for Logwell SDK errors
@@ -35,7 +35,7 @@ export class LogwellError extends Error {
     public readonly retryAfterMs?: number,
   ) {
     super(message);
-    this.name = 'LogwellError';
+    this.name = "LogwellError";
 
     // Maintains proper stack trace for where our error was thrown (V8 only)
     // Use type assertion to avoid global augmentation (required for JSR compatibility)

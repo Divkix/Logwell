@@ -40,12 +40,14 @@
 Logwell is a lightweight, self-hosted log aggregation platform for developers who want structured logging without the complexity of ELK or the costs of cloud services.
 
 **Use Logwell when you need:**
+
 - A simple logging backend for your side project or startup
 - Full-text search across logs without managing Elasticsearch
 - Real-time log streaming during development and debugging
 - Complete data ownership with no vendor lock-in
 
 **Logwell is NOT for:**
+
 - High-volume production systems (10k+ logs/second) — use Loki or Clickhouse
 - Teams needing RBAC, audit trails, or compliance features — use a managed service
 - Distributed tracing or metrics — Logwell is logs-only
@@ -93,23 +95,23 @@ Logwell is a lightweight, self-hosted log aggregation platform for developers wh
 
 ## Why Logwell?
 
-| vs | Logwell advantage |
-|----|-------------------|
-| Loki/Grafana | Built-in UI, no LogQL to learn, just PostgreSQL |
-| ELK | Lightweight PostgreSQL backend, not Elasticsearch |
-| Datadog/etc | Self-hosted, no per-GB pricing, own your data |
+| vs           | Logwell advantage                                 |
+| ------------ | ------------------------------------------------- |
+| Loki/Grafana | Built-in UI, no LogQL to learn, just PostgreSQL   |
+| ELK          | Lightweight PostgreSQL backend, not Elasticsearch |
+| Datadog/etc  | Self-hosted, no per-GB pricing, own your data     |
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|------------|
-| Framework | SvelteKit |
-| Database | PostgreSQL |
-| ORM | Drizzle |
-| Auth | better-auth |
-| UI | shadcn-svelte + Tailwind CSS v4 |
-| Real-time | Server-Sent Events |
-| Runtime | Bun |
+| Layer     | Technology                      |
+| --------- | ------------------------------- |
+| Framework | SvelteKit                       |
+| Database  | PostgreSQL                      |
+| ORM       | Drizzle                         |
+| Auth      | better-auth                     |
+| UI        | shadcn-svelte + Tailwind CSS v4 |
+| Real-time | Server-Sent Events              |
+| Runtime   | Bun                             |
 
 ## Prerequisites
 
@@ -144,6 +146,7 @@ bun run dev
 ```
 
 Open http://localhost:5173 and sign in with:
+
 - **Username**: `admin` (or your `ADMIN_USERNAME` from `.env`)
 - **Password**: Your `ADMIN_PASSWORD` from `.env`
 
@@ -194,10 +197,10 @@ openssl rand -base64 32
 
 Logwell provides two ingestion APIs:
 
-| API | Endpoint | Best For |
-|-----|----------|----------|
+| API            | Endpoint          | Best For                           |
+| -------------- | ----------------- | ---------------------------------- |
 | **Simple API** | `POST /v1/ingest` | Quick integration, any HTTP client |
-| **OTLP API** | `POST /v1/logs` | OpenTelemetry SDKs, rich metadata |
+| **OTLP API**   | `POST /v1/logs`   | OpenTelemetry SDKs, rich metadata  |
 
 ---
 
@@ -226,25 +229,25 @@ curl -X POST http://localhost:5173/v1/ingest \
 
 **Available fields:**
 
-| Field | Required | Type | Description |
-|-------|----------|------|-------------|
-| `level` | Yes | `debug` \| `info` \| `warn` \| `error` \| `fatal` | Log severity |
-| `message` | Yes | string | Log message |
-| `timestamp` | No | ISO8601 string | Defaults to current time |
-| `service` | No | string | Service name for filtering |
-| `metadata` | No | object | Additional structured data |
+| Field       | Required | Type                                              | Description                |
+| ----------- | -------- | ------------------------------------------------- | -------------------------- |
+| `level`     | Yes      | `debug` \| `info` \| `warn` \| `error` \| `fatal` | Log severity               |
+| `message`   | Yes      | string                                            | Log message                |
+| `timestamp` | No       | ISO8601 string                                    | Defaults to current time   |
+| `service`   | No       | string                                            | Service name for filtering |
+| `metadata`  | No       | object                                            | Additional structured data |
 
 <details>
 <summary><strong>Node.js (no SDK needed)</strong></summary>
 
 ```javascript
-await fetch('http://localhost:5173/v1/ingest', {
-  method: 'POST',
+await fetch("http://localhost:5173/v1/ingest", {
+  method: "POST",
   headers: {
-    'Authorization': 'Bearer lw_YOUR_API_KEY',
-    'Content-Type': 'application/json'
+    Authorization: "Bearer lw_YOUR_API_KEY",
+    "Content-Type": "application/json",
   },
-  body: JSON.stringify({ level: 'info', message: 'Hello from Node.js' })
+  body: JSON.stringify({ level: "info", message: "Hello from Node.js" }),
 });
 ```
 
@@ -287,16 +290,16 @@ npm install logwell
 ```
 
 ```typescript
-import { Logwell } from 'logwell';
+import { Logwell } from "logwell";
 
 const logger = new Logwell({
-  apiKey: 'lw_YOUR_API_KEY',
-  endpoint: 'http://localhost:5173',
+  apiKey: "lw_YOUR_API_KEY",
+  endpoint: "http://localhost:5173",
 });
 
 // Log at different levels
-logger.info('User signed in', { userId: '123' });
-logger.error('Database failed', { host: 'db.local' });
+logger.info("User signed in", { userId: "123" });
+logger.error("Database failed", { host: "db.local" });
 
 // Flush before shutdown
 await logger.shutdown();
@@ -399,12 +402,12 @@ npm install @opentelemetry/exporter-logs-otlp-http @opentelemetry/sdk-logs
 ```
 
 ```typescript
-import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-http';
-import { LoggerProvider, BatchLogRecordProcessor } from '@opentelemetry/sdk-logs';
+import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
+import { LoggerProvider, BatchLogRecordProcessor } from "@opentelemetry/sdk-logs";
 
 const exporter = new OTLPLogExporter({
-  url: 'http://localhost:5173/v1/logs',
-  headers: { 'Authorization': 'Bearer lw_YOUR_API_KEY' },
+  url: "http://localhost:5173/v1/logs",
+  headers: { Authorization: "Bearer lw_YOUR_API_KEY" },
 });
 
 const loggerProvider = new LoggerProvider();
@@ -510,47 +513,47 @@ builder.Logging.AddOpenTelemetry(logging =>
 
 Logwell derives some UI fields from common OTLP log attributes (if present):
 
-| UI field | Preferred OTLP attribute keys |
-|----------|-------------------------------|
-| `sourceFile` | `code.filepath`, `source.file` |
-| `lineNumber` | `code.lineno`, `source.line` |
-| `requestId` | `request.id`, `http.request_id` |
-| `userId` | `enduser.id`, `user.id` |
-| `ipAddress` | `client.address`, `net.peer.ip`, `net.sock.peer.addr` |
+| UI field     | Preferred OTLP attribute keys                         |
+| ------------ | ----------------------------------------------------- |
+| `sourceFile` | `code.filepath`, `source.file`                        |
+| `lineNumber` | `code.lineno`, `source.line`                          |
+| `requestId`  | `request.id`, `http.request_id`                       |
+| `userId`     | `enduser.id`, `user.id`                               |
+| `ipAddress`  | `client.address`, `net.peer.ip`, `net.sock.peer.addr` |
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `bun run dev` | Start development server |
-| `bun run build` | Build for production |
-| `bun run preview` | Preview production build |
-| `bun run check` | Run TypeScript checks |
-| `bun run lint` | Run linter |
-| `bun run lint:fix` | Fix lint issues |
+| Command            | Description              |
+| ------------------ | ------------------------ |
+| `bun run dev`      | Start development server |
+| `bun run build`    | Build for production     |
+| `bun run preview`  | Preview production build |
+| `bun run check`    | Run TypeScript checks    |
+| `bun run lint`     | Run linter               |
+| `bun run lint:fix` | Fix lint issues          |
 
 ### Database
 
-| Command | Description |
-|---------|-------------|
-| `bun run db:start` | Start PostgreSQL via Docker |
-| `bun run db:push` | Push schema to database (dev only; prefer `db:migrate`) |
-| `bun run db:generate` | Generate migration files |
-| `bun run db:migrate` | Run migrations |
-| `bun run db:studio` | Open Drizzle Studio |
-| `bun run db:seed` | Create admin user |
+| Command               | Description                                             |
+| --------------------- | ------------------------------------------------------- |
+| `bun run db:start`    | Start PostgreSQL via Docker                             |
+| `bun run db:push`     | Push schema to database (dev only; prefer `db:migrate`) |
+| `bun run db:generate` | Generate migration files                                |
+| `bun run db:migrate`  | Run migrations                                          |
+| `bun run db:studio`   | Open Drizzle Studio                                     |
+| `bun run db:seed`     | Create admin user                                       |
 
 ### Testing
 
-| Command | Description |
-|---------|-------------|
-| `bun run test` | Run all tests |
-| `bun run test:unit` | Run unit tests |
-| `bun run test:integration` | Run integration tests |
-| `bun run test:component` | Run component tests |
-| `bun run test:e2e` | Run E2E tests (Playwright) |
-| `bun run test:coverage` | Run tests with coverage |
-| `bun run test:ui` | Open Vitest UI |
+| Command                    | Description                |
+| -------------------------- | -------------------------- |
+| `bun run test`             | Run all tests              |
+| `bun run test:unit`        | Run unit tests             |
+| `bun run test:integration` | Run integration tests      |
+| `bun run test:component`   | Run component tests        |
+| `bun run test:e2e`         | Run E2E tests (Playwright) |
+| `bun run test:coverage`    | Run tests with coverage    |
+| `bun run test:ui`          | Open Vitest UI             |
 
 ## Production Deployment
 
@@ -628,6 +631,7 @@ curl http://localhost:3000/api/health
 ```
 
 Response:
+
 ```json
 {
   "status": "healthy",
@@ -654,42 +658,42 @@ The app runs on port 3000 by default.
 
 ### Health (Public)
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/health` | GET | Health check with database status |
+| Endpoint      | Method | Description                       |
+| ------------- | ------ | --------------------------------- |
+| `/api/health` | GET    | Health check with database status |
 
 ### Log Ingestion (API Key Auth)
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/v1/ingest` | POST | Simple JSON log ingestion |
-| `/v1/logs` | POST | OTLP/HTTP JSON log export |
+| Endpoint     | Method | Description               |
+| ------------ | ------ | ------------------------- |
+| `/v1/ingest` | POST   | Simple JSON log ingestion |
+| `/v1/logs`   | POST   | OTLP/HTTP JSON log export |
 
 ### Project Management (Session Auth)
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/projects` | GET | List all projects |
-| `/api/projects` | POST | Create project |
-| `/api/projects/[id]` | GET | Get project details |
-| `/api/projects/[id]` | PATCH | Update project (name, retention) |
-| `/api/projects/[id]` | DELETE | Delete project |
-| `/api/projects/[id]/regenerate` | POST | Regenerate API key |
-| `/api/projects/[id]/logs` | GET | Query logs |
-| `/api/projects/[id]/logs/stream` | POST | SSE stream |
-| `/api/projects/[id]/incidents` | GET | List incidents (open/resolved, range filters) |
-| `/api/projects/[id]/incidents/[incidentId]` | GET | Incident detail with root-cause candidates |
-| `/api/projects/[id]/incidents/[incidentId]/timeline` | GET | Incident timeline buckets + peak |
-| `/api/projects/[id]/incidents/stream` | POST | SSE incident updates |
-| `/api/projects/[id]/stats` | GET | Level distribution |
+| Endpoint                                             | Method | Description                                   |
+| ---------------------------------------------------- | ------ | --------------------------------------------- |
+| `/api/projects`                                      | GET    | List all projects                             |
+| `/api/projects`                                      | POST   | Create project                                |
+| `/api/projects/[id]`                                 | GET    | Get project details                           |
+| `/api/projects/[id]`                                 | PATCH  | Update project (name, retention)              |
+| `/api/projects/[id]`                                 | DELETE | Delete project                                |
+| `/api/projects/[id]/regenerate`                      | POST   | Regenerate API key                            |
+| `/api/projects/[id]/logs`                            | GET    | Query logs                                    |
+| `/api/projects/[id]/logs/stream`                     | POST   | SSE stream                                    |
+| `/api/projects/[id]/incidents`                       | GET    | List incidents (open/resolved, range filters) |
+| `/api/projects/[id]/incidents/[incidentId]`          | GET    | Incident detail with root-cause candidates    |
+| `/api/projects/[id]/incidents/[incidentId]/timeline` | GET    | Incident timeline buckets + peak              |
+| `/api/projects/[id]/incidents/stream`                | POST   | SSE incident updates                          |
+| `/api/projects/[id]/stats`                           | GET    | Level distribution                            |
 
 ## Current Limitations
 
-| Limitation | Impact | Workaround |
-|------------|--------|------------|
-| **Single-user auth** | No team collaboration | Share credentials (not recommended) |
-| **No log export** | Can't backup to S3/file | Direct database dumps via `pg_dump` |
-| **No rate limiting** | API keys have unlimited access | Implement at reverse proxy level |
+| Limitation           | Impact                         | Workaround                          |
+| -------------------- | ------------------------------ | ----------------------------------- |
+| **Single-user auth** | No team collaboration          | Share credentials (not recommended) |
+| **No log export**    | Can't backup to S3/file        | Direct database dumps via `pg_dump` |
+| **No rate limiting** | API keys have unlimited access | Implement at reverse proxy level    |
 
 ## Security
 
@@ -699,12 +703,12 @@ The app runs on port 3000 by default.
 
 ## Troubleshooting
 
-| Issue | Solution |
-|-------|----------|
-| Database connection refused | Ensure PostgreSQL is running: `docker compose up -d` |
-| Admin seed fails | Check `ADMIN_PASSWORD` is at least 8 characters |
-| Auth errors | Verify `BETTER_AUTH_SECRET` is at least 32 characters |
-| Port 5432 in use | Stop other PostgreSQL instances or change port in `compose.yaml` |
+| Issue                       | Solution                                                         |
+| --------------------------- | ---------------------------------------------------------------- |
+| Database connection refused | Ensure PostgreSQL is running: `docker compose up -d`             |
+| Admin seed fails            | Check `ADMIN_PASSWORD` is at least 8 characters                  |
+| Auth errors                 | Verify `BETTER_AUTH_SECRET` is at least 32 characters            |
+| Port 5432 in use            | Stop other PostgreSQL instances or change port in `compose.yaml` |
 
 ## Badge
 
@@ -735,6 +739,7 @@ bun run dev
 ```
 
 **Before submitting a PR:**
+
 - Run `bun run check` (TypeScript)
 - Run `bun run lint` (Biome)
 - Run `bun run test` (Vitest)

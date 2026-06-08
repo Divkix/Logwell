@@ -1,6 +1,6 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/svelte';
-import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, render, screen, waitFor } from "@testing-library/svelte";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 // Use vi.hoisted to ensure mock functions are hoisted with the vi.mock calls
 const { mockGoto, mockInvalidateAll } = vi.hoisted(() => ({
@@ -13,19 +13,19 @@ const { mockGoto, mockInvalidateAll } = vi.hoisted(() => ({
 let capturedOnSuccess: ((context?: any) => void | Promise<void>) | undefined;
 
 // Mock $app/navigation module
-vi.mock('$app/navigation', () => ({
+vi.mock("$app/navigation", () => ({
   goto: mockGoto,
   invalidateAll: mockInvalidateAll,
 }));
 
 // Mock authClient with username-based authentication
-vi.mock('$lib/auth-client', () => ({
+vi.mock("$lib/auth-client", () => ({
   authClient: {
     signIn: {
       username: vi.fn().mockImplementation((_credentials, callbacks) => {
         capturedOnSuccess = callbacks?.onSuccess;
         return Promise.resolve({
-          data: { user: { id: '1', username: 'admin' } },
+          data: { user: { id: "1", username: "admin" } },
           error: null,
         });
       }),
@@ -34,10 +34,10 @@ vi.mock('$lib/auth-client', () => ({
 }));
 
 // Import component after mocks are set up
-import { authClient } from '$lib/auth-client';
-import LoginPage from '../+page.svelte';
+import { authClient } from "$lib/auth-client";
+import LoginPage from "../+page.svelte";
 
-describe('Login Page Navigation', () => {
+describe("Login Page Navigation", () => {
   const user = userEvent.setup();
 
   beforeEach(() => {
@@ -49,18 +49,18 @@ describe('Login Page Navigation', () => {
     cleanup();
   });
 
-  describe('onSuccess callback navigation', () => {
-    it('should call invalidateAll before goto on successful login', async () => {
+  describe("onSuccess callback navigation", () => {
+    it("should call invalidateAll before goto on successful login", async () => {
       render(LoginPage);
 
       // Fill in the form with username (not email)
       const usernameInput = screen.getByLabelText(/username/i);
       const passwordInput = screen.getByLabelText(/password/i);
-      const submitButton = screen.getByRole('button', { name: /sign in/i });
+      const submitButton = screen.getByRole("button", { name: /sign in/i });
 
       await user.clear(usernameInput);
-      await user.type(usernameInput, 'admin');
-      await user.type(passwordInput, 'password123');
+      await user.type(usernameInput, "admin");
+      await user.type(passwordInput, "password123");
       await user.click(submitButton);
 
       // Wait for the sign in to be called
@@ -78,7 +78,7 @@ describe('Login Page Navigation', () => {
       expect(mockInvalidateAll).toHaveBeenCalled();
 
       // Verify goto is called with '/'
-      expect(mockGoto).toHaveBeenCalledWith('/');
+      expect(mockGoto).toHaveBeenCalledWith("/");
 
       // Verify the order: invalidateAll should complete before goto
       const invalidateCallOrder = mockInvalidateAll.mock.invocationCallOrder[0]!;
@@ -86,18 +86,18 @@ describe('Login Page Navigation', () => {
       expect(invalidateCallOrder).toBeLessThan(gotoCallOrder);
     });
 
-    it('should use goto instead of window.location.href for navigation', async () => {
+    it("should use goto instead of window.location.href for navigation", async () => {
       // This test verifies that goto is used instead of window.location.href
       render(LoginPage);
 
       // Fill in the form with username
       const usernameInput = screen.getByLabelText(/username/i);
       const passwordInput = screen.getByLabelText(/password/i);
-      const submitButton = screen.getByRole('button', { name: /sign in/i });
+      const submitButton = screen.getByRole("button", { name: /sign in/i });
 
       await user.clear(usernameInput);
-      await user.type(usernameInput, 'admin');
-      await user.type(passwordInput, 'password123');
+      await user.type(usernameInput, "admin");
+      await user.type(passwordInput, "password123");
       await user.click(submitButton);
 
       // Wait for the sign in to be called
@@ -109,19 +109,19 @@ describe('Login Page Navigation', () => {
       await capturedOnSuccess?.();
 
       // Verify goto is called
-      expect(mockGoto).toHaveBeenCalledWith('/');
+      expect(mockGoto).toHaveBeenCalledWith("/");
     });
   });
 
-  describe('fallback redirect when data.user exists', () => {
-    it('should use invalidateAll + goto for fallback redirect', async () => {
+  describe("fallback redirect when data.user exists", () => {
+    it("should use invalidateAll + goto for fallback redirect", async () => {
       // Mock signIn to return user data
       // The fallback redirect happens when data.user exists after signIn completes
       vi.mocked(authClient.signIn.username).mockImplementationOnce(
         async (_credentials, callbacks) => {
           capturedOnSuccess = callbacks?.onSuccess;
           // Return data with user - the component checks this for fallback redirect
-          return { data: { user: { id: '1', username: 'admin' } }, error: null };
+          return { data: { user: { id: "1", username: "admin" } }, error: null };
         },
       );
 
@@ -130,11 +130,11 @@ describe('Login Page Navigation', () => {
       // Fill in the form with username
       const usernameInput = screen.getByLabelText(/username/i);
       const passwordInput = screen.getByLabelText(/password/i);
-      const submitButton = screen.getByRole('button', { name: /sign in/i });
+      const submitButton = screen.getByRole("button", { name: /sign in/i });
 
       await user.clear(usernameInput);
-      await user.type(usernameInput, 'admin');
-      await user.type(passwordInput, 'password123');
+      await user.type(usernameInput, "admin");
+      await user.type(passwordInput, "password123");
       await user.click(submitButton);
 
       // Wait for navigation to be triggered from the fallback path
@@ -145,33 +145,33 @@ describe('Login Page Navigation', () => {
         { timeout: 2000 },
       );
 
-      expect(mockGoto).toHaveBeenCalledWith('/');
+      expect(mockGoto).toHaveBeenCalledWith("/");
     });
   });
 
-  describe('Enter key submission', () => {
-    it('should submit via form submission and not keydown handler', async () => {
+  describe("Enter key submission", () => {
+    it("should submit via form submission and not keydown handler", async () => {
       render(LoginPage);
 
       const usernameInput = screen.getByLabelText(/username/i);
       const passwordInput = screen.getByLabelText(/password/i);
-      const form = passwordInput.closest('form');
+      const form = passwordInput.closest("form");
 
       expect(form).toBeTruthy();
       if (!form) {
-        throw new Error('Login form not found');
+        throw new Error("Login form not found");
       }
 
       await user.clear(usernameInput);
-      await user.type(usernameInput, 'admin');
-      await user.type(passwordInput, 'password123');
+      await user.type(usernameInput, "admin");
+      await user.type(passwordInput, "password123");
 
       passwordInput.dispatchEvent(
-        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }),
+        new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }),
       );
       expect(authClient.signIn.username).not.toHaveBeenCalled();
 
-      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
 
       await waitFor(() => {
         expect(authClient.signIn.username).toHaveBeenCalledTimes(1);

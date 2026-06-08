@@ -1,13 +1,13 @@
-import { json } from '@sveltejs/kit';
-import { and, count, desc, eq, gte, inArray, lt, lte, or, type SQL, sql } from 'drizzle-orm';
-import { getDbClient } from '$lib/server/db/db';
-import { log } from '$lib/server/db/schema';
-import { apiError } from '$lib/server/utils/api-error';
-import { decodeCursor, encodeCursor } from '$lib/server/utils/cursor';
-import { isErrorResponse, requireProjectOwnership } from '$lib/server/utils/project-guard';
-import { buildSearchQuery } from '$lib/server/utils/search';
-import { LOG_LEVELS, type LogLevel } from '$lib/shared/types';
-import type { RequestEvent } from './$types';
+import { json } from "@sveltejs/kit";
+import { and, count, desc, eq, gte, inArray, lt, lte, or, type SQL, sql } from "drizzle-orm";
+import { getDbClient } from "$lib/server/db/db";
+import { log } from "$lib/server/db/schema";
+import { apiError } from "$lib/server/utils/api-error";
+import { decodeCursor, encodeCursor } from "$lib/server/utils/cursor";
+import { isErrorResponse, requireProjectOwnership } from "$lib/server/utils/project-guard";
+import { buildSearchQuery } from "$lib/server/utils/search";
+import { LOG_LEVELS, type LogLevel } from "$lib/shared/types";
+import type { RequestEvent } from "./$types";
 
 // Constants for pagination limits
 const DEFAULT_LIMIT = 100;
@@ -29,7 +29,7 @@ function parseLevelFilter(levelParam: string | null): LogLevel[] | null {
   if (!levelParam) return null;
 
   const levels = levelParam
-    .split(',')
+    .split(",")
     .map((l) => l.trim().toLowerCase())
     .filter((l): l is LogLevel => LOG_LEVELS.includes(l as LogLevel));
 
@@ -74,13 +74,13 @@ export async function GET(event: RequestEvent): Promise<Response> {
 
   // Parse query parameters
   const url = event.url;
-  const limitParam = url.searchParams.get('limit');
-  const offsetParam = url.searchParams.get('offset');
-  const cursorParam = url.searchParams.get('cursor');
-  const levelParam = url.searchParams.get('level');
-  const searchParam = url.searchParams.get('search');
-  const fromParam = url.searchParams.get('from');
-  const toParam = url.searchParams.get('to');
+  const limitParam = url.searchParams.get("limit");
+  const offsetParam = url.searchParams.get("offset");
+  const cursorParam = url.searchParams.get("cursor");
+  const levelParam = url.searchParams.get("level");
+  const searchParam = url.searchParams.get("search");
+  const fromParam = url.searchParams.get("from");
+  const toParam = url.searchParams.get("to");
 
   // Parse and clamp limit
   const limit = clamp(
@@ -118,8 +118,8 @@ export async function GET(event: RequestEvent): Promise<Response> {
     } catch (error) {
       return apiError(
         400,
-        'invalid_cursor',
-        error instanceof Error ? error.message : 'Invalid cursor',
+        "invalid_cursor",
+        error instanceof Error ? error.message : "Invalid cursor",
       );
     }
   }

@@ -4,10 +4,10 @@ declare global {
   namespace App {
     // interface Error {}
     interface Locals {
-      user?: import('./lib/server/auth').User;
-      session?: import('./lib/server/auth').Session;
+      user?: import("./lib/server/auth").User;
+      session?: import("./lib/server/auth").Session;
       // Optional db client for testing (dependency injection)
-      db?: import('./lib/server/db/db').DatabaseClient;
+      db?: import("./lib/server/db/db").DatabaseClient;
     }
     // interface PageData {}
     // interface PageState {}

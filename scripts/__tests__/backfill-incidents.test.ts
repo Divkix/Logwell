@@ -1,13 +1,13 @@
-import { and, eq, gte } from 'drizzle-orm';
-import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type * as schema from '../../src/lib/server/db/schema';
-import { incident, log } from '../../src/lib/server/db/schema';
-import { setupTestDatabase } from '../../src/lib/server/db/test-db';
-import { backfillProjectIncidents } from '../../src/lib/server/utils/incident-backfill';
-import { seedLog, seedProject } from '../../tests/fixtures/db';
+import { and, eq, gte } from "drizzle-orm";
+import type { PgliteDatabase } from "drizzle-orm/pglite";
+import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
+import type * as schema from "../../src/lib/server/db/schema";
+import { incident, log } from "../../src/lib/server/db/schema";
+import { setupTestDatabase } from "../../src/lib/server/db/test-db";
+import { backfillProjectIncidents } from "../../src/lib/server/utils/incident-backfill";
+import { seedLog, seedProject } from "../../tests/fixtures/db";
 
-describe('backfill-incidents', () => {
+describe("backfill-incidents", () => {
   let db: PgliteDatabase<typeof schema>;
   let cleanup: () => Promise<void>;
 
@@ -21,29 +21,29 @@ describe('backfill-incidents', () => {
     await cleanup();
   });
 
-  it('backfills only grouped levels within the selected window', async () => {
+  it("backfills only grouped levels within the selected window", async () => {
     const project = await seedProject(db);
     const now = Date.now();
     const since = new Date(now - 7 * 24 * 60 * 60 * 1000);
 
     const inWindowError = await seedLog(db, project.id, {
-      level: 'error',
-      message: 'Database timeout after 1000ms',
+      level: "error",
+      message: "Database timeout after 1000ms",
       timestamp: new Date(now - 24 * 60 * 60 * 1000),
     });
     const inWindowFatal = await seedLog(db, project.id, {
-      level: 'fatal',
-      message: 'Panic in worker 42',
+      level: "fatal",
+      message: "Panic in worker 42",
       timestamp: new Date(now - 2 * 60 * 60 * 1000),
     });
     const inWindowInfo = await seedLog(db, project.id, {
-      level: 'info',
-      message: 'Regular info log',
+      level: "info",
+      message: "Regular info log",
       timestamp: new Date(now - 2 * 60 * 60 * 1000),
     });
     const outOfWindowError = await seedLog(db, project.id, {
-      level: 'error',
-      message: 'Old error should be skipped',
+      level: "error",
+      message: "Old error should be skipped",
       timestamp: new Date(now - 9 * 24 * 60 * 60 * 1000),
     });
 
@@ -64,19 +64,19 @@ describe('backfill-incidents', () => {
     expect(incidents.length).toBe(2);
   });
 
-  it('is idempotent when run multiple times', async () => {
+  it("is idempotent when run multiple times", async () => {
     const project = await seedProject(db);
     const now = Date.now();
     const since = new Date(now - 7 * 24 * 60 * 60 * 1000);
 
     await seedLog(db, project.id, {
-      level: 'error',
-      message: 'Database timeout after 1000ms for user 123',
+      level: "error",
+      message: "Database timeout after 1000ms for user 123",
       timestamp: new Date(now - 60 * 60 * 1000),
     });
     await seedLog(db, project.id, {
-      level: 'error',
-      message: 'Database timeout after 2500ms for user 999',
+      level: "error",
+      message: "Database timeout after 2500ms for user 999",
       timestamp: new Date(now - 55 * 60 * 1000),
     });
 

@@ -1,4 +1,4 @@
-import type { TimeRange } from '$lib/components/time-range-picker.svelte';
+import type { TimeRange } from "$lib/components/time-range-picker.svelte";
 
 export interface TimeBucketConfig {
   intervalMs: number;
@@ -15,13 +15,13 @@ export interface TimeSeriesBucket {
  */
 export function getTimeBucketConfig(range: TimeRange): TimeBucketConfig {
   switch (range) {
-    case '15m':
+    case "15m":
       return { intervalMs: 60 * 1000, expectedBuckets: 15 };
-    case '1h':
+    case "1h":
       return { intervalMs: 5 * 60 * 1000, expectedBuckets: 12 };
-    case '24h':
+    case "24h":
       return { intervalMs: 60 * 60 * 1000, expectedBuckets: 24 };
-    case '7d':
+    case "7d":
       return { intervalMs: 6 * 60 * 60 * 1000, expectedBuckets: 28 };
   }
 }

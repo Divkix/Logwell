@@ -1,12 +1,12 @@
-import { eq } from 'drizzle-orm';
-import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import { beforeEach, describe, expect, it } from 'vitest';
-import type * as schema from '../../../src/lib/server/db/schema';
-import { project } from '../../../src/lib/server/db/schema';
-import { setupTestDatabase } from '../../../src/lib/server/db/test-db';
-import { seedProject } from '../../fixtures/db';
+import { eq } from "drizzle-orm";
+import type { PgliteDatabase } from "drizzle-orm/pglite";
+import { beforeEach, describe, expect, it } from "vite-plus/test";
+import type * as schema from "../../../src/lib/server/db/schema";
+import { project } from "../../../src/lib/server/db/schema";
+import { setupTestDatabase } from "../../../src/lib/server/db/test-db";
+import { seedProject } from "../../fixtures/db";
 
-describe('Project retention_days column', () => {
+describe("Project retention_days column", () => {
   let db: PgliteDatabase<typeof schema>;
 
   beforeEach(async () => {
@@ -14,28 +14,28 @@ describe('Project retention_days column', () => {
     db = setup.db;
   });
 
-  describe('default value', () => {
-    it('should default retention_days to null (system default)', async () => {
+  describe("default value", () => {
+    it("should default retention_days to null (system default)", async () => {
       const createdProject = await seedProject(db);
 
       expect(createdProject.retentionDays).toBeNull();
     });
   });
 
-  describe('valid values', () => {
-    it('should accept null (use system default)', async () => {
+  describe("valid values", () => {
+    it("should accept null (use system default)", async () => {
       const createdProject = await seedProject(db, { retentionDays: null });
 
       expect(createdProject.retentionDays).toBeNull();
     });
 
-    it('should accept 0 (never delete)', async () => {
+    it("should accept 0 (never delete)", async () => {
       const createdProject = await seedProject(db, { retentionDays: 0 });
 
       expect(createdProject.retentionDays).toBe(0);
     });
 
-    it('should accept positive integers within range', async () => {
+    it("should accept positive integers within range", async () => {
       const testValues = [1, 7, 14, 30, 60, 90, 365, 3650];
 
       for (const days of testValues) {
@@ -45,8 +45,8 @@ describe('Project retention_days column', () => {
     });
   });
 
-  describe('update operations', () => {
-    it('should update retention_days from null to positive value', async () => {
+  describe("update operations", () => {
+    it("should update retention_days from null to positive value", async () => {
       const createdProject = await seedProject(db, { retentionDays: null });
       expect(createdProject.retentionDays).toBeNull();
 
@@ -59,7 +59,7 @@ describe('Project retention_days column', () => {
       expect(updatedProject!.retentionDays).toBe(30);
     });
 
-    it('should update retention_days from positive value to null', async () => {
+    it("should update retention_days from positive value to null", async () => {
       const createdProject = await seedProject(db, { retentionDays: 30 });
       expect(createdProject.retentionDays).toBe(30);
 
@@ -72,7 +72,7 @@ describe('Project retention_days column', () => {
       expect(updatedProject!.retentionDays).toBeNull();
     });
 
-    it('should update retention_days from positive value to 0 (never delete)', async () => {
+    it("should update retention_days from positive value to 0 (never delete)", async () => {
       const createdProject = await seedProject(db, { retentionDays: 30 });
       expect(createdProject.retentionDays).toBe(30);
 
@@ -86,8 +86,8 @@ describe('Project retention_days column', () => {
     });
   });
 
-  describe('query operations', () => {
-    it('should correctly retrieve retention_days in select queries', async () => {
+  describe("query operations", () => {
+    it("should correctly retrieve retention_days in select queries", async () => {
       const createdProject = await seedProject(db, { retentionDays: 90 });
 
       const [foundProject] = await db
@@ -98,7 +98,7 @@ describe('Project retention_days column', () => {
       expect(foundProject!.retentionDays).toBe(90);
     });
 
-    it('should filter projects by retention_days', async () => {
+    it("should filter projects by retention_days", async () => {
       await seedProject(db, { retentionDays: null });
       await seedProject(db, { retentionDays: 0 });
       await seedProject(db, { retentionDays: 30 });

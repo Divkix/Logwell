@@ -1,13 +1,13 @@
-import { describe, expect, it } from 'vitest';
-import type { ClientLog } from '../logs.svelte';
+import { describe, expect, it } from "vite-plus/test";
+import type { ClientLog } from "../logs.svelte";
 
-describe('ClientLog type', () => {
-  it('can create a ClientLog-shaped object', () => {
+describe("ClientLog type", () => {
+  it("can create a ClientLog-shaped object", () => {
     const log: ClientLog = {
-      id: 'log-1',
-      projectId: 'project-1',
-      level: 'info',
-      message: 'Test log message',
+      id: "log-1",
+      projectId: "project-1",
+      level: "info",
+      message: "Test log message",
       metadata: null,
       incidentId: null,
       fingerprint: null,
@@ -19,7 +19,7 @@ describe('ClientLog type', () => {
       ipAddress: null,
       timestamp: new Date().toISOString(),
     };
-    expect(log.id).toBe('log-1');
-    expect(log.level).toBe('info');
+    expect(log.id).toBe("log-1");
+    expect(log.level).toBe("info");
   });
 });

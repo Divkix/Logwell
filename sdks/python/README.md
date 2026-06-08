@@ -34,18 +34,18 @@ asyncio.run(client.shutdown())
 
 ## Configuration
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `api_key` | `str` | **required** | API key in format `lw_[32 chars]` |
-| `endpoint` | `str` | **required** | Logwell server URL |
-| `service` | `str` | `None` | Default service name for all logs |
-| `batch_size` | `int` | `50` | Number of logs to batch before auto-flush |
-| `flush_interval` | `float` | `5.0` | Seconds between auto-flushes |
-| `max_queue_size` | `int` | `1000` | Maximum queue size before dropping oldest |
-| `max_retries` | `int` | `3` | Retry attempts for failed requests |
-| `capture_source_location` | `bool` | `False` | Capture file/line info |
-| `on_error` | `Callable` | `None` | Error callback |
-| `on_flush` | `Callable` | `None` | Flush callback |
+| Option                    | Type       | Default      | Description                               |
+| ------------------------- | ---------- | ------------ | ----------------------------------------- |
+| `api_key`                 | `str`      | **required** | API key in format `lw_[32 chars]`         |
+| `endpoint`                | `str`      | **required** | Logwell server URL                        |
+| `service`                 | `str`      | `None`       | Default service name for all logs         |
+| `batch_size`              | `int`      | `50`         | Number of logs to batch before auto-flush |
+| `flush_interval`          | `float`    | `5.0`        | Seconds between auto-flushes              |
+| `max_queue_size`          | `int`      | `1000`       | Maximum queue size before dropping oldest |
+| `max_retries`             | `int`      | `3`          | Retry attempts for failed requests        |
+| `capture_source_location` | `bool`     | `False`      | Capture file/line info                    |
+| `on_error`                | `Callable` | `None`       | Error callback                            |
+| `on_flush`                | `Callable` | `None`       | Flush callback                            |
 
 ### Example with all options
 
@@ -86,18 +86,18 @@ Logwell(config: LogwellConfig)
 
 #### Methods
 
-| Method | Description |
-|--------|-------------|
-| `debug(message, metadata=None)` | Log at debug level |
-| `info(message, metadata=None)` | Log at info level |
-| `warn(message, metadata=None)` | Log at warning level |
-| `error(message, metadata=None)` | Log at error level |
-| `fatal(message, metadata=None)` | Log at fatal level |
-| `log(entry)` | Log with explicit LogEntry |
-| `flush()` | Async: Flush queued logs immediately |
-| `shutdown()` | Async: Flush and stop the client |
-| `child(metadata=None, service=None)` | Create child logger with context |
-| `queue_size` | Property: Current queue size |
+| Method                               | Description                          |
+| ------------------------------------ | ------------------------------------ |
+| `debug(message, metadata=None)`      | Log at debug level                   |
+| `info(message, metadata=None)`       | Log at info level                    |
+| `warn(message, metadata=None)`       | Log at warning level                 |
+| `error(message, metadata=None)`      | Log at error level                   |
+| `fatal(message, metadata=None)`      | Log at fatal level                   |
+| `log(entry)`                         | Log with explicit LogEntry           |
+| `flush()`                            | Async: Flush queued logs immediately |
+| `shutdown()`                         | Async: Flush and stop the client     |
+| `child(metadata=None, service=None)` | Create child logger with context     |
+| `queue_size`                         | Property: Current queue size         |
 
 ### Child Loggers
 
@@ -168,15 +168,15 @@ except LogwellError as e:
 
 ### Error Codes
 
-| Code | Description |
-|------|-------------|
-| `INVALID_CONFIG` | Invalid configuration value |
-| `NETWORK_ERROR` | Network connectivity or timeout |
-| `UNAUTHORIZED` | Invalid or expired API key (401) |
-| `VALIDATION_ERROR` | Invalid request data |
-| `RATE_LIMITED` | Too many requests (429) |
-| `SERVER_ERROR` | Server-side error (5xx) |
-| `QUEUE_OVERFLOW` | Queue exceeded max size |
+| Code               | Description                      |
+| ------------------ | -------------------------------- |
+| `INVALID_CONFIG`   | Invalid configuration value      |
+| `NETWORK_ERROR`    | Network connectivity or timeout  |
+| `UNAUTHORIZED`     | Invalid or expired API key (401) |
+| `VALIDATION_ERROR` | Invalid request data             |
+| `RATE_LIMITED`     | Too many requests (429)          |
+| `SERVER_ERROR`     | Server-side error (5xx)          |
+| `QUEUE_OVERFLOW`   | Queue exceeded max size          |
 
 ### Error Callback
 

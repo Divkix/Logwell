@@ -1,19 +1,19 @@
-import { json, type RequestHandler } from '@sveltejs/kit';
-import { eq } from 'drizzle-orm';
-import { nanoid } from 'nanoid';
-import { API_CONFIG } from '$lib/server/config/performance';
-import { getDbClient } from '$lib/server/db/db';
-import { log, project } from '$lib/server/db/schema';
-import { logEventBus } from '$lib/server/events';
-import { ApiKeyError, validateApiKey } from '$lib/server/utils/api-key';
-import { requireJsonContentType } from '$lib/server/utils/content-type';
+import { json, type RequestHandler } from "@sveltejs/kit";
+import { eq } from "drizzle-orm";
+import { nanoid } from "nanoid";
+import { API_CONFIG } from "$lib/server/config/performance";
+import { getDbClient } from "$lib/server/db/db";
+import { log, project } from "$lib/server/db/schema";
+import { logEventBus } from "$lib/server/events";
+import { ApiKeyError, validateApiKey } from "$lib/server/utils/api-key";
+import { requireJsonContentType } from "$lib/server/utils/content-type";
 import {
   assignIncidentIds,
   prepareLogsForIncidents,
   upsertIncidentsForPreparedLogs,
-} from '$lib/server/utils/incidents';
-import { checkRateLimit, INGEST_RPM } from '$lib/server/utils/rate-limit';
-import { parseSimpleIngestRequest, SimpleIngestError } from '$lib/server/utils/simple-ingest';
+} from "$lib/server/utils/incidents";
+import { checkRateLimit, INGEST_RPM } from "$lib/server/utils/rate-limit";
+import { parseSimpleIngestRequest, SimpleIngestError } from "$lib/server/utils/simple-ingest";
 
 /**
  * POST /v1/ingest (Simple JSON API)
@@ -46,11 +46,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       .from(project)
       .where(eq(project.id, projectId));
     if (!projectRow) {
-      throw new ApiKeyError(401, 'Invalid API key');
+      throw new ApiKeyError(401, "Invalid API key");
     }
   } catch (err) {
     if (err instanceof ApiKeyError) {
-      return json({ error: 'unauthorized', message: err.message }, { status: err.status });
+      return json({ error: "unauthorized", message: err.message }, { status: err.status });
     }
     throw err;
   }
@@ -58,8 +58,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   // Apply rate limiting per project
   if (!checkRateLimit(`ingest:${projectId}`, INGEST_RPM)) {
     return json(
-      { error: 'rate_limited', message: 'Rate limit exceeded. Retry in 60 seconds.' },
-      { status: 429, headers: { 'Retry-After': '60' } },
+      { error: "rate_limited", message: "Rate limit exceeded. Retry in 60 seconds." },
+      { status: 429, headers: { "Retry-After": "60" } },
     );
   }
 
@@ -69,7 +69,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     body = await request.json();
   } catch {
     return json(
-      { error: 'invalid_json', message: 'Request body must be valid JSON' },
+      { error: "invalid_json", message: "Request body must be valid JSON" },
       { status: 400 },
     );
   }
@@ -78,7 +78,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   if (Array.isArray(body) && body.length > API_CONFIG.BATCH_INSERT_LIMIT) {
     return json(
       {
-        error: 'batch_too_large',
+        error: "batch_too_large",
         message: `Batch exceeds maximum limit of ${API_CONFIG.BATCH_INSERT_LIMIT} logs. Received ${body.length} logs.`,
       },
       { status: 400 },
@@ -91,7 +91,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     result = parseSimpleIngestRequest(body);
   } catch (err) {
     if (err instanceof SimpleIngestError) {
-      return json({ error: 'validation_error', message: err.message }, { status: 400 });
+      return json({ error: "validation_error", message: err.message }, { status: 400 });
     }
     throw err;
   }
@@ -101,7 +101,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   if (records.length > API_CONFIG.BATCH_INSERT_LIMIT) {
     return json(
       {
-        error: 'batch_too_large',
+        error: "batch_too_large",
         message: `Batch exceeds maximum limit of ${API_CONFIG.BATCH_INSERT_LIMIT} logs. Received ${records.length} logs.`,
       },
       { status: 400 },

@@ -1,6 +1,6 @@
-import { expect, type Page, test } from '@playwright/test';
-import { getLogCard } from './helpers/log-selectors';
-import { ingestOtlpLogs } from './helpers/otlp';
+import { expect, type Page, test } from "@playwright/test";
+import { getLogCard } from "./helpers/log-selectors";
+import { ingestOtlpLogs } from "./helpers/otlp";
 
 /**
  * E2E tests for Responsive Design
@@ -14,8 +14,8 @@ import { ingestOtlpLogs } from './helpers/otlp';
 
 // Test user credentials (matches seeded admin from scripts/seed-admin.ts)
 const TEST_USER = {
-  username: 'admin',
-  password: 'adminpass',
+  username: "admin",
+  password: "adminpass",
 };
 
 // Viewport sizes for testing
@@ -29,8 +29,8 @@ const VIEWPORTS = {
  * Helper to perform login
  */
 async function login(page: Page) {
-  await page.goto('/login');
-  await page.waitForSelector('form');
+  await page.goto("/login");
+  await page.waitForSelector("form");
 
   const usernameInput = page.getByLabel(/username/i);
   const passwordInput = page.getByLabel(/password/i);
@@ -43,15 +43,15 @@ async function login(page: Page) {
   await passwordInput.fill(TEST_USER.password);
   await expect(passwordInput).toHaveValue(TEST_USER.password);
 
-  await page.getByRole('button', { name: /sign in/i }).click();
-  await expect(page).toHaveURL('/', { timeout: 15000 });
+  await page.getByRole("button", { name: /sign in/i }).click();
+  await expect(page).toHaveURL("/", { timeout: 15000 });
 }
 
 /**
  * Helper to create a project via API
  */
 async function createProject(page: Page, name: string) {
-  const response = await page.request.post('/api/projects', {
+  const response = await page.request.post("/api/projects", {
     data: { name },
   });
   expect(response.ok()).toBeTruthy();
@@ -66,7 +66,7 @@ async function deleteProject(page: Page, projectId: string) {
   return response.ok();
 }
 
-test.describe('Responsive Design - Mobile Viewport', () => {
+test.describe("Responsive Design - Mobile Viewport", () => {
   test.describe.configure({ retries: 1 });
   test.use({ viewport: VIEWPORTS.mobile });
 
@@ -76,9 +76,9 @@ test.describe('Responsive Design - Mobile Viewport', () => {
     await login(page);
     testProject = await createProject(page, `responsive-mobile-${Date.now()}`);
     await ingestOtlpLogs(page, testProject.apiKey, [
-      { level: 'info', message: 'Test log message one' },
-      { level: 'error', message: 'Test error message' },
-      { level: 'warn', message: 'Test warning message' },
+      { level: "info", message: "Test log message one" },
+      { level: "error", message: "Test error message" },
+      { level: "warn", message: "Test warning message" },
     ]);
   });
 
@@ -88,7 +88,7 @@ test.describe('Responsive Design - Mobile Viewport', () => {
     }
   });
 
-  test('should show collapsible filter toggle on mobile', async ({ page }) => {
+  test("should show collapsible filter toggle on mobile", async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
     // On mobile, filters should be collapsed behind a toggle button
@@ -110,7 +110,7 @@ test.describe('Responsive Design - Mobile Viewport', () => {
     await expect(levelFilterInPanel).toBeVisible();
   });
 
-  test('should show log cards instead of table on mobile', async ({ page }) => {
+  test("should show log cards instead of table on mobile", async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
     // On mobile, logs should be displayed as cards, not table
@@ -121,7 +121,7 @@ test.describe('Responsive Design - Mobile Viewport', () => {
     await expect(logTable).not.toBeVisible();
   });
 
-  test('should show bottom navigation on mobile', async ({ page }) => {
+  test("should show bottom navigation on mobile", async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
     // Bottom navigation should be visible on mobile
@@ -129,30 +129,30 @@ test.describe('Responsive Design - Mobile Viewport', () => {
     await expect(bottomNav).toBeVisible();
 
     // Bottom nav should contain key navigation items
-    await expect(bottomNav.getByRole('link', { name: /home|dashboard/i })).toBeVisible();
+    await expect(bottomNav.getByRole("link", { name: /home|dashboard/i })).toBeVisible();
     await expect(bottomNav.locator('[data-testid="nav-incidents"]')).toBeVisible();
     // Use testid for stats link for reliability
     await expect(bottomNav.locator('[data-testid="nav-stats"]')).toBeVisible();
   });
 
-  test('should hide desktop header navigation on mobile', async ({ page }) => {
+  test("should hide desktop header navigation on mobile", async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
     // User name/email text should be hidden on mobile (only show in bottom nav or menu)
     // Admin user has name: 'Admin' which takes precedence over email
-    const userText = page.locator('header').getByText(/admin/i);
+    const userText = page.locator("header").getByText(/admin/i);
     await expect(userText).not.toBeVisible();
 
     // Logout text should be hidden (icon only or in menu)
-    const logoutText = page.locator('header').getByText('Logout');
+    const logoutText = page.locator("header").getByText("Logout");
     await expect(logoutText).not.toBeVisible();
   });
 
-  test('should stack project header elements on mobile', async ({ page }) => {
+  test("should stack project header elements on mobile", async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
     // Project name should be visible
-    await expect(page.getByRole('heading', { name: testProject.name })).toBeVisible();
+    await expect(page.getByRole("heading", { name: testProject.name })).toBeVisible();
 
     // Stats and Settings buttons should be in bottom nav or condensed
     // The header should not have buttons cramped together
@@ -162,7 +162,7 @@ test.describe('Responsive Design - Mobile Viewport', () => {
     await expect(headerButtons).not.toBeVisible();
   });
 
-  test('should have full-width search input on mobile', async ({ page }) => {
+  test("should have full-width search input on mobile", async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
     // Open filter panel
@@ -181,7 +181,7 @@ test.describe('Responsive Design - Mobile Viewport', () => {
   });
 });
 
-test.describe('Responsive Design - Tablet Viewport', () => {
+test.describe("Responsive Design - Tablet Viewport", () => {
   test.describe.configure({ retries: 1 });
   test.use({ viewport: VIEWPORTS.tablet });
 
@@ -191,8 +191,8 @@ test.describe('Responsive Design - Tablet Viewport', () => {
     await login(page);
     testProject = await createProject(page, `responsive-tablet-${Date.now()}`);
     await ingestOtlpLogs(page, testProject.apiKey, [
-      { level: 'info', message: 'Test log message one' },
-      { level: 'error', message: 'Test error message' },
+      { level: "info", message: "Test log message one" },
+      { level: "error", message: "Test error message" },
     ]);
   });
 
@@ -202,7 +202,7 @@ test.describe('Responsive Design - Tablet Viewport', () => {
     }
   });
 
-  test('should show log table on tablet', async ({ page }) => {
+  test("should show log table on tablet", async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
     // Table should be visible on tablet
@@ -214,7 +214,7 @@ test.describe('Responsive Design - Tablet Viewport', () => {
     await expect(getLogCard(page).first()).not.toBeVisible();
   });
 
-  test('should show inline filters on tablet', async ({ page }) => {
+  test("should show inline filters on tablet", async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
     // Filters should be visible inline (not collapsed)
@@ -226,7 +226,7 @@ test.describe('Responsive Design - Tablet Viewport', () => {
     await expect(filterToggle).not.toBeVisible();
   });
 
-  test('should hide bottom navigation on tablet', async ({ page }) => {
+  test("should hide bottom navigation on tablet", async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
     // Bottom navigation should be hidden on tablet
@@ -234,17 +234,17 @@ test.describe('Responsive Design - Tablet Viewport', () => {
     await expect(bottomNav).not.toBeVisible();
   });
 
-  test('should show header navigation on tablet', async ({ page }) => {
+  test("should show header navigation on tablet", async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
     // Header nav items should be visible
     // User display shows name if available, otherwise email (admin user has name: 'Admin')
-    await expect(page.locator('header').getByText(/admin/i)).toBeVisible();
-    await expect(page.getByRole('button', { name: /logout/i })).toBeVisible();
+    await expect(page.locator("header").getByText(/admin/i)).toBeVisible();
+    await expect(page.getByRole("button", { name: /logout/i })).toBeVisible();
   });
 });
 
-test.describe('Responsive Design - Desktop Viewport', () => {
+test.describe("Responsive Design - Desktop Viewport", () => {
   test.describe.configure({ retries: 1 });
   test.use({ viewport: VIEWPORTS.desktop });
 
@@ -254,9 +254,9 @@ test.describe('Responsive Design - Desktop Viewport', () => {
     await login(page);
     testProject = await createProject(page, `responsive-desktop-${Date.now()}`);
     await ingestOtlpLogs(page, testProject.apiKey, [
-      { level: 'info', message: 'Test log message one' },
-      { level: 'error', message: 'Test error message' },
-      { level: 'debug', message: 'Test debug message' },
+      { level: "info", message: "Test log message one" },
+      { level: "error", message: "Test error message" },
+      { level: "debug", message: "Test debug message" },
     ]);
   });
 
@@ -266,7 +266,7 @@ test.describe('Responsive Design - Desktop Viewport', () => {
     }
   });
 
-  test('should show full log table with all columns on desktop', async ({ page }) => {
+  test("should show full log table with all columns on desktop", async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
     // Table should be visible
@@ -274,41 +274,41 @@ test.describe('Responsive Design - Desktop Viewport', () => {
     await expect(logTable).toBeVisible();
 
     // All table columns should be visible
-    await expect(page.getByRole('columnheader', { name: /time/i })).toBeVisible();
-    await expect(page.getByRole('columnheader', { name: /level/i })).toBeVisible();
-    await expect(page.getByRole('columnheader', { name: /message/i })).toBeVisible();
+    await expect(page.getByRole("columnheader", { name: /time/i })).toBeVisible();
+    await expect(page.getByRole("columnheader", { name: /level/i })).toBeVisible();
+    await expect(page.getByRole("columnheader", { name: /message/i })).toBeVisible();
   });
 
-  test('should show all filter controls inline on desktop', async ({ page }) => {
+  test("should show all filter controls inline on desktop", async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
     // All filter components should be visible
     await expect(page.locator('[data-testid="level-filter"]')).toBeVisible();
     await expect(page.getByPlaceholder(/search/i)).toBeVisible();
-    await expect(page.getByRole('button', { name: /last 15 minutes/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /last 15 minutes/i })).toBeVisible();
     await expect(page.locator('[data-testid="live-toggle"]')).toBeVisible();
   });
 
-  test('should show header actions on desktop', async ({ page }) => {
+  test("should show header actions on desktop", async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
     // Project action buttons in header should be visible
     // Stats link has aria-label="View statistics" which overrides visible text
-    await expect(page.getByRole('link', { name: /view statistics/i })).toBeVisible();
-    await expect(page.getByRole('link', { name: /settings/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /view statistics/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /settings/i })).toBeVisible();
   });
 });
 
-test.describe('Responsive Design - Dashboard Page', () => {
+test.describe("Responsive Design - Dashboard Page", () => {
   test.describe.configure({ retries: 1 });
 
   test.beforeEach(async ({ page }) => {
     await login(page);
   });
 
-  test('should show 1 column grid on mobile', async ({ page }) => {
+  test("should show 1 column grid on mobile", async ({ page }) => {
     await page.setViewportSize(VIEWPORTS.mobile);
-    await page.goto('/');
+    await page.goto("/");
 
     // Create a project to see the grid
     const project = await createProject(page, `grid-test-mobile-${Date.now()}`);
@@ -323,9 +323,9 @@ test.describe('Responsive Design - Dashboard Page', () => {
     await deleteProject(page, project.id);
   });
 
-  test('should show 2 column grid on tablet', async ({ page }) => {
+  test("should show 2 column grid on tablet", async ({ page }) => {
     await page.setViewportSize(VIEWPORTS.tablet);
-    await page.goto('/');
+    await page.goto("/");
 
     // Create a project to see the grid
     const project = await createProject(page, `grid-test-tablet-${Date.now()}`);
@@ -342,9 +342,9 @@ test.describe('Responsive Design - Dashboard Page', () => {
     await deleteProject(page, project.id);
   });
 
-  test('should show multi-column grid on desktop', async ({ page }) => {
+  test("should show multi-column grid on desktop", async ({ page }) => {
     await page.setViewportSize(VIEWPORTS.desktop);
-    await page.goto('/');
+    await page.goto("/");
 
     // Create a project to see the grid
     const project = await createProject(page, `grid-test-desktop-${Date.now()}`);
@@ -361,7 +361,7 @@ test.describe('Responsive Design - Dashboard Page', () => {
   });
 });
 
-test.describe('Responsive Design - Filter Collapsing Interaction', () => {
+test.describe("Responsive Design - Filter Collapsing Interaction", () => {
   test.describe.configure({ retries: 1 });
   test.use({ viewport: VIEWPORTS.mobile });
 
@@ -371,9 +371,9 @@ test.describe('Responsive Design - Filter Collapsing Interaction', () => {
     await login(page);
     testProject = await createProject(page, `filter-collapse-${Date.now()}`);
     await ingestOtlpLogs(page, testProject.apiKey, [
-      { level: 'info', message: 'Info message' },
-      { level: 'error', message: 'Error message' },
-      { level: 'warn', message: 'Warning message' },
+      { level: "info", message: "Info message" },
+      { level: "error", message: "Error message" },
+      { level: "warn", message: "Warning message" },
     ]);
   });
 
@@ -383,7 +383,7 @@ test.describe('Responsive Design - Filter Collapsing Interaction', () => {
     }
   });
 
-  test('should toggle filter visibility on mobile', async ({ page }) => {
+  test("should toggle filter visibility on mobile", async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
     const filterToggle = page.locator('[data-testid="filter-toggle"]');
@@ -397,11 +397,11 @@ test.describe('Responsive Design - Filter Collapsing Interaction', () => {
     await expect(filterPanel).toBeVisible();
 
     // Close filters by clicking backdrop
-    await page.getByRole('button', { name: /close filter panel/i }).click();
+    await page.getByRole("button", { name: /close filter panel/i }).click();
     await expect(filterPanel).not.toBeVisible();
   });
 
-  test('should apply filters from collapsed panel', async ({ page }) => {
+  test("should apply filters from collapsed panel", async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
     // Open filter panel
@@ -410,19 +410,19 @@ test.describe('Responsive Design - Filter Collapsing Interaction', () => {
     // Apply level filter (within the panel)
     const filterPanel = page.locator('[data-testid="filter-panel"]');
     const levelFilter = filterPanel.locator('[data-testid="level-filter"]');
-    await levelFilter.getByRole('button', { name: /error/i }).click();
+    await levelFilter.getByRole("button", { name: /error/i }).click();
 
     // Wait for filter to apply
     await page.waitForTimeout(500);
 
     // Should show only error logs in card view
-    await expect(getLogCard(page, { hasText: 'Error message' })).toBeVisible();
+    await expect(getLogCard(page, { hasText: "Error message" })).toBeVisible();
 
     // Info message should be hidden (check within visible mobile cards container)
-    await expect(getLogCard(page, { hasText: 'Info message' })).not.toBeVisible();
+    await expect(getLogCard(page, { hasText: "Info message" })).not.toBeVisible();
   });
 
-  test('should show active filter count badge on toggle button', async ({ page }) => {
+  test("should show active filter count badge on toggle button", async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
     // Open filter panel
@@ -434,14 +434,14 @@ test.describe('Responsive Design - Filter Collapsing Interaction', () => {
 
     await filterPanel
       .locator('[data-testid="level-filter"]')
-      .getByRole('button', { name: /error/i })
+      .getByRole("button", { name: /error/i })
       .click();
 
     // Wait for filter to apply
     await page.waitForTimeout(300);
 
     // Close filter panel by pressing Escape
-    await page.keyboard.press('Escape');
+    await page.keyboard.press("Escape");
     await expect(filterPanel).not.toBeVisible();
 
     // Badge should show active filter count
@@ -449,11 +449,11 @@ test.describe('Responsive Design - Filter Collapsing Interaction', () => {
       '[data-testid="filter-toggle"] [data-testid="filter-count-badge"]',
     );
     await expect(filterBadge).toBeVisible();
-    await expect(filterBadge).toContainText('1');
+    await expect(filterBadge).toContainText("1");
   });
 });
 
-test.describe('Responsive Design - Log Card Layout', () => {
+test.describe("Responsive Design - Log Card Layout", () => {
   test.describe.configure({ retries: 1 });
   test.use({ viewport: VIEWPORTS.mobile });
 
@@ -464,9 +464,9 @@ test.describe('Responsive Design - Log Card Layout', () => {
     testProject = await createProject(page, `log-cards-${Date.now()}`);
     await ingestOtlpLogs(page, testProject.apiKey, [
       {
-        level: 'error',
-        message: 'Database connection failed with timeout error',
-        attributes: { key: 'value' },
+        level: "error",
+        message: "Database connection failed with timeout error",
+        attributes: { key: "value" },
       },
     ]);
   });
@@ -477,7 +477,7 @@ test.describe('Responsive Design - Log Card Layout', () => {
     }
   });
 
-  test('should display log cards with all essential info on mobile', async ({ page }) => {
+  test("should display log cards with all essential info on mobile", async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
     const logCard = getLogCard(page).first();
@@ -489,19 +489,19 @@ test.describe('Responsive Design - Log Card Layout', () => {
     await expect(logCard.locator('[data-testid="log-message-mobile"]')).toBeVisible();
   });
 
-  test('should open detail modal when clicking log card', async ({ page }) => {
+  test("should open detail modal when clicking log card", async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
     // Click on log card
     await getLogCard(page).first().click();
 
     // Detail modal should open
-    await expect(page.getByRole('dialog')).toBeVisible();
-    await expect(page.getByText('Log Details')).toBeVisible();
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await expect(page.getByText("Log Details")).toBeVisible();
   });
 });
 
-test.describe('Responsive Design - Bottom Navigation', () => {
+test.describe("Responsive Design - Bottom Navigation", () => {
   test.describe.configure({ retries: 1 });
   test.use({ viewport: VIEWPORTS.mobile });
 
@@ -518,16 +518,16 @@ test.describe('Responsive Design - Bottom Navigation', () => {
     }
   });
 
-  test('should navigate to dashboard via bottom nav', async ({ page }) => {
+  test("should navigate to dashboard via bottom nav", async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
     const bottomNav = page.locator('[data-testid="bottom-nav"]');
-    await bottomNav.getByRole('link', { name: /home|dashboard/i }).click();
+    await bottomNav.getByRole("link", { name: /home|dashboard/i }).click();
 
-    await expect(page).toHaveURL('/');
+    await expect(page).toHaveURL("/");
   });
 
-  test('should navigate to stats via bottom nav', async ({ page }) => {
+  test("should navigate to stats via bottom nav", async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
     const bottomNav = page.locator('[data-testid="bottom-nav"]');
@@ -537,7 +537,7 @@ test.describe('Responsive Design - Bottom Navigation', () => {
     await expect(page).toHaveURL(`/projects/${testProject.id}/stats`);
   });
 
-  test('should navigate to incidents via bottom nav', async ({ page }) => {
+  test("should navigate to incidents via bottom nav", async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
     const bottomNav = page.locator('[data-testid="bottom-nav"]');
@@ -546,7 +546,7 @@ test.describe('Responsive Design - Bottom Navigation', () => {
     await expect(page).toHaveURL(`/projects/${testProject.id}/incidents`);
   });
 
-  test('should navigate to settings from bottom nav', async ({ page }) => {
+  test("should navigate to settings from bottom nav", async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
     const bottomNav = page.locator('[data-testid="bottom-nav"]');
@@ -556,25 +556,25 @@ test.describe('Responsive Design - Bottom Navigation', () => {
     await expect(page).toHaveURL(`/projects/${testProject.id}/settings`);
   });
 
-  test('should highlight active navigation item', async ({ page }) => {
+  test("should highlight active navigation item", async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
     const bottomNav = page.locator('[data-testid="bottom-nav"]');
 
     // "Logs" should be active on the log stream page
     const logsNavItem = bottomNav.locator('[data-testid="nav-logs"]');
-    await expect(logsNavItem).toHaveAttribute('data-active', 'true');
+    await expect(logsNavItem).toHaveAttribute("data-active", "true");
 
     // Navigate to stats using testid for reliability
     await bottomNav.locator('[data-testid="nav-stats"]').click();
 
     // "Stats" should now be active
     const statsNavItem = bottomNav.locator('[data-testid="nav-stats"]');
-    await expect(statsNavItem).toHaveAttribute('data-active', 'true');
+    await expect(statsNavItem).toHaveAttribute("data-active", "true");
   });
 });
 
-test.describe('Responsive Design - Accessibility', () => {
+test.describe("Responsive Design - Accessibility", () => {
   test.describe.configure({ retries: 1 });
   test.use({ viewport: VIEWPORTS.mobile });
 
@@ -591,12 +591,12 @@ test.describe('Responsive Design - Accessibility', () => {
     }
   });
 
-  test('should have proper aria labels on filter toggle', async ({ page }) => {
+  test("should have proper aria labels on filter toggle", async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
     const filterToggle = page.locator('[data-testid="filter-toggle"]');
-    await expect(filterToggle).toHaveAttribute('aria-label', /filter|filters/i);
-    await expect(filterToggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(filterToggle).toHaveAttribute("aria-label", /filter|filters/i);
+    await expect(filterToggle).toHaveAttribute("aria-expanded", "false");
 
     await filterToggle.click();
 
@@ -605,32 +605,32 @@ test.describe('Responsive Design - Accessibility', () => {
     await expect(filterPanel).toBeVisible();
 
     // aria-expanded should now be true
-    await expect(filterToggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(filterToggle).toHaveAttribute("aria-expanded", "true");
   });
 
-  test('should have proper aria labels on bottom navigation', async ({ page }) => {
+  test("should have proper aria labels on bottom navigation", async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
     const bottomNav = page.locator('[data-testid="bottom-nav"]');
     // <nav> element has implicit navigation role - use toHaveRole() instead of toHaveAttribute()
-    await expect(bottomNav).toHaveRole('navigation');
-    await expect(bottomNav).toHaveAttribute('aria-label', /main|navigation/i);
+    await expect(bottomNav).toHaveRole("navigation");
+    await expect(bottomNav).toHaveAttribute("aria-label", /main|navigation/i);
   });
 
-  test('should be keyboard navigable on mobile', async ({ page }) => {
+  test("should be keyboard navigable on mobile", async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
     // Focus the filter toggle directly and activate with Enter
     const filterToggle = page.locator('[data-testid="filter-toggle"]');
     await filterToggle.focus();
-    await page.keyboard.press('Enter');
+    await page.keyboard.press("Enter");
 
     // Filter panel should open
     const filterPanel = page.locator('[data-testid="filter-panel"]');
     await expect(filterPanel).toBeVisible();
 
     // Should be able to close with Escape (focus is trapped in panel)
-    await page.keyboard.press('Escape');
+    await page.keyboard.press("Escape");
     await expect(filterPanel).not.toBeVisible();
   });
 });

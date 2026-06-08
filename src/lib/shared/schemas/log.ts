@@ -1,9 +1,9 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 /**
  * Valid log levels
  */
-export const LOG_LEVELS = ['debug', 'info', 'warn', 'error', 'fatal'] as const;
+export const LOG_LEVELS = ["debug", "info", "warn", "error", "fatal"] as const;
 
 /**
  * Log level schema

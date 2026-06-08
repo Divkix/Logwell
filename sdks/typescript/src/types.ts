@@ -1,7 +1,7 @@
 /**
  * Valid log levels matching Logwell server
  */
-export type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'fatal';
+export type LogLevel = "debug" | "info" | "warn" | "error" | "fatal";
 
 /**
  * Single log entry for the simple API

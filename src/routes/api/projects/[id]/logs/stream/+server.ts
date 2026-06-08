@@ -1,9 +1,9 @@
-import { SSE_CONFIG } from '$lib/server/config/performance';
-import type { Log } from '$lib/server/db/schema';
-import { logEventBus } from '$lib/server/events';
-import { checkCsrfOrigin } from '$lib/server/utils/csrf';
-import { isErrorResponse, requireProjectOwnership } from '$lib/server/utils/project-guard';
-import type { RequestEvent } from './$types';
+import { SSE_CONFIG } from "$lib/server/config/performance";
+import type { Log } from "$lib/server/db/schema";
+import { logEventBus } from "$lib/server/events";
+import { checkCsrfOrigin } from "$lib/server/utils/csrf";
+import { isErrorResponse, requireProjectOwnership } from "$lib/server/utils/project-guard";
+import type { RequestEvent } from "./$types";
 
 // Destructure SSE configuration for cleaner access
 const { BATCH_WINDOW_MS, MAX_BATCH_SIZE, HEARTBEAT_INTERVAL_MS } = SSE_CONFIG;
@@ -60,20 +60,20 @@ export async function POST(event: RequestEvent): Promise<Response> {
        * Backpressure (slow consumer) drops the event but keeps the stream open.
        * 'closed' means the controller has errored and the stream should be torn down.
        */
-      const sendEvent = (eventName: string, data: string): 'sent' | 'backpressure' | 'closed' => {
-        if (isClosed) return 'closed';
+      const sendEvent = (eventName: string, data: string): "sent" | "backpressure" | "closed" => {
+        if (isClosed) return "closed";
         try {
           const size = (controller as ReadableStreamDefaultController).desiredSize;
           if (size !== null && size <= 0) {
             // Stream backpressure: slow consumer, drop the event but keep the stream alive
-            console.debug('[logs/stream] backpressure detected, dropping batch');
-            return 'backpressure';
+            console.debug("[logs/stream] backpressure detected, dropping batch");
+            return "backpressure";
           }
           controller.enqueue(encoder.encode(formatSSEEvent(eventName, data)));
-          return 'sent';
+          return "sent";
         } catch {
           // Controller closed or errored
-          return 'closed';
+          return "closed";
         }
       };
 
@@ -82,8 +82,8 @@ export async function POST(event: RequestEvent): Promise<Response> {
        */
       const flushBatch = () => {
         if (batch.length > 0) {
-          const result = sendEvent('logs', JSON.stringify(batch));
-          if (result === 'closed') {
+          const result = sendEvent("logs", JSON.stringify(batch));
+          if (result === "closed") {
             cleanup();
           }
           // On 'backpressure', drop the batch but don't close the stream
@@ -119,8 +119,8 @@ export async function POST(event: RequestEvent): Promise<Response> {
 
       // Set up heartbeat to keep connection alive
       const heartbeatInterval = setInterval(() => {
-        const result = sendEvent('heartbeat', JSON.stringify({ ts: Date.now() }));
-        if (result === 'closed') {
+        const result = sendEvent("heartbeat", JSON.stringify({ ts: Date.now() }));
+        if (result === "closed") {
           cleanup();
         }
       }, HEARTBEAT_INTERVAL_MS);
@@ -157,9 +157,9 @@ export async function POST(event: RequestEvent): Promise<Response> {
   return new Response(stream, {
     status: 200,
     headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
     },
   });
 }

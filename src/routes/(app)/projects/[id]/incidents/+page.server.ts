@@ -1,18 +1,18 @@
-import { error } from '@sveltejs/kit';
-import { and, count, desc, eq, gte, lt, or, type SQL } from 'drizzle-orm';
-import { INCIDENT_CONFIG } from '$lib/server/config';
-import { incident, project } from '$lib/server/db/schema';
-import { requireAuth } from '$lib/server/utils/auth-guard';
-import { decodeCursor, encodeCursor } from '$lib/server/utils/cursor';
-import { getIncidentStatus } from '$lib/server/utils/incidents';
+import { error } from "@sveltejs/kit";
+import { and, count, desc, eq, gte, lt, or, type SQL } from "drizzle-orm";
+import { INCIDENT_CONFIG } from "$lib/server/config";
+import { incident, project } from "$lib/server/db/schema";
+import { requireAuth } from "$lib/server/utils/auth-guard";
+import { decodeCursor, encodeCursor } from "$lib/server/utils/cursor";
+import { getIncidentStatus } from "$lib/server/utils/incidents";
 import {
   INCIDENT_RANGES,
   INCIDENT_STATUSES,
   type IncidentRange,
   type IncidentStatus,
-} from '$lib/shared/types';
-import { getTimeRangeStart } from '$lib/utils/format';
-import type { PageServerLoad } from './$types';
+} from "$lib/shared/types";
+import { getTimeRangeStart } from "$lib/utils/format";
+import type { PageServerLoad } from "./$types";
 
 const DEFAULT_LIMIT = 50;
 const MIN_LIMIT = 20;
@@ -24,7 +24,7 @@ function clamp(value: number, min: number, max: number): number {
 
 export const load: PageServerLoad = async (event) => {
   const { user } = await requireAuth(event);
-  const { db } = await import('$lib/server/db');
+  const { db } = await import("$lib/server/db");
   const projectId = event.params.id;
 
   const [projectData] = await db
@@ -33,34 +33,34 @@ export const load: PageServerLoad = async (event) => {
     .where(and(eq(project.id, projectId), eq(project.ownerId, user.id)));
 
   if (!projectData) {
-    throw error(404, { message: 'Project not found' });
+    throw error(404, { message: "Project not found" });
   }
 
   const params = event.url.searchParams;
   const limit = clamp(
-    params.get('limit')
-      ? Number.parseInt(params.get('limit') || '', 10) || DEFAULT_LIMIT
+    params.get("limit")
+      ? Number.parseInt(params.get("limit") || "", 10) || DEFAULT_LIMIT
       : DEFAULT_LIMIT,
     MIN_LIMIT,
     MAX_LIMIT,
   );
-  const cursorParam = params.get('cursor');
-  const statusParam = params.get('status') || 'open';
+  const cursorParam = params.get("cursor");
+  const statusParam = params.get("status") || "open";
   const status: IncidentStatus = INCIDENT_STATUSES.includes(statusParam as IncidentStatus)
     ? (statusParam as IncidentStatus)
-    : 'open';
-  const rangeParam = params.get('range') || '24h';
+    : "open";
+  const rangeParam = params.get("range") || "24h";
   const range: IncidentRange = INCIDENT_RANGES.includes(rangeParam as IncidentRange)
     ? (rangeParam as IncidentRange)
-    : '24h';
+    : "24h";
 
   const rangeStart = getTimeRangeStart(range);
   const resolvedThreshold = new Date(Date.now() - INCIDENT_CONFIG.AUTO_RESOLVE_MINUTES * 60 * 1000);
   const conditions: SQL[] = [eq(incident.projectId, projectId), gte(incident.lastSeen, rangeStart)];
 
-  if (status === 'open') {
+  if (status === "open") {
     conditions.push(gte(incident.lastSeen, resolvedThreshold));
-  } else if (status === 'resolved') {
+  } else if (status === "resolved") {
     conditions.push(lt(incident.lastSeen, resolvedThreshold));
   }
 
@@ -75,7 +75,7 @@ export const load: PageServerLoad = async (event) => {
       );
     } catch (err) {
       // Invalid cursor - log and fall back to first page (consistent with API behavior)
-      console.error('[page/incidents] invalid cursor, falling back to first page:', err);
+      console.error("[page/incidents] invalid cursor, falling back to first page:", err);
     }
   }
 
@@ -127,7 +127,7 @@ export const load: PageServerLoad = async (event) => {
     filters: {
       status,
       range,
-      selectedIncidentId: params.get('incident'),
+      selectedIncidentId: params.get("incident"),
     },
   };
 };

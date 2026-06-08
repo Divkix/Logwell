@@ -6,9 +6,9 @@
  * (e.g. raw query result shapes) so callers never think about them.
  */
 
-import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-import type * as schema from './schema';
+import type { PgliteDatabase } from "drizzle-orm/pglite";
+import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
+import type * as schema from "./schema";
 
 /** Unified database client consumed by all business logic and routes. */
 export type DatabaseClient = PostgresJsDatabase<typeof schema> | PgliteDatabase<typeof schema>;
@@ -39,7 +39,7 @@ export async function getDbClient(locals: App.Locals): Promise<DatabaseClient> {
   if (locals.db) {
     return locals.db as DatabaseClient;
   }
-  const { db } = await import('./index');
+  const { db } = await import("./index");
   return db;
 }
 
@@ -49,7 +49,7 @@ export async function getDbClient(locals: App.Locals): Promise<DatabaseClient> {
  */
 export async function executeQuery<T>(
   db: DatabaseClient,
-  query: Parameters<DatabaseClient['execute']>[0],
+  query: Parameters<DatabaseClient["execute"]>[0],
 ): Promise<T[]> {
   const raw = await db.execute(query);
   return getQueryRows(raw as QueryRows<T>);
