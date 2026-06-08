@@ -156,12 +156,16 @@ jobs:
         run: bun run test:integration -- --shard=${{ matrix.shard }}/${{ matrix.total }}
 
   # =============================================================================
-  # E2E Tests (Playwright - Chromium)
+  # E2E Tests (Playwright - Chromium) — 3 parallel shards
   # =============================================================================
   test-e2e:
-    name: E2E Tests
+    name: E2E Tests (${{ matrix.shard }}/${{ matrix.total }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      matrix:
+        shard: [1, 2, 3]
+        total: [3]
 
     services:
       postgres:
@@ -236,17 +240,17 @@ jobs:
         env:
           ADMIN_PASSWORD: adminpass
 
-      - name: Run E2E tests
+      - name: Run E2E tests (shard ${{ matrix.shard }}/${{ matrix.total }})
         # Chromium-only: the job installs/caches Chromium only (see Playwright steps
         # above). The firefox project remains defined in playwright.config.ts for
         # local cross-browser runs.
-        run: bun run test:e2e --project=chromium
+        run: bun run test:e2e --project=chromium --shard=${{ matrix.shard }}/${{ matrix.total }}
 
       - name: Upload Playwright artifacts
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: playwright-report-${{ github.run_id }}
+          name: playwright-report-${{ github.run_id }}-shard-${{ matrix.shard }}
           path: |
             playwright-report/
             test-results/
