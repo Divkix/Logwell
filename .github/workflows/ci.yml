@@ -245,6 +245,8 @@ jobs:
       matrix:
         shard: [1, 2, 3]
         total: [3]
+    env:
+      RATE_LIMIT_LOGIN_RPM: 10000 # prevent test login attempts from being rate-limited
 
     services:
       postgres:
