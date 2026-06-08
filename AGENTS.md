@@ -197,12 +197,26 @@ Docker images: `ghcr.io/divkix/logwell:latest`
 ## Release Process
 
 ```bash
-# Tag format: v* (e.g., v1.0.7)
+# Main app — triggers Docker multi-platform build (release.yml)
 git tag -a v1.0.7 -m "Release v1.0.7"
 git push origin v1.0.7
+
+# TypeScript SDK — triggers sdk-typescript.yml → npm + JSR publish
+git tag -a "sdks/typescript@v1.0.5" -m "Release sdks/typescript v1.0.5"
+git push origin "sdks/typescript@v1.0.5"
+
+# Python SDK — triggers sdk-python.yml → PyPI publish
+git tag -a "sdks/python@v1.0.5" -m "Release sdks/python v1.0.5"
+git push origin "sdks/python@v1.0.5"
+
+# Go SDK — MUST use slash format (sdks/go/vX.Y.Z) so the Go toolchain can
+# resolve the subdirectory module via `go get github.com/Divkix/Logwell/sdks/go@vX.Y.Z`
+git tag -a "sdks/go/v1.0.5" -m "Release sdks/go v1.0.5"
+git push origin "sdks/go/v1.0.5"
 ```
 
 Release workflow builds multi-platform Docker images (`linux/amd64`, `linux/arm64`).
+SDK workflows check the version in each SDK's manifest and skip publish if already released.
 
 <!--VITE PLUS START-->
 
