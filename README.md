@@ -741,7 +741,7 @@ bun run dev
 **Before submitting a PR:**
 
 - Run `bun run check` (TypeScript)
-- Run `bun run lint` (Biome)
+- Run `vp check` (lint + format + typecheck)
 - Run `bun run test` (Vitest)
 - Use conventional commits (`feat:`, `fix:`, `docs:`, etc.)
 

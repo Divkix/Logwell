@@ -4,23 +4,23 @@ Self-hosted logging platform (SvelteKit + PostgreSQL + Bun).
 
 ## Critical Commands
 
-| Task               | Command                         |
-| ------------------ | ------------------------------- |
-| Dev server         | `bun run dev` (port 5173)       |
-| Production preview | `bun run preview` (port 3000)   |
-| Database start     | `bun run db:start`              |
-| Migrations         | `bun run db:migrate`            |
-| Schema push (dev)  | `bun run db:push`               |
-| Seed admin         | `bun run db:seed`               |
-| Lint + typecheck   | `bun run lint && bun run check` |
-| Run all tests      | `bun run test`                  |
-| Unit tests         | `bun run test:unit`             |
-| Integration tests  | `bun run test:integration`      |
-| E2E tests          | `bun run test:e2e`              |
-| SDK tests          | `bun run sdk:test`              |
-| Dead code check    | `bun run knip`                  |
+| Task               | Command                       |
+| ------------------ | ----------------------------- |
+| Dev server         | `bun run dev` (port 5173)     |
+| Production preview | `bun run preview` (port 3000) |
+| Database start     | `bun run db:start`            |
+| Migrations         | `bun run db:migrate`          |
+| Schema push (dev)  | `bun run db:push`             |
+| Seed admin         | `bun run db:seed`             |
+| Lint + typecheck   | `vp check`                    |
+| Run all tests      | `bun run test`                |
+| Unit tests         | `bun run test:unit`           |
+| Integration tests  | `bun run test:integration`    |
+| E2E tests          | `bun run test:e2e`            |
+| SDK tests          | `bun run sdk:test`            |
+| Dead code check    | `bun run knip`                |
 
-**Pre-commit checklist:** `bun run lint && bun run check && bun run knip`
+**Pre-commit checklist:** `vp check && bun run knip`
 
 ## Architecture
 
@@ -103,13 +103,13 @@ Each SDK in `sdks/` is an independent package with its own tooling and publish w
 
 ### TypeScript SDK (`sdks/typescript/`)
 
-**Tech**: tsup (bundler), Vitest, Biome, published to npm + JSR
+**Tech**: tsup (bundler), Vitest, vite-plus (lint/fmt), published to npm + JSR
 
 ```bash
 # From repo root (uses package.json scripts)
 bun run sdk:test        # Run all SDK tests
 bun run sdk:build       # Build with tsup
-bun run sdk:lint        # Biome check
+bun run sdk:lint        # vp check
 
 # From sdks/typescript/ directory
 bun run build           # Build (CJS + ESM + types)
@@ -165,17 +165,15 @@ golangci-lint run
 **Entry**: `logwell/` | **Module**: `github.com/Divkix/Logwell/sdks/go`
 **Zero external dependencies** — only standard library
 
-## Linting & Formatting (Biome)
+## Linting & Formatting (vite-plus)
 
-- Config: `biome.json`
+- Command: `vp check` (format + lint + typecheck), `vp check --fix` to auto-fix
+- Config: `vite.config.ts` (`fmt`, `lint` sections)
+- Uses oxlint + oxfmt under the hood
 - Svelte files have relaxed rules (unused vars allowed)
 - 2-space indent, single quotes, trailing commas
-- Import organization enabled
 
-**Key overrides for `.svelte` files:**
-
-- `noUnusedImports` / `noUnusedVariables` = off
-- `useConst` / `useImportType` = off
+**Inline disable syntax:** `// oxlint-disable-next-line <rule>`
 
 ## CI/CD
 

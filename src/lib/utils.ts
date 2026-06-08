@@ -5,9 +5,9 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: Required for conditional type check on arbitrary children prop
+// oxlint-disable-next-line no-explicit-any -- Required for conditional type check on arbitrary children prop
 export type WithoutChildren<T> = T extends { children?: any } ? Omit<T, "children"> : T;
-// biome-ignore lint/suspicious/noExplicitAny: Required for conditional type check on arbitrary child prop
+// oxlint-disable-next-line no-explicit-any -- Required for conditional type check on arbitrary child prop
 export type WithoutChild<T> = T extends { child?: any } ? Omit<T, "child"> : T;
 export type WithoutChildrenOrChild<T> = WithoutChildren<WithoutChild<T>>;
 export type WithElementRef<T, U extends HTMLElement = HTMLElement> = T & { ref?: U | null };

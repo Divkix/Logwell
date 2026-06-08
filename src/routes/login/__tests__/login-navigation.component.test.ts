@@ -9,7 +9,7 @@ const { mockGoto, mockInvalidateAll } = vi.hoisted(() => ({
 }));
 
 // Track the onSuccess callback from signIn
-// biome-ignore lint/suspicious/noExplicitAny: Test mock - we don't care about the exact callback signature
+// oxlint-disable-next-line no-explicit-any -- Test mock - we don't care about the exact callback signature
 let capturedOnSuccess: ((context?: any) => void | Promise<void>) | undefined;
 
 // Mock $app/navigation module

@@ -10,8 +10,8 @@
     "prepare": "vp config && svelte-kit sync || echo ''",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-    "lint": "biome check .",
-    "lint:fix": "biome check --write .",
+    "lint": "vp check",
+    "lint:fix": "vp check --fix",
     "knip": "knip",
     "db:start": "docker compose up -d",
     "db:stop": "docker compose down -v",
@@ -46,7 +46,6 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.16",
     "@electric-sql/pglite": "^0.5.1",
     "@internationalized/date": "^3.12.2",
     "@playwright/test": "^1.60.0",
