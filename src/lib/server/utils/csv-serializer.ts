@@ -25,7 +25,10 @@ export function escapeCSVField(field: unknown): string {
     return "";
   }
 
-  let value = String(field);
+  let value =
+    typeof field === "object" && field !== null
+      ? JSON.stringify(field)
+      : String(field as string | number | boolean | bigint);
 
   // Prefix formula-starting characters to prevent CSV injection (OWASP)
   // Strip leading whitespace before testing to prevent whitespace bypass

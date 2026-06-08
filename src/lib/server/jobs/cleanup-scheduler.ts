@@ -23,7 +23,7 @@ export function startCleanupScheduler(): boolean {
   cleanupStarted = true;
 
   // Run immediately on startup
-  runCleanupWithGuard();
+  void runCleanupWithGuard();
 
   // Schedule periodic runs
   cleanupIntervalId = setInterval(runCleanupWithGuard, RETENTION_CONFIG.LOG_CLEANUP_INTERVAL_MS);

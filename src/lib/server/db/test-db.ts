@@ -116,7 +116,7 @@ function generateCreateTableSQL(table: PgTable): string {
             typeof defaultValue === "object" && defaultValue !== null && "value" in defaultValue
               ? (defaultValue as { value: unknown }).value
               : defaultValue;
-          parts.push(`DEFAULT ${value}`);
+          parts.push(`DEFAULT ${String(value)}`);
         }
       } else if (column.default !== undefined) {
         const rawDefault = column.default;

@@ -1,6 +1,6 @@
 import { json } from "@sveltejs/kit";
 import { and, eq, gte, lte, type SQL, sql } from "drizzle-orm";
-import type { TimeRange } from "$lib/components/time-range-picker.svelte";
+import type { TimeRange } from "$lib/utils/time-range";
 import { type BucketCountRow, getDbClient, getQueryRows } from "$lib/server/db/db";
 import { log } from "$lib/server/db/schema";
 import { isErrorResponse, requireProjectOwnership } from "$lib/server/utils/project-guard";

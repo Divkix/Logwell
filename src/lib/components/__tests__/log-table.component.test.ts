@@ -145,7 +145,7 @@ describe("LogTable", () => {
       render(LogTable, { props: { logs: sampleLogs, loading: false, onLogClick } });
 
       const rows = screen.getAllByTestId("log-row");
-      await rows[0]!.click();
+      rows[0]!.click();
 
       expect(onLogClick).toHaveBeenCalledTimes(1);
       expect(onLogClick).toHaveBeenCalledWith(sampleLogs[0]);

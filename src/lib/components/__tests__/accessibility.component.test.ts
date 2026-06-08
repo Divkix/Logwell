@@ -140,7 +140,7 @@ describe("Accessibility: Modal Focus Management", () => {
       await new Promise((resolve) => setTimeout(resolve, 50));
 
       // Close the modal
-      rerender({ log: baseLog, open: false, triggerElement: triggerButton });
+      await rerender({ log: baseLog, open: false, triggerElement: triggerButton });
 
       // Focus should return to trigger
       await waitFor(
@@ -201,7 +201,7 @@ describe("Accessibility: Modal Focus Management", () => {
       // Wait for initial focus
       await new Promise((resolve) => setTimeout(resolve, 50));
 
-      rerender({ open: false, triggerElement: triggerButton });
+      await rerender({ open: false, triggerElement: triggerButton });
 
       await waitFor(
         () => {

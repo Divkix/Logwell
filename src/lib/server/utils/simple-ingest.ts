@@ -100,7 +100,7 @@ function validateLogEntry(
   if (!isValidLevel(entry.level)) {
     return {
       log: null,
-      error: `Entry at index ${index}: invalid level '${entry.level}' (must be one of: ${VALID_LEVELS.join(", ")})`,
+      error: `Entry at index ${index}: invalid level '${String(entry.level)}' (must be one of: ${VALID_LEVELS.join(", ")})`,
     };
   }
 

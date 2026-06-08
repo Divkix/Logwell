@@ -11,7 +11,7 @@ export function toastSuccess(message: string, options?: ExternalToast): void {
  * Show an error toast notification
  * Accepts string, Error object, or unknown error
  */
-export function toastError(error: string | Error | unknown, options?: ExternalToast): void {
+export function toastError(error: unknown, options?: ExternalToast): void {
   let message: string;
 
   if (typeof error === "string") {

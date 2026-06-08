@@ -47,8 +47,9 @@ async function seedAdmin(
     },
   });
 
-  if (result.error) {
-    throw new Error(`Failed to create admin user: ${result.error.message}`);
+  const resultError = (result as { error?: { message: string } }).error;
+  if (resultError) {
+    throw new Error(`Failed to create admin user: ${resultError.message}`);
   }
 
   return { created: true, message: "Admin user created successfully" };
@@ -159,7 +160,7 @@ describe("seed-admin", () => {
     });
 
     // Check that sign in succeeded (no error)
-    expect(signInResult.error).toBeUndefined();
+    expect((signInResult as { error?: unknown }).error).toBeUndefined();
 
     // Verify user exists in database with correct username
     const users = await db.select().from(user).where(eq(user.username, ADMIN_USERNAME));

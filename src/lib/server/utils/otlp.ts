@@ -52,7 +52,7 @@ export type NormalizedOtlpLogRecord = {
   observedTimeUnixNano: string | null;
   severityNumber: number | null;
   severityText: string | null;
-  body: unknown | null;
+  body: unknown;
   attributes: Record<string, unknown> | null;
   droppedAttributesCount: number | null;
   flags: number | null;
@@ -296,7 +296,7 @@ function parseAttributes(values?: OtlpKeyValue[]): Record<string, unknown> | nul
   return Object.keys(record).length > 0 ? record : null;
 }
 
-function deriveMessage(body: unknown | null, attributes: Record<string, unknown> | null): string {
+function deriveMessage(body: unknown, attributes: Record<string, unknown> | null): string {
   if (typeof body === "string") return body;
   const attrMessage = attributes?.message ?? attributes?.["log.message"];
   if (typeof attrMessage === "string") return attrMessage;
@@ -304,7 +304,7 @@ function deriveMessage(body: unknown | null, attributes: Record<string, unknown>
   try {
     return JSON.stringify(body);
   } catch {
-    return String(body);
+    return JSON.stringify(body);
   }
 }
 

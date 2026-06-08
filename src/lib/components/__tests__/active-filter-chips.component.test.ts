@@ -42,7 +42,7 @@ describe("ActiveFilterChips", () => {
     render(ActiveFilterChips, {
       props: { levels: ["error"], search: "", range: "1h", onRemoveLevel },
     });
-    await screen.getByTestId("filter-chip-level-error").click();
+    screen.getByTestId("filter-chip-level-error").click();
     expect(onRemoveLevel).toHaveBeenCalledWith("error");
   });
 
@@ -51,14 +51,14 @@ describe("ActiveFilterChips", () => {
     render(ActiveFilterChips, {
       props: { levels: [], search: "test", range: "1h", onRemoveSearch },
     });
-    await screen.getByTestId("filter-chip-search").click();
+    screen.getByTestId("filter-chip-search").click();
     expect(onRemoveSearch).toHaveBeenCalled();
   });
 
   it("calls onRemoveRange when range chip is clicked", async () => {
     const onRemoveRange = vi.fn();
     render(ActiveFilterChips, { props: { levels: [], search: "", range: "24h", onRemoveRange } });
-    await screen.getByTestId("filter-chip-range").click();
+    screen.getByTestId("filter-chip-range").click();
     expect(onRemoveRange).toHaveBeenCalled();
   });
 

@@ -53,7 +53,7 @@ describe("ThemeToggle", () => {
     render(ThemeToggle);
 
     const button = screen.getByRole("button", { name: /toggle theme/i });
-    await button.click();
+    button.click();
 
     expect(mockToggleMode).toHaveBeenCalledTimes(1);
   });

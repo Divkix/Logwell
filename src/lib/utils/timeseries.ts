@@ -1,4 +1,4 @@
-import type { TimeRange } from "$lib/components/time-range-picker.svelte";
+import type { TimeRange } from "$lib/utils/time-range";
 
 export interface TimeBucketConfig {
   intervalMs: number;
@@ -23,6 +23,8 @@ export function getTimeBucketConfig(range: TimeRange): TimeBucketConfig {
       return { intervalMs: 60 * 60 * 1000, expectedBuckets: 24 };
     case "7d":
       return { intervalMs: 6 * 60 * 60 * 1000, expectedBuckets: 28 };
+    default:
+      throw new Error(`Unknown time range: ${String(range)}`);
   }
 }
 

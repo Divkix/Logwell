@@ -68,26 +68,26 @@ describe("ConnectionStatus", () => {
   });
 
   describe("state transitions", () => {
-    it("transitions from connecting to connected", () => {
+    it("transitions from connecting to connected", async () => {
       const { rerender } = render(ConnectionStatus, {
         props: { isConnecting: true, error: null },
       });
 
       expect(screen.getByTestId("connection-connecting")).toBeInTheDocument();
 
-      rerender({ isConnecting: false, error: null });
+      await rerender({ isConnecting: false, error: null });
 
       expect(screen.queryByTestId("connection-connecting")).not.toBeInTheDocument();
     });
 
-    it("transitions from connecting to error", () => {
+    it("transitions from connecting to error", async () => {
       const { rerender } = render(ConnectionStatus, {
         props: { isConnecting: true, error: null },
       });
 
       expect(screen.getByTestId("connection-connecting")).toBeInTheDocument();
 
-      rerender({ isConnecting: false, error: new Error("Failed") });
+      await rerender({ isConnecting: false, error: new Error("Failed") });
 
       expect(screen.queryByTestId("connection-connecting")).not.toBeInTheDocument();
       expect(screen.getByTestId("connection-error")).toBeInTheDocument();

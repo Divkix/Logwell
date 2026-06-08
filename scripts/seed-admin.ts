@@ -50,8 +50,9 @@ async function seedAdmin() {
         },
       });
 
-      if (result.error) {
-        throw new Error(`Failed to create admin user: ${result.error.message}`);
+      const resultError = (result as { error?: { message: string } }).error;
+      if (resultError) {
+        throw new Error(`Failed to create admin user: ${resultError.message}`);
       }
 
       console.log("✓ Admin user created successfully");

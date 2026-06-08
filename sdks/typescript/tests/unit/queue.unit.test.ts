@@ -304,7 +304,7 @@ describe("BatchQueue", () => {
     });
 
     it("prevents concurrent flushes", async () => {
-      let resolveFirst: () => void;
+      let resolveFirst!: () => void;
       const firstFlush = new Promise<void>((resolve) => {
         resolveFirst = resolve;
       });
