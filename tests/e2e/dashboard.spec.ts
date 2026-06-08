@@ -222,8 +222,11 @@ test.describe('Dashboard - Create Project Modal', () => {
       .getByRole('button', { name: /^create$/i })
       .click();
 
-    // Modal should close
-    await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 5000 });
+    // The one-time API key reveal modal appears with the new plaintext key
+    await expect(page.getByTestId('api-key-reveal-content')).toBeVisible();
+    await expect(page.getByTestId('api-key-reveal-value')).toContainText('lw_');
+    await page.getByTestId('api-key-reveal-close').click();
+    await expect(page.getByTestId('api-key-reveal-content')).not.toBeVisible();
 
     // Project should appear in the list (use testid to avoid matching toast notification)
     await expect(

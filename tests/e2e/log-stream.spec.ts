@@ -533,15 +533,18 @@ test.describe('Log Stream Page - Settings Navigation', () => {
     await expect(page).toHaveURL(`/projects/${testProject.id}/settings`);
   });
 
-  test('should display API key on settings page', async ({ page }) => {
+  test('should not display the API key on the settings page until regenerated', async ({
+    page,
+  }) => {
     await page.goto(`/projects/${testProject.id}`);
 
     // Navigate to settings page
     await page.getByRole('link', { name: /settings/i }).click();
     await expect(page).toHaveURL(`/projects/${testProject.id}/settings`);
 
-    // API key should be displayed
-    await expect(page.locator('[data-testid="api-key-display"]')).toContainText('lw_');
+    // Keys are hashed and shown only once at creation/regeneration — not on load.
+    await expect(page.getByTestId('api-key-display')).toHaveCount(0);
+    await expect(page.getByTestId('regenerate-button')).toBeVisible();
   });
 
   test('should show curl example on settings page', async ({ page }) => {
