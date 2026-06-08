@@ -1,13 +1,13 @@
-import type { HttpError } from '@sveltejs/kit';
-import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createAuth } from '$lib/server/auth';
-import type * as schema from '$lib/server/db/schema';
-import { setupTestDatabase } from '$lib/server/db/test-db';
-import { getSession } from '$lib/server/session';
-import { clearApiKeyCache } from '$lib/server/utils/api-key';
-import { GET } from '../../../../../src/routes/api/projects/[id]/logs/+server';
-import { seedLog, seedLogs, seedProject } from '../../../../fixtures/db';
+import type { HttpError } from "@sveltejs/kit";
+import type { PgliteDatabase } from "drizzle-orm/pglite";
+import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
+import { createAuth } from "$lib/server/auth";
+import type * as schema from "$lib/server/db/schema";
+import { setupTestDatabase } from "$lib/server/db/test-db";
+import { getSession } from "$lib/server/session";
+import { clearApiKeyCache } from "$lib/server/utils/api-key";
+import { GET } from "../../../../../src/routes/api/projects/[id]/logs/+server";
+import { seedLog, seedLogs, seedProject } from "../../../../fixtures/db";
 
 /**
  * Helper to create a mock SvelteKit RequestEvent for [id]/logs routes
@@ -24,7 +24,7 @@ function createRequestEvent(
     params,
     url: new URL(request.url),
     platform: undefined,
-    route: { id: '/api/projects/[id]/logs' },
+    route: { id: "/api/projects/[id]/logs" },
     isDataRequest: false,
     isSubRequest: false,
     isRemoteRequest: false,
@@ -34,10 +34,10 @@ function createRequestEvent(
       getAll: () => [],
       set: () => {},
       delete: () => {},
-      serialize: () => '',
+      serialize: () => "",
     },
     fetch: globalThis.fetch,
-    getClientAddress: () => '127.0.0.1',
+    getClientAddress: () => "127.0.0.1",
     setHeaders: () => {},
   } as unknown;
 }
@@ -52,7 +52,7 @@ async function expectHttpError(
 ): Promise<void> {
   try {
     await promise;
-    expect.fail('Expected HTTP error to be thrown');
+    expect.fail("Expected HTTP error to be thrown");
   } catch (error) {
     const httpError = error as HttpError;
     expect(httpError.status).toBe(expectedStatus);
@@ -62,7 +62,7 @@ async function expectHttpError(
   }
 }
 
-describe('GET /api/projects/[id]/logs', () => {
+describe("GET /api/projects/[id]/logs", () => {
   let db: PgliteDatabase<typeof schema>;
   let cleanup: () => Promise<void>;
   let auth: ReturnType<typeof createAuth>;
@@ -79,20 +79,20 @@ describe('GET /api/projects/[id]/logs', () => {
     // Create authenticated user
     const signUpResult = await auth.api.signUpEmail({
       body: {
-        email: 'test@example.com',
-        password: 'SecureP@ssw0rd123',
-        name: 'Test User',
+        email: "test@example.com",
+        password: "SecureP@ssw0rd123",
+        name: "Test User",
       },
     });
 
-    const mockRequest = new Request('http://localhost:5173', {
+    const mockRequest = new Request("http://localhost:5173", {
       headers: {
         cookie: `better-auth.session_token=${signUpResult.token}`,
       },
     });
 
     const sessionData = await getSession(mockRequest.headers, db);
-    if (!sessionData) throw new Error('Session data should not be null');
+    if (!sessionData) throw new Error("Session data should not be null");
     userId = sessionData.user.id;
 
     authenticatedLocals = {
@@ -105,39 +105,39 @@ describe('GET /api/projects/[id]/logs', () => {
     await cleanup();
   });
 
-  describe('Authentication', () => {
-    it('returns 401 for unauthenticated request', async () => {
+  describe("Authentication", () => {
+    it("returns 401 for unauthenticated request", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
       const request = new Request(`http://localhost/api/projects/${testProject.id}/logs`, {
-        method: 'GET',
+        method: "GET",
       });
 
       const event = createRequestEvent(request, db, { id: testProject.id });
-      await expectHttpError(GET(event as never), 401, { message: 'Unauthorized' });
+      await expectHttpError(GET(event as never), 401, { message: "Unauthorized" });
     });
   });
 
-  describe('Ordering', () => {
-    it('returns logs ordered by timestamp DESC', async () => {
+  describe("Ordering", () => {
+    it("returns logs ordered by timestamp DESC", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
 
       // Create logs with specific timestamps to verify ordering
       const now = new Date();
       const log1 = await seedLog(db, testProject.id, {
-        message: 'First log',
+        message: "First log",
         timestamp: new Date(now.getTime() - 3000), // oldest
       });
       const log2 = await seedLog(db, testProject.id, {
-        message: 'Second log',
+        message: "Second log",
         timestamp: new Date(now.getTime() - 2000),
       });
       const log3 = await seedLog(db, testProject.id, {
-        message: 'Third log',
+        message: "Third log",
         timestamp: new Date(now.getTime() - 1000), // newest
       });
 
       const request = new Request(`http://localhost/api/projects/${testProject.id}/logs`, {
-        method: 'GET',
+        method: "GET",
       });
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
@@ -148,19 +148,19 @@ describe('GET /api/projects/[id]/logs', () => {
 
       expect(body.logs).toHaveLength(3);
       // Logs should be ordered newest first (DESC)
-      expect(body.logs[0].id).toBe(log3.id);
-      expect(body.logs[1].id).toBe(log2.id);
-      expect(body.logs[2].id).toBe(log1.id);
+      expect(body.logs[0]!.id).toBe(log3.id);
+      expect(body.logs[1]!.id).toBe(log2.id);
+      expect(body.logs[2]!.id).toBe(log1.id);
     });
   });
 
-  describe('Limit Parameter', () => {
-    it('respects limit parameter (default 100)', async () => {
+  describe("Limit Parameter", () => {
+    it("respects limit parameter (default 100)", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
       await seedLogs(db, testProject.id, 150); // More than default limit
 
       const request = new Request(`http://localhost/api/projects/${testProject.id}/logs`, {
-        method: 'GET',
+        method: "GET",
       });
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
@@ -172,13 +172,13 @@ describe('GET /api/projects/[id]/logs', () => {
       expect(body.logs).toHaveLength(100); // Default limit
     });
 
-    it('accepts custom limit within range (100-500)', async () => {
+    it("accepts custom limit within range (100-500)", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
       await seedLogs(db, testProject.id, 300);
 
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/logs?limit=200`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
@@ -190,12 +190,12 @@ describe('GET /api/projects/[id]/logs', () => {
       expect(body.logs).toHaveLength(200);
     });
 
-    it('clamps limit to minimum 100', async () => {
+    it("accepts limit of 50 (minimum is 1)", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
       await seedLogs(db, testProject.id, 150);
 
       const request = new Request(`http://localhost/api/projects/${testProject.id}/logs?limit=50`, {
-        method: 'GET',
+        method: "GET",
       });
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
@@ -204,17 +204,17 @@ describe('GET /api/projects/[id]/logs', () => {
       expect(response.status).toBe(200);
       const body = await response.json();
 
-      // Should clamp to minimum 100
-      expect(body.logs).toHaveLength(100);
+      // MIN_LIMIT is 1, so limit=50 returns 50 logs
+      expect(body.logs).toHaveLength(50);
     });
 
-    it('clamps limit to maximum 500', async () => {
+    it("clamps limit to maximum 500", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
       await seedLogs(db, testProject.id, 600);
 
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/logs?limit=1000`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
@@ -228,8 +228,8 @@ describe('GET /api/projects/[id]/logs', () => {
     });
   });
 
-  describe('Offset Parameter', () => {
-    it('respects offset parameter for pagination', async () => {
+  describe("Offset Parameter", () => {
+    it("respects offset parameter for pagination", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
 
       // Create logs with specific order
@@ -246,7 +246,7 @@ describe('GET /api/projects/[id]/logs', () => {
       // Request with offset=2
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/logs?limit=100&offset=2`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
@@ -257,20 +257,20 @@ describe('GET /api/projects/[id]/logs', () => {
 
       // Should skip the first 2 logs (newest) and return remaining 3
       expect(body.logs).toHaveLength(3);
-      expect(body.logs[0].id).toBe(logs[2].id);
+      expect(body.logs[0]!.id).toBe(logs[2]!.id);
     });
   });
 
-  describe('Level Filter', () => {
-    it('filters by single level parameter', async () => {
+  describe("Level Filter", () => {
+    it("filters by single level parameter", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
-      await seedLogs(db, testProject.id, 5, { level: 'info' });
-      await seedLogs(db, testProject.id, 3, { level: 'error' });
-      await seedLogs(db, testProject.id, 2, { level: 'debug' });
+      await seedLogs(db, testProject.id, 5, { level: "info" });
+      await seedLogs(db, testProject.id, 3, { level: "error" });
+      await seedLogs(db, testProject.id, 2, { level: "debug" });
 
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/logs?level=error`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
@@ -280,19 +280,19 @@ describe('GET /api/projects/[id]/logs', () => {
       const body = await response.json();
 
       expect(body.logs).toHaveLength(3);
-      expect(body.logs.every((log: { level: string }) => log.level === 'error')).toBe(true);
+      expect(body.logs.every((log: { level: string }) => log.level === "error")).toBe(true);
     });
 
-    it('filters by multiple comma-separated levels', async () => {
+    it("filters by multiple comma-separated levels", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
-      await seedLogs(db, testProject.id, 5, { level: 'info' });
-      await seedLogs(db, testProject.id, 3, { level: 'error' });
-      await seedLogs(db, testProject.id, 2, { level: 'debug' });
-      await seedLogs(db, testProject.id, 4, { level: 'warn' });
+      await seedLogs(db, testProject.id, 5, { level: "info" });
+      await seedLogs(db, testProject.id, 3, { level: "error" });
+      await seedLogs(db, testProject.id, 2, { level: "debug" });
+      await seedLogs(db, testProject.id, 4, { level: "warn" });
 
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/logs?level=error,fatal`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
@@ -303,23 +303,23 @@ describe('GET /api/projects/[id]/logs', () => {
 
       expect(body.logs).toHaveLength(3); // Only error logs, no fatal
       expect(
-        body.logs.every((log: { level: string }) => ['error', 'fatal'].includes(log.level)),
+        body.logs.every((log: { level: string }) => ["error", "fatal"].includes(log.level)),
       ).toBe(true);
     });
   });
 
-  describe('Time Range Filter', () => {
-    it('filters by from timestamp', async () => {
+  describe("Time Range Filter", () => {
+    it("filters by from timestamp", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
 
       const now = new Date();
       // Old log (before the 'from' filter - should be excluded)
       await seedLog(db, testProject.id, {
-        message: 'Old log',
+        message: "Old log",
         timestamp: new Date(now.getTime() - 3600000), // 1 hour ago
       });
       const recentLog = await seedLog(db, testProject.id, {
-        message: 'Recent log',
+        message: "Recent log",
         timestamp: new Date(now.getTime() - 60000), // 1 minute ago
       });
 
@@ -327,7 +327,7 @@ describe('GET /api/projects/[id]/logs', () => {
       const fromTime = new Date(now.getTime() - 1800000).toISOString();
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/logs?from=${fromTime}`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
@@ -337,20 +337,20 @@ describe('GET /api/projects/[id]/logs', () => {
       const body = await response.json();
 
       expect(body.logs).toHaveLength(1);
-      expect(body.logs[0].id).toBe(recentLog.id);
+      expect(body.logs[0]!.id).toBe(recentLog.id);
     });
 
-    it('filters by to timestamp', async () => {
+    it("filters by to timestamp", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
 
       const now = new Date();
       const oldLog = await seedLog(db, testProject.id, {
-        message: 'Old log',
+        message: "Old log",
         timestamp: new Date(now.getTime() - 3600000), // 1 hour ago
       });
       // Recent log (after the 'to' filter - should be excluded)
       await seedLog(db, testProject.id, {
-        message: 'Recent log',
+        message: "Recent log",
         timestamp: new Date(now.getTime() - 60000), // 1 minute ago
       });
 
@@ -358,7 +358,7 @@ describe('GET /api/projects/[id]/logs', () => {
       const toTime = new Date(now.getTime() - 1800000).toISOString();
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/logs?to=${toTime}`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
@@ -368,23 +368,23 @@ describe('GET /api/projects/[id]/logs', () => {
       const body = await response.json();
 
       expect(body.logs).toHaveLength(1);
-      expect(body.logs[0].id).toBe(oldLog.id);
+      expect(body.logs[0]!.id).toBe(oldLog.id);
     });
 
-    it('filters by both from and to timestamps', async () => {
+    it("filters by both from and to timestamps", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
 
       const now = new Date();
       await seedLog(db, testProject.id, {
-        message: 'Very old log',
+        message: "Very old log",
         timestamp: new Date(now.getTime() - 7200000), // 2 hours ago
       });
       const middleLog = await seedLog(db, testProject.id, {
-        message: 'Middle log',
+        message: "Middle log",
         timestamp: new Date(now.getTime() - 3600000), // 1 hour ago
       });
       await seedLog(db, testProject.id, {
-        message: 'Recent log',
+        message: "Recent log",
         timestamp: new Date(now.getTime() - 60000), // 1 minute ago
       });
 
@@ -393,7 +393,7 @@ describe('GET /api/projects/[id]/logs', () => {
       const toTime = new Date(now.getTime() - 1800000).toISOString();
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/logs?from=${fromTime}&to=${toTime}`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
@@ -403,21 +403,21 @@ describe('GET /api/projects/[id]/logs', () => {
       const body = await response.json();
 
       expect(body.logs).toHaveLength(1);
-      expect(body.logs[0].id).toBe(middleLog.id);
+      expect(body.logs[0]!.id).toBe(middleLog.id);
     });
   });
 
-  describe('Full-Text Search', () => {
-    it('performs full-text search on message', async () => {
+  describe("Full-Text Search", () => {
+    it("performs full-text search on message", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
 
-      await seedLog(db, testProject.id, { message: 'Database connection failed' });
-      await seedLog(db, testProject.id, { message: 'User logged in successfully' });
-      await seedLog(db, testProject.id, { message: 'Database query timeout' });
+      await seedLog(db, testProject.id, { message: "Database connection failed" });
+      await seedLog(db, testProject.id, { message: "User logged in successfully" });
+      await seedLog(db, testProject.id, { message: "Database query timeout" });
 
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/logs?search=database`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
@@ -429,26 +429,26 @@ describe('GET /api/projects/[id]/logs', () => {
       expect(body.logs).toHaveLength(2);
       expect(
         body.logs.every((log: { message: string }) =>
-          log.message.toLowerCase().includes('database'),
+          log.message.toLowerCase().includes("database"),
         ),
       ).toBe(true);
     });
 
-    it('performs full-text search on metadata', async () => {
+    it("performs full-text search on metadata", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
 
       await seedLog(db, testProject.id, {
-        message: 'Error occurred',
-        metadata: { service: 'payment-gateway', error_code: 'PAYMENT_FAILED' },
+        message: "Error occurred",
+        metadata: { service: "payment-gateway", error_code: "PAYMENT_FAILED" },
       });
       await seedLog(db, testProject.id, {
-        message: 'Request processed',
-        metadata: { service: 'user-service' },
+        message: "Request processed",
+        metadata: { service: "user-service" },
       });
 
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/logs?search=payment`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
@@ -458,19 +458,19 @@ describe('GET /api/projects/[id]/logs', () => {
       const body = await response.json();
 
       expect(body.logs).toHaveLength(1);
-      expect(body.logs[0].metadata).toHaveProperty('service', 'payment-gateway');
+      expect(body.logs[0]!.metadata).toHaveProperty("service", "payment-gateway");
     });
 
-    it('handles multi-word search query', async () => {
+    it("handles multi-word search query", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
 
-      await seedLog(db, testProject.id, { message: 'Database connection failed' });
-      await seedLog(db, testProject.id, { message: 'Database query succeeded' });
-      await seedLog(db, testProject.id, { message: 'Connection timeout' });
+      await seedLog(db, testProject.id, { message: "Database connection failed" });
+      await seedLog(db, testProject.id, { message: "Database query succeeded" });
+      await seedLog(db, testProject.id, { message: "Connection timeout" });
 
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/logs?search=connection+failed`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
@@ -483,15 +483,15 @@ describe('GET /api/projects/[id]/logs', () => {
       expect(body.logs.length).toBeGreaterThanOrEqual(1);
     });
 
-    it('preserves non-special characters in search query', async () => {
+    it("preserves non-special characters in search query", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
 
-      await seedLog(db, testProject.id, { message: 'Database connection failed' });
-      await seedLog(db, testProject.id, { message: 'Database query succeeded' });
+      await seedLog(db, testProject.id, { message: "Database connection failed" });
+      await seedLog(db, testProject.id, { message: "Database query succeeded" });
 
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/logs?search=database|connection`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
@@ -503,20 +503,20 @@ describe('GET /api/projects/[id]/logs', () => {
       // Pipe is a tsquery operator; shared utility replaces it with space creating 'database & connection'
       // Inline buggy version strips it creating 'databaseconnection' which matches nothing
       expect(body.logs).toHaveLength(1);
-      expect(body.logs[0].message).toBe('Database connection failed');
+      expect(body.logs[0]!.message).toBe("Database connection failed");
     });
 
-    it('preserves hyphens and underscores in search query', async () => {
+    it("preserves hyphens and underscores in search query", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
 
       await seedLog(db, testProject.id, {
-        message: 'User profile updated',
-        metadata: { service: 'user-service', error_code: 'USER_PROFILE_404' },
+        message: "User profile updated",
+        metadata: { service: "user-service", error_code: "USER_PROFILE_404" },
       });
 
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/logs?search=user-service`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
@@ -527,18 +527,18 @@ describe('GET /api/projects/[id]/logs', () => {
 
       // Hyphens should be preserved by the shared utility; inline version strips them to 'userservice'
       expect(body.logs).toHaveLength(1);
-      expect(body.logs[0].metadata).toHaveProperty('service', 'user-service');
+      expect(body.logs[0]!.metadata).toHaveProperty("service", "user-service");
     });
   });
 
-  describe('Pagination Response', () => {
-    it('returns total count and has_more flag', async () => {
+  describe("Pagination Response", () => {
+    it("returns total count and has_more flag", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
       await seedLogs(db, testProject.id, 150);
 
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/logs?limit=100`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
@@ -547,18 +547,18 @@ describe('GET /api/projects/[id]/logs', () => {
       expect(response.status).toBe(200);
       const body = await response.json();
 
-      expect(body).toHaveProperty('total', 150);
-      expect(body).toHaveProperty('has_more', true);
+      expect(body).toHaveProperty("total", 150);
+      expect(body).toHaveProperty("has_more", true);
       expect(body.logs).toHaveLength(100);
     });
 
-    it('returns has_more=false when all logs returned', async () => {
+    it("returns has_more=false when all logs returned", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
       await seedLogs(db, testProject.id, 50);
 
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/logs?limit=100`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
@@ -567,19 +567,19 @@ describe('GET /api/projects/[id]/logs', () => {
       expect(response.status).toBe(200);
       const body = await response.json();
 
-      expect(body).toHaveProperty('total', 50);
-      expect(body).toHaveProperty('has_more', false);
+      expect(body).toHaveProperty("total", 50);
+      expect(body).toHaveProperty("has_more", false);
       expect(body.logs).toHaveLength(50);
     });
 
-    it('returns correct total with filters applied', async () => {
+    it("returns correct total with filters applied", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
-      await seedLogs(db, testProject.id, 100, { level: 'info' });
-      await seedLogs(db, testProject.id, 30, { level: 'error' });
+      await seedLogs(db, testProject.id, 100, { level: "info" });
+      await seedLogs(db, testProject.id, 30, { level: "error" });
 
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/logs?level=error`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
@@ -588,12 +588,12 @@ describe('GET /api/projects/[id]/logs', () => {
       expect(response.status).toBe(200);
       const body = await response.json();
 
-      expect(body).toHaveProperty('total', 30);
-      expect(body).toHaveProperty('has_more', false);
+      expect(body).toHaveProperty("total", 30);
+      expect(body).toHaveProperty("has_more", false);
       expect(body.logs).toHaveLength(30);
     });
 
-    it('returns has_more=false when last page equals limit (cursor boundary)', async () => {
+    it("returns has_more=false when last page equals limit (cursor boundary)", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
 
       // Create exactly 200 logs (2 full pages of 100)
@@ -602,7 +602,7 @@ describe('GET /api/projects/[id]/logs', () => {
       // First page
       const request1 = new Request(
         `http://localhost/api/projects/${testProject.id}/logs?limit=100`,
-        { method: 'GET' },
+        { method: "GET" },
       );
       const event1 = createRequestEvent(request1, db, { id: testProject.id }, authenticatedLocals);
       const response1 = await GET(event1 as never);
@@ -615,7 +615,7 @@ describe('GET /api/projects/[id]/logs', () => {
       // Second page (exactly 100 remaining)
       const request2 = new Request(
         `http://localhost/api/projects/${testProject.id}/logs?limit=100&cursor=${body1.nextCursor}`,
-        { method: 'GET' },
+        { method: "GET" },
       );
       const event2 = createRequestEvent(request2, db, { id: testProject.id }, authenticatedLocals);
       const response2 = await GET(event2 as never);
@@ -627,27 +627,27 @@ describe('GET /api/projects/[id]/logs', () => {
     });
   });
 
-  describe('Project Validation', () => {
-    it('returns 404 for non-existent project', async () => {
-      const request = new Request('http://localhost/api/projects/non-existent-id/logs', {
-        method: 'GET',
+  describe("Project Validation", () => {
+    it("returns 404 for non-existent project", async () => {
+      const request = new Request("http://localhost/api/projects/non-existent-id/logs", {
+        method: "GET",
       });
 
-      const event = createRequestEvent(request, db, { id: 'non-existent-id' }, authenticatedLocals);
+      const event = createRequestEvent(request, db, { id: "non-existent-id" }, authenticatedLocals);
       const response = await GET(event as never);
 
       expect(response.status).toBe(404);
       const body = await response.json();
-      expect(body).toHaveProperty('error', 'not_found');
+      expect(body).toHaveProperty("error", "not_found");
     });
   });
 
-  describe('Empty State', () => {
-    it('returns empty array when project has no logs', async () => {
+  describe("Empty State", () => {
+    it("returns empty array when project has no logs", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
 
       const request = new Request(`http://localhost/api/projects/${testProject.id}/logs`, {
-        method: 'GET',
+        method: "GET",
       });
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
@@ -662,23 +662,23 @@ describe('GET /api/projects/[id]/logs', () => {
     });
   });
 
-  describe('Log Fields', () => {
-    it('returns all log fields in response', async () => {
+  describe("Log Fields", () => {
+    it("returns all log fields in response", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
 
       const log = await seedLog(db, testProject.id, {
-        message: 'Test message',
-        level: 'error',
-        metadata: { key: 'value' },
-        sourceFile: 'src/test.ts',
+        message: "Test message",
+        level: "error",
+        metadata: { key: "value" },
+        sourceFile: "src/test.ts",
         lineNumber: 42,
-        requestId: 'req_123',
-        userId: 'user_456',
-        ipAddress: '192.168.1.1',
+        requestId: "req_123",
+        userId: "user_456",
+        ipAddress: "192.168.1.1",
       });
 
       const request = new Request(`http://localhost/api/projects/${testProject.id}/logs`, {
-        method: 'GET',
+        method: "GET",
       });
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
@@ -690,18 +690,18 @@ describe('GET /api/projects/[id]/logs', () => {
       expect(body.logs).toHaveLength(1);
       const returnedLog = body.logs[0];
 
-      expect(returnedLog).toHaveProperty('id', log.id);
-      expect(returnedLog).toHaveProperty('level', 'error');
-      expect(returnedLog).toHaveProperty('message', 'Test message');
-      expect(returnedLog).toHaveProperty('metadata', { key: 'value' });
-      expect(returnedLog).toHaveProperty('sourceFile', 'src/test.ts');
-      expect(returnedLog).toHaveProperty('lineNumber', 42);
-      expect(returnedLog).toHaveProperty('requestId', 'req_123');
-      expect(returnedLog).toHaveProperty('userId', 'user_456');
-      expect(returnedLog).toHaveProperty('ipAddress', '192.168.1.1');
-      expect(returnedLog).toHaveProperty('timestamp');
+      expect(returnedLog).toHaveProperty("id", log.id);
+      expect(returnedLog).toHaveProperty("level", "error");
+      expect(returnedLog).toHaveProperty("message", "Test message");
+      expect(returnedLog).toHaveProperty("metadata", { key: "value" });
+      expect(returnedLog).toHaveProperty("sourceFile", "src/test.ts");
+      expect(returnedLog).toHaveProperty("lineNumber", 42);
+      expect(returnedLog).toHaveProperty("requestId", "req_123");
+      expect(returnedLog).toHaveProperty("userId", "user_456");
+      expect(returnedLog).toHaveProperty("ipAddress", "192.168.1.1");
+      expect(returnedLog).toHaveProperty("timestamp");
       // Should NOT return the search vector field
-      expect(returnedLog).not.toHaveProperty('search');
+      expect(returnedLog).not.toHaveProperty("search");
     });
   });
 });

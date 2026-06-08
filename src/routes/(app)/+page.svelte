@@ -2,6 +2,7 @@
 import FolderPlusIcon from '@lucide/svelte/icons/folder-plus';
 import PlusIcon from '@lucide/svelte/icons/plus';
 import { navigating } from '$app/stores';
+import ApiKeyRevealModal from '$lib/components/api-key-reveal-modal.svelte';
 import CreateProjectModal from '$lib/components/create-project-modal.svelte';
 import DashboardSkeleton from '$lib/components/dashboard-skeleton.svelte';
 import ProjectCard from '$lib/components/project-card.svelte';
@@ -21,12 +22,21 @@ const isLoading = $derived(
 let projects = $state([...data.projects]);
 let isCreateModalOpen = $state(false);
 
+// One-time API key reveal shown right after a project is created
+let revealedApiKey = $state('');
+let isKeyRevealOpen = $state(false);
+
 function openCreateModal() {
   isCreateModalOpen = true;
 }
 
 function closeCreateModal() {
   isCreateModalOpen = false;
+}
+
+function closeKeyReveal() {
+  isKeyRevealOpen = false;
+  revealedApiKey = '';
 }
 
 async function handleCreateProject(name: string) {
@@ -55,6 +65,12 @@ async function handleCreateProject(name: string) {
     },
     ...projects,
   ];
+
+  // Surface the plaintext key once — it is never returned again.
+  if (result.apiKey) {
+    revealedApiKey = result.apiKey;
+    isKeyRevealOpen = true;
+  }
 
   toastSuccess(`Project "${name}" created successfully`);
 }
@@ -118,3 +134,6 @@ async function handleCreateProject(name: string) {
   onClose={closeCreateModal}
   onCreate={handleCreateProject}
 />
+
+<!-- One-time API key reveal after creation -->
+<ApiKeyRevealModal open={isKeyRevealOpen} apiKey={revealedApiKey} onClose={closeKeyReveal} />

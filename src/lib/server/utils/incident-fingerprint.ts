@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash } from "node:crypto";
 
 /**
  * UUID matcher.
@@ -8,8 +8,9 @@ const UUID_REGEX = /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}
 /**
  * Hex identifier matcher.
  * Matches long hex chunks and 0x-prefixed values.
+ * Requires at least one a-f letter so pure numeric tokens fall through to NUMBER_REGEX.
  */
-const HEX_ID_REGEX = /\b0x[0-9a-f]+\b|\b[0-9a-f]{12,}\b/gi;
+const HEX_ID_REGEX = /\b0x[0-9a-f]+\b|\b(?=[0-9a-f]*[a-f])[0-9a-f]{12,}\b/gi;
 
 /**
  * IPv4 matcher.
@@ -46,14 +47,14 @@ export function normalizeIncidentMessage(message: string): string {
   const normalized = message
     .toLowerCase()
     .trim()
-    .replace(UUID_REGEX, '{uuid}')
-    .replace(HEX_ID_REGEX, '{hex}')
-    .replace(IPV4_REGEX, '{ip}')
-    .replace(NUMBER_REGEX, '{num}')
-    .replace(WHITESPACE_REGEX, ' ')
+    .replace(UUID_REGEX, "{uuid}")
+    .replace(HEX_ID_REGEX, "{hex}")
+    .replace(IPV4_REGEX, "{ip}")
+    .replace(NUMBER_REGEX, "{num}")
+    .replace(WHITESPACE_REGEX, " ")
     .trim();
 
-  return normalized || 'unknown error';
+  return normalized || "unknown error";
 }
 
 /**
@@ -65,8 +66,8 @@ export function buildIncidentFingerprintSeed(params: {
   lineNumber: number | null;
   normalizedMessage: string;
 }): string {
-  const serviceName = params.serviceName ?? 'unknown-service';
-  const sourceFile = params.sourceFile ?? 'unknown-source';
+  const serviceName = params.serviceName ?? "unknown-service";
+  const sourceFile = params.sourceFile ?? "unknown-source";
   const lineNumber = params.lineNumber ?? 0;
 
   return `${serviceName}|${sourceFile}|${lineNumber}|${params.normalizedMessage}`;
@@ -76,7 +77,7 @@ export function buildIncidentFingerprintSeed(params: {
  * Returns a stable SHA-256 based fingerprint (truncated hex).
  */
 export function hashIncidentFingerprint(seed: string): string {
-  return createHash('sha256').update(seed).digest('hex').slice(0, INCIDENT_FINGERPRINT_LENGTH);
+  return createHash("sha256").update(seed).digest("hex").slice(0, INCIDENT_FINGERPRINT_LENGTH);
 }
 
 /**

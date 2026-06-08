@@ -1,13 +1,13 @@
-import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createAuth } from '$lib/server/auth';
-import type * as schema from '$lib/server/db/schema';
-import { setupTestDatabase } from '$lib/server/db/test-db';
-import { getSession } from '$lib/server/session';
-import { POST as POST_PROJECTS } from '../../../../src/routes/api/projects/+server';
-import { DELETE, PATCH } from '../../../../src/routes/api/projects/[id]/+server';
-import { POST as POST_REGENERATE } from '../../../../src/routes/api/projects/[id]/regenerate/+server';
-import { seedProject } from '../../../fixtures/db';
+import type { PgliteDatabase } from "drizzle-orm/pglite";
+import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
+import { createAuth } from "$lib/server/auth";
+import type * as schema from "$lib/server/db/schema";
+import { setupTestDatabase } from "$lib/server/db/test-db";
+import { getSession } from "$lib/server/session";
+import { POST as POST_PROJECTS } from "../../../../src/routes/api/projects/+server";
+import { DELETE, PATCH } from "../../../../src/routes/api/projects/[id]/+server";
+import { POST as POST_REGENERATE } from "../../../../src/routes/api/projects/[id]/regenerate/+server";
+import { seedProject } from "../../../fixtures/db";
 
 /**
  * Helper to create a mock SvelteKit RequestEvent
@@ -24,7 +24,7 @@ function createRequestEvent(
     params,
     url: new URL(request.url),
     platform: undefined,
-    route: { id: '/api/projects' },
+    route: { id: "/api/projects" },
     isDataRequest: false,
     isSubRequest: false,
     isRemoteRequest: false,
@@ -34,15 +34,15 @@ function createRequestEvent(
       getAll: () => [],
       set: () => {},
       delete: () => {},
-      serialize: () => '',
+      serialize: () => "",
     },
     fetch: globalThis.fetch,
-    getClientAddress: () => '127.0.0.1',
+    getClientAddress: () => "127.0.0.1",
     setHeaders: () => {},
   } as unknown;
 }
 
-describe('CSRF Origin/Referer checks', () => {
+describe("CSRF Origin/Referer checks", () => {
   let db: PgliteDatabase<typeof schema>;
   let cleanup: () => Promise<void>;
   let auth: ReturnType<typeof createAuth>;
@@ -57,20 +57,20 @@ describe('CSRF Origin/Referer checks', () => {
 
     const signUpResult = await auth.api.signUpEmail({
       body: {
-        email: 'csrf-test@example.com',
-        password: 'SecureP@ssw0rd123',
-        name: 'CSRF Test User',
+        email: "csrf-test@example.com",
+        password: "SecureP@ssw0rd123",
+        name: "CSRF Test User",
       },
     });
 
-    const mockRequest = new Request('http://localhost:5173', {
+    const mockRequest = new Request("http://localhost:5173", {
       headers: {
         cookie: `better-auth.session_token=${signUpResult.token}`,
       },
     });
 
     const sessionData = await getSession(mockRequest.headers, db);
-    if (!sessionData) throw new Error('Session data should not be null');
+    if (!sessionData) throw new Error("Session data should not be null");
     userId = sessionData.user.id;
 
     authenticatedLocals = {
@@ -83,15 +83,15 @@ describe('CSRF Origin/Referer checks', () => {
     await cleanup();
   });
 
-  describe('POST /api/projects', () => {
-    it('rejects request with mismatched Origin header', async () => {
-      const request = new Request('http://localhost/api/projects', {
-        method: 'POST',
+  describe("POST /api/projects", () => {
+    it("rejects request with mismatched Origin header", async () => {
+      const request = new Request("http://localhost/api/projects", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          Origin: 'https://evil.com',
+          "Content-Type": "application/json",
+          Origin: "https://evil.com",
         },
-        body: JSON.stringify({ name: 'csrf-test' }),
+        body: JSON.stringify({ name: "csrf-test" }),
       });
 
       const event = createRequestEvent(request, db, authenticatedLocals);
@@ -99,17 +99,17 @@ describe('CSRF Origin/Referer checks', () => {
 
       expect(response.status).toBe(403);
       const body = await response.json();
-      expect(body.error).toBe('csrf_error');
+      expect(body.error).toBe("csrf_error");
     });
 
-    it('rejects request with mismatched Referer header', async () => {
-      const request = new Request('http://localhost/api/projects', {
-        method: 'POST',
+    it("rejects request with mismatched Referer header", async () => {
+      const request = new Request("http://localhost/api/projects", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          Referer: 'https://evil.com/phishing',
+          "Content-Type": "application/json",
+          Referer: "https://evil.com/phishing",
         },
-        body: JSON.stringify({ name: 'csrf-test' }),
+        body: JSON.stringify({ name: "csrf-test" }),
       });
 
       const event = createRequestEvent(request, db, authenticatedLocals);
@@ -117,17 +117,17 @@ describe('CSRF Origin/Referer checks', () => {
 
       expect(response.status).toBe(403);
       const body = await response.json();
-      expect(body.error).toBe('csrf_error');
+      expect(body.error).toBe("csrf_error");
     });
 
-    it('allows request with valid Origin header', async () => {
-      const request = new Request('http://localhost/api/projects', {
-        method: 'POST',
+    it("allows request with valid Origin header", async () => {
+      const request = new Request("http://localhost/api/projects", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          Origin: 'http://localhost',
+          "Content-Type": "application/json",
+          Origin: "http://localhost",
         },
-        body: JSON.stringify({ name: 'csrf-valid' }),
+        body: JSON.stringify({ name: "csrf-valid" }),
       });
 
       const event = createRequestEvent(request, db, authenticatedLocals);
@@ -136,14 +136,14 @@ describe('CSRF Origin/Referer checks', () => {
       expect(response.status).toBe(201);
     });
 
-    it('allows request with valid Referer header', async () => {
-      const request = new Request('http://localhost/api/projects', {
-        method: 'POST',
+    it("allows request with valid Referer header", async () => {
+      const request = new Request("http://localhost/api/projects", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          Referer: 'http://localhost/projects',
+          "Content-Type": "application/json",
+          Referer: "http://localhost/projects",
         },
-        body: JSON.stringify({ name: 'csrf-valid-ref' }),
+        body: JSON.stringify({ name: "csrf-valid-ref" }),
       });
 
       const event = createRequestEvent(request, db, authenticatedLocals);
@@ -152,13 +152,13 @@ describe('CSRF Origin/Referer checks', () => {
       expect(response.status).toBe(201);
     });
 
-    it('allows request without Origin or Referer (same-origin fallback)', async () => {
-      const request = new Request('http://localhost/api/projects', {
-        method: 'POST',
+    it("allows request without Origin or Referer (same-origin fallback)", async () => {
+      const request = new Request("http://localhost/api/projects", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify({ name: 'csrf-no-headers' }),
+        body: JSON.stringify({ name: "csrf-no-headers" }),
       });
 
       const event = createRequestEvent(request, db, authenticatedLocals);
@@ -168,16 +168,16 @@ describe('CSRF Origin/Referer checks', () => {
     });
   });
 
-  describe('PATCH /api/projects/[id]', () => {
-    it('rejects request with mismatched Origin header', async () => {
+  describe("PATCH /api/projects/[id]", () => {
+    it("rejects request with mismatched Origin header", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
       const request = new Request(`http://localhost/api/projects/${testProject.id}`, {
-        method: 'PATCH',
+        method: "PATCH",
         headers: {
-          'Content-Type': 'application/json',
-          Origin: 'https://evil.com',
+          "Content-Type": "application/json",
+          Origin: "https://evil.com",
         },
-        body: JSON.stringify({ name: 'hacked' }),
+        body: JSON.stringify({ name: "hacked" }),
       });
 
       const event = createRequestEvent(request, db, authenticatedLocals, { id: testProject.id });
@@ -185,18 +185,18 @@ describe('CSRF Origin/Referer checks', () => {
 
       expect(response.status).toBe(403);
       const body = await response.json();
-      expect(body.error).toBe('csrf_error');
+      expect(body.error).toBe("csrf_error");
     });
 
-    it('allows request with valid Origin header', async () => {
+    it("allows request with valid Origin header", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
       const request = new Request(`http://localhost/api/projects/${testProject.id}`, {
-        method: 'PATCH',
+        method: "PATCH",
         headers: {
-          'Content-Type': 'application/json',
-          Origin: 'http://localhost',
+          "Content-Type": "application/json",
+          Origin: "http://localhost",
         },
-        body: JSON.stringify({ name: 'valid-patch' }),
+        body: JSON.stringify({ name: "valid-patch" }),
       });
 
       const event = createRequestEvent(request, db, authenticatedLocals, { id: testProject.id });
@@ -206,13 +206,13 @@ describe('CSRF Origin/Referer checks', () => {
     });
   });
 
-  describe('DELETE /api/projects/[id]', () => {
-    it('rejects request with mismatched Origin header', async () => {
+  describe("DELETE /api/projects/[id]", () => {
+    it("rejects request with mismatched Origin header", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
       const request = new Request(`http://localhost/api/projects/${testProject.id}`, {
-        method: 'DELETE',
+        method: "DELETE",
         headers: {
-          Origin: 'https://evil.com',
+          Origin: "https://evil.com",
         },
       });
 
@@ -221,15 +221,15 @@ describe('CSRF Origin/Referer checks', () => {
 
       expect(response.status).toBe(403);
       const body = await response.json();
-      expect(body.error).toBe('csrf_error');
+      expect(body.error).toBe("csrf_error");
     });
 
-    it('allows request with valid Origin header', async () => {
+    it("allows request with valid Origin header", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
       const request = new Request(`http://localhost/api/projects/${testProject.id}`, {
-        method: 'DELETE',
+        method: "DELETE",
         headers: {
-          Origin: 'http://localhost',
+          Origin: "http://localhost",
         },
       });
 
@@ -240,13 +240,13 @@ describe('CSRF Origin/Referer checks', () => {
     });
   });
 
-  describe('POST /api/projects/[id]/regenerate', () => {
-    it('rejects request with mismatched Origin header', async () => {
+  describe("POST /api/projects/[id]/regenerate", () => {
+    it("rejects request with mismatched Origin header", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
       const request = new Request(`http://localhost/api/projects/${testProject.id}/regenerate`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          Origin: 'https://evil.com',
+          Origin: "https://evil.com",
         },
       });
 
@@ -255,15 +255,15 @@ describe('CSRF Origin/Referer checks', () => {
 
       expect(response.status).toBe(403);
       const body = await response.json();
-      expect(body.error).toBe('csrf_error');
+      expect(body.error).toBe("csrf_error");
     });
 
-    it('allows request with valid Origin header', async () => {
+    it("allows request with valid Origin header", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
       const request = new Request(`http://localhost/api/projects/${testProject.id}/regenerate`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          Origin: 'http://localhost',
+          Origin: "http://localhost",
         },
       });
 

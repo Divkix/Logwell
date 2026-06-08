@@ -1,23 +1,24 @@
-import { json, type RequestHandler } from '@sveltejs/kit';
-import { eq } from 'drizzle-orm';
-import { nanoid } from 'nanoid';
-import { API_CONFIG } from '$lib/server/config/performance';
-import { getDbClient } from '$lib/server/db/db';
-import { log, project } from '$lib/server/db/schema';
-import { logEventBus } from '$lib/server/events';
-import { ApiKeyError, validateApiKey } from '$lib/server/utils/api-key';
-import { requireJsonContentType } from '$lib/server/utils/content-type';
+import { json, type RequestHandler } from "@sveltejs/kit";
+import { eq } from "drizzle-orm";
+import { nanoid } from "nanoid";
+import { API_CONFIG } from "$lib/server/config/performance";
+import { getDbClient } from "$lib/server/db/db";
+import { log, project } from "$lib/server/db/schema";
+import { logEventBus } from "$lib/server/events";
+import { ApiKeyError, validateApiKey } from "$lib/server/utils/api-key";
+import { requireJsonContentType } from "$lib/server/utils/content-type";
 import {
   assignIncidentIds,
   prepareLogsForIncidents,
   upsertIncidentsForPreparedLogs,
-} from '$lib/server/utils/incidents';
+} from "$lib/server/utils/incidents";
 import {
   mapOtlpAttributesToLogColumns,
   type NormalizedOtlpLogsResult,
   normalizeOtlpLogsRequest,
   OtlpValidationError,
-} from '$lib/server/utils/otlp';
+} from "$lib/server/utils/otlp";
+import { checkRateLimit, INGEST_RPM } from "$lib/server/utils/rate-limit";
 
 function buildIngestResponse(accepted: number, rejected: number, errors: string[]) {
   const response: { accepted: number; rejected?: number; errors?: string[] } = { accepted };
@@ -52,13 +53,21 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       .from(project)
       .where(eq(project.id, projectId));
     if (!projectRow) {
-      throw new ApiKeyError(401, 'Invalid API key');
+      throw new ApiKeyError(401, "Invalid API key");
     }
   } catch (err) {
     if (err instanceof ApiKeyError) {
-      return json({ error: 'unauthorized', message: err.message }, { status: err.status });
+      return json({ error: "unauthorized", message: err.message }, { status: err.status });
     }
     throw err;
+  }
+
+  // Apply rate limiting per project
+  if (!checkRateLimit(`ingest:${projectId}`, INGEST_RPM)) {
+    return new Response(JSON.stringify({ error: "rate_limited" }), {
+      status: 429,
+      headers: { "Content-Type": "application/json", "Retry-After": "60" },
+    });
   }
 
   let body: unknown;
@@ -66,17 +75,20 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     body = await request.json();
   } catch {
     return json(
-      { error: 'invalid_json', message: 'Request body must be valid JSON' },
+      { error: "invalid_json", message: "Request body must be valid JSON" },
       { status: 400 },
     );
   }
 
+  // Batch size is enforced accurately against the real log-record count after
+  // normalization below (resourceLogs.length is the resource count, not the
+  // record count, so an early heuristic could reject valid payloads).
   let normalized: NormalizedOtlpLogsResult;
   try {
     normalized = normalizeOtlpLogsRequest(body);
   } catch (err) {
     if (err instanceof OtlpValidationError) {
-      return json({ error: 'validation_error', message: err.message }, { status: 400 });
+      return json({ error: "validation_error", message: err.message }, { status: 400 });
     }
     throw err;
   }
@@ -86,7 +98,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   if (records.length > API_CONFIG.BATCH_INSERT_LIMIT) {
     return json(
       {
-        error: 'batch_too_large',
+        error: "batch_too_large",
         message: `Batch exceeds maximum limit of ${API_CONFIG.BATCH_INSERT_LIMIT} logs. Received ${records.length} logs.`,
       },
       { status: 400 },
@@ -119,7 +131,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
           const assigned = assignIncidentIds(preparedLogs, incidentByFingerprint);
 
           const logEntries = assigned.map((prepared, index) => {
-            const record = records[index];
+            const record = records[index]!;
             const mapped = mapOtlpAttributesToLogColumns(record.attributes);
 
             return {

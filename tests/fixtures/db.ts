@@ -1,6 +1,7 @@
-import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import { nanoid } from 'nanoid';
-import * as schema from '../../src/lib/server/db/schema';
+import type { PgliteDatabase } from "drizzle-orm/pglite";
+import { nanoid } from "nanoid";
+import * as schema from "../../src/lib/server/db/schema";
+import { hashApiKey } from "../../src/lib/server/utils/api-key";
 
 /**
  * Type for project creation/selection
@@ -50,11 +51,13 @@ export async function getOrCreateDefaultUser(
     .insert(schema.user)
     .values({
       id: userId,
-      name: 'Test User',
+      name: "Test User",
       email: `test-${userId}@example.com`,
       emailVerified: false,
     })
     .returning();
+
+  if (!user) throw new Error("Failed to create test user");
 
   // Cache and return
   defaultUserCache.set(db, user);
@@ -68,11 +71,15 @@ export async function getOrCreateDefaultUser(
 export function createProjectFactory(
   overrides: Partial<ProjectInsert> & { ownerId: string },
 ): ProjectInsert {
+  // API keys are stored hashed only. Derive the hash from a fresh random key
+  // unless the caller provides an explicit apiKeyHash. apiKeyHash is applied
+  // after the spread so overrides can't leave it inconsistent.
+  const apiKeyHash = overrides.apiKeyHash ?? hashApiKey(generateApiKey());
   return {
     id: nanoid(),
     name: `test-project-${nanoid(8)}`,
-    apiKey: generateApiKey(),
     ...overrides,
+    apiKeyHash,
   };
 }
 
@@ -83,7 +90,7 @@ export function createLogFactory(overrides: Partial<LogInsert> = {}): LogInsert 
   return {
     id: nanoid(),
     projectId: overrides.projectId || nanoid(), // Will fail if no valid projectId
-    level: 'info',
+    level: "info",
     message: `Test log message ${nanoid(8)}`,
     metadata: null,
     sourceFile: null,
@@ -127,7 +134,23 @@ export async function seedProject(
 
   const project = createProjectFactory({ ...overrides, ownerId });
   const [result] = await db.insert(schema.project).values(project).returning();
+  if (!result) throw new Error("Failed to create test project");
   return result;
+}
+
+/**
+ * Seed a single project and return the row together with the plaintext API key.
+ * The plaintext key is never stored (only its hash is) — this helper exposes it
+ * for tests that need to authenticate ingestion requests.
+ */
+export async function seedProjectWithApiKey(
+  db: PgliteDatabase<typeof schema>,
+  overrides: Omit<Partial<ProjectInsert>, "apiKeyHash"> = {},
+): Promise<ProjectSelect & { apiKey: string }> {
+  const apiKey = generateApiKey();
+  const apiKeyHash = hashApiKey(apiKey);
+  const result = await seedProject(db, { ...overrides, apiKeyHash });
+  return { ...result, apiKey };
 }
 
 /**
@@ -156,6 +179,7 @@ export async function seedLog(
 ): Promise<LogSelect> {
   const log = createLogFactory({ projectId, ...overrides });
   const [result] = await db.insert(schema.log).values(log).returning();
+  if (!result) throw new Error("Failed to create test log");
   return result;
 }
 

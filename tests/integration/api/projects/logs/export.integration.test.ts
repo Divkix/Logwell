@@ -1,13 +1,13 @@
-import type { HttpError } from '@sveltejs/kit';
-import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createAuth } from '$lib/server/auth';
-import type * as schema from '$lib/server/db/schema';
-import { setupTestDatabase } from '$lib/server/db/test-db';
-import { getSession } from '$lib/server/session';
-import { clearApiKeyCache } from '$lib/server/utils/api-key';
-import { GET } from '../../../../../src/routes/api/projects/[id]/logs/export/+server';
-import { seedLog, seedLogs, seedProject } from '../../../../fixtures/db';
+import type { HttpError } from "@sveltejs/kit";
+import type { PgliteDatabase } from "drizzle-orm/pglite";
+import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
+import { createAuth } from "$lib/server/auth";
+import type * as schema from "$lib/server/db/schema";
+import { setupTestDatabase } from "$lib/server/db/test-db";
+import { getSession } from "$lib/server/session";
+import { clearApiKeyCache } from "$lib/server/utils/api-key";
+import { GET } from "../../../../../src/routes/api/projects/[id]/logs/export/+server";
+import { seedLog, seedLogs, seedProject } from "../../../../fixtures/db";
 
 /**
  * Helper to create a mock SvelteKit RequestEvent for [id]/logs/export routes
@@ -24,7 +24,7 @@ function createRequestEvent(
     params,
     url: new URL(request.url),
     platform: undefined,
-    route: { id: '/api/projects/[id]/logs/export' },
+    route: { id: "/api/projects/[id]/logs/export" },
     isDataRequest: false,
     isSubRequest: false,
     isRemoteRequest: false,
@@ -34,10 +34,10 @@ function createRequestEvent(
       getAll: () => [],
       set: () => {},
       delete: () => {},
-      serialize: () => '',
+      serialize: () => "",
     },
     fetch: globalThis.fetch,
-    getClientAddress: () => '127.0.0.1',
+    getClientAddress: () => "127.0.0.1",
     setHeaders: () => {},
   } as unknown;
 }
@@ -52,7 +52,7 @@ async function expectHttpError(
 ): Promise<void> {
   try {
     await promise;
-    expect.fail('Expected HTTP error to be thrown');
+    expect.fail("Expected HTTP error to be thrown");
   } catch (error) {
     const httpError = error as HttpError;
     expect(httpError.status).toBe(expectedStatus);
@@ -62,7 +62,7 @@ async function expectHttpError(
   }
 }
 
-describe('GET /api/projects/[id]/logs/export', () => {
+describe("GET /api/projects/[id]/logs/export", () => {
   let db: PgliteDatabase<typeof schema>;
   let cleanup: () => Promise<void>;
   let auth: ReturnType<typeof createAuth>;
@@ -79,20 +79,20 @@ describe('GET /api/projects/[id]/logs/export', () => {
     // Create authenticated user
     const signUpResult = await auth.api.signUpEmail({
       body: {
-        email: 'test@example.com',
-        password: 'SecureP@ssw0rd123',
-        name: 'Test User',
+        email: "test@example.com",
+        password: "SecureP@ssw0rd123",
+        name: "Test User",
       },
     });
 
-    const mockRequest = new Request('http://localhost:5173', {
+    const mockRequest = new Request("http://localhost:5173", {
       headers: {
         cookie: `better-auth.session_token=${signUpResult.token}`,
       },
     });
 
     const sessionData = await getSession(mockRequest.headers, db);
-    if (!sessionData) throw new Error('Session data should not be null');
+    if (!sessionData) throw new Error("Session data should not be null");
     userId = sessionData.user.id;
 
     authenticatedLocals = {
@@ -105,23 +105,23 @@ describe('GET /api/projects/[id]/logs/export', () => {
     await cleanup();
   });
 
-  describe('Authentication', () => {
-    it('returns 401 for unauthenticated request', async () => {
+  describe("Authentication", () => {
+    it("returns 401 for unauthenticated request", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
       const request = new Request(`http://localhost/api/projects/${testProject.id}/logs/export`, {
-        method: 'GET',
+        method: "GET",
       });
 
       const event = createRequestEvent(request, db, { id: testProject.id });
-      await expectHttpError(GET(event as never), 401, { message: 'Unauthorized' });
+      await expectHttpError(GET(event as never), 401, { message: "Unauthorized" });
     });
 
-    it('returns 200 for authenticated request', async () => {
+    it("returns 200 for authenticated request", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
       await seedLog(db, testProject.id);
 
       const request = new Request(`http://localhost/api/projects/${testProject.id}/logs/export`, {
-        method: 'GET',
+        method: "GET",
       });
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
@@ -131,13 +131,13 @@ describe('GET /api/projects/[id]/logs/export', () => {
     });
   });
 
-  describe('Format Validation', () => {
-    it('returns 400 for invalid format parameter', async () => {
+  describe("Format Validation", () => {
+    it("returns 400 for invalid format parameter", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
 
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/logs/export?format=xml`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
@@ -145,69 +145,69 @@ describe('GET /api/projects/[id]/logs/export', () => {
 
       expect(response.status).toBe(400);
       const body = await response.json();
-      expect(body).toHaveProperty('error', 'invalid_format');
+      expect(body).toHaveProperty("error", "invalid_format");
     });
 
-    it('defaults to JSON when format not specified', async () => {
+    it("defaults to JSON when format not specified", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
       await seedLog(db, testProject.id);
 
       const request = new Request(`http://localhost/api/projects/${testProject.id}/logs/export`, {
-        method: 'GET',
+        method: "GET",
       });
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
       const response = await GET(event as never);
 
       expect(response.status).toBe(200);
-      expect(response.headers.get('content-type')).toBe('application/json');
+      expect(response.headers.get("content-type")).toBe("application/json");
     });
   });
 
-  describe('JSON Export', () => {
-    it('returns application/json content-type', async () => {
+  describe("JSON Export", () => {
+    it("returns application/json content-type", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
       await seedLog(db, testProject.id);
 
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/logs/export?format=json`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
       const response = await GET(event as never);
 
       expect(response.status).toBe(200);
-      expect(response.headers.get('content-type')).toBe('application/json');
+      expect(response.headers.get("content-type")).toBe("application/json");
     });
 
-    it('returns Content-Disposition header with filename', async () => {
-      const testProject = await seedProject(db, { name: 'test-app', ownerId: userId });
+    it("returns Content-Disposition header with filename", async () => {
+      const testProject = await seedProject(db, { name: "test-app", ownerId: userId });
       await seedLog(db, testProject.id);
 
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/logs/export?format=json`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
       const response = await GET(event as never);
 
       expect(response.status).toBe(200);
-      const disposition = response.headers.get('content-disposition');
-      expect(disposition).toContain('attachment');
+      const disposition = response.headers.get("content-disposition");
+      expect(disposition).toContain("attachment");
       expect(disposition).toContain('filename="logs-test-app-');
       expect(disposition).toContain('.json"');
     });
 
-    it('returns array of logs matching filters', async () => {
+    it("returns array of logs matching filters", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
-      const log1 = await seedLog(db, testProject.id, { message: 'Test log 1' });
-      const log2 = await seedLog(db, testProject.id, { message: 'Test log 2' });
+      const log1 = await seedLog(db, testProject.id, { message: "Test log 1" });
+      const log2 = await seedLog(db, testProject.id, { message: "Test log 2" });
 
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/logs/export?format=json`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
@@ -222,14 +222,14 @@ describe('GET /api/projects/[id]/logs/export', () => {
       expect(body.some((log: { id: string }) => log.id === log2.id)).toBe(true);
     });
 
-    it('respects level filter', async () => {
+    it("respects level filter", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
-      await seedLogs(db, testProject.id, 5, { level: 'info' });
-      await seedLogs(db, testProject.id, 3, { level: 'error' });
+      await seedLogs(db, testProject.id, 5, { level: "info" });
+      await seedLogs(db, testProject.id, 3, { level: "error" });
 
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/logs/export?format=json&level=error`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
@@ -239,19 +239,19 @@ describe('GET /api/projects/[id]/logs/export', () => {
       const body = await response.json();
 
       expect(body).toHaveLength(3);
-      expect(body.every((log: { level: string }) => log.level === 'error')).toBe(true);
+      expect(body.every((log: { level: string }) => log.level === "error")).toBe(true);
     });
 
-    it('respects time range filters', async () => {
+    it("respects time range filters", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
 
       const now = new Date();
       await seedLog(db, testProject.id, {
-        message: 'Old log',
+        message: "Old log",
         timestamp: new Date(now.getTime() - 3600000), // 1 hour ago
       });
       const recentLog = await seedLog(db, testProject.id, {
-        message: 'Recent log',
+        message: "Recent log",
         timestamp: new Date(now.getTime() - 60000), // 1 minute ago
       });
 
@@ -259,7 +259,7 @@ describe('GET /api/projects/[id]/logs/export', () => {
       const fromTime = new Date(now.getTime() - 1800000).toISOString();
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/logs/export?format=json&from=${fromTime}`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
@@ -272,13 +272,13 @@ describe('GET /api/projects/[id]/logs/export', () => {
       expect(body[0].id).toBe(recentLog.id);
     });
 
-    it('handles empty result set', async () => {
+    it("handles empty result set", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
       // No logs seeded
 
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/logs/export?format=json`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
@@ -291,15 +291,15 @@ describe('GET /api/projects/[id]/logs/export', () => {
       expect(body).toHaveLength(0);
     });
 
-    it('preserves non-special characters in search query', async () => {
+    it("preserves non-special characters in search query", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
 
-      await seedLog(db, testProject.id, { message: 'Database connection failed' });
-      await seedLog(db, testProject.id, { message: 'Database query succeeded' });
+      await seedLog(db, testProject.id, { message: "Database connection failed" });
+      await seedLog(db, testProject.id, { message: "Database query succeeded" });
 
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/logs/export?format=json&search=database|connection`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
@@ -311,20 +311,20 @@ describe('GET /api/projects/[id]/logs/export', () => {
       // Pipe is a tsquery operator; shared utility replaces it with space creating 'database & connection'
       // Inline buggy version strips it creating 'databaseconnection' which matches nothing
       expect(body).toHaveLength(1);
-      expect(body[0].message).toBe('Database connection failed');
+      expect(body[0].message).toBe("Database connection failed");
     });
 
-    it('preserves hyphens and underscores in search query', async () => {
+    it("preserves hyphens and underscores in search query", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
 
       await seedLog(db, testProject.id, {
-        message: 'User profile updated',
-        metadata: { service: 'user-service', error_code: 'USER_PROFILE_404' },
+        message: "User profile updated",
+        metadata: { service: "user-service", error_code: "USER_PROFILE_404" },
       });
 
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/logs/export?format=json&search=user-service`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
@@ -339,49 +339,49 @@ describe('GET /api/projects/[id]/logs/export', () => {
     });
   });
 
-  describe('CSV Export', () => {
-    it('returns text/csv content-type', async () => {
+  describe("CSV Export", () => {
+    it("returns text/csv content-type", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
       await seedLog(db, testProject.id);
 
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/logs/export?format=csv`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
       const response = await GET(event as never);
 
       expect(response.status).toBe(200);
-      expect(response.headers.get('content-type')).toBe('text/csv; charset=utf-8');
+      expect(response.headers.get("content-type")).toBe("text/csv; charset=utf-8");
     });
 
-    it('returns Content-Disposition header', async () => {
-      const testProject = await seedProject(db, { name: 'my-service', ownerId: userId });
+    it("returns Content-Disposition header", async () => {
+      const testProject = await seedProject(db, { name: "my-service", ownerId: userId });
       await seedLog(db, testProject.id);
 
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/logs/export?format=csv`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
       const response = await GET(event as never);
 
       expect(response.status).toBe(200);
-      const disposition = response.headers.get('content-disposition');
-      expect(disposition).toContain('attachment');
+      const disposition = response.headers.get("content-disposition");
+      expect(disposition).toContain("attachment");
       expect(disposition).toContain('filename="logs-my-service-');
       expect(disposition).toContain('.csv"');
     });
 
-    it('first row contains headers', async () => {
+    it("first row contains headers", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
       await seedLog(db, testProject.id);
 
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/logs/export?format=csv`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
@@ -389,28 +389,28 @@ describe('GET /api/projects/[id]/logs/export', () => {
 
       expect(response.status).toBe(200);
       const csvText = await response.text();
-      const lines = csvText.split('\n');
+      const lines = csvText.split("\n");
 
       expect(lines[0]).toBe(
-        'id,timestamp,level,message,metadata,sourceFile,lineNumber,requestId,userId,ipAddress',
+        "id,timestamp,level,message,metadata,sourceFile,lineNumber,requestId,userId,ipAddress",
       );
     });
 
-    it('properly escapes special characters', async () => {
+    it("properly escapes special characters", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
       await seedLog(db, testProject.id, {
-        message: 'Test message with, comma',
+        message: "Test message with, comma",
       });
       await seedLog(db, testProject.id, {
         message: 'Test "quoted" message',
       });
       await seedLog(db, testProject.id, {
-        message: 'Test message\nwith newline',
+        message: "Test message\nwith newline",
       });
 
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/logs/export?format=csv`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
@@ -429,16 +429,16 @@ describe('GET /api/projects/[id]/logs/export', () => {
       expect(csvText).toContain('"Test message\nwith newline"');
     });
 
-    it('handles metadata JSON in fields', async () => {
+    it("handles metadata JSON in fields", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
       await seedLog(db, testProject.id, {
-        message: 'Log with metadata',
-        metadata: { key: 'value', count: 42 },
+        message: "Log with metadata",
+        metadata: { key: "value", count: 42 },
       });
 
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/logs/export?format=csv`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
@@ -452,8 +452,8 @@ describe('GET /api/projects/[id]/logs/export', () => {
     });
   });
 
-  describe('Limits', () => {
-    it('returns 400 if export exceeds maximum logs', async () => {
+  describe("Limits", () => {
+    it("returns 400 if export exceeds maximum logs", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
       // Seed a reasonable number of logs to test count check without breaking PGlite
       // We'll seed just enough to trigger the limit check
@@ -468,7 +468,7 @@ describe('GET /api/projects/[id]/logs/export', () => {
       // Alternative: Seed a small number and verify the error response format
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/logs/export?format=json`,
-        { method: 'GET' },
+        { method: "GET" },
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
@@ -483,19 +483,19 @@ describe('GET /api/projects/[id]/logs/export', () => {
     });
   });
 
-  describe('Project Validation', () => {
-    it('returns 404 for non-existent project', async () => {
+  describe("Project Validation", () => {
+    it("returns 404 for non-existent project", async () => {
       const request = new Request(
-        'http://localhost/api/projects/non-existent-id/logs/export?format=json',
-        { method: 'GET' },
+        "http://localhost/api/projects/non-existent-id/logs/export?format=json",
+        { method: "GET" },
       );
 
-      const event = createRequestEvent(request, db, { id: 'non-existent-id' }, authenticatedLocals);
+      const event = createRequestEvent(request, db, { id: "non-existent-id" }, authenticatedLocals);
       const response = await GET(event as never);
 
       expect(response.status).toBe(404);
       const body = await response.json();
-      expect(body).toHaveProperty('error', 'not_found');
+      expect(body).toHaveProperty("error", "not_found");
     });
   });
 });

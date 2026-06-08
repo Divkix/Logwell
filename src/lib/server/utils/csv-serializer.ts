@@ -1,18 +1,3 @@
-import type { ExportableLog } from '$lib/types/export';
-
-const CSV_HEADERS = [
-  'id',
-  'timestamp',
-  'level',
-  'message',
-  'metadata',
-  'sourceFile',
-  'lineNumber',
-  'requestId',
-  'userId',
-  'ipAddress',
-] as const;
-
 /**
  * Escapes a field value for CSV format.
  * - Converts null/undefined to empty string
@@ -22,47 +7,26 @@ const CSV_HEADERS = [
  */
 export function escapeCSVField(field: unknown): string {
   if (field === null || field === undefined) {
-    return '';
+    return "";
   }
 
-  let value = String(field);
+  let value =
+    typeof field === "object" && field !== null
+      ? JSON.stringify(field)
+      : String(field as string | number | boolean | bigint);
 
   // Prefix formula-starting characters to prevent CSV injection (OWASP)
-  if (/^[=+\-@]/.test(value)) {
+  // Strip leading whitespace before testing to prevent whitespace bypass
+  if (/^[=+\-@]/.test(value.trimStart())) {
     value = `'${value}`;
   }
 
-  // Check if field needs quoting (contains comma, quote, or newline)
-  if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+  // Check if field needs quoting (contains comma, quote, newline, or carriage return)
+  if (value.includes(",") || value.includes('"') || value.includes("\n") || value.includes("\r")) {
     // Escape double quotes by doubling them
     const escaped = value.replace(/"/g, '""');
     return `"${escaped}"`;
   }
 
   return value;
-}
-
-/**
- * Serializes an array of log entries to CSV format.
- * Returns CSV string with headers and properly escaped values.
- */
-export function serializeToCsv(logs: ExportableLog[]): string {
-  // Create header row
-  const headerRow = CSV_HEADERS.join(',');
-
-  if (logs.length === 0) {
-    return `${headerRow}\n`;
-  }
-
-  // Create data rows
-  const dataRows = logs.map((log) => {
-    const values = CSV_HEADERS.map((header) => {
-      const value = log[header];
-      return escapeCSVField(value);
-    });
-    return values.join(',');
-  });
-
-  // Combine header and data rows
-  return `${headerRow}\n${dataRows.join('\n')}\n`;
 }

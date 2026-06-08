@@ -1,10 +1,10 @@
-import { sql } from 'drizzle-orm';
-import { nanoid } from 'nanoid';
-import type { DatabaseClient } from '$lib/server/db/db';
-import { type IncidentStatus, isIncidentGroupedLevel, maxIncidentLevel } from '../../shared/types';
-import { INCIDENT_CONFIG } from '../config';
-import { type Incident, incident, type LogLevel } from '../db/schema';
-import { buildIncidentFingerprint } from './incident-fingerprint';
+import { sql } from "drizzle-orm";
+import { nanoid } from "nanoid";
+import type { DatabaseClient } from "$lib/server/db/db";
+import { type IncidentStatus, isIncidentGroupedLevel, maxIncidentLevel } from "../../shared/types";
+import { INCIDENT_CONFIG } from "../config";
+import { type Incident, incident, type LogLevel } from "../db/schema";
+import { buildIncidentFingerprint } from "./incident-fingerprint";
 
 /**
  * Log input shape needed for incident grouping.
@@ -52,7 +52,7 @@ export interface IncidentUpsertResult {
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
   }
   return value as Record<string, unknown>;
@@ -62,7 +62,7 @@ function stringField(record: Record<string, unknown> | null, keys: string[]): st
   if (!record) return null;
   for (const key of keys) {
     const value = record[key];
-    if (typeof value === 'string' && value.trim()) {
+    if (typeof value === "string" && value.trim()) {
       return value.trim();
     }
   }
@@ -77,8 +77,8 @@ export function extractServiceName(resourceAttributes: unknown, metadata: unknow
   const meta = asRecord(metadata);
 
   return (
-    stringField(resource, ['service.name', 'service_name', 'service']) ??
-    stringField(meta, ['service.name', 'service_name', 'service']) ??
+    stringField(resource, ["service.name", "service_name", "service"]) ??
+    stringField(meta, ["service.name", "service_name", "service"]) ??
     null
   );
 }
@@ -88,7 +88,7 @@ export function extractServiceName(resourceAttributes: unknown, metadata: unknow
  */
 export function buildIncidentTitle(message: string): string {
   const trimmed = message.trim();
-  if (!trimmed) return 'Unknown error';
+  if (!trimmed) return "Unknown error";
   return trimmed.length > 160 ? `${trimmed.slice(0, 157)}...` : trimmed;
 }
 
@@ -175,7 +175,7 @@ export function getIncidentStatus(
   autoResolveMinutes: number = INCIDENT_CONFIG.AUTO_RESOLVE_MINUTES,
 ): IncidentStatus {
   const thresholdMs = autoResolveMinutes * 60 * 1000;
-  return now.getTime() - lastSeen.getTime() <= thresholdMs ? 'open' : 'resolved';
+  return now.getTime() - lastSeen.getTime() <= thresholdMs ? "open" : "resolved";
 }
 
 /**
@@ -235,6 +235,9 @@ export async function upsertIncidentsForPreparedLogs(
       })
       .returning();
 
+    if (!result) {
+      throw new Error(`Incident upsert returned no row for fingerprint: ${aggregate.fingerprint}`);
+    }
     incidentByFingerprint.set(aggregate.fingerprint, result);
     touchedIncidents.push(result);
   }

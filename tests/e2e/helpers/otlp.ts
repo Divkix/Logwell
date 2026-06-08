@@ -1,6 +1,6 @@
-import type { APIRequestContext, Page } from '@playwright/test';
+import type { APIRequestContext, Page } from "@playwright/test";
 
-type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'fatal';
+type LogLevel = "debug" | "info" | "warn" | "error" | "fatal";
 
 const SEVERITY_NUMBER_BY_LEVEL: Record<LogLevel, number> = {
   debug: 5,
@@ -11,10 +11,10 @@ const SEVERITY_NUMBER_BY_LEVEL: Record<LogLevel, number> = {
 };
 
 function toOtlpAnyValue(value: unknown) {
-  if (typeof value === 'string') return { stringValue: value };
-  if (typeof value === 'boolean') return { boolValue: value };
-  if (typeof value === 'number') return { doubleValue: value };
-  if (value === null || value === undefined) return { stringValue: 'null' };
+  if (typeof value === "string") return { stringValue: value };
+  if (typeof value === "boolean") return { boolValue: value };
+  if (typeof value === "number") return { doubleValue: value };
+  if (value === null || value === undefined) return { stringValue: "null" };
   return { stringValue: JSON.stringify(value) };
 }
 
@@ -31,10 +31,10 @@ async function postOtlpLogs(
   apiKey: string,
   payload: unknown,
 ): Promise<void> {
-  const response = await request.post('/v1/logs', {
+  const response = await request.post("/v1/logs", {
     headers: {
       Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
     data: payload,
   });
@@ -65,7 +65,7 @@ export async function ingestOtlpLogs(
         {
           scopeLogs: [
             {
-              scope: { name: 'logwell-e2e' },
+              scope: { name: "logwell-e2e" },
               logRecords,
             },
           ],

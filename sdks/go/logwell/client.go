@@ -2,7 +2,9 @@ package logwell
 
 import (
 	"context"
+	"errors"
 	"sync"
+	"time"
 )
 
 // ErrClientShutdown is returned when attempting to log after shutdown.
@@ -21,6 +23,9 @@ type Client struct {
 
 	mu       sync.Mutex
 	shutdown bool
+
+	// flushWG tracks in-flight async flush goroutines so Shutdown can wait for them.
+	flushWG sync.WaitGroup
 }
 
 // ChildOption configures a child logger created via Client.Child().
@@ -72,7 +77,7 @@ func New(endpoint, apiKey string, opts ...Option) (*Client, error) {
 		return nil, err
 	}
 
-	transport := newHTTPTransport(endpoint, apiKey)
+	transport := newHTTPTransportFromConfig(cfg)
 
 	// Create client first so we can pass flush callback to queue
 	c := &Client{
@@ -181,6 +186,14 @@ func (c *Client) Log(entry LogEntry) {
 	}
 	c.mu.Unlock()
 
+	// Capture source location if enabled and not already set
+	if c.config.CaptureSourceLocation && entry.SourceFile == "" {
+		if file, line := captureSource(2); file != "" {
+			entry.SourceFile = file
+			entry.LineNumber = line
+		}
+	}
+
 	// Set defaults if not provided
 	if entry.Timestamp == "" {
 		entry.Timestamp = now()
@@ -191,14 +204,7 @@ func (c *Client) Log(entry LogEntry) {
 	// Merge config metadata with entry metadata
 	entry.Metadata = mergeMetadata(c.config.Metadata, entry.Metadata)
 
-	c.mu.Lock()
-	c.queue.add(entry)
-	shouldFlush := c.queue.size() >= c.config.BatchSize
-	c.mu.Unlock()
-
-	if shouldFlush {
-		c.flush()
-	}
+	c.enqueue(entry)
 }
 
 // log is the internal logging method used by all level methods.
@@ -225,13 +231,45 @@ func (c *Client) log(level LogLevel, message string, metadata ...map[string]any)
 		entry.SourceFile, entry.LineNumber = captureSource(3)
 	}
 
-	c.mu.Lock()
+	c.enqueue(entry)
+}
+
+// enqueue admits an entry into the shared root queue and, if the batch size is
+// reached, spawns an async flush. Admission and flush-goroutine spawning are
+// coordinated under the root's mutex and re-check the root's shutdown flag, so
+// once Shutdown begins no new entries are admitted and no new flush goroutines
+// are started (preventing races with flushWG.Wait()).
+func (c *Client) enqueue(entry LogEntry) {
+	root := c
+	if c.parent != nil {
+		root = c.parent
+	}
+
+	root.mu.Lock()
+	// Re-check the root's shutdown flag under the same lock that guards the
+	// enqueue and async-flush spawn. A child may still be active while the
+	// shared root is shutting down; reject admission in that case.
+	if root.shutdown {
+		root.mu.Unlock()
+		return
+	}
 	c.queue.add(entry)
 	shouldFlush := c.queue.size() >= c.config.BatchSize
-	c.mu.Unlock()
+	if shouldFlush {
+		// Register the in-flight flush while still holding root.mu so it is
+		// guaranteed to be observed by Shutdown's flushWG.Wait().
+		root.flushWG.Add(1)
+	}
+	root.mu.Unlock()
 
 	if shouldFlush {
-		c.flush()
+		go func() {
+			defer root.flushWG.Done()
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			// Flush handles OnError callback internally; ignore the returned error here.
+			_ = c.Flush(ctx)
+		}()
 	}
 }
 
@@ -255,7 +293,8 @@ func (c *Client) flush() {
 		// Re-queue failed entries at the front for retry
 		c.queue.prepend(entries)
 		if c.config.OnError != nil {
-			if logwellErr, ok := err.(*Error); ok {
+			var logwellErr *Error
+			if errors.As(err, &logwellErr) {
 				c.config.OnError(logwellErr)
 			} else {
 				c.config.OnError(NewErrorWithCause(ErrNetworkError, "flush failed", err))
@@ -287,7 +326,8 @@ func (c *Client) Flush(ctx context.Context) error {
 		// Re-queue failed entries at the front for retry
 		c.queue.prepend(entries)
 		if c.config.OnError != nil {
-			if logwellErr, ok := err.(*Error); ok {
+			var logwellErr *Error
+			if errors.As(err, &logwellErr) {
 				c.config.OnError(logwellErr)
 			} else {
 				c.config.OnError(NewErrorWithCause(ErrNetworkError, "flush failed", err))
@@ -307,7 +347,8 @@ func (c *Client) Flush(ctx context.Context) error {
 // It stops accepting new logs, flushes any remaining queued logs,
 // and cleans up resources.
 // Respects context cancellation and timeout.
-// Returns any error from flushing remaining logs.
+// Returns any error from flushing remaining logs. A non-nil error
+// means that some logs may not have been delivered to the server.
 //
 // For child loggers, Shutdown only marks the child as shut down;
 // it does NOT affect the parent or other children. The parent must
@@ -330,6 +371,20 @@ func (c *Client) Shutdown(ctx context.Context) error {
 	// Stop the queue timer to prevent further auto-flushes
 	c.queue.stopTimer()
 
+	// Wait for any in-flight async flush goroutines to complete, but respect
+	// context cancellation/timeout so Shutdown does not block uninterruptibly.
+	done := make(chan struct{})
+	go func() {
+		c.flushWG.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+		// All in-flight flushes completed.
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+
 	// Flush remaining logs with context
 	return c.Flush(ctx)
 }
@@ -339,6 +394,24 @@ func (c *Client) Shutdown(ctx context.Context) error {
 func mergeMetadata(maps ...map[string]any) map[string]any {
 	if len(maps) == 0 {
 		return nil
+	}
+
+	// Fast-path: single non-empty map. Clone it rather than returning the
+	// caller's reference, to avoid aliasing/concurrent map access when the
+	// entry is later JSON-marshaled.
+	if len(maps) == 1 {
+		if len(maps[0]) == 0 {
+			return nil
+		}
+		return cloneMetadata(maps[0])
+	}
+
+	// Fast-path: two maps where the second (extra) is empty.
+	if len(maps) == 2 && len(maps[1]) == 0 {
+		if len(maps[0]) == 0 {
+			return nil
+		}
+		return cloneMetadata(maps[0])
 	}
 
 	result := make(map[string]any)
@@ -353,4 +426,13 @@ func mergeMetadata(maps ...map[string]any) map[string]any {
 	}
 
 	return result
+}
+
+// cloneMetadata returns a shallow copy of m. m must be non-empty.
+func cloneMetadata(m map[string]any) map[string]any {
+	clone := make(map[string]any, len(m))
+	for k, v := range m {
+		clone[k] = v
+	}
+	return clone
 }

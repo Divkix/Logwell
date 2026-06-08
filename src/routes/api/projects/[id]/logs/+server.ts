@@ -1,16 +1,17 @@
-import { json } from '@sveltejs/kit';
-import { and, count, desc, eq, gte, inArray, lt, lte, or, type SQL, sql } from 'drizzle-orm';
-import { getDbClient } from '$lib/server/db/db';
-import { log } from '$lib/server/db/schema';
-import { decodeCursor, encodeCursor } from '$lib/server/utils/cursor';
-import { isErrorResponse, requireProjectOwnership } from '$lib/server/utils/project-guard';
-import { buildSearchQuery } from '$lib/server/utils/search';
-import { LOG_LEVELS, type LogLevel } from '$lib/shared/types';
-import type { RequestEvent } from './$types';
+import { json } from "@sveltejs/kit";
+import { and, count, desc, eq, gte, inArray, lt, lte, or, type SQL, sql } from "drizzle-orm";
+import { getDbClient } from "$lib/server/db/db";
+import { log } from "$lib/server/db/schema";
+import { apiError } from "$lib/server/utils/api-error";
+import { decodeCursor, encodeCursor } from "$lib/server/utils/cursor";
+import { isErrorResponse, requireProjectOwnership } from "$lib/server/utils/project-guard";
+import { buildSearchQuery } from "$lib/server/utils/search";
+import { LOG_LEVELS, type LogLevel } from "$lib/shared/types";
+import type { RequestEvent } from "./$types";
 
 // Constants for pagination limits
 const DEFAULT_LIMIT = 100;
-const MIN_LIMIT = 100;
+const MIN_LIMIT = 1;
 const MAX_LIMIT = 500;
 
 /**
@@ -28,7 +29,7 @@ function parseLevelFilter(levelParam: string | null): LogLevel[] | null {
   if (!levelParam) return null;
 
   const levels = levelParam
-    .split(',')
+    .split(",")
     .map((l) => l.trim().toLowerCase())
     .filter((l): l is LogLevel => LOG_LEVELS.includes(l as LogLevel));
 
@@ -73,13 +74,13 @@ export async function GET(event: RequestEvent): Promise<Response> {
 
   // Parse query parameters
   const url = event.url;
-  const limitParam = url.searchParams.get('limit');
-  const offsetParam = url.searchParams.get('offset');
-  const cursorParam = url.searchParams.get('cursor');
-  const levelParam = url.searchParams.get('level');
-  const searchParam = url.searchParams.get('search');
-  const fromParam = url.searchParams.get('from');
-  const toParam = url.searchParams.get('to');
+  const limitParam = url.searchParams.get("limit");
+  const offsetParam = url.searchParams.get("offset");
+  const cursorParam = url.searchParams.get("cursor");
+  const levelParam = url.searchParams.get("level");
+  const searchParam = url.searchParams.get("search");
+  const fromParam = url.searchParams.get("from");
+  const toParam = url.searchParams.get("to");
 
   // Parse and clamp limit
   const limit = clamp(
@@ -115,12 +116,10 @@ export async function GET(event: RequestEvent): Promise<Response> {
         ) as SQL,
       );
     } catch (error) {
-      return json(
-        {
-          code: 'invalid_cursor',
-          message: error instanceof Error ? error.message : 'Invalid cursor',
-        },
-        { status: 400 },
+      return apiError(
+        400,
+        "invalid_cursor",
+        error instanceof Error ? error.message : "Invalid cursor",
       );
     }
   }
@@ -148,10 +147,10 @@ export async function GET(event: RequestEvent): Promise<Response> {
 
   const whereClause = and(...conditions);
 
-  // Get total count (for pagination info)
-  const [countResult] = await db.select({ count: count() }).from(log).where(whereClause);
-
-  const total = countResult?.count ?? 0;
+  // Skip COUNT(*) when a cursor is provided (subsequent pages); saves a DB round-trip
+  const total = cursorParam
+    ? undefined
+    : ((await db.select({ count: count() }).from(log).where(whereClause))[0]?.count ?? 0);
 
   // Fetch logs with pagination (query one extra to detect hasMore)
   const logs = await db
@@ -186,10 +185,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
   // Compute next cursor if there are more logs
   const nextCursor =
     hasMore && logsToReturn.length > 0
-      ? encodeCursor(
-          logsToReturn[logsToReturn.length - 1].timestamp as Date,
-          logsToReturn[logsToReturn.length - 1].id,
-        )
+      ? encodeCursor(logsToReturn.at(-1)!.timestamp as Date, logsToReturn.at(-1)!.id)
       : null;
 
   return json({
@@ -197,7 +193,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
       ...l,
       timestamp: l.timestamp?.toISOString(),
     })),
-    total,
+    total: total ?? null,
     has_more: hasMore,
     nextCursor,
   });

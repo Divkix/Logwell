@@ -1,94 +1,94 @@
-import { describe, expect, it } from 'vitest';
-import { projectCreatePayloadSchema, projectUpdatePayloadSchema } from './project';
+import { describe, expect, it } from "vite-plus/test";
+import { projectCreatePayloadSchema, projectUpdatePayloadSchema } from "./project";
 
-describe('projectCreatePayloadSchema', () => {
-  it('should accept valid project name', () => {
+describe("projectCreatePayloadSchema", () => {
+  it("should accept valid project name", () => {
     const payload = {
-      name: 'my-project',
+      name: "my-project",
     };
 
     const result = projectCreatePayloadSchema.safeParse(payload);
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.name).toBe('my-project');
+      expect(result.data.name).toBe("my-project");
     }
   });
 
-  it('should reject empty project name', () => {
+  it("should reject empty project name", () => {
     const payload = {
-      name: '',
+      name: "",
     };
 
     const result = projectCreatePayloadSchema.safeParse(payload);
     expect(result.success).toBe(false);
   });
 
-  it('should reject project name over 50 characters', () => {
+  it("should reject project name over 50 characters", () => {
     const payload = {
-      name: 'a'.repeat(51),
+      name: "a".repeat(51),
     };
 
     const result = projectCreatePayloadSchema.safeParse(payload);
     expect(result.success).toBe(false);
   });
 
-  it('should accept project name with hyphens', () => {
+  it("should accept project name with hyphens", () => {
     const payload = {
-      name: 'my-awesome-project',
+      name: "my-awesome-project",
     };
 
     const result = projectCreatePayloadSchema.safeParse(payload);
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.name).toBe('my-awesome-project');
+      expect(result.data.name).toBe("my-awesome-project");
     }
   });
 
-  it('should accept project name with underscores', () => {
+  it("should accept project name with underscores", () => {
     const payload = {
-      name: 'my_awesome_project',
+      name: "my_awesome_project",
     };
 
     const result = projectCreatePayloadSchema.safeParse(payload);
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.name).toBe('my_awesome_project');
+      expect(result.data.name).toBe("my_awesome_project");
     }
   });
 
-  it('should reject project name with special characters', () => {
+  it("should reject project name with special characters", () => {
     const payload = {
-      name: 'my-project@123',
+      name: "my-project@123",
     };
 
     const result = projectCreatePayloadSchema.safeParse(payload);
     expect(result.success).toBe(false);
   });
 
-  it('should reject project name with spaces', () => {
+  it("should reject project name with spaces", () => {
     const payload = {
-      name: 'my project',
+      name: "my project",
     };
 
     const result = projectCreatePayloadSchema.safeParse(payload);
     expect(result.success).toBe(false);
   });
 
-  it('should accept single character project name', () => {
+  it("should accept single character project name", () => {
     const payload = {
-      name: 'a',
+      name: "a",
     };
 
     const result = projectCreatePayloadSchema.safeParse(payload);
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.name).toBe('a');
+      expect(result.data.name).toBe("a");
     }
   });
 
-  it('should accept project name with exactly 50 characters', () => {
+  it("should accept project name with exactly 50 characters", () => {
     const payload = {
-      name: 'a'.repeat(50),
+      name: "a".repeat(50),
     };
 
     const result = projectCreatePayloadSchema.safeParse(payload);
@@ -98,21 +98,21 @@ describe('projectCreatePayloadSchema', () => {
     }
   });
 
-  it('should accept alphanumeric project name', () => {
+  it("should accept alphanumeric project name", () => {
     const payload = {
-      name: 'project123',
+      name: "project123",
     };
 
     const result = projectCreatePayloadSchema.safeParse(payload);
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.name).toBe('project123');
+      expect(result.data.name).toBe("project123");
     }
   });
 });
 
-describe('projectUpdatePayloadSchema with retentionDays', () => {
-  it('should accept null (system default)', () => {
+describe("projectUpdatePayloadSchema with retentionDays", () => {
+  it("should accept null (system default)", () => {
     const payload = {
       retentionDays: null,
     };
@@ -124,7 +124,7 @@ describe('projectUpdatePayloadSchema with retentionDays', () => {
     }
   });
 
-  it('should accept 0 (never delete)', () => {
+  it("should accept 0 (never delete)", () => {
     const payload = {
       retentionDays: 0,
     };
@@ -136,7 +136,7 @@ describe('projectUpdatePayloadSchema with retentionDays', () => {
     }
   });
 
-  it('should accept positive integers 1-3650', () => {
+  it("should accept positive integers 1-3650", () => {
     const testCases = [1, 30, 365, 1000, 3650];
 
     for (const days of testCases) {
@@ -152,7 +152,7 @@ describe('projectUpdatePayloadSchema with retentionDays', () => {
     }
   });
 
-  it('should reject negative numbers', () => {
+  it("should reject negative numbers", () => {
     const payload = {
       retentionDays: -1,
     };
@@ -161,7 +161,7 @@ describe('projectUpdatePayloadSchema with retentionDays', () => {
     expect(result.success).toBe(false);
   });
 
-  it('should reject non-integers (e.g., 3.5)', () => {
+  it("should reject non-integers (e.g., 3.5)", () => {
     const payload = {
       retentionDays: 3.5,
     };
@@ -170,7 +170,7 @@ describe('projectUpdatePayloadSchema with retentionDays', () => {
     expect(result.success).toBe(false);
   });
 
-  it('should reject values > 3650', () => {
+  it("should reject values > 3650", () => {
     const payload = {
       retentionDays: 3651,
     };
@@ -179,9 +179,9 @@ describe('projectUpdatePayloadSchema with retentionDays', () => {
     expect(result.success).toBe(false);
   });
 
-  it('should allow omitting retentionDays (optional field)', () => {
+  it("should allow omitting retentionDays (optional field)", () => {
     const payload = {
-      name: 'updated-project',
+      name: "updated-project",
     };
 
     const result = projectUpdatePayloadSchema.safeParse(payload);
@@ -191,16 +191,16 @@ describe('projectUpdatePayloadSchema with retentionDays', () => {
     }
   });
 
-  it('should allow both name and retentionDays together', () => {
+  it("should allow both name and retentionDays together", () => {
     const payload = {
-      name: 'updated-project',
+      name: "updated-project",
       retentionDays: 30,
     };
 
     const result = projectUpdatePayloadSchema.safeParse(payload);
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.name).toBe('updated-project');
+      expect(result.data.name).toBe("updated-project");
       expect(result.data.retentionDays).toBe(30);
     }
   });

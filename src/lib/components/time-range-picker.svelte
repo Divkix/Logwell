@@ -1,18 +1,11 @@
 <script lang="ts" module>
-export type TimeRange = '15m' | '1h' | '24h' | '7d';
-
-export const TIME_RANGES: readonly TimeRange[] = ['15m', '1h', '24h', '7d'] as const;
-
-export const TIME_RANGE_LABELS: Record<TimeRange, string> = {
-  '15m': 'Last 15 minutes',
-  '1h': 'Last hour',
-  '24h': 'Last 24 hours',
-  '7d': 'Last 7 days',
-};
+export type { TimeRange } from '$lib/utils/time-range';
+export { TIME_RANGES, TIME_RANGE_LABELS } from '$lib/utils/time-range';
 </script>
 
 <script lang="ts">
 import { Button } from '$lib/components/ui/button/index.js';
+import { TIME_RANGE_LABELS, TIME_RANGES, type TimeRange } from '$lib/utils/time-range';
 
 interface Props {
   value?: TimeRange;

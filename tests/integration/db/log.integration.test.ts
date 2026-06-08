@@ -1,13 +1,13 @@
-import { eq } from 'drizzle-orm';
-import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import { nanoid } from 'nanoid';
-import { beforeEach, describe, expect, it } from 'vitest';
-import type * as schema from '../../../src/lib/server/db/schema';
-import { log, project } from '../../../src/lib/server/db/schema';
-import { setupTestDatabase } from '../../../src/lib/server/db/test-db';
-import { createLogFactory, seedProject } from '../../fixtures/db';
+import { eq } from "drizzle-orm";
+import type { PgliteDatabase } from "drizzle-orm/pglite";
+import { nanoid } from "nanoid";
+import { beforeEach, describe, expect, it } from "vite-plus/test";
+import type * as schema from "../../../src/lib/server/db/schema";
+import { log, project } from "../../../src/lib/server/db/schema";
+import { setupTestDatabase } from "../../../src/lib/server/db/test-db";
+import { createLogFactory, seedProject } from "../../fixtures/db";
 
-describe('Log Table Schema', () => {
+describe("Log Table Schema", () => {
   let db: PgliteDatabase<typeof schema>;
 
   beforeEach(async () => {
@@ -15,7 +15,7 @@ describe('Log Table Schema', () => {
     db = setup.db;
   });
 
-  it('should insert log entry with all fields', async () => {
+  it("should insert log entry with all fields", async () => {
     // Create project first
     const testProject = await seedProject(db);
 
@@ -23,33 +23,33 @@ describe('Log Table Schema', () => {
     const logData = {
       id: logId,
       projectId: testProject.id,
-      level: 'error' as const,
-      message: 'Test error message',
-      metadata: { userId: '123', action: 'login' },
-      sourceFile: 'auth.service.ts',
+      level: "error" as const,
+      message: "Test error message",
+      metadata: { userId: "123", action: "login" },
+      sourceFile: "auth.service.ts",
       lineNumber: 42,
-      requestId: 'req_123',
-      userId: 'user_456',
-      ipAddress: '192.168.1.1',
+      requestId: "req_123",
+      userId: "user_456",
+      ipAddress: "192.168.1.1",
     };
 
     const [createdLog] = await db.insert(log).values(logData).returning();
 
     expect(createdLog).toBeDefined();
-    expect(createdLog.id).toBe(logId);
-    expect(createdLog.projectId).toBe(testProject.id);
-    expect(createdLog.level).toBe('error');
-    expect(createdLog.message).toBe('Test error message');
-    expect(createdLog.metadata).toEqual({ userId: '123', action: 'login' });
-    expect(createdLog.sourceFile).toBe('auth.service.ts');
-    expect(createdLog.lineNumber).toBe(42);
-    expect(createdLog.requestId).toBe('req_123');
-    expect(createdLog.userId).toBe('user_456');
-    expect(createdLog.ipAddress).toBe('192.168.1.1');
-    expect(createdLog.timestamp).toBeInstanceOf(Date);
+    expect(createdLog!.id).toBe(logId);
+    expect(createdLog!.projectId).toBe(testProject.id);
+    expect(createdLog!.level).toBe("error");
+    expect(createdLog!.message).toBe("Test error message");
+    expect(createdLog!.metadata).toEqual({ userId: "123", action: "login" });
+    expect(createdLog!.sourceFile).toBe("auth.service.ts");
+    expect(createdLog!.lineNumber).toBe(42);
+    expect(createdLog!.requestId).toBe("req_123");
+    expect(createdLog!.userId).toBe("user_456");
+    expect(createdLog!.ipAddress).toBe("192.168.1.1");
+    expect(createdLog!.timestamp).toBeInstanceOf(Date);
   });
 
-  it('should cascade delete logs when project deleted', async () => {
+  it("should cascade delete logs when project deleted", async () => {
     // Create project
     const testProject = await seedProject(db);
 
@@ -72,7 +72,7 @@ describe('Log Table Schema', () => {
     expect(logsAfter).toHaveLength(0);
   });
 
-  it('should search logs by message content', async () => {
+  it("should search logs by message content", async () => {
     // Create project
     const testProject = await seedProject(db);
 
@@ -80,19 +80,19 @@ describe('Log Table Schema', () => {
     const logs = [
       createLogFactory({
         projectId: testProject.id,
-        message: 'User authentication failed',
+        message: "User authentication failed",
       }),
       createLogFactory({
         projectId: testProject.id,
-        message: 'Database connection successful',
+        message: "Database connection successful",
       }),
       createLogFactory({
         projectId: testProject.id,
-        message: 'User authentication successful',
+        message: "User authentication successful",
       }),
       createLogFactory({
         projectId: testProject.id,
-        message: 'Invalid API key provided',
+        message: "Invalid API key provided",
       }),
     ];
 
@@ -107,11 +107,11 @@ describe('Log Table Schema', () => {
     );
 
     expect(searchResults.rows).toHaveLength(2);
-    expect(searchResults.rows[0].message).toBe('User authentication failed');
-    expect(searchResults.rows[1].message).toBe('User authentication successful');
+    expect(searchResults.rows[0]!.message).toBe("User authentication failed");
+    expect(searchResults.rows[1]!.message).toBe("User authentication successful");
   });
 
-  it('should search logs by metadata content', async () => {
+  it("should search logs by metadata content", async () => {
     // Create project
     const testProject = await seedProject(db);
 
@@ -119,23 +119,23 @@ describe('Log Table Schema', () => {
     const logs = [
       createLogFactory({
         projectId: testProject.id,
-        message: 'User event',
-        metadata: { action: 'login', email: 'user@example.com' },
+        message: "User event",
+        metadata: { action: "login", email: "user@example.com" },
       }),
       createLogFactory({
         projectId: testProject.id,
-        message: 'User event',
-        metadata: { action: 'logout', email: 'admin@example.com' },
+        message: "User event",
+        metadata: { action: "logout", email: "admin@example.com" },
       }),
       createLogFactory({
         projectId: testProject.id,
-        message: 'User event',
-        metadata: { action: 'login', email: 'test@example.com' },
+        message: "User event",
+        metadata: { action: "login", email: "test@example.com" },
       }),
       createLogFactory({
         projectId: testProject.id,
-        message: 'System event',
-        metadata: { action: 'restart' },
+        message: "System event",
+        metadata: { action: "restart" },
       }),
     ];
 
@@ -152,7 +152,7 @@ describe('Log Table Schema', () => {
     // Verify the results contain login action
     const metadataWithLogin = searchResults.rows.filter((row) => {
       const meta = row.metadata as { action?: string };
-      return meta.action === 'login';
+      return meta.action === "login";
     });
     expect(metadataWithLogin).toHaveLength(2);
   });

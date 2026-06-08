@@ -1,10 +1,10 @@
-import { z } from 'zod';
-import { LOG_LEVELS, type LogLevel } from './log';
+import { z } from "zod";
+import type { LogLevel } from "./log";
 
 /**
  * Valid incident status values.
  */
-export const INCIDENT_STATUSES = ['open', 'resolved'] as const;
+export const INCIDENT_STATUSES = ["open", "resolved"] as const;
 
 const incidentStatusSchema = z.enum(INCIDENT_STATUSES);
 
@@ -16,7 +16,7 @@ export type IncidentStatus = z.infer<typeof incidentStatusSchema>;
 /**
  * Supported incident range filters.
  */
-export const INCIDENT_RANGES = ['15m', '1h', '24h', '7d'] as const;
+export const INCIDENT_RANGES = ["15m", "1h", "24h", "7d"] as const;
 
 const incidentRangeSchema = z.enum(INCIDENT_RANGES);
 
@@ -78,7 +78,7 @@ export interface IncidentTimelineResponse {
   peakBucket: IncidentTimelinePoint | null;
 }
 
-const INCIDENT_GROUPED_LEVELS: readonly LogLevel[] = ['error', 'fatal'] as const;
+const INCIDENT_GROUPED_LEVELS: readonly LogLevel[] = ["error", "fatal"] as const;
 
 /**
  * Type guard for grouped levels.
@@ -106,6 +106,3 @@ const LEVEL_RANK: Record<LogLevel, number> = {
 export function maxIncidentLevel(a: LogLevel, b: LogLevel): LogLevel {
   return LEVEL_RANK[a] >= LEVEL_RANK[b] ? a : b;
 }
-
-// Preserve runtime reference to LOG_LEVELS so bundlers keep a single source of truth.
-void LOG_LEVELS;

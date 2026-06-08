@@ -15,9 +15,10 @@ interface Props {
   onLogClick?: (log: Log) => void;
   class?: string;
   newLogIds?: Set<string>;
-  project?: { apiKey: string };
+  project?: { apiKeyHash: string };
   appUrl?: string;
   selectedIndex?: number;
+  selectedId?: string | null;
 }
 
 const {
@@ -30,6 +31,7 @@ const {
   project,
   appUrl,
   selectedIndex = -1,
+  selectedId = null,
 }: Props = $props();
 
 // Show quick start empty state when no filters and project/appUrl provided
@@ -112,7 +114,7 @@ const sortedLogs = $derived.by(() => {
       {/each}
     {:else if sortedLogs.length === 0}
       {#if showQuickstartEmptyState && project && appUrl}
-        <EmptyStateQuickstart apiKey={project.apiKey} baseUrl={appUrl} />
+        <EmptyStateQuickstart baseUrl={appUrl} />
       {:else}
         <div data-testid={emptyStateTestId} class="text-center py-8 text-muted-foreground">
           {emptyStateMessage}
@@ -120,7 +122,7 @@ const sortedLogs = $derived.by(() => {
       {/if}
     {:else}
       {#each sortedLogs as log, i (log.id)}
-        <LogCard {log} onclick={onLogClick} isNew={newLogIds?.has(log.id)} isSelected={i === selectedIndex} />
+        <LogCard {log} onclick={onLogClick} isNew={newLogIds?.has(log.id)} isSelected={selectedId != null ? log.id === selectedId : i === selectedIndex} />
       {/each}
     {/if}
   </div>
@@ -207,7 +209,7 @@ const sortedLogs = $derived.by(() => {
         {#if showQuickstartEmptyState && project && appUrl}
           <tr>
             <td colspan="3">
-              <EmptyStateQuickstart apiKey={project.apiKey} baseUrl={appUrl} />
+              <EmptyStateQuickstart baseUrl={appUrl} />
             </td>
           </tr>
         {:else}
@@ -219,7 +221,7 @@ const sortedLogs = $derived.by(() => {
         {/if}
       {:else}
         {#each sortedLogs as log, i (log.id)}
-          <LogRow {log} onclick={onLogClick} isNew={newLogIds?.has(log.id)} isSelected={i === selectedIndex} />
+          <LogRow {log} onclick={onLogClick} isNew={newLogIds?.has(log.id)} isSelected={selectedId != null ? log.id === selectedId : i === selectedIndex} />
         {/each}
       {/if}
     </tbody>

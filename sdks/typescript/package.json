@@ -1,14 +1,18 @@
 {
   "name": "logwell",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Official TypeScript SDK for Logwell logging platform",
   "keywords": [
     "logging",
     "logs",
-    "observability",
     "logwell",
+    "observability",
     "typescript"
   ],
+  "homepage": "https://github.com/Divkix/Logwell/tree/main/sdks/typescript#readme",
+  "bugs": {
+    "url": "https://github.com/Divkix/Logwell/issues"
+  },
   "license": "MIT",
   "author": "Logwell",
   "repository": {
@@ -16,11 +20,13 @@
     "url": "https://github.com/Divkix/Logwell",
     "directory": "sdks/typescript"
   },
-  "homepage": "https://github.com/Divkix/Logwell/tree/main/sdks/typescript#readme",
-  "bugs": {
-    "url": "https://github.com/Divkix/Logwell/issues"
-  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "type": "module",
+  "sideEffects": false,
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -37,45 +43,44 @@
     },
     "./package.json": "./package.json"
   },
-  "files": [
-    "dist",
-    "README.md",
-    "LICENSE"
-  ],
-  "sideEffects": false,
-  "engines": {
-    "node": ">=18.0.0"
-  },
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "check": "tsc --noEmit",
-    "lint": "biome check .",
-    "lint:fix": "biome check --write .",
-    "test": "vitest run",
-    "test:unit": "vitest run tests/unit/",
-    "test:integration": "vitest run tests/integration/",
-    "test:coverage": "vitest run --coverage",
-    "test:watch": "vitest --watch",
+    "check": "vp check",
+    "lint": "vp check",
+    "lint:fix": "vp check --fix",
+    "test": "vp test run",
+    "test:unit": "vp test run tests/unit/",
+    "test:integration": "vp test run tests/integration/",
+    "test:coverage": "vp test run --coverage",
+    "test:watch": "vp test",
     "prepublishOnly": "bun run build",
     "size": "size-limit",
     "attw": "attw --pack ."
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.2",
-    "@biomejs/biome": "^2.4.15",
     "@size-limit/preset-small-lib": "^12.1.0",
     "@vitest/coverage-v8": "^4.1.6",
     "msw": "^2.14.6",
     "size-limit": "^12.1.0",
     "tsup": "^8.5.1",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.6"
+    "vite": "npm:@voidzero-dev/vite-plus-core@latest",
+    "vite-plus": "latest",
+    "vitest": "npm:@voidzero-dev/vite-plus-test@latest"
+  },
+  "overrides": {
+    "vite": "npm:@voidzero-dev/vite-plus-core@latest",
+    "vitest": "npm:@voidzero-dev/vite-plus-test@latest"
   },
   "size-limit": [
     {
       "path": "./dist/index.js",
       "limit": "10 KB"
     }
-  ]
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  }
 }

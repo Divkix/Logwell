@@ -9,12 +9,16 @@
  * Encodes a cursor from timestamp and ID
  * Format: base64url(timestamp_id)
  *
- * @param timestamp - The log timestamp
+ * @param timestamp - The log timestamp (must not be null)
  * @param id - The log ID
  * @returns Base64url-encoded cursor string
+ * @throws Error if timestamp is null or undefined
  */
-export function encodeCursor(timestamp: Date, id: string): string {
-  return Buffer.from(`${timestamp.toISOString()}_${id}`).toString('base64url');
+export function encodeCursor(timestamp: Date | null | undefined, id: string): string {
+  if (!timestamp) {
+    throw new Error("Cannot encode cursor for log without timestamp");
+  }
+  return Buffer.from(`${timestamp.toISOString()}_${id}`).toString("base64url");
 }
 
 /**
@@ -26,14 +30,14 @@ export function encodeCursor(timestamp: Date, id: string): string {
  */
 export function decodeCursor(cursor: string): { timestamp: Date; id: string } {
   try {
-    const decoded = Buffer.from(cursor, 'base64url').toString('utf-8');
+    const decoded = Buffer.from(cursor, "base64url").toString("utf-8");
 
     // ISO 8601 timestamps always end with 'Z', so find the 'Z_' pattern
     // This handles IDs that may contain underscores
-    const separatorIndex = decoded.indexOf('Z_');
+    const separatorIndex = decoded.indexOf("Z_");
 
     if (separatorIndex === -1) {
-      throw new Error('Invalid cursor format: missing separator');
+      throw new Error("Invalid cursor format: missing separator");
     }
 
     // Include the 'Z' in the timestamp
@@ -41,19 +45,19 @@ export function decodeCursor(cursor: string): { timestamp: Date; id: string } {
     const id = decoded.substring(separatorIndex + 2); // Skip 'Z_'
 
     if (!timestampStr || !id) {
-      throw new Error('Invalid cursor format: empty timestamp or id');
+      throw new Error("Invalid cursor format: empty timestamp or id");
     }
 
     const timestamp = new Date(timestampStr);
     if (Number.isNaN(timestamp.getTime())) {
-      throw new Error('Invalid cursor format: invalid timestamp');
+      throw new Error("Invalid cursor format: invalid timestamp");
     }
 
     return { timestamp, id };
   } catch (error) {
-    if (error instanceof Error && error.message.startsWith('Invalid cursor')) {
+    if (error instanceof Error && error.message.startsWith("Invalid cursor")) {
       throw error;
     }
-    throw new Error('Invalid cursor');
+    throw new Error("Invalid cursor");
   }
 }

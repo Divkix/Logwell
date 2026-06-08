@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import random
+from contextlib import suppress
 from typing import TYPE_CHECKING, Any
 
 import httpx
@@ -47,6 +48,7 @@ class TransportConfig:
             endpoint=config["endpoint"],
             api_key=config["api_key"],
             max_retries=config.get("max_retries", 3),
+            timeout=config.get("timeout", 30.0),
         )
 
 
@@ -84,7 +86,8 @@ class HttpTransport:
         else:
             self._config = TransportConfig.from_logwell_config(config)
 
-        self._ingest_url = f"{self._config.endpoint}/v1/ingest"
+        # Strip trailing slash to avoid double-slash in URL (PY-11)
+        self._ingest_url = f"{self._config.endpoint.rstrip('/')}/v1/ingest"
         self._client: httpx.AsyncClient | None = None
 
     async def _get_client(self) -> httpx.AsyncClient:
@@ -131,7 +134,12 @@ class HttpTransport:
 
                 # Don't delay after the last attempt
                 if attempt < self._config.max_retries:
-                    await _delay(attempt)
+                    # Honor Retry-After header for 429 responses (PY-14)
+                    retry_after = getattr(error, "retry_after", None)
+                    if retry_after is not None:
+                        await asyncio.sleep(retry_after)
+                    else:
+                        await _delay(attempt)
 
         raise last_error
 
@@ -178,10 +186,13 @@ class HttpTransport:
         # Handle error responses
         if not response.is_success:
             error_body = self._try_parse_error(response)
-            raise self._create_error(response.status_code, error_body)
+            raise self._create_error(response.status_code, error_body, response)
 
-        # Parse successful response
-        data: IngestResponse = response.json()
+        # Parse successful response, guarding against non-JSON bodies (PY-7)
+        try:
+            data: IngestResponse = response.json()
+        except Exception:
+            data = {"accepted": len(logs), "rejected": 0, "errors": []}
         return data
 
     def _try_parse_error(self, response: httpx.Response) -> str:
@@ -199,12 +210,15 @@ class HttpTransport:
         except Exception:
             return f"HTTP {response.status_code}"
 
-    def _create_error(self, status: int, message: str) -> LogwellError:
+    def _create_error(
+        self, status: int, message: str, response: httpx.Response | None = None
+    ) -> LogwellError:
         """Create appropriate LogwellError based on status code.
 
         Args:
             status: HTTP status code
             message: Error message
+            response: Optional response for header inspection
 
         Returns:
             LogwellError with appropriate code and retryable flag
@@ -228,7 +242,7 @@ class HttpTransport:
                 False,
             )
         elif status == 429:
-            return LogwellError(
+            err = LogwellError(
                 f"Rate limit exceeded (429): {message}. "
                 "Too many requests sent to the server. The SDK will automatically "
                 "retry with exponential backoff.",
@@ -236,6 +250,13 @@ class HttpTransport:
                 status,
                 True,
             )
+            # Parse Retry-After header (PY-14)
+            if response is not None:
+                retry_after_header = response.headers.get("Retry-After")
+                if retry_after_header:
+                    with suppress(ValueError):
+                        err.retry_after = float(retry_after_header)  # type: ignore[attr-defined]
+            return err
         elif status >= 500:
             return LogwellError(
                 f"Server error ({status}): {message}. "

@@ -1,11 +1,11 @@
-import { json } from '@sveltejs/kit';
-import { eq } from 'drizzle-orm';
-import { getDbClient } from '$lib/server/db/db';
-import { project } from '$lib/server/db/schema';
-import { generateApiKey, invalidateApiKeyCache } from '$lib/server/utils/api-key';
-import { checkCsrfOrigin } from '$lib/server/utils/csrf';
-import { isErrorResponse, requireProjectOwnership } from '$lib/server/utils/project-guard';
-import type { RequestEvent } from './$types';
+import { json } from "@sveltejs/kit";
+import { eq } from "drizzle-orm";
+import { getDbClient } from "$lib/server/db/db";
+import { project } from "$lib/server/db/schema";
+import { generateApiKey, hashApiKey, invalidateApiKeyCacheByHash } from "$lib/server/utils/api-key";
+import { checkCsrfOrigin } from "$lib/server/utils/csrf";
+import { isErrorResponse, requireProjectOwnership } from "$lib/server/utils/project-guard";
+import type { RequestEvent } from "./$types";
 
 /**
  * POST /api/projects/[id]/regenerate
@@ -35,20 +35,21 @@ export async function POST(event: RequestEvent): Promise<Response> {
   const db = await getDbClient(event.locals);
   const projectId = event.params.id;
 
-  // Generate new API key
+  // Generate new API key. Only the hash is persisted; the plaintext key is
+  // returned once below and cannot be retrieved later.
   const newApiKey = generateApiKey();
 
-  // Update project with new API key
+  // Update project with the new API key hash
   await db
     .update(project)
     .set({
-      apiKey: newApiKey,
+      apiKeyHash: hashApiKey(newApiKey),
       updatedAt: new Date(),
     })
     .where(eq(project.id, projectId));
 
-  // Invalidate old API key cache
-  invalidateApiKeyCache(projectData.apiKey);
+  // Invalidate the old API key's cache entry by its stored hash
+  invalidateApiKeyCacheByHash(projectData.apiKeyHash);
 
   return json({
     apiKey: newApiKey,

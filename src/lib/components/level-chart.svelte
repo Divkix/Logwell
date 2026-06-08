@@ -147,8 +147,16 @@ function formatPercentage(value: number): string {
       >
         {#each segments as segment}
           <g data-testid="chart-segment-{segment.level}" fill={segment.color}>
-            {#each segment.paths as path}
-              <path d={path} />
+            {#each segment.paths as path, pi}
+              <path
+                d={path}
+                aria-label="{segment.level}: {data.levelCounts[segment.level]} ({formatPercentage(data.levelPercentages[segment.level] ?? 0)}%)"
+                role="img"
+              >
+                {#if pi === 0}
+                  <title>{segment.level}: {data.levelCounts[segment.level]} ({formatPercentage(data.levelPercentages[segment.level] ?? 0)}%)</title>
+                {/if}
+              </path>
             {/each}
           </g>
         {/each}

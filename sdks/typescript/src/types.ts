@@ -1,7 +1,7 @@
 /**
  * Valid log levels matching Logwell server
  */
-export type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'fatal';
+export type LogLevel = "debug" | "info" | "warn" | "error" | "fatal";
 
 /**
  * Single log entry for the simple API
@@ -36,6 +36,8 @@ export interface LogwellConfig {
   maxQueueSize?: number;
   /** Max retry attempts (default: 3) */
   maxRetries?: number;
+  /** Request timeout in milliseconds (default: 30000) */
+  timeout?: number;
   /** Capture source file and line number (default: false). Has performance overhead when enabled. */
   captureSourceLocation?: boolean;
   /** Called on send failures */

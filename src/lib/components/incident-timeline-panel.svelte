@@ -64,6 +64,12 @@ const maxBucketCount = $derived(
         <p>Total events: <span class="font-medium text-foreground">{detail.totalEvents.toLocaleString()}</span></p>
       </div>
 
+      {#if timeline}
+        <span class="sr-only">
+          Timeline: {timeline.buckets.reduce((sum, b) => sum + b.count, 0)} events{timeline.peakBucket ? `, peak at ${timeline.peakBucket.timestamp}` : ''}.
+        </span>
+      {/if}
+
       <section class="space-y-2">
         <h4 class="text-sm font-medium">Volume Over Time</h4>
         {#if timeline}

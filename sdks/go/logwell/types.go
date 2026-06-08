@@ -53,7 +53,7 @@ type IngestResponse struct {
 	Errors []string `json:"errors,omitempty"`
 }
 
-// Now returns the current time formatted as ISO8601.
+// now returns the current time formatted as ISO8601.
 // Used internally for timestamp generation.
 func now() string {
 	return time.Now().UTC().Format(time.RFC3339Nano)

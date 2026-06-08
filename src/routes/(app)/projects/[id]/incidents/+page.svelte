@@ -1,6 +1,7 @@
 <script lang="ts">
 import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
 import LoaderIcon from '@lucide/svelte/icons/loader';
+import { z } from 'zod';
 import { goto } from '$app/navigation';
 import { navigating } from '$app/stores';
 import BottomNav from '$lib/components/bottom-nav.svelte';
@@ -15,7 +16,41 @@ import type {
   IncidentStatus,
   IncidentTimelineResponse,
 } from '$lib/shared/types';
+import { INCIDENT_RANGES, INCIDENT_STATUSES } from '$lib/shared/types';
 import type { PageData } from './$types';
+
+const incidentDetailSchema = z
+  .object({
+    id: z.string(),
+    status: z.enum(INCIDENT_STATUSES),
+    title: z.string(),
+    fingerprint: z.string(),
+    highestLevel: z.enum(['debug', 'info', 'warn', 'error', 'fatal']),
+    firstSeen: z.string(),
+    lastSeen: z.string(),
+    totalEvents: z.number(),
+    rootCauseCandidates: z.array(
+      z.object({
+        sourceFile: z.string().nullable(),
+        lineNumber: z.number().nullable(),
+        count: z.number(),
+      }),
+    ),
+    correlations: z.object({
+      topRequestIds: z.array(z.object({ requestId: z.string(), count: z.number() })),
+      topTraceIds: z.array(z.object({ traceId: z.string(), count: z.number() })),
+    }),
+  })
+  .passthrough();
+
+const incidentTimelineSchema = z
+  .object({
+    incidentId: z.string(),
+    range: z.enum(INCIDENT_RANGES),
+    buckets: z.array(z.object({ timestamp: z.string(), count: z.number() })),
+    peakBucket: z.object({ timestamp: z.string(), count: z.number() }).nullable(),
+  })
+  .passthrough();
 
 const { data }: { data: PageData } = $props();
 // svelte-ignore state_referenced_locally
@@ -37,8 +72,9 @@ let selectedIncidentId = $state<string | null>(data.filters.selectedIncidentId ?
 let detail = $state<IncidentDetail | null>(null);
 let timeline = $state<IncidentTimelineResponse | null>(null);
 let detailLoading = $state(false);
-let refreshTimeout = $state<ReturnType<typeof setTimeout> | null>(null);
-let pendingIncidentUpdates = $state<ClientIncident[]>([]);
+let refreshTimeout: ReturnType<typeof setTimeout> | null = null;
+let pendingIncidentUpdates: ClientIncident[] = [];
+let detailRequestId = 0;
 
 function computeStatus(lastSeenIso: string): IncidentStatus {
   const thresholdMs = 30 * 60 * 1000;
@@ -106,6 +142,7 @@ $effect(() => {
 });
 
 async function fetchIncidentDetail(incidentId: string) {
+  const myId = ++detailRequestId;
   detailLoading = true;
   try {
     const [detailRes, timelineRes] = await Promise.all([
@@ -113,16 +150,30 @@ async function fetchIncidentDetail(incidentId: string) {
       fetch(`/api/projects/${projectId}/incidents/${incidentId}/timeline?range=${selectedRange}`),
     ]);
 
+    if (myId !== detailRequestId) return; // stale, discard
+
     if (!detailRes.ok || !timelineRes.ok) {
       detail = null;
       timeline = null;
       return;
     }
 
-    detail = await detailRes.json();
-    timeline = await timelineRes.json();
+    const detailJson = await detailRes.json();
+    const timelineJson = await timelineRes.json();
+
+    if (myId !== detailRequestId) return; // stale after awaiting json
+
+    const detailParsed = incidentDetailSchema.safeParse(detailJson);
+    const timelineParsed = incidentTimelineSchema.safeParse(timelineJson);
+
+    detail = detailParsed.success ? (detailParsed.data as unknown as IncidentDetail) : null;
+    timeline = timelineParsed.success
+      ? (timelineParsed.data as unknown as IncidentTimelineResponse)
+      : null;
   } finally {
-    detailLoading = false;
+    if (myId === detailRequestId) {
+      detailLoading = false;
+    }
   }
 }
 
@@ -195,6 +246,7 @@ async function loadMore() {
     <div class="h-80 rounded bg-accent animate-pulse"></div>
   </div>
 {:else}
+  {#key data.project.id}
   <div class="space-y-4 sm:space-y-6">
     <div class="flex items-center justify-between gap-3">
       <div class="flex min-w-0 items-center gap-2 sm:gap-4">
@@ -262,6 +314,7 @@ async function loadMore() {
       </div>
     {/if}
   </div>
+  {/key}
 {/if}
 
 <BottomNav {projectId} />

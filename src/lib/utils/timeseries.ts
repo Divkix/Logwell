@@ -1,4 +1,4 @@
-import type { TimeRange } from '$lib/components/time-range-picker.svelte';
+import type { TimeRange } from "$lib/utils/time-range";
 
 export interface TimeBucketConfig {
   intervalMs: number;
@@ -15,14 +15,16 @@ export interface TimeSeriesBucket {
  */
 export function getTimeBucketConfig(range: TimeRange): TimeBucketConfig {
   switch (range) {
-    case '15m':
+    case "15m":
       return { intervalMs: 60 * 1000, expectedBuckets: 15 };
-    case '1h':
+    case "1h":
       return { intervalMs: 5 * 60 * 1000, expectedBuckets: 12 };
-    case '24h':
+    case "24h":
       return { intervalMs: 60 * 60 * 1000, expectedBuckets: 24 };
-    case '7d':
+    case "7d":
       return { intervalMs: 6 * 60 * 60 * 1000, expectedBuckets: 28 };
+    default:
+      throw new Error(`Unknown time range: ${String(range)}`);
   }
 }
 
@@ -72,34 +74,4 @@ export function fillMissingBuckets(
   }
 
   return result;
-}
-
-/**
- * Format a bucket timestamp for display on chart axis
- */
-export function formatBucketLabel(timestamp: Date, range: TimeRange): string {
-  const hours = timestamp.getUTCHours().toString().padStart(2, '0');
-  const minutes = timestamp.getUTCMinutes().toString().padStart(2, '0');
-
-  if (range === '7d') {
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    const month = months[timestamp.getUTCMonth()];
-    const day = timestamp.getUTCDate();
-    return `${month} ${day} ${hours}:${minutes}`;
-  }
-
-  return `${hours}:${minutes}`;
 }

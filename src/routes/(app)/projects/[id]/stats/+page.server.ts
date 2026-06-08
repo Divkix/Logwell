@@ -1,25 +1,22 @@
-import { error } from '@sveltejs/kit';
-import { and, count, eq, gte, type SQL } from 'drizzle-orm';
-import { log, project } from '$lib/server/db/schema';
-import { requireAuth } from '$lib/server/utils/auth-guard';
-import type { PageServerLoad } from './$types';
+import { error } from "@sveltejs/kit";
+import { and, count, eq, gte, type SQL } from "drizzle-orm";
+import { log, project } from "$lib/server/db/schema";
+import { requireAuth } from "$lib/server/utils/auth-guard";
+import type { PageServerLoad } from "./$types";
 
-/**
- * Get time range start date based on range parameter
- * Stats page defaults to 24h for broader overview
- */
+// TODO(RT-10): deduplicate with $lib/utils/format getTimeRangeStart
 function getTimeRangeStart(range: string | null): Date | null {
   if (!range) return null;
 
   const now = Date.now();
   switch (range) {
-    case '15m':
+    case "15m":
       return new Date(now - 15 * 60 * 1000);
-    case '1h':
+    case "1h":
       return new Date(now - 60 * 60 * 1000);
-    case '24h':
+    case "24h":
       return new Date(now - 24 * 60 * 60 * 1000);
-    case '7d':
+    case "7d":
       return new Date(now - 7 * 24 * 60 * 60 * 1000);
     default:
       return null;
@@ -30,7 +27,7 @@ export const load: PageServerLoad = async (event) => {
   // Require session authentication
   const { user } = await requireAuth(event);
 
-  const { db } = await import('$lib/server/db');
+  const { db } = await import("$lib/server/db");
   const projectId = event.params.id;
 
   // Fetch project data - verify ownership
@@ -40,12 +37,12 @@ export const load: PageServerLoad = async (event) => {
     .where(and(eq(project.id, projectId), eq(project.ownerId, user.id)));
 
   if (!projectData) {
-    throw error(404, { message: 'Project not found' });
+    throw error(404, { message: "Project not found" });
   }
 
   // Parse query parameters - default to 24h for stats overview
   const url = event.url;
-  const rangeParam = url.searchParams.get('range') || '24h';
+  const rangeParam = url.searchParams.get("range") || "24h";
 
   // Calculate time range
   const fromDate = getTimeRangeStart(rangeParam);
@@ -94,7 +91,6 @@ export const load: PageServerLoad = async (event) => {
     project: {
       id: projectData.id,
       name: projectData.name,
-      apiKey: projectData.apiKey,
       createdAt: projectData.createdAt?.toISOString() ?? null,
       updatedAt: projectData.updatedAt?.toISOString() ?? null,
     },

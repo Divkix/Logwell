@@ -12,7 +12,8 @@
 # -----------------------------------------------------------------------------
 # Stage 1: Base image with Bun runtime
 # -----------------------------------------------------------------------------
-FROM oven/bun:1-alpine AS base
+# SECURITY: pinned to an exact version + digest for reproducible builds (matches CI's Bun 1.2.15)
+FROM oven/bun:1.2.15-alpine@sha256:37b37b8cefbf88956d4cbecbc5b3ac4b3f1a9fb051f745c98a4bc6f5f285aacb AS base
 WORKDIR /app
 
 # Install curl for healthcheck (alpine minimal doesn't include it)
@@ -79,7 +80,7 @@ ENV NODE_ENV=production
 # Dummy env vars satisfy build-time validation; real values provided at runtime
 RUN DATABASE_URL=postgresql://build:build@localhost/build \
     BETTER_AUTH_SECRET=build-time-placeholder-secret-32chars \
-    bun --bun run build
+    bun run build
 
 # -----------------------------------------------------------------------------
 # Stage 5: Production runtime
@@ -128,7 +129,7 @@ ENV PORT=3000
 # Checks /api/health endpoint every 30 seconds
 # Allows 30 seconds for startup (migrations + seed), 10 second timeout per check
 # Marks unhealthy after 3 consecutive failures
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:3000/api/health || exit 1
 
 # Start the application via entrypoint (runs migrations + seed first)

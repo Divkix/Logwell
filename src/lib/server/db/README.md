@@ -9,7 +9,7 @@ This directory contains the database schema, client initialization, and test uti
 Drizzle ORM table definitions for the application.
 
 ```typescript
-import * as schema from './schema';
+import * as schema from "./schema";
 
 // Access tables
 const users = schema.user;
@@ -20,7 +20,7 @@ const users = schema.user;
 Production database client initialization using postgres.js.
 
 ```typescript
-import { db } from './index';
+import { db } from "./index";
 
 // Use in production/development
 const users = await db.select().from(schema.user);
@@ -44,7 +44,7 @@ In-memory PGlite database for testing. **Do not use in production.**
 Creates a new in-memory PGlite database with all schema tables.
 
 ```typescript
-import { createTestDatabase } from './test-db';
+import { createTestDatabase } from "./test-db";
 
 const db = await createTestDatabase();
 // All schema tables are created automatically
@@ -55,7 +55,7 @@ const db = await createTestDatabase();
 Truncates all tables and restarts identity sequences.
 
 ```typescript
-import { cleanDatabase } from './test-db';
+import { cleanDatabase } from "./test-db";
 
 await cleanDatabase(db);
 // All tables are now empty, sequences reset to 1
@@ -66,7 +66,7 @@ await cleanDatabase(db);
 Convenience function that creates a database and returns it with a cleanup function.
 
 ```typescript
-import { setupTestDatabase } from './test-db';
+import { setupTestDatabase } from "./test-db";
 
 const { db, cleanup } = await setupTestDatabase();
 
@@ -78,12 +78,12 @@ await cleanup(); // Truncates all tables
 #### Usage in Tests
 
 ```typescript
-import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import { afterEach, beforeEach, describe, it } from 'vitest';
-import * as schema from './schema';
-import { setupTestDatabase } from './test-db';
+import type { PgliteDatabase } from "drizzle-orm/pglite";
+import { afterEach, beforeEach, describe, it } from "vitest";
+import * as schema from "./schema";
+import { setupTestDatabase } from "./test-db";
 
-describe('Database Tests', () => {
+describe("Database Tests", () => {
   let db: PgliteDatabase<typeof schema>;
   let cleanup: () => Promise<void>;
 
@@ -97,7 +97,7 @@ describe('Database Tests', () => {
     await cleanup();
   });
 
-  it('should work with database', async () => {
+  it("should work with database", async () => {
     const result = await db.insert(schema.user).values({ age: 25 }).returning();
     // Test assertions...
   });
@@ -120,10 +120,10 @@ Example:
 
 ```typescript
 // schema.ts
-export const posts = pgTable('posts', {
-  id: serial('id').primaryKey(),
-  title: text('title').notNull(),
-  content: text('content').notNull(),
+export const posts = pgTable("posts", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
 });
 
 // test-db.ts automatically creates the "posts" table

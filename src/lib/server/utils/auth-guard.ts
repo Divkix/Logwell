@@ -1,6 +1,6 @@
-import type { RequestEvent } from '@sveltejs/kit';
-import { error, redirect } from '@sveltejs/kit';
-import type { Session, User } from '../auth';
+import type { RequestEvent } from "@sveltejs/kit";
+import { error, redirect } from "@sveltejs/kit";
+import type { Session, User } from "../auth";
 
 /**
  * Result of successful authentication check
@@ -15,7 +15,7 @@ export interface AuthenticatedSession {
  * Check if a route is an API route based on its route ID
  */
 function isApiRoute(routeId: string | null): boolean {
-  return routeId?.startsWith('/api/') ?? false;
+  return routeId?.startsWith("/api/") ?? false;
 }
 
 /**
@@ -45,9 +45,9 @@ export async function requireAuth(event: RequestEvent): Promise<AuthenticatedSes
 
   if (!user || !session) {
     if (isApiRoute(event.route.id)) {
-      throw error(401, { message: 'Unauthorized' });
+      throw error(401, { message: "Unauthorized" });
     }
-    throw redirect(303, '/login');
+    throw redirect(303, "/login");
   }
 
   return { user, session };

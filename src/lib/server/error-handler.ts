@@ -1,4 +1,4 @@
-import { nanoid } from 'nanoid';
+import { nanoid } from "nanoid";
 
 /**
  * Context for error handling
@@ -49,7 +49,7 @@ export function createErrorHandler(): (context: ErrorContext) => ErrorResponse {
 
     // For 5xx errors, sanitize the message to avoid leaking internal details
     // For 4xx errors, preserve the user-friendly message
-    const clientMessage = status >= 500 ? message : message;
+    const clientMessage = status >= 500 ? "Internal server error" : message;
 
     return {
       id: errorId,

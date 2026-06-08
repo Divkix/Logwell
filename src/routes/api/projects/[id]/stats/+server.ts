@@ -1,9 +1,9 @@
-import { json } from '@sveltejs/kit';
-import { and, count, eq, gte, lte, type SQL } from 'drizzle-orm';
-import { getDbClient } from '$lib/server/db/db';
-import { log } from '$lib/server/db/schema';
-import { isErrorResponse, requireProjectOwnership } from '$lib/server/utils/project-guard';
-import type { RequestEvent } from './$types';
+import { json } from "@sveltejs/kit";
+import { and, count, eq, gte, lte, type SQL } from "drizzle-orm";
+import { getDbClient } from "$lib/server/db/db";
+import { log } from "$lib/server/db/schema";
+import { isErrorResponse, requireProjectOwnership } from "$lib/server/utils/project-guard";
+import type { RequestEvent } from "./$types";
 
 /**
  * GET /api/projects/[id]/stats
@@ -48,8 +48,8 @@ export async function GET(event: RequestEvent): Promise<Response> {
 
   // Parse query parameters for time range
   const url = event.url;
-  const fromParam = url.searchParams.get('from');
-  const toParam = url.searchParams.get('to');
+  const fromParam = url.searchParams.get("from");
+  const toParam = url.searchParams.get("to");
 
   // Parse time range
   const fromDate = fromParam ? new Date(fromParam) : null;

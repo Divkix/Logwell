@@ -1,5 +1,5 @@
-import { LogwellError } from './errors';
-import type { IngestResponse, LogEntry } from './types';
+import { LogwellError } from "./errors";
+import type { IngestResponse, LogEntry } from "./types";
 
 /**
  * Transport configuration
@@ -21,6 +21,40 @@ function delay(attempt: number, baseDelay = 100): Promise<void> {
 }
 
 /**
+ * Sleep for a given number of milliseconds
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Parse a `Retry-After` header into milliseconds.
+ *
+ * Supports both HTTP formats:
+ * - delta-seconds (e.g. "120") — multiplied by 1000
+ * - HTTP-date (e.g. "Wed, 21 Oct 2015 07:28:00 GMT") — the non-negative
+ *   difference from the current time
+ *
+ * @returns delay in milliseconds, or undefined if the header is absent/invalid
+ */
+function parseRetryAfter(header: string | null): number | undefined {
+  if (!header) {
+    return undefined;
+  }
+  // delta-seconds form
+  const seconds = Number(header);
+  if (Number.isFinite(seconds)) {
+    return Math.max(0, seconds * 1000);
+  }
+  // HTTP-date form
+  const dateMs = Date.parse(header);
+  if (Number.isFinite(dateMs)) {
+    return Math.max(0, dateMs - Date.now());
+  }
+  return undefined;
+}
+
+/**
  * HTTP transport for sending logs to Logwell server
  *
  * Features:
@@ -32,7 +66,8 @@ export class HttpTransport {
   private readonly ingestUrl: string;
 
   constructor(private config: TransportConfig) {
-    this.ingestUrl = `${config.endpoint}/v1/ingest`;
+    const cleanEndpoint = config.endpoint.replace(/\/$/, "");
+    this.ingestUrl = `${cleanEndpoint}/v1/ingest`;
   }
 
   /**
@@ -44,8 +79,8 @@ export class HttpTransport {
    */
   async send(logs: LogEntry[]): Promise<IngestResponse> {
     let lastError: LogwellError = new LogwellError(
-      'Max retries exceeded',
-      'NETWORK_ERROR',
+      "Max retries exceeded",
+      "NETWORK_ERROR",
       undefined,
       true,
     );
@@ -54,7 +89,16 @@ export class HttpTransport {
       try {
         return await this.doRequest(logs);
       } catch (error) {
-        lastError = error as LogwellError;
+        if (error instanceof LogwellError) {
+          lastError = error;
+        } else {
+          lastError = new LogwellError(
+            `Unexpected error: ${(error as Error).message}`,
+            "NETWORK_ERROR",
+            undefined,
+            true,
+          );
+        }
 
         // Don't retry non-retryable errors
         if (!lastError.retryable) {
@@ -63,7 +107,13 @@ export class HttpTransport {
 
         // Don't delay after the last attempt
         if (attempt < this.config.maxRetries) {
-          await delay(attempt);
+          if (lastError.retryAfterMs !== undefined) {
+            // Honor Retry-After but cap it to the exponential backoff ceiling
+            const backoffMs = Math.min(100 * 2 ** attempt, 10000);
+            await sleep(Math.min(lastError.retryAfterMs, backoffMs));
+          } else {
+            await delay(attempt);
+          }
         }
       }
     }
@@ -75,19 +125,33 @@ export class HttpTransport {
     let response: Response;
 
     try {
+      const body = JSON.stringify(logs);
+      // The Fetch spec caps keepalive request bodies at 64 KiB; enabling it for
+      // larger payloads makes the request fail outright in browsers and undici.
+      // Only opt in under that limit so large batches still send reliably.
+      const useKeepalive = new TextEncoder().encode(body).length < 60_000;
       response = await fetch(this.ingestUrl, {
-        method: 'POST',
+        method: "POST",
         headers: {
           Authorization: `Bearer ${this.config.apiKey}`,
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify(logs),
+        body,
+        signal: AbortSignal.timeout(this.config.timeout ?? 30000),
+        keepalive: useKeepalive,
       });
     } catch (error) {
+      // Timeout error (AbortError or TimeoutError)
+      if (
+        error instanceof Error &&
+        (error.name === "AbortError" || error.name === "TimeoutError")
+      ) {
+        throw new LogwellError("Request timed out", "NETWORK_ERROR", undefined, true);
+      }
       // Network error (fetch failed)
       throw new LogwellError(
         `Network error: ${(error as Error).message}`,
-        'NETWORK_ERROR',
+        "NETWORK_ERROR",
         undefined,
         true,
       );
@@ -96,7 +160,7 @@ export class HttpTransport {
     // Handle error responses
     if (!response.ok) {
       const errorBody = await this.tryParseError(response);
-      throw this.createError(response.status, errorBody);
+      throw this.createErrorWithRetryAfter(response, errorBody);
     }
 
     // Parse successful response
@@ -106,25 +170,40 @@ export class HttpTransport {
   private async tryParseError(response: Response): Promise<string> {
     try {
       const body = await response.json();
-      return body.message || body.error || 'Unknown error';
+      return body.message || body.error || "Unknown error";
     } catch {
       return `HTTP ${response.status}`;
     }
   }
 
+  private createErrorWithRetryAfter(response: Response, message: string): LogwellError {
+    const { status } = response;
+    if (status === 429) {
+      const retryAfterMs = parseRetryAfter(response.headers.get("Retry-After"));
+      return new LogwellError(
+        `Rate limited: ${message}`,
+        "RATE_LIMITED",
+        status,
+        true,
+        retryAfterMs,
+      );
+    }
+    return this.createError(status, message);
+  }
+
   private createError(status: number, message: string): LogwellError {
     switch (status) {
       case 401:
-        return new LogwellError(`Unauthorized: ${message}`, 'UNAUTHORIZED', status, false);
+        return new LogwellError(`Unauthorized: ${message}`, "UNAUTHORIZED", status, false);
       case 400:
-        return new LogwellError(`Validation error: ${message}`, 'VALIDATION_ERROR', status, false);
+        return new LogwellError(`Validation error: ${message}`, "VALIDATION_ERROR", status, false);
       case 429:
-        return new LogwellError(`Rate limited: ${message}`, 'RATE_LIMITED', status, true);
+        return new LogwellError(`Rate limited: ${message}`, "RATE_LIMITED", status, true);
       default:
         if (status >= 500) {
-          return new LogwellError(`Server error: ${message}`, 'SERVER_ERROR', status, true);
+          return new LogwellError(`Server error: ${message}`, "SERVER_ERROR", status, true);
         }
-        return new LogwellError(`HTTP error ${status}: ${message}`, 'SERVER_ERROR', status, false);
+        return new LogwellError(`HTTP error ${status}: ${message}`, "SERVER_ERROR", status, false);
     }
   }
 }

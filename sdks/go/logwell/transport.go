@@ -8,6 +8,7 @@ import (
 	"io"
 	"math/rand"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -27,14 +28,42 @@ type httpTransport struct {
 	maxRetries int
 }
 
-// newHTTPTransport creates a new HTTP transport.
+// newHTTPTransport creates a new HTTP transport with the given endpoint and API key.
+// Uses default settings: no custom HTTP client and defaultMaxRetries.
 func newHTTPTransport(endpoint, apiKey string) *httpTransport {
 	return &httpTransport{
 		endpoint:   endpoint,
 		apiKey:     apiKey,
-		httpClient: &http.Client{},
-		ingestURL:  endpoint + "/v1/ingest",
+		httpClient: &http.Client{Timeout: 30 * time.Second},
+		ingestURL:  strings.TrimRight(endpoint, "/") + "/v1/ingest",
 		maxRetries: defaultMaxRetries,
+	}
+}
+
+// newHTTPTransportFromConfig creates a new HTTP transport from the given config.
+// Wires MaxRetries and HTTPClient from the config; applies a 30s default timeout
+// when no custom HTTP client is provided.
+func newHTTPTransportFromConfig(cfg *Config) *httpTransport {
+	httpClient := cfg.HTTPClient
+	if httpClient == nil {
+		httpClient = &http.Client{Timeout: 30 * time.Second}
+	} else if httpClient == http.DefaultClient || httpClient.Timeout == 0 {
+		// http.DefaultClient (and any client without a timeout) has no request
+		// timeout, which can hang flushes indefinitely. Apply a 30s default
+		// without mutating the caller's client; carry over its Transport.
+		httpClient = &http.Client{
+			Transport:     httpClient.Transport,
+			CheckRedirect: httpClient.CheckRedirect,
+			Jar:           httpClient.Jar,
+			Timeout:       30 * time.Second,
+		}
+	}
+	return &httpTransport{
+		endpoint:   cfg.Endpoint,
+		apiKey:     cfg.APIKey,
+		httpClient: httpClient,
+		ingestURL:  strings.TrimRight(cfg.Endpoint, "/") + "/v1/ingest",
+		maxRetries: cfg.MaxRetries,
 	}
 }
 

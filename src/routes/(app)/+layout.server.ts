@@ -1,5 +1,5 @@
-import { requireAuth } from '$lib/server/utils/auth-guard';
-import type { LayoutServerLoad } from './$types';
+import { requireAuth } from "$lib/server/utils/auth-guard";
+import type { LayoutServerLoad } from "./$types";
 
 /**
  * Server-side layout load function for the protected (app) route group.

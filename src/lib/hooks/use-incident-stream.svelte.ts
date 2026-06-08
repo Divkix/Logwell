@@ -10,7 +10,7 @@ export interface ClientIncident {
   serviceName: string | null;
   sourceFile: string | null;
   lineNumber: number | null;
-  highestLevel: 'debug' | 'info' | 'warn' | 'error' | 'fatal';
+  highestLevel: "debug" | "info" | "warn" | "error" | "fatal";
   firstSeen: string;
   lastSeen: string;
   totalEvents: number;
@@ -50,6 +50,11 @@ export function useIncidentStream(options: UseIncidentStreamOptions): UseInciden
     reconnectBaseDelay = DEFAULT_RECONNECT_BASE_DELAY,
   } = options;
 
+  // NOTE: these are intentionally plain (non-reactive) variables. connect()/disconnect() mutate
+  // them and are invoked from a component $effect; making them $state caused the effect to take a
+  // reactive dependency on them (via connect()'s guard reads) while also writing them, producing an
+  // infinite update loop (effect_update_depth_exceeded) that broke page hydration. Connection state
+  // is surfaced reactively to the UI via the onConnectionChange callback instead.
   let _isConnected = false;
   let _isConnecting = false;
   let _error: Error | null = null;
@@ -69,22 +74,22 @@ export function useIncidentStream(options: UseIncidentStreamOptions): UseInciden
     events: Array<{ event: string; data: string }>;
     remaining: string;
   } {
-    const lines = buffer.split('\n');
-    const remaining = lines.pop() || '';
+    const lines = buffer.split("\n");
+    const remaining = lines.pop() || "";
     const events: Array<{ event: string; data: string }> = [];
 
-    let currentEvent = '';
-    let currentData = '';
+    let currentEvent = "";
+    let currentData = "";
 
     for (const line of lines) {
-      if (line.startsWith('event: ')) {
+      if (line.startsWith("event: ")) {
         currentEvent = line.slice(7);
-      } else if (line.startsWith('data: ')) {
+      } else if (line.startsWith("data: ")) {
         currentData = line.slice(6);
-      } else if (line === '' && currentEvent && currentData) {
+      } else if (line === "" && currentEvent && currentData) {
         events.push({ event: currentEvent, data: currentData });
-        currentEvent = '';
-        currentData = '';
+        currentEvent = "";
+        currentData = "";
       }
     }
 
@@ -93,7 +98,7 @@ export function useIncidentStream(options: UseIncidentStreamOptions): UseInciden
 
   function processSSEEvents(events: Array<{ event: string; data: string }>): void {
     for (const event of events) {
-      if (event.event === 'incidents') {
+      if (event.event === "incidents") {
         try {
           const incidents = JSON.parse(event.data) as ClientIncident[];
           onIncidents?.(incidents);
@@ -125,8 +130,8 @@ export function useIncidentStream(options: UseIncidentStreamOptions): UseInciden
     _abortController = new AbortController();
 
     fetch(`/api/projects/${projectId}/incidents/stream`, {
-      method: 'POST',
-      credentials: 'same-origin',
+      method: "POST",
+      credentials: "same-origin",
       signal: _abortController.signal,
     })
       .then(async (response) => {
@@ -134,7 +139,7 @@ export function useIncidentStream(options: UseIncidentStreamOptions): UseInciden
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
         if (!response.body) {
-          throw new Error('Response body is empty');
+          throw new Error("Response body is empty");
         }
 
         _isConnecting = false;
@@ -143,7 +148,7 @@ export function useIncidentStream(options: UseIncidentStreamOptions): UseInciden
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
-        let buffer = '';
+        let buffer = "";
 
         try {
           while (true) {
@@ -171,14 +176,14 @@ export function useIncidentStream(options: UseIncidentStreamOptions): UseInciden
       })
       .catch((error) => {
         _isConnecting = false;
-        if (error?.name === 'AbortError' && _isDisconnected) return;
+        if (error?.name === "AbortError" && _isDisconnected) return;
 
         _error = error instanceof Error ? error : new Error(String(error));
         onError?.(_error);
         setConnected(false);
 
         // Don't reconnect on permanent errors (404)
-        if (_error.message.startsWith('HTTP 404:')) return;
+        if (_error.message.startsWith("HTTP 404:")) return;
 
         scheduleReconnect();
       });
@@ -201,7 +206,7 @@ export function useIncidentStream(options: UseIncidentStreamOptions): UseInciden
     setConnected(false);
   }
 
-  if (enabled && typeof window !== 'undefined') {
+  if (enabled && typeof window !== "undefined") {
     queueMicrotask(() => connect());
   }
 

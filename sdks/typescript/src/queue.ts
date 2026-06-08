@@ -1,5 +1,5 @@
-import { LogwellError } from './errors';
-import type { IngestResponse, LogEntry } from './types';
+import { LogwellError } from "./errors";
+import type { IngestResponse, LogEntry } from "./types";
 
 /**
  * Callback type for sending batched logs
@@ -32,6 +32,7 @@ export class BatchQueue {
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
   private flushing = false;
   private stopped = false;
+  private _flushPromise: Promise<IngestResponse | null> | null = null;
 
   constructor(
     private sendBatch: SendBatchFn,
@@ -62,7 +63,7 @@ export class BatchQueue {
       this.config.onError?.(
         new LogwellError(
           `Queue overflow. Dropped log: ${dropped?.message.substring(0, 50)}...`,
-          'QUEUE_OVERFLOW',
+          "QUEUE_OVERFLOW",
         ),
       );
     }
@@ -83,7 +84,8 @@ export class BatchQueue {
   /**
    * Flush all queued logs immediately
    *
-   * @returns Response from the server, or null if queue was empty
+   * Sends in chunks bounded by batchSize.
+   * @returns Last response from the server, or null if queue was empty
    */
   async flush(): Promise<IngestResponse | null> {
     // Prevent concurrent flushes
@@ -94,52 +96,91 @@ export class BatchQueue {
     this.flushing = true;
     this.stopTimer();
 
-    // Take current batch
-    const batch = this.queue.splice(0);
-    const count = batch.length;
-
-    try {
-      const response = await this.sendBatch(batch);
-      this.config.onFlush?.(count);
-
-      // Restart timer if more logs remain (added during flush)
-      if (this.queue.length > 0 && !this.stopped) {
-        this.startTimer();
+    this._flushPromise = (async () => {
+      // Snapshot current queue length so concurrent adds during flush are deferred
+      const snapshotLength = this.queue.length;
+      let sent = 0;
+      let lastResponse: IngestResponse | null = null;
+      try {
+        // Send in chunks bounded by batchSize, up to the snapshot count
+        while (sent < snapshotLength) {
+          const remaining = snapshotLength - sent;
+          const chunkSize = Math.min(this.config.batchSize, remaining);
+          const batch = this.queue.splice(0, chunkSize);
+          sent += batch.length;
+          try {
+            const response = await this.sendBatch(batch);
+            this.config.onFlush?.(batch.length);
+            lastResponse = response;
+          } catch (error) {
+            // Re-queue failed batch at front, respect maxQueueSize
+            const requeued = [...batch, ...this.queue];
+            this.queue.length = 0;
+            this.queue.push(...requeued.slice(0, this.config.maxQueueSize));
+            if (requeued.length > this.config.maxQueueSize) {
+              this.config.onError?.(
+                new LogwellError(
+                  `Queue overflow: dropped ${requeued.length - this.config.maxQueueSize} logs`,
+                  "QUEUE_OVERFLOW",
+                ),
+              );
+            }
+            this.config.onError?.(error as Error);
+            break; // stop flushing on error
+          }
+        }
+      } finally {
+        this.flushing = false;
+        if (this.queue.length > 0 && !this.stopped) {
+          this.startTimer();
+        }
       }
+      return lastResponse;
+    })();
 
-      return response;
-    } catch (error) {
-      // Re-queue failed logs at the front
-      this.queue.unshift(...batch);
-      this.config.onError?.(error as Error);
-
-      // Restart timer to retry
-      if (!this.stopped) {
-        this.startTimer();
-      }
-
-      return null;
-    } finally {
-      this.flushing = false;
-    }
+    return this._flushPromise;
   }
 
   /**
    * Flush remaining logs and stop the queue
+   *
+   * @returns Last response from the server, or null if queue was empty
+   * @throws LogwellError if logs remain queued after the final flush attempt
+   *   (e.g. the flush failed and re-queued the batch). Unlike the normal timer
+   *   path, a shutdown failure must not be silently swallowed as success.
    */
-  async shutdown(): Promise<void> {
+  async shutdown(): Promise<IngestResponse | null> {
     if (this.stopped) {
-      return;
+      return null;
     }
 
     this.stopped = true;
     this.stopTimer();
 
-    // Flush all remaining logs
-    if (this.queue.length > 0) {
-      this.flushing = false; // Reset flushing flag
-      await this.flush();
+    if (this._flushPromise) {
+      await this._flushPromise.catch(() => {});
     }
+
+    if (this.queue.length === 0) {
+      return null;
+    }
+
+    const response = await this.flush();
+
+    // flush() re-queues failed batches and reports via onError instead of
+    // throwing. After the final shutdown flush, any remaining logs mean the
+    // flush did not fully succeed — surface that so shutdown does not report
+    // success while logs are dropped on exit.
+    if (this.queue.length > 0) {
+      throw new LogwellError(
+        `Shutdown flush failed: ${this.queue.length} log(s) could not be delivered`,
+        "NETWORK_ERROR",
+        undefined,
+        false,
+      );
+    }
+
+    return response;
   }
 
   private startTimer(): void {

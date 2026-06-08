@@ -1,7 +1,8 @@
-import { and, asc, eq, inArray, lt, sql } from 'drizzle-orm';
-import { RETENTION_CONFIG } from '$lib/server/config';
-import type { DatabaseClient } from '$lib/server/db/db';
-import { log, project } from '$lib/server/db/schema';
+import { sql } from "drizzle-orm";
+import { RETENTION_CONFIG } from "$lib/server/config";
+import type { DatabaseClient } from "$lib/server/db/db";
+import { getQueryRows } from "$lib/server/db/db";
+import { project } from "$lib/server/db/schema";
 
 export interface CleanupResult {
   projectsProcessed: number;
@@ -25,7 +26,7 @@ const BATCH_SIZE = 1000;
  * @returns Summary of cleanup operation
  */
 export async function cleanupOldLogs(dbClient?: DatabaseClient): Promise<CleanupResult> {
-  const db = dbClient ?? (await import('$lib/server/db')).db;
+  const db = dbClient ?? (await import("$lib/server/db")).db;
 
   const result: CleanupResult = {
     projectsProcessed: 0,
@@ -59,39 +60,23 @@ export async function cleanupOldLogs(dbClient?: DatabaseClient): Promise<Cleanup
         const cutoffDate = new Date();
         cutoffDate.setDate(cutoffDate.getDate() - effectiveRetention);
 
-        // Count logs to delete first (for reporting)
-        const logsToDeleteCount = await db
-          .select({ count: sql<number>`count(*)::int` })
-          .from(log)
-          .where(and(eq(log.projectId, proj.id), lt(log.timestamp, cutoffDate)));
-
-        const totalToDelete = logsToDeleteCount[0]?.count || 0;
-
-        if (totalToDelete === 0) {
-          // No logs to delete for this project
-          continue;
-        }
-
-        // Batch delete logs in chunks of BATCH_SIZE
+        // Batch delete logs using a CTE to avoid count + id-select round-trips
         let deletedInProject = 0;
-        while (deletedInProject < totalToDelete) {
-          // Get a batch of log IDs to delete
-          const logsToDelete = await db
-            .select({ id: log.id })
-            .from(log)
-            .where(and(eq(log.projectId, proj.id), lt(log.timestamp, cutoffDate)))
-            .orderBy(asc(log.id))
-            .limit(BATCH_SIZE);
-
-          if (logsToDelete.length === 0) {
-            break;
-          }
-
-          // Delete the batch
-          const idsToDelete = logsToDelete.map((l) => l.id);
-          await db.delete(log).where(inArray(log.id, idsToDelete));
-
-          deletedInProject += logsToDelete.length;
+        while (true) {
+          const raw = await db.execute(sql`
+            WITH batch AS (
+              SELECT id FROM "log"
+              WHERE project_id = ${proj.id}
+                AND timestamp < ${cutoffDate}
+              ORDER BY timestamp ASC
+              LIMIT ${BATCH_SIZE}
+            )
+            DELETE FROM "log" WHERE id IN (SELECT id FROM batch)
+            RETURNING id
+          `);
+          const rows = getQueryRows(raw as Parameters<typeof getQueryRows>[0]);
+          if (rows.length === 0) break;
+          deletedInProject += rows.length;
         }
 
         if (deletedInProject > 0) {

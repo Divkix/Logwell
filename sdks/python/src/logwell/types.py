@@ -62,6 +62,7 @@ class LogwellConfig(TypedDict, total=False):
     flush_interval: float
     max_queue_size: int
     max_retries: int
+    timeout: float
     capture_source_location: bool
     on_error: Callable[[Exception], None]
     on_flush: Callable[[int], None]

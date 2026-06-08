@@ -87,7 +87,7 @@ async function handleExport(format: 'csv' | 'json') {
     let filename = `logs-export.${format}`;
     if (contentDisposition) {
       const match = contentDisposition.match(/filename="([^"]+)"/);
-      if (match) filename = match[1];
+      if (match?.[1]) filename = match[1];
     }
 
     const a = document.createElement('a');

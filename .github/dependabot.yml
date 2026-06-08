@@ -77,3 +77,63 @@ updates:
     labels:
       - dependencies
       - docker
+
+  # TypeScript SDK
+  - package-ecosystem: npm
+    directory: /sdks/typescript
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: "America/Phoenix"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps(sdk-ts)"
+      include: scope
+    labels:
+      - dependencies
+      - sdk
+    groups:
+      sdk-typescript:
+        patterns:
+          - "*"
+
+  # Python SDK
+  - package-ecosystem: pip
+    directory: /sdks/python
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: "America/Phoenix"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps(sdk-py)"
+      include: scope
+    labels:
+      - dependencies
+      - sdk
+    groups:
+      sdk-python:
+        patterns:
+          - "*"
+
+  # Go SDK
+  - package-ecosystem: gomod
+    directory: /sdks/go
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: "America/Phoenix"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps(sdk-go)"
+      include: scope
+    labels:
+      - dependencies
+      - sdk
+    groups:
+      sdk-go:
+        patterns:
+          - "*"

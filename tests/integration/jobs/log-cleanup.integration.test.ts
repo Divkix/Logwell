@@ -1,13 +1,13 @@
-import { eq } from 'drizzle-orm';
-import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import { beforeEach, describe, expect, it } from 'vitest';
-import type * as schema from '../../../src/lib/server/db/schema';
-import { log } from '../../../src/lib/server/db/schema';
-import { setupTestDatabase } from '../../../src/lib/server/db/test-db';
-import { cleanupOldLogs } from '../../../src/lib/server/jobs/log-cleanup';
-import { seedLogs, seedProject } from '../../fixtures/db';
+import { eq } from "drizzle-orm";
+import type { PgliteDatabase } from "drizzle-orm/pglite";
+import { beforeEach, describe, expect, it } from "vite-plus/test";
+import type * as schema from "../../../src/lib/server/db/schema";
+import { log } from "../../../src/lib/server/db/schema";
+import { setupTestDatabase } from "../../../src/lib/server/db/test-db";
+import { cleanupOldLogs } from "../../../src/lib/server/jobs/log-cleanup";
+import { seedLogs, seedProject } from "../../fixtures/db";
 
-describe('cleanupOldLogs', () => {
+describe("cleanupOldLogs", () => {
   let db: PgliteDatabase<typeof schema>;
 
   beforeEach(async () => {
@@ -15,8 +15,8 @@ describe('cleanupOldLogs', () => {
     db = setup.db;
   });
 
-  describe('effective retention calculation', () => {
-    it('should use project retention_days when set', async () => {
+  describe("effective retention calculation", () => {
+    it("should use project retention_days when set", async () => {
       // Create project with 7-day retention
       const project1 = await seedProject(db, { retentionDays: 7 });
 
@@ -39,7 +39,7 @@ describe('cleanupOldLogs', () => {
       expect(result.projectsSkipped).toBe(0);
     });
 
-    it('should use system default when project retention_days is null', async () => {
+    it("should use system default when project retention_days is null", async () => {
       // Create project with null retention (use system default)
       const project1 = await seedProject(db, { retentionDays: null });
 
@@ -61,7 +61,7 @@ describe('cleanupOldLogs', () => {
       expect(result.projectsProcessed).toBe(1);
     });
 
-    it('should skip deletion when effective retention is 0', async () => {
+    it("should skip deletion when effective retention is 0", async () => {
       // Create project with 0 retention (never delete)
       const project1 = await seedProject(db, { retentionDays: 0 });
 
@@ -82,7 +82,7 @@ describe('cleanupOldLogs', () => {
       expect(result.projectsSkipped).toBe(1);
     });
 
-    it('should skip deletion when system default is 0 and project is null', async () => {
+    it("should skip deletion when system default is 0 and project is null", async () => {
       // This test verifies the behavior when effective retention is 0
       const project1 = await seedProject(db, { retentionDays: null });
       const project2 = await seedProject(db, { retentionDays: 0 });
@@ -104,8 +104,8 @@ describe('cleanupOldLogs', () => {
     });
   });
 
-  describe('log deletion', () => {
-    it('should delete logs older than retention period', async () => {
+  describe("log deletion", () => {
+    it("should delete logs older than retention period", async () => {
       const project1 = await seedProject(db, { retentionDays: 10 });
 
       const now = new Date();
@@ -120,7 +120,7 @@ describe('cleanupOldLogs', () => {
       expect(result.totalLogsDeleted).toBe(8);
     });
 
-    it('should NOT delete logs newer than retention period', async () => {
+    it("should NOT delete logs newer than retention period", async () => {
       const project1 = await seedProject(db, { retentionDays: 30 });
 
       const now = new Date();
@@ -135,7 +135,7 @@ describe('cleanupOldLogs', () => {
       expect(result.totalLogsDeleted).toBe(0);
     });
 
-    it('should handle multiple projects with different retention', async () => {
+    it("should handle multiple projects with different retention", async () => {
       // Project 1: 7 day retention
       const project1 = await seedProject(db, { retentionDays: 7 });
       // Project 2: 30 day retention
@@ -175,7 +175,7 @@ describe('cleanupOldLogs', () => {
       expect(result.projectsSkipped).toBe(1); // p3
     });
 
-    it('should batch delete in chunks of 1000', async () => {
+    it("should batch delete in chunks of 1000", async () => {
       const project1 = await seedProject(db, { retentionDays: 7 });
 
       const now = new Date();
@@ -193,7 +193,7 @@ describe('cleanupOldLogs', () => {
       expect(result.totalLogsDeleted).toBe(2500);
     });
 
-    it('should handle projects with no logs', async () => {
+    it("should handle projects with no logs", async () => {
       const project1 = await seedProject(db, { retentionDays: 30 });
       // Create a second project without logs to verify cleanup handles empty projects gracefully
       await seedProject(db, { retentionDays: 7 });
@@ -211,7 +211,7 @@ describe('cleanupOldLogs', () => {
       expect(result.errors).toHaveLength(0);
     });
 
-    it('should handle empty database', async () => {
+    it("should handle empty database", async () => {
       // No projects, no logs
       const result = await cleanupOldLogs(db);
 
@@ -222,8 +222,8 @@ describe('cleanupOldLogs', () => {
     });
   });
 
-  describe('edge cases', () => {
-    it('should handle logs exactly at retention boundary', async () => {
+  describe("edge cases", () => {
+    it("should handle logs exactly at retention boundary", async () => {
       const project1 = await seedProject(db, { retentionDays: 30 });
 
       const now = new Date();

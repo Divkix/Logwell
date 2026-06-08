@@ -419,13 +419,35 @@ class TestValidateConfigNumericBounds:
         result = validate_config(config)  # type: ignore[arg-type]
         assert result["batch_size"] == 1
 
-    def test_batch_size_large(self, valid_config: LogwellConfig) -> None:
-        """Accepts large batch_size values."""
+    def test_batch_size_too_large(self, valid_config: LogwellConfig) -> None:
+        """Raises LogwellError when batch_size exceeds the server limit (100)."""
         config = dict(valid_config)
         config["batch_size"] = 10000
 
+        with pytest.raises(LogwellError) as exc_info:
+            validate_config(config)  # type: ignore[arg-type]
+
+        assert exc_info.value.code == LogwellErrorCode.INVALID_CONFIG
+        assert "batch_size" in exc_info.value.message
+
+    def test_batch_size_boundary_100_accepted(self, valid_config: LogwellConfig) -> None:
+        """Accepts batch_size at the server limit boundary (100)."""
+        config = dict(valid_config)
+        config["batch_size"] = 100
+
         result = validate_config(config)  # type: ignore[arg-type]
-        assert result["batch_size"] == 10000
+        assert result["batch_size"] == 100
+
+    def test_batch_size_boundary_101_rejected(self, valid_config: LogwellConfig) -> None:
+        """Raises LogwellError when batch_size is just above the limit (101)."""
+        config = dict(valid_config)
+        config["batch_size"] = 101
+
+        with pytest.raises(LogwellError) as exc_info:
+            validate_config(config)  # type: ignore[arg-type]
+
+        assert exc_info.value.code == LogwellErrorCode.INVALID_CONFIG
+        assert "batch_size" in exc_info.value.message
 
     # flush_interval tests
     def test_flush_interval_negative(self, valid_config: LogwellConfig) -> None:
@@ -557,13 +579,13 @@ class TestValidateConfigDefaults:
     def test_partial_overrides(self, valid_config: LogwellConfig) -> None:
         """Allows partial override of defaults."""
         config = dict(valid_config)
-        config["batch_size"] = 200
+        config["batch_size"] = 100
         config["max_retries"] = 10
 
         result = validate_config(config)  # type: ignore[arg-type]
 
         # Overridden values
-        assert result["batch_size"] == 200
+        assert result["batch_size"] == 100
         assert result["max_retries"] == 10
         # Default values
         assert result["flush_interval"] == DEFAULT_CONFIG["flush_interval"]

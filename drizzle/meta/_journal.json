@@ -57,6 +57,20 @@
       "when": 1778493600000,
       "tag": "0007_per_user_project_names",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1778580000000,
+      "tag": "0008_audit_improvements",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1780876800000,
+      "tag": "0009_hash_only_api_keys",
+      "breakpoints": true
     }
   ]
 }

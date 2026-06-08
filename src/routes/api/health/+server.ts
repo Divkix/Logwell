@@ -1,7 +1,7 @@
-import { json } from '@sveltejs/kit';
-import { sql } from 'drizzle-orm';
-import { type DatabaseClient, getDbClient } from '$lib/server/db/db';
-import type { RequestEvent } from './$types';
+import { json } from "@sveltejs/kit";
+import { sql } from "drizzle-orm";
+import { type DatabaseClient, getDbClient } from "$lib/server/db/db";
+import type { RequestEvent } from "./$types";
 
 // Track server start time for uptime calculation
 const serverStartTime = Date.now();
@@ -14,14 +14,14 @@ async function checkDatabase(
   db: DatabaseClient | null,
 ): Promise<{ connected: boolean; error?: string }> {
   if (!db) {
-    return { connected: false, error: 'Database client not available' };
+    return { connected: false, error: "Database client not available" };
   }
   try {
     // Execute a simple query to verify connectivity
     await db.execute(sql`SELECT 1`);
     return { connected: true };
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown database error';
+    const message = error instanceof Error ? error.message : "Unknown database error";
     return { connected: false, error: message };
   }
 }
@@ -30,8 +30,8 @@ async function checkDatabase(
  * Health check response type
  */
 interface HealthResponse {
-  status: 'healthy' | 'unhealthy';
-  database: 'connected' | 'disconnected';
+  status: "healthy" | "unhealthy";
+  database: "connected" | "disconnected";
   timestamp: string;
   uptime: number;
   version: string;
@@ -71,21 +71,22 @@ export async function GET(event: RequestEvent): Promise<Response> {
   const uptimeSeconds = Math.floor((Date.now() - serverStartTime) / 1000);
 
   const responseBody: HealthResponse = {
-    status: isHealthy ? 'healthy' : 'unhealthy',
-    database: dbStatus.connected ? 'connected' : 'disconnected',
+    status: isHealthy ? "healthy" : "unhealthy",
+    database: dbStatus.connected ? "connected" : "disconnected",
     timestamp: new Date().toISOString(),
     uptime: uptimeSeconds,
     version: __APP_VERSION__,
   };
 
-  // Include error details when unhealthy
+  // Include generic error message when unhealthy (log the real error server-side)
   if (!isHealthy && dbStatus.error) {
-    responseBody.error = dbStatus.error;
+    console.error("[health] Database connectivity check failed:", dbStatus.error);
+    responseBody.error = "database unavailable";
   }
 
   const headers = new Headers({
-    'Content-Type': 'application/json',
-    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    "Content-Type": "application/json",
+    "Cache-Control": "no-cache, no-store, must-revalidate",
   });
 
   return json(responseBody, {

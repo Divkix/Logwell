@@ -41,6 +41,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create Logwell client: %v", err)
 	}
+	defer func() {
+		if err := client.Shutdown(context.Background()); err != nil {
+			log.Printf("logwell shutdown failed: %v", err)
+		}
+	}()
 
 	fmt.Println("Logwell Go SDK - Basic Example")
 	fmt.Printf("Endpoint: %s\n", endpoint)
@@ -70,11 +75,6 @@ func main() {
 
 	// Give some time for the flush to complete
 	time.Sleep(100 * time.Millisecond)
-
-	// Flush any remaining logs before exit
-	// Note: In POC, Flush is not yet implemented on Client, but will be in Phase 2
-	// For now, just give time for any background operations
-	_ = context.Background()
 
 	fmt.Println()
 	fmt.Println("Example completed. Check your Logwell server for the logs!")

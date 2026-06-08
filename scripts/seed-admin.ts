@@ -1,12 +1,11 @@
 #!/usr/bin/env bun
-import { eq } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/postgres-js';
-import postgres from 'postgres';
-import { createAuth } from '../src/lib/server/auth';
-import * as schema from '../src/lib/server/db/schema';
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
+import { createAuth } from "../src/lib/server/auth";
+import * as schema from "../src/lib/server/db/schema";
 
 // Admin username constant (configurable via ADMIN_USERNAME env var)
-const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "admin";
 
 /**
  * Seeds the admin user into the database
@@ -18,15 +17,15 @@ async function seedAdmin() {
   const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
   if (!DATABASE_URL) {
-    throw new Error('DATABASE_URL environment variable is required');
+    throw new Error("DATABASE_URL environment variable is required");
   }
 
   if (!ADMIN_PASSWORD) {
-    throw new Error('ADMIN_PASSWORD environment variable is required');
+    throw new Error("ADMIN_PASSWORD environment variable is required");
   }
 
   if (ADMIN_PASSWORD.length < 8) {
-    throw new Error('ADMIN_PASSWORD must be at least 8 characters long');
+    throw new Error("ADMIN_PASSWORD must be at least 8 characters long");
   }
 
   // Generate email from username (email is still required by better-auth internally)
@@ -38,37 +37,37 @@ async function seedAdmin() {
   const db = drizzle(client, { schema });
 
   try {
-    // Check if admin already exists by username
-    const existingAdmin = await db
-      .select()
-      .from(schema.user)
-      .where(eq(schema.user.username, ADMIN_USERNAME));
-
-    if (existingAdmin.length > 0) {
-      console.log('✓ Admin user already exists, skipping');
-      return;
-    }
-
     // Create admin user via better-auth with username
+    // Idempotent: catch unique constraint errors and treat as success
     const auth = createAuth(db);
-    const result = await auth.api.signUpEmail({
-      body: {
-        email: generatedEmail,
-        password: ADMIN_PASSWORD,
-        name: 'Admin',
-        username: ADMIN_USERNAME,
-      },
-    });
+    try {
+      const result = await auth.api.signUpEmail({
+        body: {
+          email: generatedEmail,
+          password: ADMIN_PASSWORD,
+          name: "Admin",
+          username: ADMIN_USERNAME,
+        },
+      });
 
-    if (result.error) {
-      throw new Error(`Failed to create admin user: ${result.error.message}`);
+      const resultError = (result as { error?: { message: string } }).error;
+      if (resultError) {
+        throw new Error(`Failed to create admin user: ${resultError.message}`);
+      }
+
+      console.log("✓ Admin user created successfully");
+      console.log(`  Username: ${ADMIN_USERNAME}`);
+      console.log("  You can now sign in with the admin credentials");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message.toLowerCase() : "";
+      if (msg.includes("unique") || msg.includes("already exists") || msg.includes("23505")) {
+        console.log("✓ Admin user already exists, skipping seed.");
+      } else {
+        throw e;
+      }
     }
-
-    console.log('✓ Admin user created successfully');
-    console.log(`  Username: ${ADMIN_USERNAME}`);
-    console.log('  You can now sign in with the admin credentials');
   } catch (error) {
-    console.error('✗ Failed to seed admin user:', error);
+    console.error("✗ Failed to seed admin user:", error);
     throw error;
   } finally {
     // Close database connection
@@ -78,6 +77,6 @@ async function seedAdmin() {
 
 // Run the seed function
 seedAdmin().catch((error) => {
-  console.error('Seed failed:', error);
+  console.error("Seed failed:", error);
   process.exit(1);
 });

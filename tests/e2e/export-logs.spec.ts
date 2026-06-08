@@ -1,5 +1,5 @@
-import { expect, type Page, test } from '@playwright/test';
-import { ingestOtlpLogs } from './helpers/otlp';
+import { expect, type Page, test } from "@playwright/test";
+import { ingestOtlpLogs } from "./helpers/otlp";
 
 /**
  * E2E tests for Log Export Feature
@@ -10,16 +10,16 @@ import { ingestOtlpLogs } from './helpers/otlp';
 
 // Test user credentials (matches seeded admin from scripts/seed-admin.ts)
 const TEST_USER = {
-  username: 'admin',
-  password: 'adminpass',
+  username: "admin",
+  password: "adminpass",
 };
 
 /**
  * Helper to perform login
  */
 async function login(page: Page) {
-  await page.goto('/login');
-  await page.waitForSelector('form');
+  await page.goto("/login");
+  await page.waitForSelector("form");
 
   const usernameInput = page.getByLabel(/username/i);
   const passwordInput = page.getByLabel(/password/i);
@@ -32,8 +32,8 @@ async function login(page: Page) {
   await passwordInput.fill(TEST_USER.password);
   await expect(passwordInput).toHaveValue(TEST_USER.password);
 
-  await page.getByRole('button', { name: /sign in/i }).click();
-  await expect(page).toHaveURL('/', { timeout: 15000 });
+  await page.getByRole("button", { name: /sign in/i }).click();
+  await expect(page).toHaveURL("/", { timeout: 15000 });
 }
 
 /**
@@ -41,7 +41,7 @@ async function login(page: Page) {
  * Returns the created project data including apiKey
  */
 async function createProject(page: Page, name: string) {
-  const response = await page.request.post('/api/projects', {
+  const response = await page.request.post("/api/projects", {
     data: { name },
   });
   expect(response.ok()).toBeTruthy();
@@ -63,7 +63,7 @@ async function ingestLogsBatch(
   page: Page,
   apiKey: string,
   logs: Array<{
-    level: 'debug' | 'info' | 'warn' | 'error' | 'fatal';
+    level: "debug" | "info" | "warn" | "error" | "fatal";
     message: string;
     metadata?: Record<string, unknown>;
     sourceFile?: string;
@@ -74,13 +74,13 @@ async function ingestLogsBatch(
   }>,
 ) {
   const otlpLogs = logs.map((log) => {
-    const attributes: Record<string, unknown> = { ...(log.metadata ?? {}) };
+    const attributes: Record<string, unknown> = { ...log.metadata };
 
-    if (log.sourceFile) attributes['code.filepath'] = log.sourceFile;
-    if (log.lineNumber !== undefined) attributes['code.lineno'] = log.lineNumber;
-    if (log.requestId) attributes['request.id'] = log.requestId;
-    if (log.userId) attributes['enduser.id'] = log.userId;
-    if (log.ipAddress) attributes['client.address'] = log.ipAddress;
+    if (log.sourceFile) attributes["code.filepath"] = log.sourceFile;
+    if (log.lineNumber !== undefined) attributes["code.lineno"] = log.lineNumber;
+    if (log.requestId) attributes["request.id"] = log.requestId;
+    if (log.userId) attributes["enduser.id"] = log.userId;
+    if (log.ipAddress) attributes["client.address"] = log.ipAddress;
 
     return { level: log.level, message: log.message, attributes };
   });
@@ -92,11 +92,11 @@ async function ingestLogsBatch(
  * Helper to parse CSV content into rows
  */
 function parseCsv(csvContent: string): string[][] {
-  const lines = csvContent.trim().split('\n');
+  const lines = csvContent.trim().split("\n");
   return lines.map((line) => {
     // Simple CSV parsing - handles quoted fields
     const fields: string[] = [];
-    let current = '';
+    let current = "";
     let inQuotes = false;
 
     for (let i = 0; i < line.length; i++) {
@@ -104,9 +104,9 @@ function parseCsv(csvContent: string): string[][] {
 
       if (char === '"') {
         inQuotes = !inQuotes;
-      } else if (char === ',' && !inQuotes) {
+      } else if (char === "," && !inQuotes) {
         fields.push(current.trim());
-        current = '';
+        current = "";
       } else {
         current += char;
       }
@@ -116,7 +116,7 @@ function parseCsv(csvContent: string): string[][] {
   });
 }
 
-test.describe('Log Export - Visibility', () => {
+test.describe("Log Export - Visibility", () => {
   test.describe.configure({ retries: 1 });
 
   let testProject: { id: string; name: string; apiKey: string };
@@ -132,11 +132,11 @@ test.describe('Log Export - Visibility', () => {
     }
   });
 
-  test('should show export button when logs exist', async ({ page }) => {
+  test("should show export button when logs exist", async ({ page }) => {
     // Ingest some logs
     await ingestLogsBatch(page, testProject.apiKey, [
-      { level: 'info', message: 'Test log for export visibility' },
-      { level: 'error', message: 'Another test log' },
+      { level: "info", message: "Test log for export visibility" },
+      { level: "error", message: "Another test log" },
     ]);
 
     await page.goto(`/projects/${testProject.id}`);
@@ -146,13 +146,13 @@ test.describe('Log Export - Visibility', () => {
     await expect(exportButton).toBeVisible({ timeout: 5000 });
   });
 
-  test('should hide export button when no logs exist', async ({ page }) => {
+  test("should hide export button when no logs exist", async ({ page }) => {
     // Navigate to project with no logs
     await page.goto(`/projects/${testProject.id}`);
 
     // Wait for page to load and verify empty state (desktop table cell)
     await expect(page.locator('[data-testid="log-table"]')).toBeVisible();
-    await expect(page.getByRole('cell', { name: 'No logs yet' })).toBeVisible();
+    await expect(page.getByRole("cell", { name: "No logs yet" })).toBeVisible();
 
     // Export button should not be visible
     const exportButton = page.locator('[data-testid="export-button"]');
@@ -160,7 +160,7 @@ test.describe('Log Export - Visibility', () => {
   });
 });
 
-test.describe('Log Export - Format Selection', () => {
+test.describe("Log Export - Format Selection", () => {
   test.describe.configure({ retries: 1 });
 
   let testProject: { id: string; name: string; apiKey: string };
@@ -171,7 +171,7 @@ test.describe('Log Export - Format Selection', () => {
 
     // Ingest test logs
     await ingestLogsBatch(page, testProject.apiKey, [
-      { level: 'info', message: 'Format selection test log' },
+      { level: "info", message: "Format selection test log" },
     ]);
   });
 
@@ -181,7 +181,7 @@ test.describe('Log Export - Format Selection', () => {
     }
   });
 
-  test('should show format dropdown when clicking export button', async ({ page }) => {
+  test("should show format dropdown when clicking export button", async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
     // Click export button
@@ -194,7 +194,7 @@ test.describe('Log Export - Format Selection', () => {
     await expect(page.locator('[data-testid="export-json"]')).toBeVisible();
   });
 
-  test('should close dropdown when pressing Escape', async ({ page }) => {
+  test("should close dropdown when pressing Escape", async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
     // Open dropdown
@@ -203,14 +203,14 @@ test.describe('Log Export - Format Selection', () => {
     await expect(page.locator('[data-testid="export-csv"]')).toBeVisible();
 
     // Press Escape to close dropdown
-    await page.keyboard.press('Escape');
+    await page.keyboard.press("Escape");
 
     // Dropdown should close
     await expect(page.locator('[data-testid="export-csv"]')).not.toBeVisible();
   });
 });
 
-test.describe('Log Export - CSV Download', () => {
+test.describe("Log Export - CSV Download", () => {
   test.describe.configure({ retries: 1 });
 
   let testProject: { id: string; name: string; apiKey: string };
@@ -222,18 +222,18 @@ test.describe('Log Export - CSV Download', () => {
     // Ingest test logs with various fields
     await ingestLogsBatch(page, testProject.apiKey, [
       {
-        level: 'info',
-        message: 'CSV export test log',
-        metadata: { key: 'value' },
-        sourceFile: 'test.ts',
+        level: "info",
+        message: "CSV export test log",
+        metadata: { key: "value" },
+        sourceFile: "test.ts",
         lineNumber: 42,
-        requestId: 'req_123',
-        userId: 'user_456',
-        ipAddress: '192.168.1.1',
+        requestId: "req_123",
+        userId: "user_456",
+        ipAddress: "192.168.1.1",
       },
       {
-        level: 'error',
-        message: 'Error log for CSV',
+        level: "error",
+        message: "Error log for CSV",
       },
     ]);
   });
@@ -244,14 +244,14 @@ test.describe('Log Export - CSV Download', () => {
     }
   });
 
-  test('should trigger CSV download with correct filename pattern', async ({ page }) => {
+  test("should trigger CSV download with correct filename pattern", async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
     // Open export dropdown
     await page.locator('[data-testid="export-button"]').click();
 
     // Start download listener
-    const downloadPromise = page.waitForEvent('download');
+    const downloadPromise = page.waitForEvent("download");
 
     // Click CSV option
     await page.locator('[data-testid="export-csv"]').click();
@@ -262,15 +262,15 @@ test.describe('Log Export - CSV Download', () => {
 
     // Verify filename matches pattern: logs-*.csv
     expect(filename).toMatch(/^logs-.+\.csv$/);
-    expect(filename).toContain(testProject.name.replace(/[^a-zA-Z0-9-_]/g, '-'));
+    expect(filename).toContain(testProject.name.replace(/[^a-zA-Z0-9-_]/g, "-"));
   });
 
-  test('should download CSV with expected headers', async ({ page }) => {
+  test("should download CSV with expected headers", async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
     // Trigger CSV download
     await page.locator('[data-testid="export-button"]').click();
-    const downloadPromise = page.waitForEvent('download');
+    const downloadPromise = page.waitForEvent("download");
     await page.locator('[data-testid="export-csv"]').click();
 
     // Get download content
@@ -282,31 +282,31 @@ test.describe('Log Export - CSV Download', () => {
         chunks.push(Buffer.from(chunk));
       }
     }
-    const csvContent = Buffer.concat(chunks).toString('utf-8');
+    const csvContent = Buffer.concat(chunks).toString("utf-8");
 
     // Parse CSV
     const rows = parseCsv(csvContent);
     const headers = rows[0];
 
     // Verify expected headers exist
-    expect(headers).toContain('id');
-    expect(headers).toContain('level');
-    expect(headers).toContain('message');
-    expect(headers).toContain('timestamp');
-    expect(headers).toContain('sourceFile');
-    expect(headers).toContain('lineNumber');
-    expect(headers).toContain('requestId');
-    expect(headers).toContain('userId');
-    expect(headers).toContain('ipAddress');
-    expect(headers).toContain('metadata');
+    expect(headers).toContain("id");
+    expect(headers).toContain("level");
+    expect(headers).toContain("message");
+    expect(headers).toContain("timestamp");
+    expect(headers).toContain("sourceFile");
+    expect(headers).toContain("lineNumber");
+    expect(headers).toContain("requestId");
+    expect(headers).toContain("userId");
+    expect(headers).toContain("ipAddress");
+    expect(headers).toContain("metadata");
   });
 
-  test('should download CSV with correct data rows', async ({ page }) => {
+  test("should download CSV with correct data rows", async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
     // Trigger CSV download
     await page.locator('[data-testid="export-button"]').click();
-    const downloadPromise = page.waitForEvent('download');
+    const downloadPromise = page.waitForEvent("download");
     await page.locator('[data-testid="export-csv"]').click();
 
     // Get download content
@@ -318,17 +318,17 @@ test.describe('Log Export - CSV Download', () => {
         chunks.push(Buffer.from(chunk));
       }
     }
-    const csvContent = Buffer.concat(chunks).toString('utf-8');
+    const csvContent = Buffer.concat(chunks).toString("utf-8");
 
     // Verify content includes test data
-    expect(csvContent).toContain('CSV export test log');
-    expect(csvContent).toContain('Error log for CSV');
-    expect(csvContent).toContain('info');
-    expect(csvContent).toContain('error');
+    expect(csvContent).toContain("CSV export test log");
+    expect(csvContent).toContain("Error log for CSV");
+    expect(csvContent).toContain("info");
+    expect(csvContent).toContain("error");
   });
 });
 
-test.describe('Log Export - JSON Download', () => {
+test.describe("Log Export - JSON Download", () => {
   test.describe.configure({ retries: 1 });
 
   let testProject: { id: string; name: string; apiKey: string };
@@ -340,13 +340,13 @@ test.describe('Log Export - JSON Download', () => {
     // Ingest test logs
     await ingestLogsBatch(page, testProject.apiKey, [
       {
-        level: 'warn',
-        message: 'JSON export test log',
-        metadata: { environment: 'test' },
+        level: "warn",
+        message: "JSON export test log",
+        metadata: { environment: "test" },
       },
       {
-        level: 'debug',
-        message: 'Debug log for JSON',
+        level: "debug",
+        message: "Debug log for JSON",
       },
     ]);
   });
@@ -357,14 +357,14 @@ test.describe('Log Export - JSON Download', () => {
     }
   });
 
-  test('should trigger JSON download with correct filename pattern', async ({ page }) => {
+  test("should trigger JSON download with correct filename pattern", async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
     // Open export dropdown
     await page.locator('[data-testid="export-button"]').click();
 
     // Start download listener
-    const downloadPromise = page.waitForEvent('download');
+    const downloadPromise = page.waitForEvent("download");
 
     // Click JSON option
     await page.locator('[data-testid="export-json"]').click();
@@ -375,15 +375,15 @@ test.describe('Log Export - JSON Download', () => {
 
     // Verify filename matches pattern: logs-*.json
     expect(filename).toMatch(/^logs-.+\.json$/);
-    expect(filename).toContain(testProject.name.replace(/[^a-zA-Z0-9-_]/g, '-'));
+    expect(filename).toContain(testProject.name.replace(/[^a-zA-Z0-9-_]/g, "-"));
   });
 
-  test('should download valid JSON array', async ({ page }) => {
+  test("should download valid JSON array", async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
     // Trigger JSON download
     await page.locator('[data-testid="export-button"]').click();
-    const downloadPromise = page.waitForEvent('download');
+    const downloadPromise = page.waitForEvent("download");
     await page.locator('[data-testid="export-json"]').click();
 
     // Get download content
@@ -395,7 +395,7 @@ test.describe('Log Export - JSON Download', () => {
         chunks.push(Buffer.from(chunk));
       }
     }
-    const jsonContent = Buffer.concat(chunks).toString('utf-8');
+    const jsonContent = Buffer.concat(chunks).toString("utf-8");
 
     // Parse JSON and verify structure
     let parsedJson: unknown;
@@ -406,12 +406,12 @@ test.describe('Log Export - JSON Download', () => {
     expect(Array.isArray(parsedJson)).toBe(true);
   });
 
-  test('should download JSON with expected fields', async ({ page }) => {
+  test("should download JSON with expected fields", async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
     // Trigger JSON download
     await page.locator('[data-testid="export-button"]').click();
-    const downloadPromise = page.waitForEvent('download');
+    const downloadPromise = page.waitForEvent("download");
     await page.locator('[data-testid="export-json"]').click();
 
     // Get download content
@@ -423,7 +423,7 @@ test.describe('Log Export - JSON Download', () => {
         chunks.push(Buffer.from(chunk));
       }
     }
-    const jsonContent = Buffer.concat(chunks).toString('utf-8');
+    const jsonContent = Buffer.concat(chunks).toString("utf-8");
 
     // Parse and verify structure
     const logs = JSON.parse(jsonContent) as Array<Record<string, unknown>>;
@@ -432,19 +432,19 @@ test.describe('Log Export - JSON Download', () => {
     const firstLog = logs[0];
 
     // Verify expected fields
-    expect(firstLog).toHaveProperty('id');
-    expect(firstLog).toHaveProperty('level');
-    expect(firstLog).toHaveProperty('message');
-    expect(firstLog).toHaveProperty('timestamp');
+    expect(firstLog).toHaveProperty("id");
+    expect(firstLog).toHaveProperty("level");
+    expect(firstLog).toHaveProperty("message");
+    expect(firstLog).toHaveProperty("timestamp");
 
     // Verify content
     const messages = logs.map((l) => l.message);
-    expect(messages).toContain('JSON export test log');
-    expect(messages).toContain('Debug log for JSON');
+    expect(messages).toContain("JSON export test log");
+    expect(messages).toContain("Debug log for JSON");
   });
 });
 
-test.describe('Log Export - With Filters', () => {
+test.describe("Log Export - With Filters", () => {
   test.describe.configure({ retries: 1 });
 
   let testProject: { id: string; name: string; apiKey: string };
@@ -455,10 +455,10 @@ test.describe('Log Export - With Filters', () => {
 
     // Ingest logs with different levels and messages
     await ingestLogsBatch(page, testProject.apiKey, [
-      { level: 'info', message: 'Info message about database' },
-      { level: 'error', message: 'Error connecting to database' },
-      { level: 'warn', message: 'Warning about memory usage' },
-      { level: 'error', message: 'Critical error occurred' },
+      { level: "info", message: "Info message about database" },
+      { level: "error", message: "Error connecting to database" },
+      { level: "warn", message: "Warning about memory usage" },
+      { level: "error", message: "Critical error occurred" },
     ]);
   });
 
@@ -468,17 +468,17 @@ test.describe('Log Export - With Filters', () => {
     }
   });
 
-  test('should export filtered logs when level filter is active', async ({ page }) => {
+  test("should export filtered logs when level filter is active", async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
     // Apply level filter - select only ERROR
     const levelFilter = page.locator('[data-testid="level-filter"]');
-    await levelFilter.getByRole('button', { name: /error/i }).click();
+    await levelFilter.getByRole("button", { name: /error/i }).click();
     await page.waitForTimeout(500); // Wait for filter to apply
 
     // Trigger CSV export
     await page.locator('[data-testid="export-button"]').click();
-    const downloadPromise = page.waitForEvent('download');
+    const downloadPromise = page.waitForEvent("download");
     await page.locator('[data-testid="export-csv"]').click();
 
     // Get download content
@@ -490,26 +490,26 @@ test.describe('Log Export - With Filters', () => {
         chunks.push(Buffer.from(chunk));
       }
     }
-    const csvContent = Buffer.concat(chunks).toString('utf-8');
+    const csvContent = Buffer.concat(chunks).toString("utf-8");
 
     // Verify only error logs are exported
-    expect(csvContent).toContain('Error connecting to database');
-    expect(csvContent).toContain('Critical error occurred');
-    expect(csvContent).not.toContain('Info message about database');
-    expect(csvContent).not.toContain('Warning about memory usage');
+    expect(csvContent).toContain("Error connecting to database");
+    expect(csvContent).toContain("Critical error occurred");
+    expect(csvContent).not.toContain("Info message about database");
+    expect(csvContent).not.toContain("Warning about memory usage");
   });
 
-  test('should export filtered logs when search filter is active', async ({ page }) => {
+  test("should export filtered logs when search filter is active", async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
     // Apply search filter
     const searchInput = page.getByPlaceholder(/search/i);
-    await searchInput.fill('database');
+    await searchInput.fill("database");
     await page.waitForTimeout(500); // Wait for debounce
 
     // Trigger JSON export
     await page.locator('[data-testid="export-button"]').click();
-    const downloadPromise = page.waitForEvent('download');
+    const downloadPromise = page.waitForEvent("download");
     await page.locator('[data-testid="export-json"]').click();
 
     // Get download content
@@ -521,33 +521,33 @@ test.describe('Log Export - With Filters', () => {
         chunks.push(Buffer.from(chunk));
       }
     }
-    const jsonContent = Buffer.concat(chunks).toString('utf-8');
+    const jsonContent = Buffer.concat(chunks).toString("utf-8");
 
     // Parse and verify
     const logs = JSON.parse(jsonContent) as Array<Record<string, unknown>>;
     const messages = logs.map((l) => l.message as string);
 
     // Should only contain logs with "database" in message
-    expect(messages.every((msg) => msg.toLowerCase().includes('database'))).toBe(true);
-    expect(messages).toContain('Info message about database');
-    expect(messages).toContain('Error connecting to database');
+    expect(messages.every((msg) => msg.toLowerCase().includes("database"))).toBe(true);
+    expect(messages).toContain("Info message about database");
+    expect(messages).toContain("Error connecting to database");
   });
 
-  test('should export filtered logs with combined filters', async ({ page }) => {
+  test("should export filtered logs with combined filters", async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
 
     // Apply both level and search filters
     const levelFilter = page.locator('[data-testid="level-filter"]');
-    await levelFilter.getByRole('button', { name: /error/i }).click();
+    await levelFilter.getByRole("button", { name: /error/i }).click();
     await page.waitForTimeout(300);
 
     const searchInput = page.getByPlaceholder(/search/i);
-    await searchInput.fill('database');
+    await searchInput.fill("database");
     await page.waitForTimeout(500);
 
     // Trigger CSV export
     await page.locator('[data-testid="export-button"]').click();
-    const downloadPromise = page.waitForEvent('download');
+    const downloadPromise = page.waitForEvent("download");
     await page.locator('[data-testid="export-csv"]').click();
 
     // Get download content
@@ -559,17 +559,17 @@ test.describe('Log Export - With Filters', () => {
         chunks.push(Buffer.from(chunk));
       }
     }
-    const csvContent = Buffer.concat(chunks).toString('utf-8');
+    const csvContent = Buffer.concat(chunks).toString("utf-8");
 
     // Should only contain error logs with "database" in message
-    expect(csvContent).toContain('Error connecting to database');
-    expect(csvContent).not.toContain('Info message about database'); // Wrong level
-    expect(csvContent).not.toContain('Critical error occurred'); // Missing search term
-    expect(csvContent).not.toContain('Warning about memory usage'); // Wrong level and missing search
+    expect(csvContent).toContain("Error connecting to database");
+    expect(csvContent).not.toContain("Info message about database"); // Wrong level
+    expect(csvContent).not.toContain("Critical error occurred"); // Missing search term
+    expect(csvContent).not.toContain("Warning about memory usage"); // Wrong level and missing search
   });
 });
 
-test.describe('Log Export - Edge Cases', () => {
+test.describe("Log Export - Edge Cases", () => {
   test.describe.configure({ retries: 1 });
 
   let testProject: { id: string; name: string; apiKey: string };
@@ -585,11 +585,11 @@ test.describe('Log Export - Edge Cases', () => {
     }
   });
 
-  test('should handle export of logs with special characters in message', async ({ page }) => {
+  test("should handle export of logs with special characters in message", async ({ page }) => {
     // Ingest log with special characters
     await ingestLogsBatch(page, testProject.apiKey, [
       {
-        level: 'info',
+        level: "info",
         message: 'Log with special chars: "quotes", commas,, and\nnewlines',
       },
     ]);
@@ -598,7 +598,7 @@ test.describe('Log Export - Edge Cases', () => {
 
     // Trigger CSV export
     await page.locator('[data-testid="export-button"]').click();
-    const downloadPromise = page.waitForEvent('download');
+    const downloadPromise = page.waitForEvent("download");
     await page.locator('[data-testid="export-csv"]').click();
 
     // Should complete without error
@@ -606,15 +606,15 @@ test.describe('Log Export - Edge Cases', () => {
     expect(download.suggestedFilename()).toMatch(/\.csv$/);
   });
 
-  test('should handle export when filter results in no logs', async ({ page }) => {
+  test("should handle export when filter results in no logs", async ({ page }) => {
     // Ingest one log
-    await ingestLogsBatch(page, testProject.apiKey, [{ level: 'info', message: 'Single log' }]);
+    await ingestLogsBatch(page, testProject.apiKey, [{ level: "info", message: "Single log" }]);
 
     await page.goto(`/projects/${testProject.id}`);
 
     // Apply filter that matches nothing
     const searchInput = page.getByPlaceholder(/search/i);
-    await searchInput.fill('nonexistentterm123456');
+    await searchInput.fill("nonexistentterm123456");
     await page.waitForTimeout(500);
 
     // Export button might be hidden when no results
@@ -624,7 +624,7 @@ test.describe('Log Export - Edge Cases', () => {
     if (isVisible) {
       // If export is still available, it should export empty results
       await exportButton.click();
-      const downloadPromise = page.waitForEvent('download');
+      const downloadPromise = page.waitForEvent("download");
       await page.locator('[data-testid="export-json"]').click();
 
       const download = await downloadPromise;
@@ -635,7 +635,7 @@ test.describe('Log Export - Edge Cases', () => {
           chunks.push(Buffer.from(chunk));
         }
       }
-      const jsonContent = Buffer.concat(chunks).toString('utf-8');
+      const jsonContent = Buffer.concat(chunks).toString("utf-8");
       const logs = JSON.parse(jsonContent) as Array<Record<string, unknown>>;
 
       expect(logs.length).toBe(0);

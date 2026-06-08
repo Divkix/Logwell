@@ -1,4 +1,4 @@
-import type { Locator, Page } from '@playwright/test';
+import type { Locator, Page } from "@playwright/test";
 
 /**
  * Log selector helpers for E2E tests
@@ -36,9 +36,9 @@ export function getLogCard(page: Page, options?: { hasText?: string }): Locator 
 export function getLogMessage(
   page: Page,
   text: string,
-  viewport: 'desktop' | 'mobile' = 'desktop',
+  viewport: "desktop" | "mobile" = "desktop",
 ): Locator {
-  if (viewport === 'mobile') {
+  if (viewport === "mobile") {
     // Mobile uses card layout
     return page.locator('[data-testid="log-card"]').getByText(text);
   }
@@ -57,9 +57,9 @@ export function getLogMessage(
 export function getLevelBadge(
   page: Page,
   level: string,
-  viewport: 'desktop' | 'mobile' = 'desktop',
+  viewport: "desktop" | "mobile" = "desktop",
 ): Locator {
-  if (viewport === 'mobile') {
+  if (viewport === "mobile") {
     return page.locator('[data-testid="log-card"]').getByText(level);
   }
   return page.locator('[data-testid="log-table"] table').getByText(level);

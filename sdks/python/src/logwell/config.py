@@ -21,6 +21,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "flush_interval": 5.0,  # seconds
     "max_queue_size": 1000,
     "max_retries": 3,
+    "timeout": 30.0,  # seconds
     "capture_source_location": False,
 }
 
@@ -97,12 +98,28 @@ def validate_config(config: LogwellConfig) -> LogwellConfig:
             LogwellErrorCode.INVALID_CONFIG,
         )
 
-    # Validate endpoint URL
-    if not _is_valid_url(config["endpoint"]):
+    # Validate endpoint URL and strip trailing slash (PY-11)
+    try:
+        parsed_endpoint = urlparse(config["endpoint"])
+        valid_url = bool(parsed_endpoint.scheme and parsed_endpoint.netloc)
+        valid_scheme = parsed_endpoint.scheme in ("http", "https")
+        endpoint_scheme = parsed_endpoint.scheme
+    except (ValueError, AttributeError):
+        valid_url = False
+        valid_scheme = False
+        endpoint_scheme = ""
+
+    if not valid_url:
         raise LogwellError(
             f"Invalid endpoint URL: '{config['endpoint']}'. "
             "Expected a valid URL with scheme (http:// or https://) and host. "
             "Example: 'https://logs.example.com' or 'http://localhost:3000'",
+            LogwellErrorCode.INVALID_CONFIG,
+        )
+    if not valid_scheme:
+        raise LogwellError(
+            f"Invalid endpoint URL scheme: '{endpoint_scheme}'. "
+            "endpoint must use http or https scheme.",
             LogwellErrorCode.INVALID_CONFIG,
         )
 
@@ -112,6 +129,13 @@ def validate_config(config: LogwellConfig) -> LogwellConfig:
             f"Invalid batch_size: {config['batch_size']}. "
             "batch_size must be a positive integer (e.g., 50). "
             "This controls how many logs are batched before auto-flush.",
+            LogwellErrorCode.INVALID_CONFIG,
+        )
+
+    if "batch_size" in config and config["batch_size"] > 100:
+        raise LogwellError(
+            f"Invalid batch_size: {config['batch_size']}. "
+            "batch_size must not exceed 100 (the server's per-request limit).",
             LogwellErrorCode.INVALID_CONFIG,
         )
 
@@ -139,6 +163,13 @@ def validate_config(config: LogwellConfig) -> LogwellConfig:
             LogwellErrorCode.INVALID_CONFIG,
         )
 
+    if "timeout" in config and config["timeout"] <= 0:
+        raise LogwellError(
+            f"Invalid timeout: {config['timeout']}. "
+            "timeout must be a positive number in seconds (e.g., 30.0).",
+            LogwellErrorCode.INVALID_CONFIG,
+        )
+
     # Return merged config with defaults
     merged: LogwellConfig = {
         "api_key": config["api_key"],
@@ -147,6 +178,7 @@ def validate_config(config: LogwellConfig) -> LogwellConfig:
         "flush_interval": config.get("flush_interval", DEFAULT_CONFIG["flush_interval"]),
         "max_queue_size": config.get("max_queue_size", DEFAULT_CONFIG["max_queue_size"]),
         "max_retries": config.get("max_retries", DEFAULT_CONFIG["max_retries"]),
+        "timeout": config.get("timeout", DEFAULT_CONFIG["timeout"]),
         "capture_source_location": config.get(
             "capture_source_location", DEFAULT_CONFIG["capture_source_location"]
         ),

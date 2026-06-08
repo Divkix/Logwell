@@ -69,18 +69,18 @@ func main() {
 
 Configure the client using functional options:
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `WithService(s)` | `string` | `""` | Service name attached to all logs |
-| `WithMetadata(m)` | `map[string]any` | `nil` | Default metadata for all logs |
-| `WithBatchSize(n)` | `int` | `50` | Logs per batch (1-500) |
-| `WithFlushInterval(d)` | `time.Duration` | `5s` | Auto-flush interval (100ms-60s) |
-| `WithMaxQueueSize(n)` | `int` | `1000` | Max queue size before dropping oldest (1-10000) |
-| `WithMaxRetries(n)` | `int` | `3` | Retry attempts for failed requests (0-10) |
-| `WithCaptureSourceLocation(b)` | `bool` | `false` | Capture file/line info |
-| `WithHTTPClient(c)` | `*http.Client` | `http.DefaultClient` | Custom HTTP client |
-| `WithOnError(fn)` | `func(*Error)` | `nil` | Error callback |
-| `WithOnFlush(fn)` | `func(int)` | `nil` | Flush callback (receives count) |
+| Option                         | Type             | Default              | Description                                     |
+| ------------------------------ | ---------------- | -------------------- | ----------------------------------------------- |
+| `WithService(s)`               | `string`         | `""`                 | Service name attached to all logs               |
+| `WithMetadata(m)`              | `map[string]any` | `nil`                | Default metadata for all logs                   |
+| `WithBatchSize(n)`             | `int`            | `50`                 | Logs per batch (1-500)                          |
+| `WithFlushInterval(d)`         | `time.Duration`  | `5s`                 | Auto-flush interval (100ms-60s)                 |
+| `WithMaxQueueSize(n)`          | `int`            | `1000`               | Max queue size before dropping oldest (1-10000) |
+| `WithMaxRetries(n)`            | `int`            | `3`                  | Retry attempts for failed requests (0-10)       |
+| `WithCaptureSourceLocation(b)` | `bool`           | `false`              | Capture file/line info                          |
+| `WithHTTPClient(c)`            | `*http.Client`   | `http.DefaultClient` | Custom HTTP client                              |
+| `WithOnError(fn)`              | `func(*Error)`   | `nil`                | Error callback                                  |
+| `WithOnFlush(fn)`              | `func(int)`      | `nil`                | Flush callback (receives count)                 |
 
 ### Example with all options
 
@@ -181,6 +181,7 @@ dbLogger.Info("Query executed", logwell.M{"duration": 45})
 ```
 
 Child loggers:
+
 - Share the parent's queue and transport (efficient batching)
 - Inherit parent metadata (child metadata overrides on conflict)
 - Can override the service name
@@ -257,15 +258,15 @@ client, _ := logwell.New(
 
 ### Error Codes
 
-| Code | Description | Retryable |
-|------|-------------|-----------|
-| `ErrNetworkError` | Network failure (connection, timeout) | Yes |
-| `ErrUnauthorized` | Invalid API key (401) | No |
-| `ErrValidationError` | Invalid log data (400) | No |
-| `ErrRateLimited` | Too many requests (429) | Yes |
-| `ErrServerError` | Server error (5xx) | Yes |
-| `ErrQueueOverflow` | Queue full, oldest logs dropped | No |
-| `ErrInvalidConfig` | Invalid configuration | No |
+| Code                 | Description                           | Retryable |
+| -------------------- | ------------------------------------- | --------- |
+| `ErrNetworkError`    | Network failure (connection, timeout) | Yes       |
+| `ErrUnauthorized`    | Invalid API key (401)                 | No        |
+| `ErrValidationError` | Invalid log data (400)                | No        |
+| `ErrRateLimited`     | Too many requests (429)               | Yes       |
+| `ErrServerError`     | Server error (5xx)                    | Yes       |
+| `ErrQueueOverflow`   | Queue full, oldest logs dropped       | No        |
+| `ErrInvalidConfig`   | Invalid configuration                 | No        |
 
 ### Error Type
 

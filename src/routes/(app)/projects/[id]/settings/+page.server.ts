@@ -1,15 +1,15 @@
-import { error } from '@sveltejs/kit';
-import { and, count, eq, min } from 'drizzle-orm';
-import { RETENTION_CONFIG } from '$lib/server/config';
-import { log, project } from '$lib/server/db/schema';
-import { requireAuth } from '$lib/server/utils/auth-guard';
-import type { PageServerLoad } from './$types';
+import { error } from "@sveltejs/kit";
+import { and, count, eq, min } from "drizzle-orm";
+import { RETENTION_CONFIG } from "$lib/server/config";
+import { log, project } from "$lib/server/db/schema";
+import { requireAuth } from "$lib/server/utils/auth-guard";
+import type { PageServerLoad } from "./$types";
 
 export const load: PageServerLoad = async (event) => {
   // Require session authentication
   const { user } = await requireAuth(event);
 
-  const { db } = await import('$lib/server/db');
+  const { db } = await import("$lib/server/db");
   const projectId = event.params.id;
 
   // Fetch project data - verify ownership
@@ -19,7 +19,7 @@ export const load: PageServerLoad = async (event) => {
     .where(and(eq(project.id, projectId), eq(project.ownerId, user.id)));
 
   if (!projectData) {
-    throw error(404, { message: 'Project not found' });
+    throw error(404, { message: "Project not found" });
   }
 
   // Get log stats: total count and oldest log date
@@ -35,7 +35,6 @@ export const load: PageServerLoad = async (event) => {
     project: {
       id: projectData.id,
       name: projectData.name,
-      apiKey: projectData.apiKey,
       retentionDays: projectData.retentionDays,
       createdAt: projectData.createdAt?.toISOString() ?? null,
       updatedAt: projectData.updatedAt?.toISOString() ?? null,

@@ -1,8 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { BatchQueue, type QueueConfig, type SendBatchFn } from '../../src/queue';
-import { createLogBatch, createLogFixture } from '../fixtures/logs';
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { BatchQueue, type QueueConfig, type SendBatchFn } from "../../src/queue";
+import { createLogBatch, createLogFixture } from "../fixtures/logs";
 
-describe('BatchQueue', () => {
+describe("BatchQueue", () => {
   let mockSendBatch: SendBatchFn;
   let defaultConfig: QueueConfig;
 
@@ -20,8 +20,8 @@ describe('BatchQueue', () => {
     vi.useRealTimers();
   });
 
-  describe('constructor', () => {
-    it('creates queue with config', () => {
+  describe("constructor", () => {
+    it("creates queue with config", () => {
       const queue = new BatchQueue(mockSendBatch, defaultConfig);
 
       expect(queue).toBeInstanceOf(BatchQueue);
@@ -29,8 +29,8 @@ describe('BatchQueue', () => {
     });
   });
 
-  describe('add', () => {
-    it('adds entry to queue', () => {
+  describe("add", () => {
+    it("adds entry to queue", () => {
       const queue = new BatchQueue(mockSendBatch, defaultConfig);
       const log = createLogFixture();
 
@@ -39,7 +39,7 @@ describe('BatchQueue', () => {
       expect(queue.size).toBe(1);
     });
 
-    it('increments size for each added entry', () => {
+    it("increments size for each added entry", () => {
       const queue = new BatchQueue(mockSendBatch, defaultConfig);
 
       queue.add(createLogFixture());
@@ -49,7 +49,7 @@ describe('BatchQueue', () => {
       expect(queue.size).toBe(3);
     });
 
-    it('triggers flush when batchSize reached', async () => {
+    it("triggers flush when batchSize reached", async () => {
       const queue = new BatchQueue(mockSendBatch, defaultConfig);
       const logs = createLogBatch(5);
 
@@ -64,7 +64,7 @@ describe('BatchQueue', () => {
       expect(mockSendBatch).toHaveBeenCalledWith(logs);
     });
 
-    it('does not flush before batchSize reached', () => {
+    it("does not flush before batchSize reached", () => {
       const queue = new BatchQueue(mockSendBatch, defaultConfig);
 
       queue.add(createLogFixture());
@@ -74,8 +74,8 @@ describe('BatchQueue', () => {
     });
   });
 
-  describe('flush interval', () => {
-    it('flushes after flushInterval elapsed', async () => {
+  describe("flush interval", () => {
+    it("flushes after flushInterval elapsed", async () => {
       const queue = new BatchQueue(mockSendBatch, defaultConfig);
       const log = createLogFixture();
 
@@ -88,7 +88,7 @@ describe('BatchQueue', () => {
       expect(mockSendBatch).toHaveBeenCalledWith([log]);
     });
 
-    it('does not flush if queue is empty', async () => {
+    it("does not flush if queue is empty", async () => {
       new BatchQueue(mockSendBatch, defaultConfig);
 
       await vi.advanceTimersByTimeAsync(1000);
@@ -96,7 +96,7 @@ describe('BatchQueue', () => {
       expect(mockSendBatch).not.toHaveBeenCalled();
     });
 
-    it('resets timer after manual flush', async () => {
+    it("resets timer after manual flush", async () => {
       const queue = new BatchQueue(mockSendBatch, defaultConfig);
 
       queue.add(createLogFixture());
@@ -110,8 +110,8 @@ describe('BatchQueue', () => {
     });
   });
 
-  describe('flush', () => {
-    it('sends all queued logs', async () => {
+  describe("flush", () => {
+    it("sends all queued logs", async () => {
       const queue = new BatchQueue(mockSendBatch, defaultConfig);
       const logs = createLogBatch(3);
 
@@ -125,7 +125,7 @@ describe('BatchQueue', () => {
       expect(queue.size).toBe(0);
     });
 
-    it('returns response from sendBatch', async () => {
+    it("returns response from sendBatch", async () => {
       mockSendBatch = vi.fn().mockResolvedValue({ accepted: 3 });
       const queue = new BatchQueue(mockSendBatch, defaultConfig);
 
@@ -138,7 +138,7 @@ describe('BatchQueue', () => {
       expect(response).toEqual({ accepted: 3 });
     });
 
-    it('returns null if queue is empty', async () => {
+    it("returns null if queue is empty", async () => {
       const queue = new BatchQueue(mockSendBatch, defaultConfig);
 
       const response = await queue.flush();
@@ -147,7 +147,7 @@ describe('BatchQueue', () => {
       expect(mockSendBatch).not.toHaveBeenCalled();
     });
 
-    it('clears queue after successful flush', async () => {
+    it("clears queue after successful flush", async () => {
       const queue = new BatchQueue(mockSendBatch, defaultConfig);
 
       queue.add(createLogFixture());
@@ -158,11 +158,11 @@ describe('BatchQueue', () => {
       expect(queue.size).toBe(0);
     });
 
-    it('preserves log order', async () => {
+    it("preserves log order", async () => {
       const queue = new BatchQueue(mockSendBatch, defaultConfig);
-      const log1 = createLogFixture({ message: 'first' });
-      const log2 = createLogFixture({ message: 'second' });
-      const log3 = createLogFixture({ message: 'third' });
+      const log1 = createLogFixture({ message: "first" });
+      const log2 = createLogFixture({ message: "second" });
+      const log3 = createLogFixture({ message: "third" });
 
       queue.add(log1);
       queue.add(log2);
@@ -174,15 +174,15 @@ describe('BatchQueue', () => {
     });
   });
 
-  describe('queue overflow', () => {
-    it('drops oldest logs when maxQueueSize exceeded', () => {
+  describe("queue overflow", () => {
+    it("drops oldest logs when maxQueueSize exceeded", () => {
       const config = { ...defaultConfig, maxQueueSize: 3 };
       const queue = new BatchQueue(mockSendBatch, config);
 
-      const log1 = createLogFixture({ message: 'oldest' });
-      const log2 = createLogFixture({ message: 'middle' });
-      const log3 = createLogFixture({ message: 'newest1' });
-      const log4 = createLogFixture({ message: 'newest2' });
+      const log1 = createLogFixture({ message: "oldest" });
+      const log2 = createLogFixture({ message: "middle" });
+      const log3 = createLogFixture({ message: "newest1" });
+      const log4 = createLogFixture({ message: "newest2" });
 
       queue.add(log1);
       queue.add(log2);
@@ -192,22 +192,22 @@ describe('BatchQueue', () => {
       expect(queue.size).toBe(3);
     });
 
-    it('calls onError when overflow occurs', () => {
+    it("calls onError when overflow occurs", () => {
       const onError = vi.fn();
       const config = { ...defaultConfig, maxQueueSize: 2, onError };
       const queue = new BatchQueue(mockSendBatch, config);
 
-      queue.add(createLogFixture({ message: 'first' }));
-      queue.add(createLogFixture({ message: 'second' }));
-      queue.add(createLogFixture({ message: 'overflow' }));
+      queue.add(createLogFixture({ message: "first" }));
+      queue.add(createLogFixture({ message: "second" }));
+      queue.add(createLogFixture({ message: "overflow" }));
 
       expect(onError).toHaveBeenCalled();
-      expect(onError.mock.calls[0][0].message).toContain('overflow');
+      expect(onError.mock.calls[0][0].message).toContain("overflow");
     });
   });
 
-  describe('callbacks', () => {
-    it('calls onFlush after successful flush', async () => {
+  describe("callbacks", () => {
+    it("calls onFlush after successful flush", async () => {
       const onFlush = vi.fn();
       const config = { ...defaultConfig, onFlush };
       const queue = new BatchQueue(mockSendBatch, config);
@@ -220,9 +220,9 @@ describe('BatchQueue', () => {
       expect(onFlush).toHaveBeenCalledWith(2);
     });
 
-    it('calls onError on send failure', async () => {
+    it("calls onError on send failure", async () => {
       const onError = vi.fn();
-      const error = new Error('Send failed');
+      const error = new Error("Send failed");
       mockSendBatch = vi.fn().mockRejectedValue(error);
       const config = { ...defaultConfig, onError };
       const queue = new BatchQueue(mockSendBatch, config);
@@ -234,8 +234,8 @@ describe('BatchQueue', () => {
       expect(onError).toHaveBeenCalledWith(error);
     });
 
-    it('re-queues logs on send failure', async () => {
-      const error = new Error('Send failed');
+    it("re-queues logs on send failure", async () => {
+      const error = new Error("Send failed");
       mockSendBatch = vi.fn().mockRejectedValueOnce(error).mockResolvedValue({ accepted: 1 });
       const queue = new BatchQueue(mockSendBatch, defaultConfig);
 
@@ -248,8 +248,8 @@ describe('BatchQueue', () => {
     });
   });
 
-  describe('shutdown', () => {
-    it('flushes remaining logs', async () => {
+  describe("shutdown", () => {
+    it("flushes remaining logs", async () => {
       const queue = new BatchQueue(mockSendBatch, defaultConfig);
 
       queue.add(createLogFixture());
@@ -261,7 +261,7 @@ describe('BatchQueue', () => {
       expect(queue.size).toBe(0);
     });
 
-    it('stops timer after shutdown', async () => {
+    it("stops timer after shutdown", async () => {
       const queue = new BatchQueue(mockSendBatch, defaultConfig);
 
       queue.add(createLogFixture());
@@ -275,7 +275,7 @@ describe('BatchQueue', () => {
       expect(mockSendBatch).toHaveBeenCalledTimes(1);
     });
 
-    it('handles multiple shutdown calls gracefully', async () => {
+    it("handles multiple shutdown calls gracefully", async () => {
       const queue = new BatchQueue(mockSendBatch, defaultConfig);
 
       queue.add(createLogFixture());
@@ -288,8 +288,8 @@ describe('BatchQueue', () => {
     });
   });
 
-  describe('concurrent operations', () => {
-    it('handles concurrent add and flush', async () => {
+  describe("concurrent operations", () => {
+    it("handles concurrent add and flush", async () => {
       const queue = new BatchQueue(mockSendBatch, defaultConfig);
 
       // Add logs while flushing
@@ -303,8 +303,8 @@ describe('BatchQueue', () => {
       expect(queue.size).toBe(1);
     });
 
-    it('prevents concurrent flushes', async () => {
-      let resolveFirst: () => void;
+    it("prevents concurrent flushes", async () => {
+      let resolveFirst!: () => void;
       const firstFlush = new Promise<void>((resolve) => {
         resolveFirst = resolve;
       });

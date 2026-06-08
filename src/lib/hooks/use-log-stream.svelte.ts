@@ -1,4 +1,4 @@
-import type { ClientLog } from '$lib/stores/logs.svelte';
+import type { ClientLog } from "$lib/stores/logs.svelte";
 
 /**
  * Configuration options for the useLogStream hook
@@ -66,6 +66,11 @@ export function useLogStream(options: UseLogStreamOptions): UseLogStreamReturn {
   } = options;
 
   // Internal state
+  // NOTE: these are intentionally plain (non-reactive) variables. connect()/disconnect() mutate
+  // them and are invoked from a component $effect; making them $state caused the effect to take a
+  // reactive dependency on them (via connect()'s guard reads) while also writing them, producing an
+  // infinite update loop (effect_update_depth_exceeded) that broke page hydration. Connection state
+  // is surfaced reactively to the UI via the onConnectionChange callback instead.
   let _isConnected = false;
   let _isConnecting = false;
   let _error: Error | null = null;
@@ -92,22 +97,22 @@ export function useLogStream(options: UseLogStreamOptions): UseLogStreamReturn {
     events: Array<{ event: string; data: string }>;
     remaining: string;
   } {
-    const lines = buffer.split('\n');
-    const remaining = lines.pop() || '';
+    const lines = buffer.split("\n");
+    const remaining = lines.pop() || "";
     const events: Array<{ event: string; data: string }> = [];
 
-    let currentEvent = '';
-    let currentData = '';
+    let currentEvent = "";
+    let currentData = "";
 
     for (const line of lines) {
-      if (line.startsWith('event: ')) {
+      if (line.startsWith("event: ")) {
         currentEvent = line.slice(7);
-      } else if (line.startsWith('data: ')) {
+      } else if (line.startsWith("data: ")) {
         currentData = line.slice(6);
-      } else if (line === '' && currentEvent && currentData) {
+      } else if (line === "" && currentEvent && currentData) {
         events.push({ event: currentEvent, data: currentData });
-        currentEvent = '';
-        currentData = '';
+        currentEvent = "";
+        currentData = "";
       }
     }
 
@@ -119,7 +124,7 @@ export function useLogStream(options: UseLogStreamOptions): UseLogStreamReturn {
    */
   function processSSEEvents(events: Array<{ event: string; data: string }>): void {
     for (const event of events) {
-      if (event.event === 'logs') {
+      if (event.event === "logs") {
         try {
           const logs = JSON.parse(event.data) as ClientLog[];
           onLogs?.(logs);
@@ -161,8 +166,8 @@ export function useLogStream(options: UseLogStreamOptions): UseLogStreamReturn {
     _abortController = new AbortController();
 
     fetch(`/api/projects/${projectId}/logs/stream`, {
-      method: 'POST',
-      credentials: 'same-origin',
+      method: "POST",
+      credentials: "same-origin",
       signal: _abortController.signal,
     })
       .then(async (response) => {
@@ -171,7 +176,7 @@ export function useLogStream(options: UseLogStreamOptions): UseLogStreamReturn {
         }
 
         if (!response.body) {
-          throw new Error('Response body is empty');
+          throw new Error("Response body is empty");
         }
 
         _isConnecting = false;
@@ -180,7 +185,7 @@ export function useLogStream(options: UseLogStreamOptions): UseLogStreamReturn {
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
-        let buffer = '';
+        let buffer = "";
 
         try {
           while (true) {
@@ -213,7 +218,7 @@ export function useLogStream(options: UseLogStreamOptions): UseLogStreamReturn {
         _isConnecting = false;
 
         // Ignore abort errors from intentional disconnection
-        if (error?.name === 'AbortError' && _isDisconnected) {
+        if (error?.name === "AbortError" && _isDisconnected) {
           return;
         }
 
@@ -222,7 +227,7 @@ export function useLogStream(options: UseLogStreamOptions): UseLogStreamReturn {
         setConnected(false);
 
         // Don't reconnect on permanent errors (404)
-        if (_error.message.startsWith('HTTP 404:')) return;
+        if (_error.message.startsWith("HTTP 404:")) return;
 
         // Schedule reconnection attempt
         scheduleReconnect();
@@ -253,7 +258,7 @@ export function useLogStream(options: UseLogStreamOptions): UseLogStreamReturn {
   }
 
   // Auto-connect if enabled on creation (only in browser)
-  if (enabled && typeof window !== 'undefined') {
+  if (enabled && typeof window !== "undefined") {
     // Use queueMicrotask to allow the return value to be captured first
     queueMicrotask(() => {
       connect();
