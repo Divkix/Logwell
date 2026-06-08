@@ -392,14 +392,17 @@ test.describe("Stats Page - Timeseries Chart", () => {
     // Wait for initial chart to load
     await initialResponsePromise;
 
-    // Click 7d time range
-    await page.getByRole("button", { name: /last 7 days/i }).click();
-
-    // Should trigger a new API request
-    await page.waitForResponse(
+    // Register the response listener BEFORE clicking to avoid a race where the request
+    // completes before the listener is attached (fast localhost responses in CI).
+    const rangeChangeResponse = page.waitForResponse(
       (response) =>
         response.url().includes("/stats/timeseries?range=7d") && response.status() === 200,
     );
+
+    // Click 7d time range — should trigger a new API request
+    await page.getByRole("button", { name: /last 7 days/i }).click();
+
+    await rangeChangeResponse;
 
     // Chart should still be visible
     await expect(page.locator('[data-testid="timeseries-chart"]')).toBeVisible();
