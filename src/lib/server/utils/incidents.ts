@@ -235,7 +235,9 @@ export async function upsertIncidentsForPreparedLogs(
       })
       .returning();
 
-    if (!result) continue;
+    if (!result) {
+      throw new Error(`Incident upsert returned no row for fingerprint: ${aggregate.fingerprint}`);
+    }
     incidentByFingerprint.set(aggregate.fingerprint, result);
     touchedIncidents.push(result);
   }

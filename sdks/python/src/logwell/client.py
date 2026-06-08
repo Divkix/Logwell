@@ -82,14 +82,17 @@ class Logwell:
 
     def _register_atexit(self) -> None:
         """Register a best-effort flush on process exit (PY-6)."""
+
         def _flush_on_exit() -> None:
             import asyncio as _asyncio
+
             try:
                 loop = _asyncio.new_event_loop()
                 loop.run_until_complete(_asyncio.wait_for(self.shutdown(), timeout=5.0))
                 loop.close()
             except Exception:
                 pass
+
         atexit.register(_flush_on_exit)
 
     def _add_log(self, entry: LogEntry, skip_frames: int) -> None:
@@ -112,10 +115,12 @@ class Logwell:
                 line_number = location.line_number
 
         # Build full entry with defaults
+        default_timestamp = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        timestamp = entry.get("timestamp") or default_timestamp
         full_entry: LogEntry = {
             "level": entry["level"],
             "message": entry["message"],
-            "timestamp": entry.get("timestamp") or datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
+            "timestamp": timestamp,
         }
 
         # Add service from entry, config, or omit

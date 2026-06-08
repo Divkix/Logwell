@@ -35,26 +35,26 @@ export async function POST(event: RequestEvent): Promise<Response> {
       let flushTimeout: ReturnType<typeof setTimeout> | null = null;
       let isClosed = false;
 
-      const sendEvent = (eventName: string, data: string): boolean => {
-        if (isClosed) return false;
+      const sendEvent = (eventName: string, data: string): 'sent' | 'backpressure' | 'closed' => {
+        if (isClosed) return 'closed';
         try {
           const size = (controller as ReadableStreamDefaultController).desiredSize;
           if (size !== null && size <= 0) {
-            // Stream backpressure: slow consumer, drop the event
-            return false;
+            // Stream backpressure: slow consumer — drop this event but keep the stream open
+            return 'backpressure';
           }
           controller.enqueue(encoder.encode(formatSSEEvent(eventName, data)));
-          return true;
+          return 'sent';
         } catch {
           // Controller closed
-          return false;
+          return 'closed';
         }
       };
 
       const flushBatch = () => {
         if (batch.length > 0) {
-          const success = sendEvent('incidents', JSON.stringify(batch));
-          if (!success) cleanup();
+          // Only a closed controller is terminal; backpressure just drops this event.
+          if (sendEvent('incidents', JSON.stringify(batch)) === 'closed') cleanup();
           batch = [];
         }
         flushTimeout = null;
@@ -79,8 +79,7 @@ export async function POST(event: RequestEvent): Promise<Response> {
 
       const unsubscribe = logEventBus.onIncident(projectId, handleIncident);
       const heartbeatInterval = setInterval(() => {
-        const success = sendEvent('heartbeat', JSON.stringify({ ts: Date.now() }));
-        if (!success) cleanup();
+        if (sendEvent('heartbeat', JSON.stringify({ ts: Date.now() })) === 'closed') cleanup();
       }, HEARTBEAT_INTERVAL_MS);
 
       const cleanup = () => {

@@ -47,6 +47,16 @@ func newHTTPTransportFromConfig(cfg *Config) *httpTransport {
 	httpClient := cfg.HTTPClient
 	if httpClient == nil {
 		httpClient = &http.Client{Timeout: 30 * time.Second}
+	} else if httpClient == http.DefaultClient || httpClient.Timeout == 0 {
+		// http.DefaultClient (and any client without a timeout) has no request
+		// timeout, which can hang flushes indefinitely. Apply a 30s default
+		// without mutating the caller's client; carry over its Transport.
+		httpClient = &http.Client{
+			Transport:     httpClient.Transport,
+			CheckRedirect: httpClient.CheckRedirect,
+			Jar:           httpClient.Jar,
+			Timeout:       30 * time.Second,
+		}
 	}
 	return &httpTransport{
 		endpoint:   cfg.Endpoint,

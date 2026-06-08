@@ -12,8 +12,8 @@
 # -----------------------------------------------------------------------------
 # Stage 1: Base image with Bun runtime
 # -----------------------------------------------------------------------------
-# SECURITY: pin to digest for reproducible builds (e.g. oven/bun:1.2.15-alpine)
-FROM oven/bun:1-alpine AS base
+# SECURITY: pinned to an exact version + digest for reproducible builds (matches CI's Bun 1.2.15)
+FROM oven/bun:1.2.15-alpine@sha256:37b37b8cefbf88956d4cbecbc5b3ac4b3f1a9fb051f745c98a4bc6f5f285aacb AS base
 WORKDIR /app
 
 # Install curl for healthcheck (alpine minimal doesn't include it)

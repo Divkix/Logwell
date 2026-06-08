@@ -204,25 +204,7 @@ func (c *Client) Log(entry LogEntry) {
 	// Merge config metadata with entry metadata
 	entry.Metadata = mergeMetadata(c.config.Metadata, entry.Metadata)
 
-	c.mu.Lock()
-	c.queue.add(entry)
-	shouldFlush := c.queue.size() >= c.config.BatchSize
-	c.mu.Unlock()
-
-	if shouldFlush {
-		root := c
-		if c.parent != nil {
-			root = c.parent
-		}
-		root.flushWG.Add(1)
-		go func() {
-			defer root.flushWG.Done()
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer cancel()
-			// Flush handles OnError callback internally; ignore the returned error here.
-			_ = c.Flush(ctx)
-		}()
-	}
+	c.enqueue(entry)
 }
 
 // log is the internal logging method used by all level methods.
@@ -249,17 +231,38 @@ func (c *Client) log(level LogLevel, message string, metadata ...map[string]any)
 		entry.SourceFile, entry.LineNumber = captureSource(3)
 	}
 
-	c.mu.Lock()
+	c.enqueue(entry)
+}
+
+// enqueue admits an entry into the shared root queue and, if the batch size is
+// reached, spawns an async flush. Admission and flush-goroutine spawning are
+// coordinated under the root's mutex and re-check the root's shutdown flag, so
+// once Shutdown begins no new entries are admitted and no new flush goroutines
+// are started (preventing races with flushWG.Wait()).
+func (c *Client) enqueue(entry LogEntry) {
+	root := c
+	if c.parent != nil {
+		root = c.parent
+	}
+
+	root.mu.Lock()
+	// Re-check the root's shutdown flag under the same lock that guards the
+	// enqueue and async-flush spawn. A child may still be active while the
+	// shared root is shutting down; reject admission in that case.
+	if root.shutdown {
+		root.mu.Unlock()
+		return
+	}
 	c.queue.add(entry)
 	shouldFlush := c.queue.size() >= c.config.BatchSize
-	c.mu.Unlock()
+	if shouldFlush {
+		// Register the in-flight flush while still holding root.mu so it is
+		// guaranteed to be observed by Shutdown's flushWG.Wait().
+		root.flushWG.Add(1)
+	}
+	root.mu.Unlock()
 
 	if shouldFlush {
-		root := c
-		if c.parent != nil {
-			root = c.parent
-		}
-		root.flushWG.Add(1)
 		go func() {
 			defer root.flushWG.Done()
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -368,8 +371,19 @@ func (c *Client) Shutdown(ctx context.Context) error {
 	// Stop the queue timer to prevent further auto-flushes
 	c.queue.stopTimer()
 
-	// Wait for any in-flight async flush goroutines to complete
-	c.flushWG.Wait()
+	// Wait for any in-flight async flush goroutines to complete, but respect
+	// context cancellation/timeout so Shutdown does not block uninterruptibly.
+	done := make(chan struct{})
+	go func() {
+		c.flushWG.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+		// All in-flight flushes completed.
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 
 	// Flush remaining logs with context
 	return c.Flush(ctx)
@@ -382,20 +396,22 @@ func mergeMetadata(maps ...map[string]any) map[string]any {
 		return nil
 	}
 
-	// Fast-path: single map, return directly (read-only, safe)
+	// Fast-path: single non-empty map. Clone it rather than returning the
+	// caller's reference, to avoid aliasing/concurrent map access when the
+	// entry is later JSON-marshaled.
 	if len(maps) == 1 {
 		if len(maps[0]) == 0 {
 			return nil
 		}
-		return maps[0]
+		return cloneMetadata(maps[0])
 	}
 
-	// Fast-path: two maps where the second (extra) is empty
+	// Fast-path: two maps where the second (extra) is empty.
 	if len(maps) == 2 && len(maps[1]) == 0 {
 		if len(maps[0]) == 0 {
 			return nil
 		}
-		return maps[0]
+		return cloneMetadata(maps[0])
 	}
 
 	result := make(map[string]any)
@@ -410,4 +426,13 @@ func mergeMetadata(maps ...map[string]any) map[string]any {
 	}
 
 	return result
+}
+
+// cloneMetadata returns a shallow copy of m. m must be non-empty.
+func cloneMetadata(m map[string]any) map[string]any {
+	clone := make(map[string]any, len(m))
+	for k, v := range m {
+		clone[k] = v
+	}
+	return clone
 }

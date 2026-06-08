@@ -140,6 +140,9 @@ export class BatchQueue {
    * Flush remaining logs and stop the queue
    *
    * @returns Last response from the server, or null if queue was empty
+   * @throws LogwellError if logs remain queued after the final flush attempt
+   *   (e.g. the flush failed and re-queued the batch). Unlike the normal timer
+   *   path, a shutdown failure must not be silently swallowed as success.
    */
   async shutdown(): Promise<IngestResponse | null> {
     if (this.stopped) {
@@ -149,10 +152,26 @@ export class BatchQueue {
     this.stopped = true;
     this.stopTimer();
 
-    if (this.queue.length > 0) {
-      return this.flush();
+    if (this.queue.length === 0) {
+      return null;
     }
-    return null;
+
+    const response = await this.flush();
+
+    // flush() re-queues failed batches and reports via onError instead of
+    // throwing. After the final shutdown flush, any remaining logs mean the
+    // flush did not fully succeed — surface that so shutdown does not report
+    // success while logs are dropped on exit.
+    if (this.queue.length > 0) {
+      throw new LogwellError(
+        `Shutdown flush failed: ${this.queue.length} log(s) could not be delivered`,
+        'NETWORK_ERROR',
+        undefined,
+        false,
+      );
+    }
+
+    return response;
   }
 
   private startTimer(): void {

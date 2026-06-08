@@ -11,7 +11,12 @@ echo "✓ Migrations completed successfully"
 # Seed admin user (idempotent - skips if exists)
 if [ -n "$ADMIN_PASSWORD" ]; then
   echo "Seeding admin user..."
-  bun run db:seed || echo "Seed step failed (admin may already exist, continuing)"
+  # ADMIN_PASSWORD was provided, so a seed failure is a real error — fail fast
+  # rather than booting with partially-initialized auth state.
+  if ! bun run db:seed; then
+    echo "Seed step failed! Aborting startup."
+    exit 1
+  fi
 else
   echo "⚠ ADMIN_PASSWORD not set, skipping admin seed"
 fi

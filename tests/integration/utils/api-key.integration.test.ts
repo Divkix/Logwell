@@ -36,7 +36,6 @@ describe('API Key Validation with Database', () => {
     await db.insert(project).values({
       id: projectId,
       name: projectName,
-      apiKey: apiKey,
       apiKeyHash: hashApiKey(apiKey),
       ownerId: userId,
     });
@@ -106,7 +105,6 @@ describe('API Key Validation with Database', () => {
     await db.insert(project).values({
       id: projectId,
       name: projectName,
-      apiKey: apiKey,
       apiKeyHash: hashApiKey(apiKey),
       ownerId: userId,
     });
@@ -144,7 +142,6 @@ describe('API Key Validation with Database', () => {
     await db.insert(project).values({
       id: projectId,
       name: projectName,
-      apiKey: apiKey,
       apiKeyHash: hashApiKey(apiKey),
       ownerId: userId,
     });
@@ -186,7 +183,6 @@ describe('API Key Validation with Database', () => {
     await db.insert(project).values({
       id: projectId,
       name: projectName,
-      apiKey: apiKey,
       apiKeyHash: hashApiKey(apiKey),
       ownerId: userId,
     });
@@ -232,7 +228,6 @@ describe('API Key Validation with Database', () => {
     await db.insert(project).values({
       id: projectId,
       name: projectName,
-      apiKey: apiKey,
       apiKeyHash: hashApiKey(apiKey),
       ownerId: userId,
     });
@@ -267,14 +262,12 @@ describe('API Key Validation with Database', () => {
       {
         id: project1Id,
         name: 'project-1',
-        apiKey: apiKey1,
         apiKeyHash: hashApiKey(apiKey1),
         ownerId: userId,
       },
       {
         id: project2Id,
         name: 'project-2',
-        apiKey: apiKey2,
         apiKeyHash: hashApiKey(apiKey2),
         ownerId: userId,
       },

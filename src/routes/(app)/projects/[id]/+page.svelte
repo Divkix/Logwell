@@ -58,7 +58,6 @@ function parseClientLog(log: ClientLog): Log {
 const projectData = $derived<Omit<Project, 'ownerId'>>({
   id: data.project.id,
   name: data.project.name,
-  apiKey: data.project.apiKey,
   apiKeyHash: data.project.apiKeyHash,
   retentionDays: data.project.retentionDays ?? null,
   createdAt: data.project.createdAt ? new Date(data.project.createdAt) : null,

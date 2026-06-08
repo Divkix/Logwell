@@ -2,7 +2,7 @@ import { json } from '@sveltejs/kit';
 import { and, count, eq, ne } from 'drizzle-orm';
 import { getDbClient } from '$lib/server/db/db';
 import { log, project } from '$lib/server/db/schema';
-import { invalidateApiKeyCache } from '$lib/server/utils/api-key';
+import { invalidateApiKeyCacheByHash } from '$lib/server/utils/api-key';
 import { requireJsonContentType } from '$lib/server/utils/content-type';
 import { checkCsrfOrigin } from '$lib/server/utils/csrf';
 import { isErrorResponse, requireProjectOwnership } from '$lib/server/utils/project-guard';
@@ -19,7 +19,6 @@ import type { RequestEvent } from './$types';
  * {
  *   id: string,
  *   name: string,
- *   apiKey: string,
  *   retentionDays: number | null,
  *   createdAt: string,
  *   updatedAt: string,
@@ -74,7 +73,6 @@ export async function GET(event: RequestEvent): Promise<Response> {
   return json({
     id: projectData.id,
     name: projectData.name,
-    apiKey: projectData.apiKey,
     retentionDays: projectData.retentionDays,
     createdAt: projectData.createdAt?.toISOString(),
     updatedAt: projectData.updatedAt?.toISOString(),
@@ -101,7 +99,6 @@ export async function GET(event: RequestEvent): Promise<Response> {
  * {
  *   id: string,
  *   name: string,
- *   apiKey: string,
  *   retentionDays: number | null,
  *   createdAt: string,
  *   updatedAt: string
@@ -168,7 +165,6 @@ export async function PATCH(event: RequestEvent): Promise<Response> {
     return json({
       id: currentProject.id,
       name: currentProject.name,
-      apiKey: currentProject.apiKey,
       retentionDays: currentProject.retentionDays,
       createdAt: currentProject.createdAt?.toISOString(),
       updatedAt: currentProject.updatedAt?.toISOString(),
@@ -204,7 +200,6 @@ export async function PATCH(event: RequestEvent): Promise<Response> {
   return json({
     id: updated.id,
     name: updated.name,
-    apiKey: updated.apiKey,
     retentionDays: updated.retentionDays,
     createdAt: updated.createdAt?.toISOString(),
     updatedAt: updated.updatedAt?.toISOString(),
@@ -241,7 +236,7 @@ export async function DELETE(event: RequestEvent): Promise<Response> {
   const projectId = event.params.id;
 
   // Invalidate API key cache BEFORE deleting project to close TOCTOU window
-  invalidateApiKeyCache(projectData.apiKey);
+  invalidateApiKeyCacheByHash(projectData.apiKeyHash);
 
   // Delete project (logs will cascade delete via FK constraint)
   await db.delete(project).where(eq(project.id, projectId));

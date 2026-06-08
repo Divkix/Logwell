@@ -6,11 +6,11 @@
 # Required Environment Variables:
 #   BETTER_AUTH_SECRET - Auth secret (min 32 chars). Generate: openssl rand -base64 32
 #   ADMIN_PASSWORD     - Admin user password (min 8 chars)
+#   DB_PASSWORD        - Database password (no default, for security)
 #   ORIGIN             - Production URL (e.g., https://logs.example.com)
 #
 # Optional Environment Variables:
-#   DB_PASSWORD - Database password (required, no default for security)
-#   PORT        - App port (default: 3000)
+#   PORT               - App port (default: 3000)
 #
 # Usage:
 #   export BETTER_AUTH_SECRET=$(openssl rand -base64 32)

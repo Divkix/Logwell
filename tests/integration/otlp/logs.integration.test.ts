@@ -8,7 +8,7 @@ import { setupTestDatabase } from '../../../src/lib/server/db/test-db';
 import { logEventBus } from '../../../src/lib/server/events';
 import { clearApiKeyCache, validateApiKey } from '../../../src/lib/server/utils/api-key';
 import { POST } from '../../../src/routes/v1/logs/+server';
-import { seedProject } from '../../fixtures/db';
+import { seedProjectWithApiKey } from '../../fixtures/db';
 
 function createRequestEvent(request: Request, db: PgliteDatabase<typeof schema>) {
   return {
@@ -68,7 +68,7 @@ describe('POST /v1/logs (OTLP)', () => {
   });
 
   it('returns 415 for non-JSON Content-Type', async () => {
-    const project = await seedProject(db);
+    const project = await seedProjectWithApiKey(db);
 
     const request = new Request('http://localhost/v1/logs', {
       method: 'POST',
@@ -89,7 +89,7 @@ describe('POST /v1/logs (OTLP)', () => {
   });
 
   it('ingests OTLP log records and maps core fields', async () => {
-    const project = await seedProject(db);
+    const project = await seedProjectWithApiKey(db);
 
     const payload = {
       resourceLogs: [
@@ -165,7 +165,7 @@ describe('POST /v1/logs (OTLP)', () => {
   });
 
   it('returns partial success when invalid log records are present', async () => {
-    const project = await seedProject(db);
+    const project = await seedProjectWithApiKey(db);
 
     const payload = {
       resourceLogs: [
@@ -200,7 +200,7 @@ describe('POST /v1/logs (OTLP)', () => {
   });
 
   it('returns accepted count in unified response shape on full success', async () => {
-    const project = await seedProject(db);
+    const project = await seedProjectWithApiKey(db);
 
     const payload = {
       resourceLogs: [
@@ -235,7 +235,7 @@ describe('POST /v1/logs (OTLP)', () => {
   });
 
   it('creates incidents for error/fatal OTLP logs', async () => {
-    const project = await seedProject(db);
+    const project = await seedProjectWithApiKey(db);
 
     const payload = {
       resourceLogs: [
@@ -297,7 +297,7 @@ describe('POST /v1/logs (OTLP)', () => {
   });
 
   it('rejects negative timeUnixNano and falls back to current timestamp', async () => {
-    const project = await seedProject(db);
+    const project = await seedProjectWithApiKey(db);
 
     const payload = {
       resourceLogs: [
@@ -338,7 +338,7 @@ describe('POST /v1/logs (OTLP)', () => {
   });
 
   it('stores null metadata for empty OTLP attributes', async () => {
-    const project = await seedProject(db);
+    const project = await seedProjectWithApiKey(db);
 
     const payload = {
       resourceLogs: [
@@ -375,7 +375,7 @@ describe('POST /v1/logs (OTLP)', () => {
   });
 
   it(`accepts a batch of exactly ${API_CONFIG.BATCH_INSERT_LIMIT} log records`, async () => {
-    const project = await seedProject(db);
+    const project = await seedProjectWithApiKey(db);
 
     const logRecords = Array.from({ length: API_CONFIG.BATCH_INSERT_LIMIT }, (_, i) => ({
       body: { stringValue: `Log ${i}` },
@@ -411,7 +411,7 @@ describe('POST /v1/logs (OTLP)', () => {
   });
 
   it(`rejects a batch exceeding ${API_CONFIG.BATCH_INSERT_LIMIT} log records`, async () => {
-    const project = await seedProject(db);
+    const project = await seedProjectWithApiKey(db);
 
     const logRecords = Array.from({ length: API_CONFIG.BATCH_INSERT_LIMIT + 1 }, (_, i) => ({
       body: { stringValue: `Log ${i}` },
@@ -449,7 +449,7 @@ describe('POST /v1/logs (OTLP)', () => {
 
   describe('Stale cache handling', () => {
     it('returns 401 instead of 500 when project is deleted after API key is cached', async () => {
-      const project = await seedProject(db);
+      const project = await seedProjectWithApiKey(db);
 
       // Populate cache by validating the API key
       const apiKeyRequest = new Request('http://localhost', {

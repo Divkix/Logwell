@@ -80,23 +80,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     );
   }
 
-  // Early batch size check before full parse (BU-7): count resourceLogs entries as a heuristic
-  if (
-    body !== null &&
-    typeof body === 'object' &&
-    'resourceLogs' in body &&
-    Array.isArray((body as { resourceLogs: unknown }).resourceLogs) &&
-    (body as { resourceLogs: unknown[] }).resourceLogs.length > API_CONFIG.BATCH_INSERT_LIMIT
-  ) {
-    return json(
-      {
-        error: 'batch_too_large',
-        message: `Batch exceeds maximum limit of ${API_CONFIG.BATCH_INSERT_LIMIT} logs.`,
-      },
-      { status: 400 },
-    );
-  }
-
+  // Batch size is enforced accurately against the real log-record count after
+  // normalization below (resourceLogs.length is the resource count, not the
+  // record count, so an early heuristic could reject valid payloads).
   let normalized: NormalizedOtlpLogsResult;
   try {
     normalized = normalizeOtlpLogsRequest(body);

@@ -48,6 +48,10 @@ export const handle: Handle = async ({ event, resolve }) => {
 
   await ensureInitialized();
 
+  // Inject the DB on every route, including the fast-path routes below.
+  // Test injection seam — tests override this with a PGlite client via locals.db.
+  event.locals.db = db;
+
   // Skip session lookup for paths that never need auth
   const pathname = event.url.pathname;
   if (
@@ -68,9 +72,6 @@ export const handle: Handle = async ({ event, resolve }) => {
     event.locals.session = session.session;
     event.locals.user = session.user;
   }
-
-  // Test injection seam — tests override this with a PGlite client via locals.db
-  event.locals.db = db;
 
   // Use better-auth's SvelteKit handler for proper routing
   return svelteKitHandler({ event, resolve, auth, building });

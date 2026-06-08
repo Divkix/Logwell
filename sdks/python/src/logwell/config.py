@@ -103,10 +103,11 @@ def validate_config(config: LogwellConfig) -> LogwellConfig:
         parsed_endpoint = urlparse(config["endpoint"])
         valid_url = bool(parsed_endpoint.scheme and parsed_endpoint.netloc)
         valid_scheme = parsed_endpoint.scheme in ("http", "https")
+        endpoint_scheme = parsed_endpoint.scheme
     except (ValueError, AttributeError):
         valid_url = False
         valid_scheme = False
-        parsed_endpoint = None  # type: ignore[assignment]
+        endpoint_scheme = ""
 
     if not valid_url:
         raise LogwellError(
@@ -117,7 +118,7 @@ def validate_config(config: LogwellConfig) -> LogwellConfig:
         )
     if not valid_scheme:
         raise LogwellError(
-            f"Invalid endpoint URL scheme: '{parsed_endpoint.scheme}'. "
+            f"Invalid endpoint URL scheme: '{endpoint_scheme}'. "
             "endpoint must use http or https scheme.",
             LogwellErrorCode.INVALID_CONFIG,
         )

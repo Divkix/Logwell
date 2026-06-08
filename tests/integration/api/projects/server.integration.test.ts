@@ -7,6 +7,7 @@ import type * as schema from '$lib/server/db/schema';
 import { project } from '$lib/server/db/schema';
 import { setupTestDatabase } from '$lib/server/db/test-db';
 import { getSession } from '$lib/server/session';
+import { hashApiKey } from '$lib/server/utils/api-key';
 import { GET, POST } from '../../../../src/routes/api/projects/+server';
 import { seedLogs, seedProject, seedProjects } from '../../../fixtures/db';
 
@@ -286,7 +287,7 @@ describe('POST /api/projects', () => {
       const [dbProject] = await db.select().from(project).where(eq(project.id, body.id));
       expect(dbProject).toBeDefined();
       expect(dbProject!.name).toBe('my-new-project');
-      expect(dbProject!.apiKey).toBe(body.apiKey);
+      expect(dbProject!.apiKeyHash).toBe(hashApiKey(body.apiKey));
     });
 
     it('returns 400 for duplicate name for same user', async () => {

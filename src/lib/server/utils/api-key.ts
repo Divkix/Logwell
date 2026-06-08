@@ -63,6 +63,12 @@ const NEGATIVE_CACHE_TTL_MS = 30 * 1000;
 const MAX_CACHE_SIZE = 1000;
 
 /**
+ * Maximum number of entries in the negative cache (bounds memory under a flood
+ * of unique invalid keys)
+ */
+const MAX_NEGATIVE_CACHE_SIZE = 5000;
+
+/**
  * Regex pattern for API key validation
  * Format: lw_[32 alphanumeric characters including - and _]
  */
@@ -119,6 +125,24 @@ function evictCacheEntry(): void {
 }
 
 /**
+ * Records a key hash in the negative cache, pruning expired entries and
+ * enforcing a size bound (evicts the oldest entry when at capacity).
+ */
+function setNegativeCache(keyHash: string): void {
+  const now = Date.now();
+  // Prune expired entries first
+  for (const [k, v] of NEGATIVE_CACHE) {
+    if (v.expiresAt <= now) NEGATIVE_CACHE.delete(k);
+  }
+  // Enforce the size bound — evict the oldest (first inserted) entry
+  if (NEGATIVE_CACHE.size >= MAX_NEGATIVE_CACHE_SIZE) {
+    const oldest = NEGATIVE_CACHE.keys().next().value;
+    if (oldest !== undefined) NEGATIVE_CACHE.delete(oldest);
+  }
+  NEGATIVE_CACHE.set(keyHash, { expiresAt: now + NEGATIVE_CACHE_TTL_MS });
+}
+
+/**
  * Validates API key from request Authorization header and returns project ID
  * Implements caching with 5-minute TTL for performance
  * Uses SHA-256 hash for cache lookup (never stores raw key in cache)
@@ -145,10 +169,13 @@ export async function validateApiKey(request: Request, dbClient?: DatabaseClient
 
   const keyHash = hashApiKey(apiKey);
 
-  // Check negative cache
+  // Check negative cache (prune expired entries on read)
   const negCached = NEGATIVE_CACHE.get(keyHash);
-  if (negCached && negCached.expiresAt > Date.now()) {
-    throw new ApiKeyError(401, 'Invalid API key');
+  if (negCached) {
+    if (negCached.expiresAt > Date.now()) {
+      throw new ApiKeyError(401, 'Invalid API key');
+    }
+    NEGATIVE_CACHE.delete(keyHash);
   }
 
   // Check positive cache — validate stored hash matches
@@ -167,8 +194,8 @@ export async function validateApiKey(request: Request, dbClient?: DatabaseClient
     .where(eq(project.apiKeyHash, keyHash));
 
   if (!result) {
-    // Store in negative cache
-    NEGATIVE_CACHE.set(keyHash, { expiresAt: Date.now() + NEGATIVE_CACHE_TTL_MS });
+    // Store in negative cache (bounded + prunes expired)
+    setNegativeCache(keyHash);
     throw new ApiKeyError(401, 'Invalid API key');
   }
 
@@ -200,7 +227,17 @@ export async function validateApiKey(request: Request, dbClient?: DatabaseClient
  * @param apiKey - API key to remove from cache
  */
 export function invalidateApiKeyCache(apiKey: string): void {
-  const keyHash = hashApiKey(apiKey);
+  invalidateApiKeyCacheByHash(hashApiKey(apiKey));
+}
+
+/**
+ * Invalidates a specific API key from the cache by its SHA-256 hash.
+ * Useful when only the stored hash is available (e.g. regenerating a key where
+ * the previous plaintext is no longer persisted).
+ *
+ * @param keyHash - SHA-256 hash of the API key to remove from cache
+ */
+export function invalidateApiKeyCacheByHash(keyHash: string): void {
   API_KEY_CACHE.delete(keyHash);
   NEGATIVE_CACHE.delete(keyHash);
 }

@@ -15,7 +15,6 @@ interface Props {
     project: {
       id: string;
       name: string;
-      apiKey: string;
       retentionDays: number | null;
       createdAt: string | null;
       updatedAt: string | null;
@@ -36,8 +35,10 @@ const { data }: Props = $props();
 // These intentionally capture initial values - we update them locally after API calls
 // svelte-ignore state_referenced_locally
 let projectName = $state(data.project.name);
-// svelte-ignore state_referenced_locally
-let projectApiKey = $state(data.project.apiKey);
+// API keys are stored hashed and never returned on load. This holds the
+// plaintext key only transiently, right after a regenerate, so it can be shown
+// once and copied.
+let projectApiKey = $state('');
 // svelte-ignore state_referenced_locally
 let projectRetentionDays = $state(data.project.retentionDays);
 
@@ -86,10 +87,13 @@ const baseUrl = $derived(
   typeof window !== 'undefined' ? window.location.origin : 'https://your-domain.com',
 );
 
-// Code examples
+// Code examples. The live key is only available transiently after a regenerate;
+// otherwise show a placeholder the user replaces with the key they saved.
+const exampleApiKey = $derived(projectApiKey || 'YOUR_API_KEY');
+
 const simpleCurlCommand = $derived(
   `curl -X POST ${baseUrl}/v1/ingest \\
-  -H "Authorization: Bearer ${projectApiKey}" \\
+  -H "Authorization: Bearer ${exampleApiKey}" \\
   -H "Content-Type: application/json" \\
   -d '{"level": "info", "message": "Hello from my app"}'`,
 );
@@ -98,7 +102,7 @@ const sdkExample = (packageName: string) =>
   `import { Logwell } from '${packageName}';
 
 const logger = new Logwell({
-  apiKey: '${projectApiKey}',
+  apiKey: '${exampleApiKey}',
   endpoint: '${baseUrl}',
 });
 
@@ -334,38 +338,57 @@ function formatDate(isoDate: string | null): string {
     <section class="bg-card rounded-lg border p-6">
       <h2 class="text-lg font-semibold">API Key</h2>
       <p class="text-muted-foreground mt-1 text-sm">
-        Use this key to authenticate your log ingestion requests.
+        Keys are stored hashed and shown only once. Regenerate to issue a new key —
+        copy it immediately, as it can't be retrieved later.
       </p>
 
-      <div
-        data-testid="api-key-display"
-        class="bg-muted mt-4 rounded-md p-3 font-mono text-sm break-all"
-      >
-        {projectApiKey}
-      </div>
+      {#if projectApiKey}
+        <div
+          data-testid="api-key-display"
+          class="bg-muted mt-4 rounded-md p-3 font-mono text-sm break-all"
+        >
+          {projectApiKey}
+        </div>
+        <p class="text-muted-foreground mt-2 text-xs" data-testid="api-key-once-warning">
+          Copy this key now — for security it won't be shown again.
+        </p>
 
-      <div class="mt-4 flex gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          data-testid="copy-api-key-button"
-          aria-label="Copy API key to clipboard"
-          onclick={() => copyToClipboard(projectApiKey, 'API key copied to clipboard')}
-        >
-          <CopyIcon class="mr-2 size-4" aria-hidden="true" />
-          Copy
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          data-testid="regenerate-button"
-          aria-label="Regenerate API key"
-          onclick={() => (showRegenerateConfirm = true)}
-        >
-          <RefreshCwIcon class="mr-2 size-4" aria-hidden="true" />
-          Regenerate
-        </Button>
-      </div>
+        <div class="mt-4 flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            data-testid="copy-api-key-button"
+            aria-label="Copy API key to clipboard"
+            onclick={() => copyToClipboard(projectApiKey, 'API key copied to clipboard')}
+          >
+            <CopyIcon class="mr-2 size-4" aria-hidden="true" />
+            Copy
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            data-testid="regenerate-button"
+            aria-label="Regenerate API key"
+            onclick={() => (showRegenerateConfirm = true)}
+          >
+            <RefreshCwIcon class="mr-2 size-4" aria-hidden="true" />
+            Regenerate
+          </Button>
+        </div>
+      {:else}
+        <div class="mt-4 flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            data-testid="regenerate-button"
+            aria-label="Regenerate API key"
+            onclick={() => (showRegenerateConfirm = true)}
+          >
+            <RefreshCwIcon class="mr-2 size-4" aria-hidden="true" />
+            Regenerate
+          </Button>
+        </div>
+      {/if}
     </section>
 
       <!-- Row 2: Quick Start + Log Retention -->

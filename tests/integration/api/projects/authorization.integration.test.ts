@@ -6,6 +6,7 @@ import type * as schema from '$lib/server/db/schema';
 import { project } from '$lib/server/db/schema';
 import { setupTestDatabase } from '$lib/server/db/test-db';
 import { getSession } from '$lib/server/session';
+import { hashApiKey } from '$lib/server/utils/api-key';
 import {
   GET as GET_PROJECTS,
   POST as POST_PROJECTS,
@@ -18,7 +19,7 @@ import {
 import { GET as GET_LOGS } from '../../../../src/routes/api/projects/[id]/logs/+server';
 import { POST as POST_REGENERATE } from '../../../../src/routes/api/projects/[id]/regenerate/+server';
 import { GET as GET_STATS } from '../../../../src/routes/api/projects/[id]/stats/+server';
-import { seedProject } from '../../../fixtures/db';
+import { seedProject, seedProjectWithApiKey } from '../../../fixtures/db';
 
 /**
  * Helper to create a mock SvelteKit RequestEvent for session-authenticated routes
@@ -297,7 +298,10 @@ describe('Project Authorization - Ownership Isolation', () => {
   describe('POST /api/projects/[id]/regenerate - API Key Regeneration Authorization', () => {
     it("returns 404 when regenerating another user's project API key", async () => {
       // Create project owned by User B
-      const projectB = await seedProject(db, { name: 'project-b', ownerId: userB.userId });
+      const projectB = await seedProjectWithApiKey(db, {
+        name: 'project-b',
+        ownerId: userB.userId,
+      });
       const originalApiKey = projectB.apiKey;
 
       // User A tries to regenerate User B's API key
@@ -313,12 +317,15 @@ describe('Project Authorization - Ownership Isolation', () => {
 
       // Verify API key was NOT changed
       const [dbProject] = await db.select().from(project).where(eq(project.id, projectB.id));
-      expect(dbProject!.apiKey).toBe(originalApiKey);
+      expect(dbProject!.apiKeyHash).toBe(hashApiKey(originalApiKey));
     });
 
     it('allows regenerating own project API key', async () => {
       // Create project owned by User A
-      const projectA = await seedProject(db, { name: 'project-a', ownerId: userA.userId });
+      const projectA = await seedProjectWithApiKey(db, {
+        name: 'project-a',
+        ownerId: userA.userId,
+      });
       const originalApiKey = projectA.apiKey;
 
       // User A regenerates their own API key

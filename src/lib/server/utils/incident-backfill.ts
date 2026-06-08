@@ -112,7 +112,9 @@ export async function backfillProjectIncidents(
         })
         .returning();
 
-      if (!created) continue;
+      if (!created) {
+        throw new Error(`Failed to create incident for fingerprint: ${aggregate.fingerprint}`);
+      }
       incidentByFingerprint.set(aggregate.fingerprint, created);
       touchedIncidents.push(created);
     }

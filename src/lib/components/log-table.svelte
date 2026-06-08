@@ -15,7 +15,7 @@ interface Props {
   onLogClick?: (log: Log) => void;
   class?: string;
   newLogIds?: Set<string>;
-  project?: { apiKey: string };
+  project?: { apiKeyHash: string };
   appUrl?: string;
   selectedIndex?: number;
   selectedId?: string | null;
@@ -114,7 +114,7 @@ const sortedLogs = $derived.by(() => {
       {/each}
     {:else if sortedLogs.length === 0}
       {#if showQuickstartEmptyState && project && appUrl}
-        <EmptyStateQuickstart apiKey={project.apiKey} baseUrl={appUrl} />
+        <EmptyStateQuickstart baseUrl={appUrl} />
       {:else}
         <div data-testid={emptyStateTestId} class="text-center py-8 text-muted-foreground">
           {emptyStateMessage}
@@ -209,7 +209,7 @@ const sortedLogs = $derived.by(() => {
         {#if showQuickstartEmptyState && project && appUrl}
           <tr>
             <td colspan="3">
-              <EmptyStateQuickstart apiKey={project.apiKey} baseUrl={appUrl} />
+              <EmptyStateQuickstart baseUrl={appUrl} />
             </td>
           </tr>
         {:else}

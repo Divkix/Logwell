@@ -7,11 +7,11 @@ import type * as schema from '$lib/server/db/schema';
 import { log, project } from '$lib/server/db/schema';
 import { setupTestDatabase } from '$lib/server/db/test-db';
 import { getSession } from '$lib/server/session';
-import { clearApiKeyCache, validateApiKey } from '$lib/server/utils/api-key';
+import { clearApiKeyCache, hashApiKey, validateApiKey } from '$lib/server/utils/api-key';
 import { DELETE, GET } from '../../../../src/routes/api/projects/[id]/+server';
 import { POST as POST_REGENERATE } from '../../../../src/routes/api/projects/[id]/regenerate/+server';
 import { POST as POST_INGEST } from '../../../../src/routes/v1/ingest/+server';
-import { seedLogs, seedProject } from '../../../fixtures/db';
+import { seedLogs, seedProject, seedProjectWithApiKey } from '../../../fixtures/db';
 
 /**
  * Helper to create a mock SvelteKit RequestEvent for [id] routes
@@ -164,7 +164,7 @@ describe('GET /api/projects/[id]', () => {
       // Basic project fields
       expect(body).toHaveProperty('id', testProject.id);
       expect(body).toHaveProperty('name', 'my-test-project');
-      expect(body).toHaveProperty('apiKey', testProject.apiKey);
+      expect(body).not.toHaveProperty('apiKey');
       expect(body).toHaveProperty('createdAt');
       expect(body).toHaveProperty('updatedAt');
 
@@ -306,7 +306,7 @@ describe('DELETE /api/projects/[id]', () => {
     });
 
     it('invalidates API key cache on deletion', async () => {
-      const testProject = await seedProject(db, { ownerId: userId });
+      const testProject = await seedProjectWithApiKey(db, { ownerId: userId });
 
       // Validate API key to add to cache
       const apiKeyRequest = new Request('http://localhost', {
@@ -329,7 +329,7 @@ describe('DELETE /api/projects/[id]', () => {
     });
 
     it('prevents ingestion with deleted project API key', async () => {
-      const testProject = await seedProject(db, { ownerId: userId });
+      const testProject = await seedProjectWithApiKey(db, { ownerId: userId });
 
       // Populate cache by validating the API key
       const apiKeyRequest = new Request('http://localhost', {
@@ -430,7 +430,7 @@ describe('POST /api/projects/[id]/regenerate', () => {
 
   describe('API Key Regeneration', () => {
     it('returns new API key', async () => {
-      const testProject = await seedProject(db, { ownerId: userId });
+      const testProject = await seedProjectWithApiKey(db, { ownerId: userId });
       const oldApiKey = testProject.apiKey;
 
       const request = new Request(`http://localhost/api/projects/${testProject.id}/regenerate`, {
@@ -452,11 +452,11 @@ describe('POST /api/projects/[id]/regenerate', () => {
         .select()
         .from(project)
         .where(eq(project.id, testProject.id));
-      expect(updatedProject!.apiKey).toBe(body.apiKey);
+      expect(updatedProject!.apiKeyHash).toBe(hashApiKey(body.apiKey));
     });
 
     it('invalidates old API key', async () => {
-      const testProject = await seedProject(db, { ownerId: userId });
+      const testProject = await seedProjectWithApiKey(db, { ownerId: userId });
       const oldApiKey = testProject.apiKey;
 
       // Validate old API key to add to cache

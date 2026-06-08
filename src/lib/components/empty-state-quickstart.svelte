@@ -7,12 +7,15 @@ import Button from './ui/button/button.svelte';
 import * as Select from './ui/select';
 
 interface Props {
-  apiKey: string;
+  // Plaintext keys are no longer persisted, so the live key is usually
+  // unavailable here — fall back to a placeholder the user replaces with the
+  // key they saved at creation.
+  apiKey?: string;
   baseUrl: string;
   class?: string;
 }
 
-const { apiKey, baseUrl, class: className }: Props = $props();
+const { apiKey = 'YOUR_API_KEY', baseUrl, class: className }: Props = $props();
 
 let selectedExample = $state<string>('curl');
 

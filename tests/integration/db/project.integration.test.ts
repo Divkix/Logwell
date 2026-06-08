@@ -40,7 +40,7 @@ describe('Project Table Schema', () => {
       .values({
         id: projectId,
         name: projectName,
-        apiKey: apiKey,
+        apiKeyHash: hashApiKey(apiKey),
         ownerId: userId,
       })
       .returning();
@@ -48,7 +48,7 @@ describe('Project Table Schema', () => {
     expect(createdProject).toBeDefined();
     expect(createdProject!.id).toBe(projectId);
     expect(createdProject!.name).toBe(projectName);
-    expect(createdProject!.apiKey).toBe(apiKey);
+    expect(createdProject!.apiKeyHash).toBe(hashApiKey(apiKey));
     expect(createdProject!.createdAt).toBeInstanceOf(Date);
     expect(createdProject!.updatedAt).toBeInstanceOf(Date);
   });
@@ -62,7 +62,6 @@ describe('Project Table Schema', () => {
     await db.insert(project).values({
       id: nanoid(),
       name: projectName,
-      apiKey: apiKey1,
       apiKeyHash: hashApiKey(apiKey1),
       ownerId: userId,
     });
@@ -72,7 +71,6 @@ describe('Project Table Schema', () => {
       db.insert(project).values({
         id: nanoid(),
         name: projectName,
-        apiKey: apiKey2,
         apiKeyHash: hashApiKey(apiKey2),
         ownerId: userId,
       }),
@@ -94,7 +92,6 @@ describe('Project Table Schema', () => {
       .values({
         id: nanoid(),
         name: projectName,
-        apiKey: apiKey3,
         apiKeyHash: hashApiKey(apiKey3),
         ownerId: otherUserId,
       })
@@ -114,17 +111,19 @@ describe('Project Table Schema', () => {
     await db.insert(project).values({
       id: projectId,
       name: projectName,
-      apiKey: apiKey,
       apiKeyHash: hashApiKey(apiKey),
       ownerId: userId,
     });
 
-    // Find by API key
-    const [foundProject] = await db.select().from(project).where(eq(project.apiKey, apiKey));
+    // Find by API key hash
+    const [foundProject] = await db
+      .select()
+      .from(project)
+      .where(eq(project.apiKeyHash, hashApiKey(apiKey)));
 
     expect(foundProject).toBeDefined();
     expect(foundProject!.id).toBe(projectId);
     expect(foundProject!.name).toBe(projectName);
-    expect(foundProject!.apiKey).toBe(apiKey);
+    expect(foundProject!.apiKeyHash).toBe(hashApiKey(apiKey));
   });
 });

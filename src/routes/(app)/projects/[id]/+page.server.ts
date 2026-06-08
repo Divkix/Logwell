@@ -174,7 +174,6 @@ export const load: PageServerLoad = async (event) => {
     project: {
       id: projectData.id,
       name: projectData.name,
-      apiKey: projectData.apiKey,
       apiKeyHash: projectData.apiKeyHash,
       retentionDays: projectData.retentionDays,
       createdAt: projectData.createdAt?.toISOString() ?? null,

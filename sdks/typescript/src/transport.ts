@@ -28,6 +28,33 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
+ * Parse a `Retry-After` header into milliseconds.
+ *
+ * Supports both HTTP formats:
+ * - delta-seconds (e.g. "120") — multiplied by 1000
+ * - HTTP-date (e.g. "Wed, 21 Oct 2015 07:28:00 GMT") — the non-negative
+ *   difference from the current time
+ *
+ * @returns delay in milliseconds, or undefined if the header is absent/invalid
+ */
+function parseRetryAfter(header: string | null): number | undefined {
+  if (!header) {
+    return undefined;
+  }
+  // delta-seconds form
+  const seconds = Number(header);
+  if (Number.isFinite(seconds)) {
+    return Math.max(0, seconds * 1000);
+  }
+  // HTTP-date form
+  const dateMs = Date.parse(header);
+  if (Number.isFinite(dateMs)) {
+    return Math.max(0, dateMs - Date.now());
+  }
+  return undefined;
+}
+
+/**
  * HTTP transport for sending logs to Logwell server
  *
  * Features:
@@ -147,8 +174,7 @@ export class HttpTransport {
   private createErrorWithRetryAfter(response: Response, message: string): LogwellError {
     const { status } = response;
     if (status === 429) {
-      const retryAfterHeader = response.headers.get('Retry-After');
-      const retryAfterMs = retryAfterHeader ? parseFloat(retryAfterHeader) * 1000 : undefined;
+      const retryAfterMs = parseRetryAfter(response.headers.get('Retry-After'));
       return new LogwellError(
         `Rate limited: ${message}`,
         'RATE_LIMITED',

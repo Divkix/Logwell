@@ -139,12 +139,12 @@ export async function POST(event: RequestEvent): Promise<Response> {
     return apiError(400, 'duplicate_name', 'A project with this name already exists');
   }
 
-  // Generate new project with current user as owner
+  // Generate new project with current user as owner. The plaintext key is
+  // returned once below and never persisted — only its hash is stored.
   const generatedApiKey = generateApiKey();
   const newProject = {
     id: nanoid(),
     name,
-    apiKey: generatedApiKey,
     apiKeyHash: hashApiKey(generatedApiKey),
     ownerId: user.id,
   };
@@ -157,7 +157,8 @@ export async function POST(event: RequestEvent): Promise<Response> {
     {
       id: created.id,
       name: created.name,
-      apiKey: created.apiKey,
+      // Shown only once; the plaintext key is not stored and cannot be retrieved later.
+      apiKey: generatedApiKey,
       createdAt: created.createdAt?.toISOString(),
       updatedAt: created.updatedAt?.toISOString(),
     },

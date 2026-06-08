@@ -143,7 +143,7 @@ describe('PATCH /api/projects/[id]', () => {
 
       expect(body).toHaveProperty('id', testProject.id);
       expect(body).toHaveProperty('name', 'new-name');
-      expect(body).toHaveProperty('apiKey', testProject.apiKey);
+      expect(body).not.toHaveProperty('apiKey');
       expect(body).toHaveProperty('updatedAt');
 
       // Verify in database

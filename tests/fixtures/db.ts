@@ -71,13 +71,16 @@ export async function getOrCreateDefaultUser(
 export function createProjectFactory(
   overrides: Partial<ProjectInsert> & { ownerId: string },
 ): ProjectInsert {
-  const apiKey = overrides.apiKey ?? generateApiKey();
+  // API keys are stored hashed only. Derive the hash from a fresh random key
+  // unless the caller provides an explicit apiKeyHash. apiKeyHash is applied
+  // after the spread so overrides can't leave it inconsistent.
+  const apiKeyHash =
+    overrides.apiKeyHash ?? createHash('sha256').update(generateApiKey()).digest('hex');
   return {
     id: nanoid(),
     name: `test-project-${nanoid(8)}`,
-    apiKey,
-    apiKeyHash: createHash('sha256').update(apiKey).digest('hex'),
     ...overrides,
+    apiKeyHash,
   };
 }
 
@@ -134,6 +137,21 @@ export async function seedProject(
   const [result] = await db.insert(schema.project).values(project).returning();
   if (!result) throw new Error('Failed to create test project');
   return result;
+}
+
+/**
+ * Seed a single project and return the row together with the plaintext API key.
+ * The plaintext key is never stored (only its hash is) — this helper exposes it
+ * for tests that need to authenticate ingestion requests.
+ */
+export async function seedProjectWithApiKey(
+  db: PgliteDatabase<typeof schema>,
+  overrides: Omit<Partial<ProjectInsert>, 'apiKeyHash'> = {},
+): Promise<ProjectSelect & { apiKey: string }> {
+  const apiKey = generateApiKey();
+  const apiKeyHash = createHash('sha256').update(apiKey).digest('hex');
+  const result = await seedProject(db, { ...overrides, apiKeyHash });
+  return { ...result, apiKey };
 }
 
 /**

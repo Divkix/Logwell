@@ -18,8 +18,9 @@ export const project = pgTable(
   {
     id: text('id').primaryKey(),
     name: text('name').notNull(),
-    apiKey: text('api_key').notNull().unique().$type<string>(),
-    apiKeyHash: text('api_key_hash').notNull().default('').unique(),
+    // API keys are stored hashed only (SHA-256). The plaintext key is shown to
+    // the user once at creation/regeneration and never persisted.
+    apiKeyHash: text('api_key_hash').notNull().unique(),
     // Owner of the project - required for authorization
     ownerId: text('owner_id')
       .notNull()

@@ -7,8 +7,9 @@ import type * as schema from '$lib/server/db/schema';
 import { project } from '$lib/server/db/schema';
 import { setupTestDatabase } from '$lib/server/db/test-db';
 import { getSession } from '$lib/server/session';
+import { hashApiKey } from '$lib/server/utils/api-key';
 import { POST as POST_REGENERATE } from '../../../../src/routes/api/projects/[id]/regenerate/+server';
-import { seedProject } from '../../../fixtures/db';
+import { seedProject, seedProjectWithApiKey } from '../../../fixtures/db';
 
 function createRequestEvent(
   request: Request,
@@ -124,7 +125,7 @@ describe('POST /api/projects/[id]/regenerate', () => {
   });
 
   it('returns a new API key different from the old one', async () => {
-    const testProject = await seedProject(db, { ownerId: userId });
+    const testProject = await seedProjectWithApiKey(db, { ownerId: userId });
     const oldApiKey = testProject.apiKey;
 
     const request = new Request(`http://localhost/api/projects/${testProject.id}/regenerate`, {
@@ -142,7 +143,7 @@ describe('POST /api/projects/[id]/regenerate', () => {
   });
 
   it('updates the API key in the database', async () => {
-    const testProject = await seedProject(db, { ownerId: userId });
+    const testProject = await seedProjectWithApiKey(db, { ownerId: userId });
 
     const request = new Request(`http://localhost/api/projects/${testProject.id}/regenerate`, {
       method: 'POST',
@@ -155,13 +156,13 @@ describe('POST /api/projects/[id]/regenerate', () => {
     const body = await response.json();
 
     const [dbProject] = await db
-      .select({ apiKey: project.apiKey })
+      .select({ apiKeyHash: project.apiKeyHash })
       .from(project)
       .where(eq(project.id, testProject.id));
 
     expect(dbProject).toBeDefined();
-    expect(dbProject!.apiKey).toBe(body.apiKey);
-    expect(dbProject!.apiKey).not.toBe(testProject.apiKey);
+    expect(dbProject!.apiKeyHash).toBe(hashApiKey(body.apiKey));
+    expect(dbProject!.apiKeyHash).not.toBe(hashApiKey(testProject.apiKey));
   });
 
   it('rejects cross-origin request (CSRF)', async () => {

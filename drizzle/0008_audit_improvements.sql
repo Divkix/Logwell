@@ -11,6 +11,8 @@ DROP INDEX IF EXISTS "idx_log_project_id";
 DROP INDEX IF EXISTS "idx_project_api_key";
 
 -- BC-16: Make timestamp not-null (safe; defaultNow so no nulls in practice)
+-- Backfill any legacy NULL timestamps first so SET NOT NULL cannot fail.
+UPDATE "log" SET "timestamp" = NOW() WHERE "timestamp" IS NULL;
 ALTER TABLE "log" ALTER COLUMN "timestamp" SET NOT NULL;
 
 -- BU-4: Add api_key_hash column for hashed API key storage

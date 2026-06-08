@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import random
+from contextlib import suppress
 from typing import TYPE_CHECKING, Any
 
 import httpx
@@ -253,10 +254,8 @@ class HttpTransport:
             if response is not None:
                 retry_after_header = response.headers.get("Retry-After")
                 if retry_after_header:
-                    try:
+                    with suppress(ValueError):
                         err.retry_after = float(retry_after_header)  # type: ignore[attr-defined]
-                    except ValueError:
-                        pass
             return err
         elif status >= 500:
             return LogwellError(

@@ -57,10 +57,10 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
   // Apply rate limiting per project
   if (!checkRateLimit(`ingest:${projectId}`, INGEST_RPM)) {
-    return new Response(JSON.stringify({ error: 'rate_limited' }), {
-      status: 429,
-      headers: { 'Content-Type': 'application/json', 'Retry-After': '60' },
-    });
+    return json(
+      { error: 'rate_limited', message: 'Rate limit exceeded. Retry in 60 seconds.' },
+      { status: 429, headers: { 'Retry-After': '60' } },
+    );
   }
 
   // Parse JSON body

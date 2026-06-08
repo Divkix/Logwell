@@ -212,22 +212,49 @@ test.describe('Project Settings - API Key Section', () => {
     }
   });
 
-  test('should display API key', async ({ page }) => {
-    const apiKeyDisplay = page.getByTestId('api-key-display');
-    await expect(apiKeyDisplay).toBeVisible();
-    await expect(apiKeyDisplay).toContainText(testProject.apiKey);
+  test('should not display API key on load, only a regenerate button', async ({ page }) => {
+    // Keys are hashed and shown only once at creation; the settings page no
+    // longer surfaces the live key on load.
+    await expect(page.getByTestId('api-key-display')).toHaveCount(0);
+    await expect(page.getByTestId('api-key-once-warning')).toHaveCount(0);
+    await expect(page.getByTestId('regenerate-button')).toBeVisible();
   });
 
-  test('should copy API key to clipboard', async ({ page, context, browserName }) => {
+  test('should reveal the new API key after regenerating', async ({ page }) => {
+    // The key only appears transiently after a regenerate.
+    await page.getByTestId('regenerate-button').click();
+    await page.getByTestId('confirm-regenerate-button').click();
+
+    const apiKeyDisplay = page.getByTestId('api-key-display');
+    await expect(apiKeyDisplay).toBeVisible();
+    await expect(apiKeyDisplay).toContainText(/^lw_[A-Za-z0-9_-]{32}$/);
+
+    // The original key is never re-displayed.
+    await expect(apiKeyDisplay).not.toContainText(testProject.apiKey);
+    await expect(page.getByTestId('api-key-once-warning')).toBeVisible();
+  });
+
+  test('should copy the regenerated API key to clipboard', async ({
+    page,
+    context,
+    browserName,
+  }) => {
     test.skip(browserName !== 'chromium', 'Clipboard permissions only supported in Chromium');
     // Grant clipboard permissions
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
 
+    // The key (and its copy button) only exist after a regenerate.
+    await page.getByTestId('regenerate-button').click();
+    await page.getByTestId('confirm-regenerate-button').click();
+
+    const newKey = (await page.getByTestId('api-key-display').textContent())?.trim() ?? '';
+    expect(newKey).toMatch(/^lw_[A-Za-z0-9_-]{32}$/);
+
     await page.getByTestId('copy-api-key-button').click();
 
-    // Verify clipboard content
+    // Verify clipboard content matches the freshly regenerated key
     const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
-    expect(clipboardText).toBe(testProject.apiKey);
+    expect(clipboardText).toBe(newKey);
   });
 
   test('should show regenerate confirmation dialog', async ({ page }) => {
@@ -247,8 +274,8 @@ test.describe('Project Settings - API Key Section', () => {
     // Dialog should close
     await expect(page.getByTestId('regenerate-confirm-dialog')).not.toBeVisible();
 
-    // API key should be unchanged
-    await expect(page.getByTestId('api-key-display')).toContainText(testProject.apiKey);
+    // No new key was issued, so nothing is displayed.
+    await expect(page.getByTestId('api-key-display')).toHaveCount(0);
   });
 
   test('should regenerate API key', async ({ page }) => {
@@ -428,7 +455,8 @@ test.describe('Project Settings - Quick Start Section', () => {
     const codeBlock = page.getByTestId('example-code');
     await expect(codeBlock).toBeVisible();
     await expect(codeBlock).toContainText('curl');
-    await expect(codeBlock).toContainText(testProject.apiKey);
+    // On load the live key is not shown; the example uses a placeholder.
+    await expect(codeBlock).toContainText('YOUR_API_KEY');
   });
 
   test('should switch to TypeScript example', async ({ page }) => {
@@ -438,7 +466,7 @@ test.describe('Project Settings - Quick Start Section', () => {
     const codeBlock = page.getByTestId('example-code');
     await expect(codeBlock).toContainText('import');
     await expect(codeBlock).toContainText('Logwell');
-    await expect(codeBlock).toContainText(testProject.apiKey);
+    await expect(codeBlock).toContainText('YOUR_API_KEY');
   });
 
   test('should switch to JSR example', async ({ page }) => {
@@ -447,7 +475,20 @@ test.describe('Project Settings - Quick Start Section', () => {
 
     const codeBlock = page.getByTestId('example-code');
     await expect(codeBlock).toContainText('@divkix/logwell');
-    await expect(codeBlock).toContainText(testProject.apiKey);
+    await expect(codeBlock).toContainText('YOUR_API_KEY');
+  });
+
+  test('should inline the live key into examples after regenerating', async ({ page }) => {
+    // After regenerating, the freshly issued key is woven into the examples.
+    await page.getByTestId('regenerate-button').click();
+    await page.getByTestId('confirm-regenerate-button').click();
+
+    const newKey = (await page.getByTestId('api-key-display').textContent())?.trim() ?? '';
+    expect(newKey).toMatch(/^lw_[A-Za-z0-9_-]{32}$/);
+
+    const codeBlock = page.getByTestId('example-code');
+    await expect(codeBlock).toContainText(newKey);
+    await expect(codeBlock).not.toContainText('YOUR_API_KEY');
   });
 
   test('should copy example code to clipboard', async ({ page, context, browserName }) => {
@@ -458,7 +499,7 @@ test.describe('Project Settings - Quick Start Section', () => {
 
     const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
     expect(clipboardText).toContain('curl');
-    expect(clipboardText).toContain(testProject.apiKey);
+    expect(clipboardText).toContain('YOUR_API_KEY');
   });
 });
 

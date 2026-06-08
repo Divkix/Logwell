@@ -64,6 +64,13 @@
       "when": 1749340800000,
       "tag": "0008_audit_improvements",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1780876800000,
+      "tag": "0009_hash_only_api_keys",
+      "breakpoints": true
     }
   ]
 }

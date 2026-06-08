@@ -111,6 +111,10 @@ export function validateConfig(config: Partial<LogwellConfig>): ResolvedConfig {
     throw new LogwellError('maxRetries must be non-negative', 'INVALID_CONFIG');
   }
 
+  if (config.timeout !== undefined && (!Number.isFinite(config.timeout) || config.timeout <= 0)) {
+    throw new LogwellError('timeout must be a positive finite number', 'INVALID_CONFIG');
+  }
+
   // Validate numeric options — upper bounds (TS-7)
   if (config.batchSize !== undefined && config.batchSize > 100) {
     throw new LogwellError('batchSize cannot exceed 100 (server limit)', 'INVALID_CONFIG');

@@ -8,7 +8,7 @@ import { setupTestDatabase } from '../../../src/lib/server/db/test-db';
 import { logEventBus } from '../../../src/lib/server/events';
 import { clearApiKeyCache, validateApiKey } from '../../../src/lib/server/utils/api-key';
 import { POST } from '../../../src/routes/v1/ingest/+server';
-import { seedProject } from '../../fixtures/db';
+import { seedProjectWithApiKey } from '../../fixtures/db';
 
 function createRequestEvent(request: Request, db: PgliteDatabase<typeof schema>) {
   return {
@@ -85,7 +85,7 @@ describe('POST /v1/ingest (Simple API)', () => {
 
   describe('Single log ingestion', () => {
     it('ingests a single log with minimal fields', async () => {
-      const project = await seedProject(db);
+      const project = await seedProjectWithApiKey(db);
 
       const request = new Request('http://localhost/v1/ingest', {
         method: 'POST',
@@ -111,7 +111,7 @@ describe('POST /v1/ingest (Simple API)', () => {
     });
 
     it('ingests a single log with all optional fields', async () => {
-      const project = await seedProject(db);
+      const project = await seedProjectWithApiKey(db);
       const timestamp = '2025-01-05T12:00:00.000Z';
 
       const request = new Request('http://localhost/v1/ingest', {
@@ -147,7 +147,7 @@ describe('POST /v1/ingest (Simple API)', () => {
     });
 
     it('uses current time when timestamp is invalid', async () => {
-      const project = await seedProject(db);
+      const project = await seedProjectWithApiKey(db);
       const before = new Date();
 
       const request = new Request('http://localhost/v1/ingest', {
@@ -179,7 +179,7 @@ describe('POST /v1/ingest (Simple API)', () => {
 
   describe('Batch ingestion', () => {
     it('ingests multiple logs in a batch', async () => {
-      const project = await seedProject(db);
+      const project = await seedProjectWithApiKey(db);
 
       const logs = [
         { level: 'debug', message: 'Starting process' },
@@ -210,7 +210,7 @@ describe('POST /v1/ingest (Simple API)', () => {
     });
 
     it('handles partial success with mixed valid/invalid logs', async () => {
-      const project = await seedProject(db);
+      const project = await seedProjectWithApiKey(db);
 
       const logs = [
         { level: 'info', message: 'Valid log 1' },
@@ -245,7 +245,7 @@ describe('POST /v1/ingest (Simple API)', () => {
     });
 
     it(`accepts a batch of exactly ${API_CONFIG.BATCH_INSERT_LIMIT} logs`, async () => {
-      const project = await seedProject(db);
+      const project = await seedProjectWithApiKey(db);
 
       const logs = Array.from({ length: API_CONFIG.BATCH_INSERT_LIMIT }, (_, i) => ({
         level: 'info',
@@ -270,7 +270,7 @@ describe('POST /v1/ingest (Simple API)', () => {
     });
 
     it(`rejects a batch exceeding ${API_CONFIG.BATCH_INSERT_LIMIT} logs`, async () => {
-      const project = await seedProject(db);
+      const project = await seedProjectWithApiKey(db);
 
       const logs = Array.from({ length: API_CONFIG.BATCH_INSERT_LIMIT + 1 }, (_, i) => ({
         level: 'info',
@@ -298,7 +298,7 @@ describe('POST /v1/ingest (Simple API)', () => {
 
   describe('Validation errors', () => {
     it('returns 415 for non-JSON Content-Type', async () => {
-      const project = await seedProject(db);
+      const project = await seedProjectWithApiKey(db);
 
       const request = new Request('http://localhost/v1/ingest', {
         method: 'POST',
@@ -319,7 +319,7 @@ describe('POST /v1/ingest (Simple API)', () => {
     });
 
     it('returns 400 for invalid JSON', async () => {
-      const project = await seedProject(db);
+      const project = await seedProjectWithApiKey(db);
 
       const request = new Request('http://localhost/v1/ingest', {
         method: 'POST',
@@ -339,7 +339,7 @@ describe('POST /v1/ingest (Simple API)', () => {
     });
 
     it('returns 400 for empty array', async () => {
-      const project = await seedProject(db);
+      const project = await seedProjectWithApiKey(db);
 
       const request = new Request('http://localhost/v1/ingest', {
         method: 'POST',
@@ -360,7 +360,7 @@ describe('POST /v1/ingest (Simple API)', () => {
     });
 
     it('returns error for missing level field', async () => {
-      const project = await seedProject(db);
+      const project = await seedProjectWithApiKey(db);
 
       const request = new Request('http://localhost/v1/ingest', {
         method: 'POST',
@@ -382,7 +382,7 @@ describe('POST /v1/ingest (Simple API)', () => {
     });
 
     it('returns error for invalid level value', async () => {
-      const project = await seedProject(db);
+      const project = await seedProjectWithApiKey(db);
 
       const request = new Request('http://localhost/v1/ingest', {
         method: 'POST',
@@ -405,7 +405,7 @@ describe('POST /v1/ingest (Simple API)', () => {
     });
 
     it('returns error for empty message', async () => {
-      const project = await seedProject(db);
+      const project = await seedProjectWithApiKey(db);
 
       const request = new Request('http://localhost/v1/ingest', {
         method: 'POST',
@@ -429,7 +429,7 @@ describe('POST /v1/ingest (Simple API)', () => {
 
   describe('Metadata extraction', () => {
     it('extracts requestId, userId, ipAddress from metadata into dedicated columns', async () => {
-      const project = await seedProject(db);
+      const project = await seedProjectWithApiKey(db);
 
       const request = new Request('http://localhost/v1/ingest', {
         method: 'POST',
@@ -460,7 +460,7 @@ describe('POST /v1/ingest (Simple API)', () => {
     });
 
     it('stores null metadata for empty metadata object', async () => {
-      const project = await seedProject(db);
+      const project = await seedProjectWithApiKey(db);
 
       const request = new Request('http://localhost/v1/ingest', {
         method: 'POST',
@@ -487,7 +487,7 @@ describe('POST /v1/ingest (Simple API)', () => {
 
   describe('Event bus integration', () => {
     it('emits logs to event bus for real-time streaming', async () => {
-      const project = await seedProject(db);
+      const project = await seedProjectWithApiKey(db);
       const emittedLogs: unknown[] = [];
 
       logEventBus.onLog(project.id, (log) => {
@@ -515,7 +515,7 @@ describe('POST /v1/ingest (Simple API)', () => {
 
   describe('Incident aggregation', () => {
     it('groups dynamic error variants into one incident fingerprint', async () => {
-      const project = await seedProject(db);
+      const project = await seedProjectWithApiKey(db);
 
       const request = new Request('http://localhost/v1/ingest', {
         method: 'POST',
@@ -574,7 +574,7 @@ describe('POST /v1/ingest (Simple API)', () => {
 
   describe('Stale cache handling', () => {
     it('returns 401 instead of 500 when project is deleted after API key is cached', async () => {
-      const project = await seedProject(db);
+      const project = await seedProjectWithApiKey(db);
 
       // Populate cache by validating the API key
       const apiKeyRequest = new Request('http://localhost', {

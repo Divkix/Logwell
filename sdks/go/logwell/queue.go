@@ -1,6 +1,7 @@
 package logwell
 
 import (
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -93,10 +94,22 @@ func (q *batchQueue) prepend(entries []LogEntry) {
 		return
 	}
 
-	// Prepend entries to the front: new slice = entries + existing
-	combined := append(entries, q.entries...)
+	// Prepend entries to the front: new slice = entries + existing.
+	// Pre-allocate to avoid aliasing the caller's slice (appendAssign).
+	combined := make([]LogEntry, 0, len(entries)+len(q.entries))
+	combined = append(combined, entries...)
+	combined = append(combined, q.entries...)
 	if q.maxQueueSize > 0 && len(combined) > q.maxQueueSize {
+		dropped := len(combined) - q.maxQueueSize
 		combined = combined[:q.maxQueueSize] // keep newest (prepended) entries
+
+		// Surface overflow via the same onError path add() uses.
+		if q.onError != nil {
+			onError := q.onError
+			q.mu.Unlock()
+			onError(NewError(ErrQueueOverflow, fmt.Sprintf("queue overflow: dropping %d oldest entries", dropped)))
+			q.mu.Lock()
+		}
 	}
 	q.entries = combined
 

@@ -41,7 +41,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create Logwell client: %v", err)
 	}
-	defer client.Shutdown(context.Background())
+	defer func() {
+		if err := client.Shutdown(context.Background()); err != nil {
+			log.Printf("logwell shutdown failed: %v", err)
+		}
+	}()
 
 	fmt.Println("Logwell Go SDK - Basic Example")
 	fmt.Printf("Endpoint: %s\n", endpoint)
