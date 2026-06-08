@@ -1,6 +1,6 @@
-# Logwell — Agent Instructions
+# Repository Guidelines
 
-Self-hosted logging platform (SvelteKit + PostgreSQL + Bun).
+Self-hosted logging platform — SvelteKit + PostgreSQL + Bun.
 
 ## Critical Commands
 
