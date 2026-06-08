@@ -9,11 +9,15 @@
  * Encodes a cursor from timestamp and ID
  * Format: base64url(timestamp_id)
  *
- * @param timestamp - The log timestamp
+ * @param timestamp - The log timestamp (must not be null)
  * @param id - The log ID
  * @returns Base64url-encoded cursor string
+ * @throws Error if timestamp is null or undefined
  */
-export function encodeCursor(timestamp: Date, id: string): string {
+export function encodeCursor(timestamp: Date | null | undefined, id: string): string {
+  if (!timestamp) {
+    throw new Error('Cannot encode cursor for log without timestamp');
+  }
   return Buffer.from(`${timestamp.toISOString()}_${id}`).toString('base64url');
 }
 

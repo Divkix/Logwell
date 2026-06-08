@@ -14,37 +14,9 @@ vi.mock('svelte-sonner', () => ({
 }));
 
 // Import after mocking
-import { showToast, toastError, toastInfo, toastSuccess, toastWarning } from './toast';
+import { toastError, toastSuccess } from './toast';
 
 describe('Toast Utility', () => {
-  describe('showToast', () => {
-    it('calls toast.success for success type', () => {
-      showToast('success', 'Success message');
-      expect(sonner.toast.success).toHaveBeenCalledWith('Success message', undefined);
-    });
-
-    it('calls toast.error for error type', () => {
-      showToast('error', 'Error message');
-      expect(sonner.toast.error).toHaveBeenCalledWith('Error message', undefined);
-    });
-
-    it('calls toast.info for info type', () => {
-      showToast('info', 'Info message');
-      expect(sonner.toast.info).toHaveBeenCalledWith('Info message', undefined);
-    });
-
-    it('calls toast.warning for warning type', () => {
-      showToast('warning', 'Warning message');
-      expect(sonner.toast.warning).toHaveBeenCalledWith('Warning message', undefined);
-    });
-
-    it('passes options to toast function', () => {
-      const options = { duration: 5000, description: 'More details' };
-      showToast('success', 'Success', options);
-      expect(sonner.toast.success).toHaveBeenCalledWith('Success', options);
-    });
-  });
-
   describe('toastSuccess', () => {
     it('calls toast.success with message', () => {
       toastSuccess('Operation completed');
@@ -71,20 +43,6 @@ describe('Toast Utility', () => {
     it('uses fallback message for unknown error types', () => {
       toastError({ foo: 'bar' });
       expect(sonner.toast.error).toHaveBeenCalledWith('An unexpected error occurred', undefined);
-    });
-  });
-
-  describe('toastInfo', () => {
-    it('calls toast.info with message', () => {
-      toastInfo('FYI');
-      expect(sonner.toast.info).toHaveBeenCalledWith('FYI', undefined);
-    });
-  });
-
-  describe('toastWarning', () => {
-    it('calls toast.warning with message', () => {
-      toastWarning('Be careful');
-      expect(sonner.toast.warning).toHaveBeenCalledWith('Be careful', undefined);
     });
   });
 });

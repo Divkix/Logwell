@@ -145,7 +145,7 @@ describe('LogTable', () => {
       render(LogTable, { props: { logs: sampleLogs, loading: false, onLogClick } });
 
       const rows = screen.getAllByTestId('log-row');
-      await rows[0].click();
+      await rows[0]!.click();
 
       expect(onLogClick).toHaveBeenCalledTimes(1);
       expect(onLogClick).toHaveBeenCalledWith(sampleLogs[0]);
@@ -192,7 +192,7 @@ describe('LogTable', () => {
     it('skeleton rows have animated pulse effect', () => {
       render(LogTable, { props: { logs: [], loading: true } });
 
-      const skeleton = screen.getAllByTestId('log-table-skeleton-row')[0];
+      const skeleton = screen.getAllByTestId('log-table-skeleton-row')[0]!;
       // Check that skeleton children have animation class
       const skeletonElements = within(skeleton).getAllByRole('presentation', { hidden: true });
       expect(skeletonElements.length).toBeGreaterThan(0);
@@ -343,9 +343,9 @@ describe('LogTable', () => {
 
       // After ascending sort by time: Alpha (14:30) -> Charlie (14:31) -> Beta (14:32)
       const rows = screen.getAllByTestId('log-row');
-      expect(within(rows[0]).getByText('Alpha message')).toBeInTheDocument();
-      expect(within(rows[1]).getByText('Charlie message')).toBeInTheDocument();
-      expect(within(rows[2]).getByText('Beta message')).toBeInTheDocument();
+      expect(within(rows[0]!).getByText('Alpha message')).toBeInTheDocument();
+      expect(within(rows[1]!).getByText('Charlie message')).toBeInTheDocument();
+      expect(within(rows[2]!).getByText('Beta message')).toBeInTheDocument();
     });
 
     it('sorts logs by timestamp descending on second click', async () => {
@@ -357,9 +357,9 @@ describe('LogTable', () => {
 
       // After descending sort by time: Beta (14:32) -> Charlie (14:31) -> Alpha (14:30)
       const rows = screen.getAllByTestId('log-row');
-      expect(within(rows[0]).getByText('Beta message')).toBeInTheDocument();
-      expect(within(rows[1]).getByText('Charlie message')).toBeInTheDocument();
-      expect(within(rows[2]).getByText('Alpha message')).toBeInTheDocument();
+      expect(within(rows[0]!).getByText('Beta message')).toBeInTheDocument();
+      expect(within(rows[1]!).getByText('Charlie message')).toBeInTheDocument();
+      expect(within(rows[2]!).getByText('Alpha message')).toBeInTheDocument();
     });
 
     it('resets sort on third click', async () => {
@@ -372,9 +372,9 @@ describe('LogTable', () => {
 
       // Original order restored: Alpha -> Beta -> Charlie
       const rows = screen.getAllByTestId('log-row');
-      expect(within(rows[0]).getByText('Alpha message')).toBeInTheDocument();
-      expect(within(rows[1]).getByText('Beta message')).toBeInTheDocument();
-      expect(within(rows[2]).getByText('Charlie message')).toBeInTheDocument();
+      expect(within(rows[0]!).getByText('Alpha message')).toBeInTheDocument();
+      expect(within(rows[1]!).getByText('Beta message')).toBeInTheDocument();
+      expect(within(rows[2]!).getByText('Charlie message')).toBeInTheDocument();
     });
 
     it('sorts logs by level severity ascending', async () => {
@@ -386,9 +386,9 @@ describe('LogTable', () => {
       // Level priority: debug (1) < warn (3) < error (4)
       // Ascending: debug -> warn -> error
       const rows = screen.getAllByTestId('log-row');
-      expect(within(rows[0]).getByText('DEBUG')).toBeInTheDocument();
-      expect(within(rows[1]).getByText('WARN')).toBeInTheDocument();
-      expect(within(rows[2]).getByText('ERROR')).toBeInTheDocument();
+      expect(within(rows[0]!).getByText('DEBUG')).toBeInTheDocument();
+      expect(within(rows[1]!).getByText('WARN')).toBeInTheDocument();
+      expect(within(rows[2]!).getByText('ERROR')).toBeInTheDocument();
     });
 
     it('sorts logs by level severity descending on second click', async () => {
@@ -400,9 +400,9 @@ describe('LogTable', () => {
 
       // Descending: error -> warn -> debug
       const rows = screen.getAllByTestId('log-row');
-      expect(within(rows[0]).getByText('ERROR')).toBeInTheDocument();
-      expect(within(rows[1]).getByText('WARN')).toBeInTheDocument();
-      expect(within(rows[2]).getByText('DEBUG')).toBeInTheDocument();
+      expect(within(rows[0]!).getByText('ERROR')).toBeInTheDocument();
+      expect(within(rows[1]!).getByText('WARN')).toBeInTheDocument();
+      expect(within(rows[2]!).getByText('DEBUG')).toBeInTheDocument();
     });
 
     it('sorts logs by message alphabetically ascending', async () => {
@@ -413,9 +413,9 @@ describe('LogTable', () => {
 
       // Alphabetically: Alpha -> Beta -> Charlie
       const rows = screen.getAllByTestId('log-row');
-      expect(within(rows[0]).getByText('Alpha message')).toBeInTheDocument();
-      expect(within(rows[1]).getByText('Beta message')).toBeInTheDocument();
-      expect(within(rows[2]).getByText('Charlie message')).toBeInTheDocument();
+      expect(within(rows[0]!).getByText('Alpha message')).toBeInTheDocument();
+      expect(within(rows[1]!).getByText('Beta message')).toBeInTheDocument();
+      expect(within(rows[2]!).getByText('Charlie message')).toBeInTheDocument();
     });
 
     it('sorts logs by message alphabetically descending on second click', async () => {
@@ -427,9 +427,9 @@ describe('LogTable', () => {
 
       // Descending: Charlie -> Beta -> Alpha
       const rows = screen.getAllByTestId('log-row');
-      expect(within(rows[0]).getByText('Charlie message')).toBeInTheDocument();
-      expect(within(rows[1]).getByText('Beta message')).toBeInTheDocument();
-      expect(within(rows[2]).getByText('Alpha message')).toBeInTheDocument();
+      expect(within(rows[0]!).getByText('Charlie message')).toBeInTheDocument();
+      expect(within(rows[1]!).getByText('Beta message')).toBeInTheDocument();
+      expect(within(rows[2]!).getByText('Alpha message')).toBeInTheDocument();
     });
 
     it('switching sort columns resets to ascending', async () => {
@@ -444,9 +444,9 @@ describe('LogTable', () => {
 
       // After switching to level, should be ascending: debug -> warn -> error
       const rows = screen.getAllByTestId('log-row');
-      expect(within(rows[0]).getByText('DEBUG')).toBeInTheDocument();
-      expect(within(rows[1]).getByText('WARN')).toBeInTheDocument();
-      expect(within(rows[2]).getByText('ERROR')).toBeInTheDocument();
+      expect(within(rows[0]!).getByText('DEBUG')).toBeInTheDocument();
+      expect(within(rows[1]!).getByText('WARN')).toBeInTheDocument();
+      expect(within(rows[2]!).getByText('ERROR')).toBeInTheDocument();
     });
 
     it('displays sort direction indicator on active column', async () => {

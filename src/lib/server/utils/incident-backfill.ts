@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray } from 'drizzle-orm';
+import { and, eq, gte, inArray, sql } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import type { DatabaseClient } from '$lib/server/db/db';
 import { type Incident, incident, type LogLevel, log } from '$lib/server/db/schema';
@@ -112,6 +112,7 @@ export async function backfillProjectIncidents(
         })
         .returning();
 
+      if (!created) continue;
       incidentByFingerprint.set(aggregate.fingerprint, created);
       touchedIncidents.push(created);
     }
@@ -119,8 +120,8 @@ export async function backfillProjectIncidents(
 
     let updatedLogs = 0;
     for (let i = 0; i < logs.length; i++) {
-      const original = logs[i];
-      const enriched = assigned[i];
+      const original = logs[i]!;
+      const enriched = assigned[i]!;
 
       if (
         original.incidentId === enriched.incidentId &&
@@ -139,6 +140,45 @@ export async function backfillProjectIncidents(
         })
         .where(eq(log.id, original.id));
       updatedLogs++;
+    }
+
+    // Recompute stats for all touched incidents based on their actual linked logs
+    const touchedIncidentIds = touchedIncidents.map((i) => i.id);
+    if (touchedIncidentIds.length > 0) {
+      for (const incidentId of touchedIncidentIds) {
+        const [stats] = await tx
+          .select({
+            firstSeen: sql<string>`MIN(${log.timestamp})`,
+            lastSeen: sql<string>`MAX(${log.timestamp})`,
+            totalEvents: sql<number>`COUNT(*)`,
+            // Use CASE to order levels: debug=1 < info=2 < warn=3 < error=4 < fatal=5
+            highestLevel: sql<LogLevel>`(ARRAY['debug','info','warn','error','fatal'])[MAX(
+              CASE ${log.level}
+                WHEN 'debug' THEN 1
+                WHEN 'info' THEN 2
+                WHEN 'warn' THEN 3
+                WHEN 'error' THEN 4
+                WHEN 'fatal' THEN 5
+                ELSE 0
+              END
+            )]`,
+          })
+          .from(log)
+          .where(eq(log.incidentId, incidentId));
+
+        if (stats && stats.firstSeen && stats.lastSeen) {
+          await tx
+            .update(incident)
+            .set({
+              firstSeen: new Date(stats.firstSeen),
+              lastSeen: new Date(stats.lastSeen),
+              totalEvents: Number(stats.totalEvents),
+              highestLevel: stats.highestLevel,
+              updatedAt: new Date(),
+            })
+            .where(eq(incident.id, incidentId));
+        }
+      }
     }
 
     return {

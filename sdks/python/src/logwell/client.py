@@ -6,6 +6,7 @@ logging to the Logwell platform.
 
 from __future__ import annotations
 
+import atexit
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
@@ -53,25 +54,43 @@ class Logwell:
         self._parent_metadata = _parent_metadata
         self._stopped = False
 
-        # Create transport
-        self._transport = HttpTransport(self._config)
-
-        # Use existing queue (for child loggers) or create new one
+        # Use existing queue (for child loggers) or create new one (PY-10)
         if _queue is not None:
+            self._transport: HttpTransport | None = None
             self._queue = _queue
             self._owns_queue = False
         else:
+            self._transport = HttpTransport(self._config)
             queue_config = QueueConfig.from_logwell_config(self._config)
             self._queue = BatchQueue(
                 send_batch=self._transport.send,
                 config=queue_config,
             )
             self._owns_queue = True
+            self._register_atexit()
 
     @property
     def queue_size(self) -> int:
         """Current number of logs waiting in the queue."""
         return self._queue.size
+
+    async def __aenter__(self) -> Logwell:
+        return self
+
+    async def __aexit__(self, *args: object) -> None:
+        await self.shutdown()
+
+    def _register_atexit(self) -> None:
+        """Register a best-effort flush on process exit (PY-6)."""
+        def _flush_on_exit() -> None:
+            import asyncio as _asyncio
+            try:
+                loop = _asyncio.new_event_loop()
+                loop.run_until_complete(_asyncio.wait_for(self.shutdown(), timeout=5.0))
+                loop.close()
+            except Exception:
+                pass
+        atexit.register(_flush_on_exit)
 
     def _add_log(self, entry: LogEntry, skip_frames: int) -> None:
         """Internal log method with source location capture.
@@ -96,7 +115,7 @@ class Logwell:
         full_entry: LogEntry = {
             "level": entry["level"],
             "message": entry["message"],
-            "timestamp": entry.get("timestamp") or datetime.now(timezone.utc).isoformat(),
+            "timestamp": entry.get("timestamp") or datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
         }
 
         # Add service from entry, config, or omit
@@ -202,7 +221,8 @@ class Logwell:
         self._stopped = True
         if self._owns_queue:
             await self._queue.shutdown()
-            await self._transport.close()
+            if self._transport is not None:
+                await self._transport.close()
 
     def child(
         self,
@@ -233,6 +253,7 @@ class Logwell:
             "flush_interval": self._config.get("flush_interval", 5.0),
             "max_queue_size": self._config.get("max_queue_size", 1000),
             "max_retries": self._config.get("max_retries", 3),
+            "timeout": self._config.get("timeout", 30.0),
             "capture_source_location": self._config.get("capture_source_location", False),
         }
 

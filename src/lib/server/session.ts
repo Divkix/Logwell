@@ -1,3 +1,10 @@
+/**
+ * TEST-ONLY helper — do NOT use in production routes.
+ * Production code uses auth.api.getSession() which properly validates HMAC signatures.
+ * This module does a raw DB lookup without signature verification and is only used in
+ * integration test setup.
+ */
+
 import { eq } from 'drizzle-orm';
 import { session as sessionTable, user as userTable } from '$lib/server/db/schema';
 import type { Session, User } from './auth';
@@ -49,7 +56,9 @@ export async function getSession(
 
   if (result.length === 0) return null;
 
-  const { session, user } = result[0];
+  const resultRow = result[0];
+  if (!resultRow) return null;
+  const { session, user } = resultRow;
 
   // Check if session is expired
   if (session.expiresAt < new Date()) {

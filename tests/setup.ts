@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import * as matchers from '@testing-library/jest-dom/matchers';
+import { cleanup } from '@testing-library/svelte';
 import { afterEach, expect } from 'vitest';
 
 // Ensure DATABASE_URL is set for tests (PGlite doesn't need real connection)
@@ -17,5 +18,5 @@ expect.extend(matchers);
 
 // Global cleanup after each test
 afterEach(() => {
-  // Add any global cleanup logic here
+  cleanup();
 });

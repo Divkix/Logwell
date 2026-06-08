@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import threading
+from collections import deque
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING
 
@@ -89,8 +90,9 @@ class BatchQueue:
             self._config = QueueConfig.from_logwell_config(config)
 
         self._send_batch = send_batch
-        self._queue: list[LogEntry] = []
+        self._queue: deque[LogEntry] = deque()
         self._lock = threading.Lock()
+        self._loop_lock = threading.Lock()  # Separate lock for event-loop creation (PY-3)
         self._timer_future: ConcurrentFuture[Any] | None = None
         self._flushing = False
         self._stopped = False
@@ -112,26 +114,24 @@ class BatchQueue:
         Args:
             entry: Log entry to add
         """
+        overflow_error: LogwellError | None = None
         with self._lock:
             if self._stopped:
                 return
 
             # Handle queue overflow
             if len(self._queue) >= self._config.max_queue_size:
-                dropped = self._queue.pop(0)
-                if self._config.on_error:
-                    msg = dropped.get("message", "")[:50]
-                    self._config.on_error(
-                        LogwellError(
-                            f"Queue overflow: max_queue_size "
-                            f"({self._config.max_queue_size}) exceeded. "
-                            f"Dropped oldest log: '{msg}...'. "
-                            "Logs are being generated faster than they can be sent. "
-                            "Consider increasing max_queue_size, reducing log volume, "
-                            "or calling flush() more frequently.",
-                            LogwellErrorCode.QUEUE_OVERFLOW,
-                        )
-                    )
+                dropped = self._queue.popleft()
+                msg = dropped.get("message", "")[:50]
+                overflow_error = LogwellError(
+                    f"Queue overflow: max_queue_size "
+                    f"({self._config.max_queue_size}) exceeded. "
+                    f"Dropped oldest log: '{msg}...'. "
+                    "Logs are being generated faster than they can be sent. "
+                    "Consider increasing max_queue_size, reducing log volume, "
+                    "or calling flush() more frequently.",
+                    LogwellErrorCode.QUEUE_OVERFLOW,
+                )
 
             self._queue.append(entry)
 
@@ -142,6 +142,10 @@ class BatchQueue:
 
             # Flush immediately if batch size reached
             should_flush = len(self._queue) >= self._config.batch_size
+
+        # Invoke callback outside the lock to prevent re-entrant deadlock (PY-1)
+        if overflow_error is not None and self._config.on_error:
+            self._config.on_error(overflow_error)
 
         if should_flush:
             self._trigger_flush()
@@ -183,36 +187,49 @@ class BatchQueue:
             self._stop_timer()
 
             # Take current batch
-            batch = self._queue.copy()
+            batch = list(self._queue)
             self._queue.clear()
             count = len(batch)
 
+        send_error: Exception | None = None
         try:
             response = await self._send_batch(batch)
-            if self._config.on_flush:
-                self._config.on_flush(count)
-
-            # Restart timer if more logs remain (added during flush)
-            with self._lock:
-                if len(self._queue) > 0 and not self._stopped:
-                    self._start_timer()
-
-            return response
         except Exception as error:
-            # Re-queue failed logs at the front
+            send_error = error
+            response = None
+
+        if send_error is not None:
+            # Re-queue failed logs at the front (outside error callback to avoid deadlock)
             with self._lock:
-                self._queue = batch + self._queue
-                if self._config.on_error:
-                    self._config.on_error(error)
+                self._queue.extendleft(reversed(batch))
 
                 # Restart timer to retry
                 if not self._stopped:
                     self._start_timer()
 
-            return None
-        finally:
+            # Invoke callback outside the lock (PY-1)
+            if self._config.on_error:
+                self._config.on_error(send_error)
+
             with self._lock:
                 self._flushing = False
+            return None
+
+        # Success path — call on_flush in its own try/except (PY-2)
+        if self._config.on_flush:
+            try:
+                self._config.on_flush(count)
+            except Exception as flush_err:
+                if self._config.on_error:
+                    self._config.on_error(flush_err)
+
+        # Restart timer if more logs remain (added during flush)
+        with self._lock:
+            self._flushing = False
+            if len(self._queue) > 0 and not self._stopped:
+                self._start_timer()
+
+        return response
 
     async def shutdown(self) -> None:
         """Flush remaining logs and stop the queue.
@@ -235,12 +252,24 @@ class BatchQueue:
         self._stop_loop()
 
     def _ensure_loop(self) -> asyncio.AbstractEventLoop:
-        """Ensure a background event loop is running."""
-        if self._queue_loop is None or self._queue_loop.is_closed():
-            self._queue_loop = asyncio.new_event_loop()
-            self._queue_thread = threading.Thread(target=self._run_loop, daemon=True)
-            self._queue_thread.start()
-        return self._queue_loop
+        """Ensure a background event loop is running (double-checked locking, PY-3).
+
+        Uses a dedicated _loop_lock separate from _lock so this method can be
+        called safely from within code that already holds _lock.
+        """
+        loop = self._queue_loop
+        if loop is not None and not loop.is_closed():
+            return loop
+        with self._loop_lock:
+            loop = self._queue_loop
+            if loop is None or loop.is_closed():
+                loop = asyncio.new_event_loop()
+                # Assign before starting the thread so _run_loop sees it
+                self._queue_loop = loop
+                thread = threading.Thread(target=self._run_loop, daemon=True)
+                thread.start()
+                self._queue_thread = thread
+        return self._queue_loop  # type: ignore[return-value]
 
     def _run_loop(self) -> None:
         """Run the background event loop."""

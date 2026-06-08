@@ -64,6 +64,8 @@ function createFocusTrap(container: HTMLElement, options: FocusTrapOptions = {})
     const firstFocusable = focusableElements[0];
     const lastFocusable = focusableElements[focusableElements.length - 1];
 
+    if (!firstFocusable || !lastFocusable) return;
+
     if (event.shiftKey) {
       // Shift + Tab: if on first element, wrap to last
       if (document.activeElement === firstFocusable) {
@@ -94,7 +96,7 @@ function createFocusTrap(container: HTMLElement, options: FocusTrapOptions = {})
       elementToFocus = initialFocus;
     } else {
       // Default to first focusable element
-      elementToFocus = focusableElements[0];
+      elementToFocus = focusableElements[0] ?? null;
     }
 
     if (elementToFocus) {
@@ -119,18 +121,6 @@ function createFocusTrap(container: HTMLElement, options: FocusTrapOptions = {})
       container.removeEventListener('keydown', handleKeyDown);
       if (previouslyFocused && typeof previouslyFocused.focus === 'function') {
         previouslyFocused.focus();
-      }
-    },
-
-    /**
-     * Updates the initial focus element and focuses it.
-     */
-    updateInitialFocus(element: HTMLElement | string | null) {
-      if (typeof element === 'string') {
-        const el = container.querySelector<HTMLElement>(element);
-        el?.focus();
-      } else if (element) {
-        element.focus();
       }
     },
   };

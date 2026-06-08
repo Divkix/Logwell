@@ -50,9 +50,9 @@ export function useIncidentStream(options: UseIncidentStreamOptions): UseInciden
     reconnectBaseDelay = DEFAULT_RECONNECT_BASE_DELAY,
   } = options;
 
-  let _isConnected = false;
-  let _isConnecting = false;
-  let _error: Error | null = null;
+  let _isConnected = $state(false);
+  let _isConnecting = $state(false);
+  let _error = $state<Error | null>(null);
   let _abortController: AbortController | null = null;
   let _reconnectTimeoutId: ReturnType<typeof setTimeout> | null = null;
   let _reconnectAttempts = 0;

@@ -57,6 +57,13 @@
       "when": 1778493600000,
       "tag": "0007_per_user_project_names",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1749340800000,
+      "tag": "0008_audit_improvements",
+      "breakpoints": true
     }
   ]
 }

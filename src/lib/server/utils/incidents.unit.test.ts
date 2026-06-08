@@ -70,8 +70,8 @@ describe('upsertIncidentsForPreparedLogs', () => {
       .from(incident)
       .where(eq(incident.projectId, projectId));
 
-    expect(updatedIncident.firstSeen.toISOString()).toBe('2026-03-01T12:00:00.000Z');
-    expect(updatedIncident.lastSeen.toISOString()).toBe('2026-03-02T12:00:00.000Z');
-    expect(updatedIncident.totalEvents).toBe(2);
+    expect(updatedIncident!.firstSeen.toISOString()).toBe('2026-03-01T12:00:00.000Z');
+    expect(updatedIncident!.lastSeen.toISOString()).toBe('2026-03-02T12:00:00.000Z');
+    expect(updatedIncident!.totalEvents).toBe(2);
   });
 });

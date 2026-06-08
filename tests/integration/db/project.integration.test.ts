@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
 import { nanoid } from 'nanoid';
@@ -12,6 +13,10 @@ import { getOrCreateDefaultUser } from '../../fixtures/db';
  */
 function generateApiKey(): string {
   return `lw_${nanoid(32)}`;
+}
+
+function hashApiKey(key: string): string {
+  return createHash('sha256').update(key).digest('hex');
 }
 
 describe('Project Table Schema', () => {
@@ -41,11 +46,11 @@ describe('Project Table Schema', () => {
       .returning();
 
     expect(createdProject).toBeDefined();
-    expect(createdProject.id).toBe(projectId);
-    expect(createdProject.name).toBe(projectName);
-    expect(createdProject.apiKey).toBe(apiKey);
-    expect(createdProject.createdAt).toBeInstanceOf(Date);
-    expect(createdProject.updatedAt).toBeInstanceOf(Date);
+    expect(createdProject!.id).toBe(projectId);
+    expect(createdProject!.name).toBe(projectName);
+    expect(createdProject!.apiKey).toBe(apiKey);
+    expect(createdProject!.createdAt).toBeInstanceOf(Date);
+    expect(createdProject!.updatedAt).toBeInstanceOf(Date);
   });
 
   it('should enforce unique project names per owner', async () => {
@@ -58,6 +63,7 @@ describe('Project Table Schema', () => {
       id: nanoid(),
       name: projectName,
       apiKey: apiKey1,
+      apiKeyHash: hashApiKey(apiKey1),
       ownerId: userId,
     });
 
@@ -67,6 +73,7 @@ describe('Project Table Schema', () => {
         id: nanoid(),
         name: projectName,
         apiKey: apiKey2,
+        apiKeyHash: hashApiKey(apiKey2),
         ownerId: userId,
       }),
     ).rejects.toThrow();
@@ -88,13 +95,14 @@ describe('Project Table Schema', () => {
         id: nanoid(),
         name: projectName,
         apiKey: apiKey3,
+        apiKeyHash: hashApiKey(apiKey3),
         ownerId: otherUserId,
       })
       .returning();
 
     expect(otherProject).toBeDefined();
-    expect(otherProject.name).toBe(projectName);
-    expect(otherProject.ownerId).toBe(otherUserId);
+    expect(otherProject!.name).toBe(projectName);
+    expect(otherProject!.ownerId).toBe(otherUserId);
   });
 
   it('should find project by API key', async () => {
@@ -107,6 +115,7 @@ describe('Project Table Schema', () => {
       id: projectId,
       name: projectName,
       apiKey: apiKey,
+      apiKeyHash: hashApiKey(apiKey),
       ownerId: userId,
     });
 
@@ -114,8 +123,8 @@ describe('Project Table Schema', () => {
     const [foundProject] = await db.select().from(project).where(eq(project.apiKey, apiKey));
 
     expect(foundProject).toBeDefined();
-    expect(foundProject.id).toBe(projectId);
-    expect(foundProject.name).toBe(projectName);
-    expect(foundProject.apiKey).toBe(apiKey);
+    expect(foundProject!.id).toBe(projectId);
+    expect(foundProject!.name).toBe(projectName);
+    expect(foundProject!.apiKey).toBe(apiKey);
   });
 });

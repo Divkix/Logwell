@@ -3,6 +3,7 @@ import { and, count, desc, eq, gte, lt, or, type SQL } from 'drizzle-orm';
 import { INCIDENT_CONFIG } from '$lib/server/config';
 import { getDbClient } from '$lib/server/db/db';
 import { incident } from '$lib/server/db/schema';
+import { apiError } from '$lib/server/utils/api-error';
 import { decodeCursor, encodeCursor } from '$lib/server/utils/cursor';
 import { getIncidentStatus } from '$lib/server/utils/incidents';
 import { isErrorResponse, requireProjectOwnership } from '$lib/server/utils/project-guard';
@@ -67,19 +68,19 @@ export async function GET(event: RequestEvent): Promise<Response> {
         ) as SQL,
       );
     } catch (error) {
-      return json(
-        {
-          code: 'invalid_cursor',
-          message: error instanceof Error ? error.message : 'Invalid cursor',
-        },
-        { status: 400 },
+      return apiError(
+        400,
+        'invalid_cursor',
+        error instanceof Error ? error.message : 'Invalid cursor',
       );
     }
   }
 
   const whereClause = and(...conditions);
-  const [countResult] = await db.select({ count: count() }).from(incident).where(whereClause);
-  const total = countResult?.count ?? 0;
+  // Skip COUNT(*) when a cursor is provided (subsequent pages); saves a DB round-trip
+  const total = cursorParam
+    ? undefined
+    : ((await db.select({ count: count() }).from(incident).where(whereClause))[0]?.count ?? 0);
 
   const incidents = await db
     .select()
@@ -93,10 +94,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
 
   const nextCursor =
     hasMore && incidentsToReturn.length > 0
-      ? encodeCursor(
-          incidentsToReturn[incidentsToReturn.length - 1].lastSeen as Date,
-          incidentsToReturn[incidentsToReturn.length - 1].id,
-        )
+      ? encodeCursor(incidentsToReturn.at(-1)!.lastSeen as Date, incidentsToReturn.at(-1)!.id)
       : null;
 
   return json({
@@ -115,7 +113,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
       totalEvents: i.totalEvents,
       status: getIncidentStatus(i.lastSeen),
     })),
-    total,
+    total: total ?? null,
     has_more: hasMore,
     nextCursor,
     filters: { status, range },

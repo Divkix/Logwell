@@ -77,7 +77,7 @@ describe('LogRow', () => {
     });
 
     it('handles null timestamp gracefully', () => {
-      const log = { ...baseLog, timestamp: null };
+      const log = { ...baseLog, timestamp: null as unknown as Date };
       render(LogRow, { props: { log } });
 
       // Should show a placeholder or handle gracefully

@@ -140,28 +140,28 @@ describe('POST /v1/logs (OTLP)', () => {
 
     const [inserted] = await db.select().from(log).where(eq(log.projectId, project.id));
     expect(inserted).toBeTruthy();
-    expect(inserted.message).toBe('Database failed');
-    expect(inserted.level).toBe('error');
-    expect(inserted.severityNumber).toBe(17);
-    expect(inserted.severityText).toBe('ERROR');
-    expect(inserted.timeUnixNano).toBe('1700000000000000000');
-    expect(inserted.metadata).toEqual({
+    expect(inserted!.message).toBe('Database failed');
+    expect(inserted!.level).toBe('error');
+    expect(inserted!.severityNumber).toBe(17);
+    expect(inserted!.severityText).toBe('ERROR');
+    expect(inserted!.timeUnixNano).toBe('1700000000000000000');
+    expect(inserted!.metadata).toEqual({
       'request.id': 'req-123',
       'code.filepath': 'src/db.ts',
       'code.lineno': 45,
       'enduser.id': 'user-456',
       'client.address': '192.168.1.1',
     });
-    expect(inserted.sourceFile).toBe('src/db.ts');
-    expect(inserted.lineNumber).toBe(45);
-    expect(inserted.requestId).toBe('req-123');
-    expect(inserted.userId).toBe('user-456');
-    expect(inserted.ipAddress).toBe('192.168.1.1');
-    expect(inserted.resourceAttributes).toEqual({ 'service.name': 'api' });
-    expect(inserted.scopeName).toBe('logger');
-    expect(inserted.scopeVersion).toBe('2.0.0');
-    expect(inserted.traceId).toBe('5b8efff798038103d269b633813fc60c');
-    expect(inserted.spanId).toBe('eee19b7ec3c1b174');
+    expect(inserted!.sourceFile).toBe('src/db.ts');
+    expect(inserted!.lineNumber).toBe(45);
+    expect(inserted!.requestId).toBe('req-123');
+    expect(inserted!.userId).toBe('user-456');
+    expect(inserted!.ipAddress).toBe('192.168.1.1');
+    expect(inserted!.resourceAttributes).toEqual({ 'service.name': 'api' });
+    expect(inserted!.scopeName).toBe('logger');
+    expect(inserted!.scopeVersion).toBe('2.0.0');
+    expect(inserted!.traceId).toBe('5b8efff798038103d269b633813fc60c');
+    expect(inserted!.spanId).toBe('eee19b7ec3c1b174');
   });
 
   it('returns partial success when invalid log records are present', async () => {
@@ -285,15 +285,15 @@ describe('POST /v1/logs (OTLP)', () => {
 
     const incidents = await db.select().from(incident).where(eq(incident.projectId, project.id));
     expect(incidents).toHaveLength(1);
-    expect(incidents[0].totalEvents).toBe(2);
+    expect(incidents[0]!.totalEvents).toBe(2);
 
     const logs = await db.select().from(log).where(eq(log.projectId, project.id));
     const errorLogs = logs.filter((entry) => entry.level === 'error');
     const infoLogs = logs.filter((entry) => entry.level === 'info');
 
-    expect(errorLogs.every((entry) => entry.incidentId === incidents[0].id)).toBe(true);
+    expect(errorLogs.every((entry) => entry.incidentId === incidents[0]!.id)).toBe(true);
     expect(errorLogs.every((entry) => entry.serviceName === 'api')).toBe(true);
-    expect(infoLogs[0].incidentId).toBeNull();
+    expect(infoLogs[0]!.incidentId).toBeNull();
   });
 
   it('rejects negative timeUnixNano and falls back to current timestamp', async () => {
@@ -330,11 +330,11 @@ describe('POST /v1/logs (OTLP)', () => {
     expect(response.status).toBe(200);
 
     const [inserted] = await db.select().from(log).where(eq(log.projectId, project.id));
-    expect(inserted.timeUnixNano).toBeNull();
-    expect(inserted.timestamp).toBeTruthy();
+    expect(inserted!.timeUnixNano).toBeNull();
+    expect(inserted!.timestamp).toBeTruthy();
     const now = new Date();
-    expect(inserted.timestamp!.getTime()).toBeGreaterThanOrEqual(now.getTime() - 5000);
-    expect(inserted.timestamp!.getTime()).toBeLessThanOrEqual(now.getTime() + 5000);
+    expect(inserted!.timestamp!.getTime()).toBeGreaterThanOrEqual(now.getTime() - 5000);
+    expect(inserted!.timestamp!.getTime()).toBeLessThanOrEqual(now.getTime() + 5000);
   });
 
   it('stores null metadata for empty OTLP attributes', async () => {
@@ -371,7 +371,7 @@ describe('POST /v1/logs (OTLP)', () => {
     expect(response.status).toBe(200);
 
     const [inserted] = await db.select().from(log).where(eq(log.projectId, project.id));
-    expect(inserted.metadata).toBeNull();
+    expect(inserted!.metadata).toBeNull();
   });
 
   it(`accepts a batch of exactly ${API_CONFIG.BATCH_INSERT_LIMIT} log records`, async () => {

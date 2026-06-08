@@ -1,6 +1,7 @@
 import { SSE_CONFIG } from '$lib/server/config/performance';
 import type { Log } from '$lib/server/db/schema';
 import { logEventBus } from '$lib/server/events';
+import { checkCsrfOrigin } from '$lib/server/utils/csrf';
 import { isErrorResponse, requireProjectOwnership } from '$lib/server/utils/project-guard';
 import type { RequestEvent } from './$types';
 
@@ -30,6 +31,10 @@ function formatSSEEvent(event: string, data: string): string {
  * - Only logs for the subscribed project are emitted
  */
 export async function POST(event: RequestEvent): Promise<Response> {
+  // CSRF check
+  const csrfError = checkCsrfOrigin(event);
+  if (csrfError) return csrfError;
+
   // Require authentication and project ownership
   const authResult = await requireProjectOwnership(event, event.params.id);
   if (isErrorResponse(authResult)) return authResult;
@@ -50,22 +55,25 @@ export async function POST(event: RequestEvent): Promise<Response> {
       let isClosed = false;
 
       /**
-       * Send an SSE event to the client
-       * Checks desiredSize to apply backpressure on slow consumers
+       * Send an SSE event to the client.
+       * Returns 'sent' | 'backpressure' | 'closed'.
+       * Backpressure (slow consumer) drops the event but keeps the stream open.
+       * 'closed' means the controller has errored and the stream should be torn down.
        */
-      const sendEvent = (eventName: string, data: string): boolean => {
-        if (isClosed) return false;
+      const sendEvent = (eventName: string, data: string): 'sent' | 'backpressure' | 'closed' => {
+        if (isClosed) return 'closed';
         try {
           const size = (controller as ReadableStreamDefaultController).desiredSize;
           if (size !== null && size <= 0) {
-            // Stream backpressure: slow consumer, drop the event
-            return false;
+            // Stream backpressure: slow consumer, drop the event but keep the stream alive
+            console.debug('[logs/stream] backpressure detected, dropping batch');
+            return 'backpressure';
           }
           controller.enqueue(encoder.encode(formatSSEEvent(eventName, data)));
-          return true;
+          return 'sent';
         } catch {
-          // Controller closed
-          return false;
+          // Controller closed or errored
+          return 'closed';
         }
       };
 
@@ -74,10 +82,11 @@ export async function POST(event: RequestEvent): Promise<Response> {
        */
       const flushBatch = () => {
         if (batch.length > 0) {
-          const success = sendEvent('logs', JSON.stringify(batch));
-          if (!success) {
+          const result = sendEvent('logs', JSON.stringify(batch));
+          if (result === 'closed') {
             cleanup();
           }
+          // On 'backpressure', drop the batch but don't close the stream
           batch = [];
         }
         flushTimeout = null;
@@ -110,8 +119,8 @@ export async function POST(event: RequestEvent): Promise<Response> {
 
       // Set up heartbeat to keep connection alive
       const heartbeatInterval = setInterval(() => {
-        const success = sendEvent('heartbeat', JSON.stringify({ ts: Date.now() }));
-        if (!success) {
+        const result = sendEvent('heartbeat', JSON.stringify({ ts: Date.now() }));
+        if (result === 'closed') {
           cleanup();
         }
       }, HEARTBEAT_INTERVAL_MS);

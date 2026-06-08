@@ -3,6 +3,9 @@
   "private": true,
   "version": "1.0.12",
   "type": "module",
+  "engines": {
+    "bun": ">=1.2.0"
+  },
   "scripts": {
     "dev": "bun --bun run vite dev",
     "build": "bun --bun run vite build",

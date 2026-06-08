@@ -185,25 +185,6 @@ export function severityNumberToLogLevel(value: number | null | undefined): LogL
   return 'fatal';
 }
 
-export function logLevelToSeverityNumber(level: LogLevel): number {
-  switch (level) {
-    case 'debug':
-      return 5;
-    case 'info':
-      return 9;
-    case 'warn':
-      return 13;
-    case 'error':
-      return 17;
-    case 'fatal':
-      return 21;
-  }
-}
-
-export function dateToUnixNanoString(date: Date): string {
-  return (BigInt(date.getTime()) * 1000000n).toString();
-}
-
 function attributeString(
   attributes: Record<string, unknown> | null,
   keys: string[],
@@ -265,7 +246,8 @@ export function normalizeSpanId(value: unknown): string | null {
   return trimmed.toLowerCase();
 }
 
-export function parseOtlpAnyValue(value: OtlpAnyValue): unknown {
+export function parseOtlpAnyValue(value: OtlpAnyValue, depth = 0): unknown {
+  if (depth > 32) return null;
   if (!isRecord(value)) return null;
 
   if (value.stringValue !== undefined) return value.stringValue;
@@ -281,11 +263,11 @@ export function parseOtlpAnyValue(value: OtlpAnyValue): unknown {
 
   if (value.arrayValue !== undefined) {
     const values = Array.isArray(value.arrayValue?.values) ? (value.arrayValue?.values ?? []) : [];
-    return values.map((entry) => parseOtlpAnyValue(entry));
+    return values.map((entry) => parseOtlpAnyValue(entry, depth + 1));
   }
 
   if (value.kvlistValue !== undefined) {
-    return parseKeyValueList(value.kvlistValue?.values);
+    return parseKeyValueList(value.kvlistValue?.values, depth + 1);
   }
 
   if (value.bytesValue !== undefined) {
@@ -295,14 +277,15 @@ export function parseOtlpAnyValue(value: OtlpAnyValue): unknown {
   return null;
 }
 
-function parseKeyValueList(values?: OtlpKeyValue[]): Record<string, unknown> {
+function parseKeyValueList(values?: OtlpKeyValue[], depth = 0): Record<string, unknown> {
+  if (depth > 32) return {};
   if (!Array.isArray(values)) return {};
   const record: Record<string, unknown> = {};
   for (const entry of values) {
     if (!isRecord(entry)) continue;
     const key = typeof entry.key === 'string' ? entry.key : null;
     if (!key) continue;
-    const parsedValue = entry.value ? parseOtlpAnyValue(entry.value) : null;
+    const parsedValue = entry.value ? parseOtlpAnyValue(entry.value, depth + 1) : null;
     record[key] = parsedValue;
   }
   return record;

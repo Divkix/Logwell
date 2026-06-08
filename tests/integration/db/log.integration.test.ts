@@ -36,17 +36,17 @@ describe('Log Table Schema', () => {
     const [createdLog] = await db.insert(log).values(logData).returning();
 
     expect(createdLog).toBeDefined();
-    expect(createdLog.id).toBe(logId);
-    expect(createdLog.projectId).toBe(testProject.id);
-    expect(createdLog.level).toBe('error');
-    expect(createdLog.message).toBe('Test error message');
-    expect(createdLog.metadata).toEqual({ userId: '123', action: 'login' });
-    expect(createdLog.sourceFile).toBe('auth.service.ts');
-    expect(createdLog.lineNumber).toBe(42);
-    expect(createdLog.requestId).toBe('req_123');
-    expect(createdLog.userId).toBe('user_456');
-    expect(createdLog.ipAddress).toBe('192.168.1.1');
-    expect(createdLog.timestamp).toBeInstanceOf(Date);
+    expect(createdLog!.id).toBe(logId);
+    expect(createdLog!.projectId).toBe(testProject.id);
+    expect(createdLog!.level).toBe('error');
+    expect(createdLog!.message).toBe('Test error message');
+    expect(createdLog!.metadata).toEqual({ userId: '123', action: 'login' });
+    expect(createdLog!.sourceFile).toBe('auth.service.ts');
+    expect(createdLog!.lineNumber).toBe(42);
+    expect(createdLog!.requestId).toBe('req_123');
+    expect(createdLog!.userId).toBe('user_456');
+    expect(createdLog!.ipAddress).toBe('192.168.1.1');
+    expect(createdLog!.timestamp).toBeInstanceOf(Date);
   });
 
   it('should cascade delete logs when project deleted', async () => {
@@ -107,8 +107,8 @@ describe('Log Table Schema', () => {
     );
 
     expect(searchResults.rows).toHaveLength(2);
-    expect(searchResults.rows[0].message).toBe('User authentication failed');
-    expect(searchResults.rows[1].message).toBe('User authentication successful');
+    expect(searchResults.rows[0]!.message).toBe('User authentication failed');
+    expect(searchResults.rows[1]!.message).toBe('User authentication successful');
   });
 
   it('should search logs by metadata content', async () => {

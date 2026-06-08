@@ -150,8 +150,8 @@ describe('Incident APIs', () => {
 
     const body = await response.json();
     expect(body.incidents).toHaveLength(1);
-    expect(body.incidents[0].id).toBe('inc-open');
-    expect(body.incidents[0].status).toBe('open');
+    expect(body.incidents[0]!.id).toBe('inc-open');
+    expect(body.incidents[0]!.status).toBe('open');
     expect(body.incidents[0]).not.toHaveProperty('reopenCount');
   });
 
@@ -211,8 +211,8 @@ describe('Incident APIs', () => {
       .returning();
 
     await seedLog(db, project.id, {
-      incidentId: createdIncident.id,
-      fingerprint: createdIncident.fingerprint,
+      incidentId: createdIncident!.id,
+      fingerprint: createdIncident!.fingerprint,
       level: 'error',
       message: 'DB timeout',
       sourceFile: 'src/db.ts',
@@ -221,8 +221,8 @@ describe('Incident APIs', () => {
       traceId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     });
     await seedLog(db, project.id, {
-      incidentId: createdIncident.id,
-      fingerprint: createdIncident.fingerprint,
+      incidentId: createdIncident!.id,
+      fingerprint: createdIncident!.fingerprint,
       level: 'error',
       message: 'DB timeout',
       sourceFile: 'src/db.ts',
@@ -231,8 +231,8 @@ describe('Incident APIs', () => {
       traceId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     });
     await seedLog(db, project.id, {
-      incidentId: createdIncident.id,
-      fingerprint: createdIncident.fingerprint,
+      incidentId: createdIncident!.id,
+      fingerprint: createdIncident!.fingerprint,
       level: 'error',
       message: 'DB timeout',
       sourceFile: 'src/worker.ts',
@@ -242,12 +242,12 @@ describe('Incident APIs', () => {
     });
 
     const request = new Request(
-      `http://localhost/api/projects/${project.id}/incidents/${createdIncident.id}`,
+      `http://localhost/api/projects/${project.id}/incidents/${createdIncident!.id}`,
     );
     const event = createRequestEvent(
       request,
       db,
-      { id: project.id, incidentId: createdIncident.id },
+      { id: project.id, incidentId: createdIncident!.id },
       authenticatedLocals,
       '/api/projects/[id]/incidents/[incidentId]',
     );
@@ -255,7 +255,7 @@ describe('Incident APIs', () => {
     expect(response.status).toBe(200);
 
     const body = await response.json();
-    expect(body.id).toBe(createdIncident.id);
+    expect(body.id).toBe(createdIncident!.id);
     expect(body).not.toHaveProperty('reopenCount');
     expect(body.rootCauseCandidates[0].sourceFile).toBe('src/db.ts');
     expect(body.correlations.topRequestIds[0]).toEqual({ requestId: 'req-1', count: 2 });
@@ -286,8 +286,8 @@ describe('Incident APIs', () => {
       .returning();
 
     await seedLogs(db, project.id, 20, {
-      incidentId: createdIncident.id,
-      fingerprint: createdIncident.fingerprint,
+      incidentId: createdIncident!.id,
+      fingerprint: createdIncident!.fingerprint,
       level: 'error',
       message: 'SQL detail',
       sourceFile: 'src/detail.ts',
@@ -310,12 +310,12 @@ describe('Incident APIs', () => {
     }) as typeof db.select);
 
     const request = new Request(
-      `http://localhost/api/projects/${project.id}/incidents/${createdIncident.id}`,
+      `http://localhost/api/projects/${project.id}/incidents/${createdIncident!.id}`,
     );
     const event = createRequestEvent(
       request,
       db,
-      { id: project.id, incidentId: createdIncident.id },
+      { id: project.id, incidentId: createdIncident!.id },
       authenticatedLocals,
       '/api/projects/[id]/incidents/[incidentId]',
     );
@@ -353,31 +353,31 @@ describe('Incident APIs', () => {
       .returning();
 
     await seedLog(db, project.id, {
-      incidentId: createdIncident.id,
+      incidentId: createdIncident!.id,
       level: 'error',
       message: 'err1',
       timestamp: new Date(Date.now() - 20 * 60 * 1000),
     });
     await seedLog(db, project.id, {
-      incidentId: createdIncident.id,
+      incidentId: createdIncident!.id,
       level: 'error',
       message: 'err2',
       timestamp: new Date(Date.now() - 20 * 60 * 1000),
     });
     await seedLog(db, project.id, {
-      incidentId: createdIncident.id,
+      incidentId: createdIncident!.id,
       level: 'error',
       message: 'err3',
       timestamp: new Date(Date.now() - 10 * 60 * 1000),
     });
 
     const request = new Request(
-      `http://localhost/api/projects/${project.id}/incidents/${createdIncident.id}/timeline?range=1h`,
+      `http://localhost/api/projects/${project.id}/incidents/${createdIncident!.id}/timeline?range=1h`,
     );
     const event = createRequestEvent(
       request,
       db,
-      { id: project.id, incidentId: createdIncident.id },
+      { id: project.id, incidentId: createdIncident!.id },
       authenticatedLocals,
       '/api/projects/[id]/incidents/[incidentId]/timeline',
     );
@@ -411,8 +411,8 @@ describe('Incident APIs', () => {
       .returning();
 
     await seedLogs(db, project.id, 30, {
-      incidentId: createdIncident.id,
-      fingerprint: createdIncident.fingerprint,
+      incidentId: createdIncident!.id,
+      fingerprint: createdIncident!.fingerprint,
       level: 'error',
       message: 'SQL timeline',
       timestamp: new Date(Date.now() - 20 * 60 * 1000),
@@ -433,12 +433,12 @@ describe('Incident APIs', () => {
     }) as typeof db.select);
 
     const request = new Request(
-      `http://localhost/api/projects/${project.id}/incidents/${createdIncident.id}/timeline?range=1h`,
+      `http://localhost/api/projects/${project.id}/incidents/${createdIncident!.id}/timeline?range=1h`,
     );
     const event = createRequestEvent(
       request,
       db,
-      { id: project.id, incidentId: createdIncident.id },
+      { id: project.id, incidentId: createdIncident!.id },
       authenticatedLocals,
       '/api/projects/[id]/incidents/[incidentId]/timeline',
     );
@@ -483,12 +483,12 @@ describe('Incident APIs', () => {
       .returning();
 
     const request = new Request(
-      `http://localhost/api/projects/${otherProject.id}/incidents/${otherIncident.id}`,
+      `http://localhost/api/projects/${otherProject.id}/incidents/${otherIncident!.id}`,
     );
     const event = createRequestEvent(
       request,
       db,
-      { id: otherProject.id, incidentId: otherIncident.id },
+      { id: otherProject.id, incidentId: otherIncident!.id },
       authenticatedLocals,
       '/api/projects/[id]/incidents/[incidentId]',
     );

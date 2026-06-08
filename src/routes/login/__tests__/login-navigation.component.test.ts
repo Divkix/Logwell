@@ -81,8 +81,8 @@ describe('Login Page Navigation', () => {
       expect(mockGoto).toHaveBeenCalledWith('/');
 
       // Verify the order: invalidateAll should complete before goto
-      const invalidateCallOrder = mockInvalidateAll.mock.invocationCallOrder[0];
-      const gotoCallOrder = mockGoto.mock.invocationCallOrder[0];
+      const invalidateCallOrder = mockInvalidateAll.mock.invocationCallOrder[0]!;
+      const gotoCallOrder = mockGoto.mock.invocationCallOrder[0]!;
       expect(invalidateCallOrder).toBeLessThan(gotoCallOrder);
     });
 

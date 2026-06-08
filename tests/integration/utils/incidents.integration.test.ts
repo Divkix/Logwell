@@ -61,8 +61,8 @@ describe('upsertIncidentsForPreparedLogs', () => {
     ]);
 
     expect(touchedIncidents).toHaveLength(1);
-    expect(touchedIncidents[0].totalEvents).toBe(2);
-    expect(touchedIncidents[0].lastSeen).toEqual(new Date('2026-02-12T13:30:00.000Z'));
-    expect(touchedIncidents[0].firstSeen).toEqual(new Date('2026-02-12T10:00:00.000Z'));
+    expect(touchedIncidents[0]!.totalEvents).toBe(2);
+    expect(touchedIncidents[0]!.lastSeen).toEqual(new Date('2026-02-12T13:30:00.000Z'));
+    expect(touchedIncidents[0]!.firstSeen).toEqual(new Date('2026-02-12T10:00:00.000Z'));
   });
 });

@@ -1,6 +1,7 @@
 import { SSE_CONFIG } from '$lib/server/config/performance';
 import type { Incident } from '$lib/server/db/schema';
 import { logEventBus } from '$lib/server/events';
+import { checkCsrfOrigin } from '$lib/server/utils/csrf';
 import { isErrorResponse, requireProjectOwnership } from '$lib/server/utils/project-guard';
 import type { RequestEvent } from './$types';
 
@@ -17,6 +18,10 @@ function formatSSEEvent(event: string, data: string): string {
  * Requires session authentication and project ownership.
  */
 export async function POST(event: RequestEvent): Promise<Response> {
+  // CSRF check
+  const csrfError = checkCsrfOrigin(event);
+  if (csrfError) return csrfError;
+
   const authResult = await requireProjectOwnership(event, event.params.id);
   if (isErrorResponse(authResult)) return authResult;
 
@@ -33,9 +38,15 @@ export async function POST(event: RequestEvent): Promise<Response> {
       const sendEvent = (eventName: string, data: string): boolean => {
         if (isClosed) return false;
         try {
+          const size = (controller as ReadableStreamDefaultController).desiredSize;
+          if (size !== null && size <= 0) {
+            // Stream backpressure: slow consumer, drop the event
+            return false;
+          }
           controller.enqueue(encoder.encode(formatSSEEvent(eventName, data)));
           return true;
         } catch {
+          // Controller closed
           return false;
         }
       };

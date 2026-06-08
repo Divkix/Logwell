@@ -59,6 +59,7 @@ const projectData = $derived<Omit<Project, 'ownerId'>>({
   id: data.project.id,
   name: data.project.name,
   apiKey: data.project.apiKey,
+  apiKeyHash: data.project.apiKeyHash,
   retentionDays: data.project.retentionDays ?? null,
   createdAt: data.project.createdAt ? new Date(data.project.createdAt) : null,
   updatedAt: data.project.updatedAt ? new Date(data.project.updatedAt) : null,
@@ -75,12 +76,13 @@ let selectedRange = $state<TimeRange>((data.filters.range as TimeRange) || '1h')
 let selectedLog = $state<Log | null>(null);
 let showDetailModal = $state(false);
 let showHelpModal = $state(false);
-let selectedIndex = $state(-1);
+let selectedLogId = $state<string | null>(null);
 let loading = $state(false);
 let searchInputRef = $state<HTMLInputElement | null>(null);
 
 // Track new log IDs for highlighting
 let newLogIds = $state<Set<string>>(new Set());
+const highlightTimers: ReturnType<typeof setTimeout>[] = [];
 
 // Pagination state for Load More
 let loadedMoreLogs = $state<Log[]>([]);
@@ -110,10 +112,11 @@ function handleIncomingLogs(logs: ClientLog[]) {
   const ids = parsedLogs.map((l) => l.id);
   newLogIds = new Set([...ids, ...newLogIds]);
 
-  // Remove highlight after 3s
-  setTimeout(() => {
+  // Remove highlight after 3s; track timer for cleanup
+  const timer = setTimeout(() => {
     newLogIds = new Set([...newLogIds].filter((id) => !ids.includes(id)));
   }, 3000);
+  highlightTimers.push(timer);
 
   streamedLogs = [...parsedLogs, ...streamedLogs];
 }
@@ -142,6 +145,8 @@ $effect(() => {
 
   return () => {
     logStream.disconnect();
+    for (const t of highlightTimers) clearTimeout(t);
+    highlightTimers.length = 0;
   };
 });
 
@@ -184,19 +189,19 @@ const allLogs = $derived.by(() => {
 
 function handleSearch(value: string) {
   searchValue = value;
-  selectedIndex = -1;
+  selectedLogId = null;
   updateFilters();
 }
 
 function handleLevelChange(levels: LogLevel[]) {
   selectedLevels = levels;
-  selectedIndex = -1;
+  selectedLogId = null;
   updateFilters();
 }
 
 function handleTimeRangeChange(range: TimeRange) {
   selectedRange = range;
-  selectedIndex = -1;
+  selectedLogId = null;
   updateFilters();
 }
 
@@ -259,7 +264,7 @@ function clearFilters() {
   searchValue = '';
   selectedLevels = [];
   selectedRange = '1h';
-  selectedIndex = -1;
+  selectedLogId = null;
   updateFilters();
 }
 
@@ -279,7 +284,10 @@ function handleRemoveRange() {
 }
 
 function scrollSelectedIntoView() {
-  const element = document.querySelector('[data-selected="true"]');
+  // Prefer table row (desktop) to avoid matching hidden mobile card first
+  const element =
+    document.querySelector('table [data-selected="true"]') ??
+    document.querySelector('[data-selected="true"]');
   element?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
 
@@ -302,15 +310,13 @@ function handleKeyboardShortcut(event: KeyboardEvent) {
       // Skip navigation when loading or no logs
       if (isLoading || allLogs.length === 0) return;
       // Navigate to next log
-      const prevIndexJ = selectedIndex;
-      if (selectedIndex < allLogs.length - 1) {
-        selectedIndex++;
-      } else if (selectedIndex === -1 && allLogs.length > 0) {
-        selectedIndex = 0;
-      }
-      if (selectedIndex !== prevIndexJ) {
+      const currentIdxJ = selectedLogId ? allLogs.findIndex((l) => l.id === selectedLogId) : -1;
+      const nextIdxJ = currentIdxJ < allLogs.length - 1 ? currentIdxJ + 1 : currentIdxJ;
+      if (nextIdxJ !== currentIdxJ || currentIdxJ === -1) {
+        const newIdx = currentIdxJ === -1 ? 0 : nextIdxJ;
+        selectedLogId = allLogs[newIdx]?.id ?? null;
         scrollSelectedIntoView();
-        announceToScreenReader(`Log ${selectedIndex + 1} of ${allLogs.length}`);
+        announceToScreenReader(`Log ${newIdx + 1} of ${allLogs.length}`);
       }
       break;
     }
@@ -318,25 +324,25 @@ function handleKeyboardShortcut(event: KeyboardEvent) {
       // Skip navigation when loading or no logs
       if (isLoading || allLogs.length === 0) return;
       // Navigate to previous log
-      const prevIndexK = selectedIndex;
-      if (selectedIndex > 0) {
-        selectedIndex--;
-      }
-      if (selectedIndex !== prevIndexK) {
+      const currentIdxK = selectedLogId ? allLogs.findIndex((l) => l.id === selectedLogId) : -1;
+      if (currentIdxK > 0) {
+        selectedLogId = allLogs[currentIdxK - 1]?.id ?? null;
         scrollSelectedIntoView();
-        announceToScreenReader(`Log ${selectedIndex + 1} of ${allLogs.length}`);
+        announceToScreenReader(`Log ${currentIdxK} of ${allLogs.length}`);
       }
       break;
     }
-    case 'Enter':
+    case 'Enter': {
       // Open modal for selected log (only when a log is selected)
-      if (selectedIndex >= 0 && selectedIndex < allLogs.length) {
-        selectedLog = allLogs[selectedIndex];
+      const selectedForEnter = selectedLogId ? allLogs.find((l) => l.id === selectedLogId) : null;
+      if (selectedForEnter) {
+        selectedLog = selectedForEnter;
         showDetailModal = true;
         event.preventDefault();
       }
       // Don't preventDefault when no selection - allow buttons to work normally
       break;
+    }
     case '/':
       // Focus search input
       event.preventDefault();
@@ -361,6 +367,7 @@ function handleKeyboardShortcut(event: KeyboardEvent) {
 {#if isNavigating}
   <LogStreamSkeleton />
 {:else}
+  {#key data.project.id}
   <div class="space-y-4 sm:space-y-6">
     <!-- Header -->
     <div class="flex items-center justify-between gap-2">
@@ -480,7 +487,7 @@ function handleKeyboardShortcut(event: KeyboardEvent) {
       {newLogIds}
       project={projectData}
       appUrl={data.appUrl ?? undefined}
-      {selectedIndex}
+      selectedId={selectedLogId}
     />
 
     <!-- Load More Button -->
@@ -512,6 +519,7 @@ function handleKeyboardShortcut(event: KeyboardEvent) {
       </div>
     {/if}
   </div>
+  {/key}
 {/if}
 
 <!-- Log Detail Modal -->

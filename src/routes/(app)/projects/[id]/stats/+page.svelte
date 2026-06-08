@@ -21,9 +21,10 @@ let loading = $state(false);
 let timeseriesData = $state<TimeSeriesBucket[]>([]);
 let timeseriesLoading = $state(true);
 let timeseriesError = $state<string | undefined>();
+let fetchController: AbortController | null = null;
 
 // Fetch timeseries data
-async function fetchTimeseries(range: TimeRange, from: string | null) {
+async function fetchTimeseries(range: TimeRange, from: string | null, signal: AbortSignal) {
   timeseriesLoading = true;
   timeseriesError = undefined;
   try {
@@ -32,23 +33,32 @@ async function fetchTimeseries(range: TimeRange, from: string | null) {
     if (from) {
       params.set('from', from);
     }
-    const res = await fetch(`/api/projects/${data.project.id}/stats/timeseries?${params}`);
+    const res = await fetch(`/api/projects/${data.project.id}/stats/timeseries?${params}`, {
+      signal,
+    });
     if (!res.ok) {
       throw new Error('Failed to load timeseries data');
     }
     const json = await res.json();
     timeseriesData = json.buckets;
   } catch (e) {
+    if (e instanceof Error && e.name === 'AbortError') return;
     timeseriesError = e instanceof Error ? e.message : 'Unknown error';
     timeseriesData = [];
   } finally {
-    timeseriesLoading = false;
+    if (!signal.aborted) {
+      timeseriesLoading = false;
+    }
   }
 }
 
 // Fetch timeseries on mount and when data changes (page reload updates data.filters.from)
 $effect(() => {
-  fetchTimeseries(selectedRange, data.filters.from);
+  // Cancel previous in-flight request
+  fetchController?.abort();
+  fetchController = new AbortController();
+  const signal = fetchController.signal;
+  fetchTimeseries(selectedRange, data.filters.from, signal);
 });
 
 // Show skeleton when navigating TO this page
@@ -119,7 +129,7 @@ const chartData = $derived({
         <div class="flex flex-col gap-4">
           <div class="h-[160px] w-[160px] sm:h-[200px] sm:w-[200px] rounded-full bg-accent animate-pulse"></div>
           <div class="flex flex-col gap-2">
-            {#each Array(5) as _}
+            {#each Array(5) as _, i (i)}
               <div class="flex items-center gap-2">
                 <div class="h-3 w-3 rounded-sm bg-accent animate-pulse"></div>
                 <div class="h-4 w-24 bg-accent animate-pulse rounded-md"></div>

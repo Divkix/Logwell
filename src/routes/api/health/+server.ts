@@ -78,9 +78,10 @@ export async function GET(event: RequestEvent): Promise<Response> {
     version: __APP_VERSION__,
   };
 
-  // Include error details when unhealthy
+  // Include generic error message when unhealthy (log the real error server-side)
   if (!isHealthy && dbStatus.error) {
-    responseBody.error = dbStatus.error;
+    console.error('[health] Database connectivity check failed:', dbStatus.error);
+    responseBody.error = 'database unavailable';
   }
 
   const headers = new Headers({

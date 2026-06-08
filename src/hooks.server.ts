@@ -4,7 +4,7 @@ import { building } from '$app/environment';
 import { auth, initAuth } from '$lib/server/auth';
 import { db } from '$lib/server/db';
 import { createErrorHandler } from '$lib/server/error-handler';
-import { startCleanupScheduler } from '$lib/server/jobs/cleanup-scheduler';
+import { startCleanupScheduler, stopCleanupScheduler } from '$lib/server/jobs/cleanup-scheduler';
 
 // Initialize on server startup
 let initialized = false;
@@ -25,6 +25,16 @@ async function ensureInitialized(): Promise<void> {
   }
 }
 
+// Graceful shutdown
+function gracefulShutdown(signal: string) {
+  console.log(`[shutdown] ${signal} received`);
+  stopCleanupScheduler();
+  // Give in-flight requests ~5s then exit
+  setTimeout(() => process.exit(0), 5000);
+}
+process.once('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.once('SIGINT', () => gracefulShutdown('SIGINT'));
+
 /**
  * Combined SvelteKit handle hook for better-auth
  * - Populates event.locals with session/user data
@@ -38,6 +48,16 @@ export const handle: Handle = async ({ event, resolve }) => {
 
   await ensureInitialized();
 
+  // Skip session lookup for paths that never need auth
+  const pathname = event.url.pathname;
+  if (
+    pathname.startsWith('/v1/') ||
+    pathname === '/api/health' ||
+    pathname.startsWith('/static/')
+  ) {
+    return resolve(event);
+  }
+
   // Fetch current session from Better Auth
   const session = await auth.api.getSession({
     headers: event.request.headers,
@@ -49,6 +69,7 @@ export const handle: Handle = async ({ event, resolve }) => {
     event.locals.user = session.user;
   }
 
+  // Test injection seam — tests override this with a PGlite client via locals.db
   event.locals.db = db;
 
   // Use better-auth's SvelteKit handler for proper routing

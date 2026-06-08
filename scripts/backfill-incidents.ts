@@ -1,4 +1,10 @@
 #!/usr/bin/env bun
+/**
+ * IMPORTANT: This script is non-transactional and not resumable.
+ * If it fails mid-run, some projects may be partially backfilled.
+ * Re-running is safe (it is idempotent per fingerprint) but may be slow.
+ * For large datasets, consider running per-project with the --project flag.
+ */
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from '../src/lib/server/db/schema';

@@ -141,7 +141,7 @@ describe('LogDetailModal', () => {
     });
 
     it('handles null timestamp gracefully', () => {
-      const logWithNullTimestamp = { ...baseLog, timestamp: null };
+      const logWithNullTimestamp = { ...baseLog, timestamp: null as unknown as Date };
       render(LogDetailModal, { props: { log: logWithNullTimestamp, open: true } });
 
       expect(screen.getByText('N/A')).toBeInTheDocument();

@@ -1,6 +1,7 @@
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { username } from 'better-auth/plugins';
+import { env } from '$lib/server/config/env';
 import type { DatabaseClient } from './db/db';
 
 /**
@@ -21,7 +22,7 @@ export function createAuth(database: DatabaseClient) {
       expiresIn: 60 * 60 * 24 * 7, // 7 days
       updateAge: 60 * 60 * 24, // Update session every 24 hours
     },
-    secret: process.env.BETTER_AUTH_SECRET || 'default-secret-for-development-only',
+    secret: env.BETTER_AUTH_SECRET,
     // Self-hosted app - trust the configured ORIGIN for reverse proxies/tunnels
     trustedOrigins: [process.env.ORIGIN].filter(Boolean) as string[],
   });

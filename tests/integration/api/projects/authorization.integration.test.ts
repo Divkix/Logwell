@@ -169,7 +169,7 @@ describe('Project Authorization - Ownership Isolation', () => {
       // Verify ownerId is set in database
       const [dbProject] = await db.select().from(project).where(eq(project.id, body.id));
       expect(dbProject).toBeDefined();
-      expect(dbProject.ownerId).toBe(userA.userId);
+      expect(dbProject!.ownerId).toBe(userA.userId);
     });
   });
 
@@ -230,7 +230,7 @@ describe('Project Authorization - Ownership Isolation', () => {
 
       // Verify project was NOT modified
       const [dbProject] = await db.select().from(project).where(eq(project.id, projectB.id));
-      expect(dbProject.name).toBe('project-b');
+      expect(dbProject!.name).toBe('project-b');
     });
 
     it('allows updating own project', async () => {
@@ -313,7 +313,7 @@ describe('Project Authorization - Ownership Isolation', () => {
 
       // Verify API key was NOT changed
       const [dbProject] = await db.select().from(project).where(eq(project.id, projectB.id));
-      expect(dbProject.apiKey).toBe(originalApiKey);
+      expect(dbProject!.apiKey).toBe(originalApiKey);
     });
 
     it('allows regenerating own project API key', async () => {

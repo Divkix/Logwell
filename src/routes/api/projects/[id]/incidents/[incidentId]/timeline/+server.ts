@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import { and, eq, gte, lte, type SQL, sql } from 'drizzle-orm';
 import { type BucketCountRow, getDbClient, getQueryRows } from '$lib/server/db/db';
 import { incident, log } from '$lib/server/db/schema';
+import { apiError } from '$lib/server/utils/api-error';
 import { isErrorResponse, requireProjectOwnership } from '$lib/server/utils/project-guard';
 import { INCIDENT_RANGES, type IncidentRange } from '$lib/shared/types';
 import { getTimeRangeStart } from '$lib/utils/format';
@@ -29,7 +30,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
     .where(and(eq(incident.projectId, projectId), eq(incident.id, incidentId)));
 
   if (!incidentRow) {
-    return json({ error: 'not_found', message: 'Incident not found' }, { status: 404 });
+    return apiError(404, 'not_found', 'Incident not found');
   }
 
   const rangeParam = event.url.searchParams.get('range') || '24h';

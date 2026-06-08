@@ -73,8 +73,9 @@ export const load: PageServerLoad = async (event) => {
           and(eq(incident.lastSeen, cursorTimestamp), lt(incident.id, cursorId)),
         ) as SQL,
       );
-    } catch {
-      // Ignore invalid cursor in page load; fallback to first page.
+    } catch (err) {
+      // Invalid cursor - log and fall back to first page (consistent with API behavior)
+      console.error('[page/incidents] invalid cursor, falling back to first page:', err);
     }
   }
 
@@ -94,10 +95,7 @@ export const load: PageServerLoad = async (event) => {
 
   const nextCursor =
     hasMore && incidentsToReturn.length > 0
-      ? encodeCursor(
-          incidentsToReturn[incidentsToReturn.length - 1].lastSeen as Date,
-          incidentsToReturn[incidentsToReturn.length - 1].id,
-        )
+      ? encodeCursor(incidentsToReturn.at(-1)!.lastSeen as Date, incidentsToReturn.at(-1)!.id)
       : null;
 
   return {

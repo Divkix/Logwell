@@ -18,6 +18,7 @@ interface Props {
   project?: { apiKey: string };
   appUrl?: string;
   selectedIndex?: number;
+  selectedId?: string | null;
 }
 
 const {
@@ -30,6 +31,7 @@ const {
   project,
   appUrl,
   selectedIndex = -1,
+  selectedId = null,
 }: Props = $props();
 
 // Show quick start empty state when no filters and project/appUrl provided
@@ -120,7 +122,7 @@ const sortedLogs = $derived.by(() => {
       {/if}
     {:else}
       {#each sortedLogs as log, i (log.id)}
-        <LogCard {log} onclick={onLogClick} isNew={newLogIds?.has(log.id)} isSelected={i === selectedIndex} />
+        <LogCard {log} onclick={onLogClick} isNew={newLogIds?.has(log.id)} isSelected={selectedId != null ? log.id === selectedId : i === selectedIndex} />
       {/each}
     {/if}
   </div>
@@ -219,7 +221,7 @@ const sortedLogs = $derived.by(() => {
         {/if}
       {:else}
         {#each sortedLogs as log, i (log.id)}
-          <LogRow {log} onclick={onLogClick} isNew={newLogIds?.has(log.id)} isSelected={i === selectedIndex} />
+          <LogRow {log} onclick={onLogClick} isNew={newLogIds?.has(log.id)} isSelected={selectedId != null ? log.id === selectedId : i === selectedIndex} />
         {/each}
       {/if}
     </tbody>

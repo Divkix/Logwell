@@ -46,21 +46,21 @@ describe('DashboardSkeleton', () => {
       render(DashboardSkeleton);
 
       const cards = screen.getAllByTestId('project-card-skeleton');
-      expect(within(cards[0]).getByTestId('skeleton-title')).toBeInTheDocument();
+      expect(within(cards[0]!).getByTestId('skeleton-title')).toBeInTheDocument();
     });
 
     it('card skeleton has content placeholders', () => {
       render(DashboardSkeleton);
 
       const cards = screen.getAllByTestId('project-card-skeleton');
-      expect(within(cards[0]).getByTestId('skeleton-content')).toBeInTheDocument();
+      expect(within(cards[0]!).getByTestId('skeleton-content')).toBeInTheDocument();
     });
 
     it('card skeleton has button placeholder', () => {
       render(DashboardSkeleton);
 
       const cards = screen.getAllByTestId('project-card-skeleton');
-      expect(within(cards[0]).getByTestId('skeleton-card-button')).toBeInTheDocument();
+      expect(within(cards[0]!).getByTestId('skeleton-card-button')).toBeInTheDocument();
     });
   });
 
@@ -68,7 +68,7 @@ describe('DashboardSkeleton', () => {
     it('has pulse animation on skeleton elements', () => {
       render(DashboardSkeleton);
 
-      const skeletonTitle = screen.getAllByTestId('skeleton-title')[0];
+      const skeletonTitle = screen.getAllByTestId('skeleton-title')[0]!;
       expect(skeletonTitle).toHaveClass('animate-pulse');
     });
 

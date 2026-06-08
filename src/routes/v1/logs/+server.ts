@@ -18,6 +18,7 @@ import {
   normalizeOtlpLogsRequest,
   OtlpValidationError,
 } from '$lib/server/utils/otlp';
+import { checkRateLimit, INGEST_RPM } from '$lib/server/utils/rate-limit';
 
 function buildIngestResponse(accepted: number, rejected: number, errors: string[]) {
   const response: { accepted: number; rejected?: number; errors?: string[] } = { accepted };
@@ -61,12 +62,37 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     throw err;
   }
 
+  // Apply rate limiting per project
+  if (!checkRateLimit(`ingest:${projectId}`, INGEST_RPM)) {
+    return new Response(JSON.stringify({ error: 'rate_limited' }), {
+      status: 429,
+      headers: { 'Content-Type': 'application/json', 'Retry-After': '60' },
+    });
+  }
+
   let body: unknown;
   try {
     body = await request.json();
   } catch {
     return json(
       { error: 'invalid_json', message: 'Request body must be valid JSON' },
+      { status: 400 },
+    );
+  }
+
+  // Early batch size check before full parse (BU-7): count resourceLogs entries as a heuristic
+  if (
+    body !== null &&
+    typeof body === 'object' &&
+    'resourceLogs' in body &&
+    Array.isArray((body as { resourceLogs: unknown }).resourceLogs) &&
+    (body as { resourceLogs: unknown[] }).resourceLogs.length > API_CONFIG.BATCH_INSERT_LIMIT
+  ) {
+    return json(
+      {
+        error: 'batch_too_large',
+        message: `Batch exceeds maximum limit of ${API_CONFIG.BATCH_INSERT_LIMIT} logs.`,
+      },
       { status: 400 },
     );
   }
@@ -119,7 +145,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
           const assigned = assignIncidentIds(preparedLogs, incidentByFingerprint);
 
           const logEntries = assigned.map((prepared, index) => {
-            const record = records[index];
+            const record = records[index]!;
             const mapped = mapOtlpAttributesToLogColumns(record.attributes);
 
             return {

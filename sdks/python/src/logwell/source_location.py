@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import inspect
+import sys
 from dataclasses import dataclass
 
 
@@ -22,8 +22,8 @@ class SourceLocation:
 def capture_source_location(skip_frames: int = 0) -> SourceLocation | None:
     """Capture the source location of the caller.
 
-    Uses Python's inspect module to get the call stack and extract
-    the file path and line number of the caller.
+    Uses direct frame walking (sys._getframe) instead of inspect.stack()
+    to avoid per-frame file I/O overhead.
 
     Args:
         skip_frames: Number of stack frames to skip (0 = immediate caller
@@ -41,23 +41,11 @@ def capture_source_location(skip_frames: int = 0) -> SourceLocation | None:
             # location.source_file = file where log() was called
     """
     try:
-        # inspect.stack() returns list of FrameInfo objects
-        # Index 0 is this function (capture_source_location)
-        # Index 1 is the immediate caller
-        # So we need index 1 + skip_frames
-        stack = inspect.stack()
-
-        # Target frame: skip capture_source_location frame + user-specified frames
-        target_index = 1 + skip_frames
-
-        if target_index >= len(stack):
-            return None
-
-        frame_info = stack[target_index]
-
+        # skip_frames=0 → caller of this function (1 frame above us)
+        frame = sys._getframe(skip_frames + 1)
         return SourceLocation(
-            source_file=frame_info.filename,
-            line_number=frame_info.lineno,
+            source_file=frame.f_code.co_filename,
+            line_number=frame.f_lineno,
         )
-    except (IndexError, AttributeError):
+    except (ValueError, AttributeError):
         return None

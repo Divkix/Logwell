@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  bucketTimestamps,
-  fillMissingBuckets,
-  formatBucketLabel,
-  getTimeBucketConfig,
-} from './timeseries';
+import { bucketTimestamps, fillMissingBuckets, getTimeBucketConfig } from './timeseries';
 
 describe('getTimeBucketConfig', () => {
   it('returns 60000ms interval for 15m range', () => {
@@ -103,9 +98,9 @@ describe('fillMissingBuckets', () => {
     const result = fillMissingBuckets(bucketCounts, config, rangeStart, rangeEnd);
 
     expect(result).toHaveLength(3);
-    expect(result[0].count).toBe(5);
-    expect(result[1].count).toBe(0); // filled with zero
-    expect(result[2].count).toBe(3);
+    expect(result[0]!.count).toBe(5);
+    expect(result[1]!.count).toBe(0); // filled with zero
+    expect(result[2]!.count).toBe(3);
   });
 
   it('generates all buckets for completely empty input', () => {
@@ -128,8 +123,8 @@ describe('fillMissingBuckets', () => {
 
     const result = fillMissingBuckets(bucketCounts, config, rangeStart, rangeEnd);
 
-    expect(result[0].count).toBe(10);
-    expect(result[1].count).toBe(20);
+    expect(result[0]!.count).toBe(10);
+    expect(result[1]!.count).toBe(20);
   });
 
   it('returns buckets with valid ISO timestamps', () => {
@@ -139,35 +134,7 @@ describe('fillMissingBuckets', () => {
 
     const result = fillMissingBuckets({}, config, rangeStart, rangeEnd);
 
-    expect(result[0].timestamp).toBe('2024-01-15T10:00:00.000Z');
-    expect(result[1].timestamp).toBe('2024-01-15T11:00:00.000Z');
-  });
-});
-
-describe('formatBucketLabel', () => {
-  it('formats minute bucket as HH:mm', () => {
-    const date = new Date('2024-01-15T14:35:00.000Z');
-    expect(formatBucketLabel(date, '15m')).toBe('14:35');
-    expect(formatBucketLabel(date, '1h')).toBe('14:35');
-  });
-
-  it('formats hour bucket as HH:00', () => {
-    const date = new Date('2024-01-15T14:00:00.000Z');
-    expect(formatBucketLabel(date, '24h')).toBe('14:00');
-  });
-
-  it('formats 6-hour bucket as MMM DD HH:00', () => {
-    const date = new Date('2024-01-15T18:00:00.000Z');
-    expect(formatBucketLabel(date, '7d')).toBe('Jan 15 18:00');
-  });
-
-  it('handles single-digit day correctly', () => {
-    const date = new Date('2024-01-05T06:00:00.000Z');
-    expect(formatBucketLabel(date, '7d')).toBe('Jan 5 06:00');
-  });
-
-  it('handles midnight correctly', () => {
-    const date = new Date('2024-01-15T00:00:00.000Z');
-    expect(formatBucketLabel(date, '24h')).toBe('00:00');
+    expect(result[0]!.timestamp).toBe('2024-01-15T10:00:00.000Z');
+    expect(result[1]!.timestamp).toBe('2024-01-15T11:00:00.000Z');
   });
 });

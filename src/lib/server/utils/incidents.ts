@@ -235,6 +235,7 @@ export async function upsertIncidentsForPreparedLogs(
       })
       .returning();
 
+    if (!result) continue;
     incidentByFingerprint.set(aggregate.fingerprint, result);
     touchedIncidents.push(result);
   }

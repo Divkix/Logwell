@@ -156,8 +156,8 @@ describe('Cursor-based Pagination', () => {
 
       expect(body1.logs).toHaveLength(5);
       // Logs should be ordered newest first
-      expect(body1.logs[0].id).toBe(logs[4].id); // Newest
-      expect(body1.logs[4].id).toBe(logs[0].id); // Oldest
+      expect(body1.logs[0]?.id).toBe(logs[4]?.id); // Newest
+      expect(body1.logs[4]?.id).toBe(logs[0]?.id); // Oldest
 
       // Create 150 more logs to test pagination
       await seedLogs(db, testProject.id, 150);

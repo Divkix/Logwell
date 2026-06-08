@@ -3,7 +3,8 @@ import { and, count, desc, eq } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { getDbClient } from '$lib/server/db/db';
 import { log, project } from '$lib/server/db/schema';
-import { generateApiKey } from '$lib/server/utils/api-key';
+import { apiError } from '$lib/server/utils/api-error';
+import { generateApiKey, hashApiKey } from '$lib/server/utils/api-key';
 import { requireAuth } from '$lib/server/utils/auth-guard';
 import { requireJsonContentType } from '$lib/server/utils/content-type';
 import { checkCsrfOrigin } from '$lib/server/utils/csrf';
@@ -112,7 +113,7 @@ export async function POST(event: RequestEvent): Promise<Response> {
   try {
     body = await event.request.json();
   } catch {
-    return json({ error: 'invalid_json', message: 'Invalid JSON body' }, { status: 400 });
+    return apiError(400, 'invalid_json', 'Invalid JSON body');
   }
 
   // Validate request body
@@ -123,7 +124,7 @@ export async function POST(event: RequestEvent): Promise<Response> {
     const field = firstError?.path.join('.') || 'name';
     const message = firstError?.message || 'Validation failed';
 
-    return json({ error: 'validation_error', message: `${field}: ${message}` }, { status: 400 });
+    return apiError(400, 'validation_error', `${field}: ${message}`);
   }
 
   const { name } = validation.data;
@@ -135,22 +136,22 @@ export async function POST(event: RequestEvent): Promise<Response> {
     .where(and(eq(project.name, name), eq(project.ownerId, user.id)));
 
   if (existing) {
-    return json(
-      { error: 'duplicate_name', message: 'A project with this name already exists' },
-      { status: 400 },
-    );
+    return apiError(400, 'duplicate_name', 'A project with this name already exists');
   }
 
   // Generate new project with current user as owner
+  const generatedApiKey = generateApiKey();
   const newProject = {
     id: nanoid(),
     name,
-    apiKey: generateApiKey(),
+    apiKey: generatedApiKey,
+    apiKeyHash: hashApiKey(generatedApiKey),
     ownerId: user.id,
   };
 
   // Insert project
   const [created] = await db.insert(project).values(newProject).returning();
+  if (!created) return apiError(500, 'internal_error', 'Failed to create project');
 
   return json(
     {

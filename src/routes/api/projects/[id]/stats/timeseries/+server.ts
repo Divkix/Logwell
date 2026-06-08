@@ -55,7 +55,12 @@ export async function GET(event: RequestEvent): Promise<Response> {
   // If 'from' is provided, use it to ensure consistency with page server
   // Otherwise calculate from current time
   const rangeEnd = new Date();
-  const rangeStart = fromParam ? new Date(fromParam) : getTimeRangeStart(range, rangeEnd);
+  const rangeStart = fromParam
+    ? (() => {
+        const d = new Date(fromParam);
+        return Number.isNaN(d.getTime()) ? getTimeRangeStart(range, rangeEnd) : d;
+      })()
+    : getTimeRangeStart(range, rangeEnd);
   const config = getTimeBucketConfig(range);
 
   // Build WHERE conditions

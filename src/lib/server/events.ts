@@ -45,7 +45,11 @@ class LogEventBus {
     const projectListeners = this.listeners.get(log.projectId);
     if (projectListeners) {
       for (const listener of projectListeners) {
-        listener(log);
+        try {
+          listener(log);
+        } catch (e) {
+          console.error('[events] listener error:', e);
+        }
       }
     }
   }
@@ -83,7 +87,11 @@ class LogEventBus {
     const projectListeners = this.incidentListeners.get(incident.projectId);
     if (projectListeners) {
       for (const listener of projectListeners) {
-        listener(incident);
+        try {
+          listener(incident);
+        } catch (e) {
+          console.error('[events] listener error:', e);
+        }
       }
     }
   }

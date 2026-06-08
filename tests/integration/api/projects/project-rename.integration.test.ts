@@ -151,7 +151,7 @@ describe('PATCH /api/projects/[id]', () => {
         .select()
         .from(project)
         .where(eq(project.id, testProject.id));
-      expect(updatedProject.name).toBe('new-name');
+      expect(updatedProject!.name).toBe('new-name');
     });
 
     it('rejects duplicate project name for same user', async () => {
@@ -179,7 +179,7 @@ describe('PATCH /api/projects/[id]', () => {
         .select()
         .from(project)
         .where(eq(project.id, testProject.id));
-      expect(unchangedProject.name).toBe('my-project');
+      expect(unchangedProject!.name).toBe('my-project');
     });
 
     it('allows renaming to a name used by another user', async () => {
@@ -332,7 +332,7 @@ describe('PATCH /api/projects/[id]', () => {
         .select()
         .from(project)
         .where(eq(project.id, testProject.id));
-      expect(updatedProject.updatedAt?.getTime()).toBeGreaterThan(
+      expect(updatedProject!.updatedAt?.getTime()).toBeGreaterThan(
         originalUpdatedAt?.getTime() ?? 0,
       );
     });
@@ -380,7 +380,7 @@ describe('PATCH /api/projects/[id]', () => {
         .select()
         .from(project)
         .where(eq(project.id, testProject.id));
-      expect(unchangedProject.updatedAt?.getTime()).toBe(originalUpdatedAt?.getTime());
+      expect(unchangedProject!.updatedAt?.getTime()).toBe(originalUpdatedAt?.getTime());
     });
 
     it('returns 415 for non-JSON Content-Type', async () => {

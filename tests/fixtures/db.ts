@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
 import { nanoid } from 'nanoid';
 import * as schema from '../../src/lib/server/db/schema';
@@ -56,6 +57,8 @@ export async function getOrCreateDefaultUser(
     })
     .returning();
 
+  if (!user) throw new Error('Failed to create test user');
+
   // Cache and return
   defaultUserCache.set(db, user);
   return user;
@@ -68,10 +71,12 @@ export async function getOrCreateDefaultUser(
 export function createProjectFactory(
   overrides: Partial<ProjectInsert> & { ownerId: string },
 ): ProjectInsert {
+  const apiKey = overrides.apiKey ?? generateApiKey();
   return {
     id: nanoid(),
     name: `test-project-${nanoid(8)}`,
-    apiKey: generateApiKey(),
+    apiKey,
+    apiKeyHash: createHash('sha256').update(apiKey).digest('hex'),
     ...overrides,
   };
 }
@@ -127,6 +132,7 @@ export async function seedProject(
 
   const project = createProjectFactory({ ...overrides, ownerId });
   const [result] = await db.insert(schema.project).values(project).returning();
+  if (!result) throw new Error('Failed to create test project');
   return result;
 }
 
@@ -156,6 +162,7 @@ export async function seedLog(
 ): Promise<LogSelect> {
   const log = createLogFactory({ projectId, ...overrides });
   const [result] = await db.insert(schema.log).values(log).returning();
+  if (!result) throw new Error('Failed to create test log');
   return result;
 }
 

@@ -1,14 +1,5 @@
 import { type ExternalToast, toast } from 'svelte-sonner';
 
-export type ToastType = 'success' | 'error' | 'info' | 'warning';
-
-/**
- * Show a toast notification with the specified type
- */
-export function showToast(type: ToastType, message: string, options?: ExternalToast): void {
-  toast[type](message, options);
-}
-
 /**
  * Show a success toast notification
  */
@@ -32,18 +23,4 @@ export function toastError(error: string | Error | unknown, options?: ExternalTo
   }
 
   toast.error(message, options);
-}
-
-/**
- * Show an info toast notification
- */
-export function toastInfo(message: string, options?: ExternalToast): void {
-  toast.info(message, options);
-}
-
-/**
- * Show a warning toast notification
- */
-export function toastWarning(message: string, options?: ExternalToast): void {
-  toast.warning(message, options);
 }

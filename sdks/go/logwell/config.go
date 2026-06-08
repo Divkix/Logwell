@@ -45,7 +45,7 @@ type Config struct {
 	Metadata map[string]any
 
 	// BatchSize is the number of logs to batch before sending.
-	// Default: 10, Range: 1-500.
+	// Default: 50, Range: 1-500.
 	BatchSize int
 
 	// FlushInterval is the maximum time to wait before flushing.

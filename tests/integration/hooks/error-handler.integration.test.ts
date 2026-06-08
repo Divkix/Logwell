@@ -21,7 +21,7 @@ describe('Global Error Handler', () => {
       method: 'POST',
       route: '/api/projects',
       status: 500,
-      message: 'Internal Server Error',
+      message: 'Internal server error',
       ...overrides,
     };
   }
@@ -65,14 +65,14 @@ describe('Global Error Handler', () => {
       const context = createErrorContext({
         error: sensitiveError,
         status: 500,
-        message: 'Internal Server Error',
+        message: 'Internal server error',
       });
 
       const result = handleError(context);
 
       // Should not expose internal error details
       expect(result.message).not.toContain('secret123');
-      expect(result.message).toBe('Internal Server Error');
+      expect(result.message).toBe('Internal server error');
     });
 
     it('returns original message for 4xx errors', () => {

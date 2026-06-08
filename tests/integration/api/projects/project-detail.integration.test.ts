@@ -452,7 +452,7 @@ describe('POST /api/projects/[id]/regenerate', () => {
         .select()
         .from(project)
         .where(eq(project.id, testProject.id));
-      expect(updatedProject.apiKey).toBe(body.apiKey);
+      expect(updatedProject!.apiKey).toBe(body.apiKey);
     });
 
     it('invalidates old API key', async () => {
@@ -520,7 +520,7 @@ describe('POST /api/projects/[id]/regenerate', () => {
         .select()
         .from(project)
         .where(eq(project.id, testProject.id));
-      expect(updatedProject.updatedAt?.getTime()).toBeGreaterThan(
+      expect(updatedProject!.updatedAt?.getTime()).toBeGreaterThan(
         originalUpdatedAt?.getTime() ?? 0,
       );
     });

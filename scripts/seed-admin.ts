@@ -1,5 +1,4 @@
 #!/usr/bin/env bun
-import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import { createAuth } from '../src/lib/server/auth';
@@ -38,35 +37,34 @@ async function seedAdmin() {
   const db = drizzle(client, { schema });
 
   try {
-    // Check if admin already exists by username
-    const existingAdmin = await db
-      .select()
-      .from(schema.user)
-      .where(eq(schema.user.username, ADMIN_USERNAME));
-
-    if (existingAdmin.length > 0) {
-      console.log('✓ Admin user already exists, skipping');
-      return;
-    }
-
     // Create admin user via better-auth with username
+    // Idempotent: catch unique constraint errors and treat as success
     const auth = createAuth(db);
-    const result = await auth.api.signUpEmail({
-      body: {
-        email: generatedEmail,
-        password: ADMIN_PASSWORD,
-        name: 'Admin',
-        username: ADMIN_USERNAME,
-      },
-    });
+    try {
+      const result = await auth.api.signUpEmail({
+        body: {
+          email: generatedEmail,
+          password: ADMIN_PASSWORD,
+          name: 'Admin',
+          username: ADMIN_USERNAME,
+        },
+      });
 
-    if (result.error) {
-      throw new Error(`Failed to create admin user: ${result.error.message}`);
+      if (result.error) {
+        throw new Error(`Failed to create admin user: ${result.error.message}`);
+      }
+
+      console.log('✓ Admin user created successfully');
+      console.log(`  Username: ${ADMIN_USERNAME}`);
+      console.log('  You can now sign in with the admin credentials');
+    } catch (e) {
+      const msg = e instanceof Error ? e.message.toLowerCase() : '';
+      if (msg.includes('unique') || msg.includes('already exists') || msg.includes('23505')) {
+        console.log('✓ Admin user already exists, skipping seed.');
+      } else {
+        throw e;
+      }
     }
-
-    console.log('✓ Admin user created successfully');
-    console.log(`  Username: ${ADMIN_USERNAME}`);
-    console.log('  You can now sign in with the admin credentials');
   } catch (error) {
     console.error('✗ Failed to seed admin user:', error);
     throw error;

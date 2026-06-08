@@ -2,7 +2,7 @@ import { json } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
 import { getDbClient } from '$lib/server/db/db';
 import { project } from '$lib/server/db/schema';
-import { generateApiKey, invalidateApiKeyCache } from '$lib/server/utils/api-key';
+import { generateApiKey, hashApiKey, invalidateApiKeyCache } from '$lib/server/utils/api-key';
 import { checkCsrfOrigin } from '$lib/server/utils/csrf';
 import { isErrorResponse, requireProjectOwnership } from '$lib/server/utils/project-guard';
 import type { RequestEvent } from './$types';
@@ -38,11 +38,12 @@ export async function POST(event: RequestEvent): Promise<Response> {
   // Generate new API key
   const newApiKey = generateApiKey();
 
-  // Update project with new API key
+  // Update project with new API key and its hash
   await db
     .update(project)
     .set({
       apiKey: newApiKey,
+      apiKeyHash: hashApiKey(newApiKey),
       updatedAt: new Date(),
     })
     .where(eq(project.id, projectId));

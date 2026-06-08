@@ -105,9 +105,9 @@ describe('POST /v1/ingest (Simple API)', () => {
 
       const [inserted] = await db.select().from(log).where(eq(log.projectId, project.id));
       expect(inserted).toBeTruthy();
-      expect(inserted.level).toBe('info');
-      expect(inserted.message).toBe('Hello world');
-      expect(inserted.timestamp).toBeTruthy();
+      expect(inserted!.level).toBe('info');
+      expect(inserted!.message).toBe('Hello world');
+      expect(inserted!.timestamp).toBeTruthy();
     });
 
     it('ingests a single log with all optional fields', async () => {
@@ -135,11 +135,11 @@ describe('POST /v1/ingest (Simple API)', () => {
       expect(response.status).toBe(200);
 
       const [inserted] = await db.select().from(log).where(eq(log.projectId, project.id));
-      expect(inserted.level).toBe('error');
-      expect(inserted.message).toBe('Database connection failed');
-      expect(inserted.timestamp?.toISOString()).toBe(timestamp);
-      expect(inserted.resourceAttributes).toEqual({ 'service.name': 'api-gateway' });
-      expect(inserted.metadata).toEqual({
+      expect(inserted!.level).toBe('error');
+      expect(inserted!.message).toBe('Database connection failed');
+      expect(inserted!.timestamp?.toISOString()).toBe(timestamp);
+      expect(inserted!.resourceAttributes).toEqual({ 'service.name': 'api-gateway' });
+      expect(inserted!.metadata).toEqual({
         userId: '123',
         requestId: 'req-456',
         error: { code: 'ECONNREFUSED' },
@@ -172,8 +172,8 @@ describe('POST /v1/ingest (Simple API)', () => {
       const after = new Date();
 
       // Timestamp should be between before and after
-      expect(inserted.timestamp?.getTime()).toBeGreaterThanOrEqual(before.getTime());
-      expect(inserted.timestamp?.getTime()).toBeLessThanOrEqual(after.getTime());
+      expect(inserted!.timestamp?.getTime()).toBeGreaterThanOrEqual(before.getTime());
+      expect(inserted!.timestamp?.getTime()).toBeLessThanOrEqual(after.getTime());
     });
   });
 
@@ -454,9 +454,9 @@ describe('POST /v1/ingest (Simple API)', () => {
       expect(response.status).toBe(200);
 
       const [inserted] = await db.select().from(log).where(eq(log.projectId, project.id));
-      expect(inserted.requestId).toBe('req-123');
-      expect(inserted.userId).toBe('user-456');
-      expect(inserted.ipAddress).toBe('192.168.1.1');
+      expect(inserted!.requestId).toBe('req-123');
+      expect(inserted!.userId).toBe('user-456');
+      expect(inserted!.ipAddress).toBe('192.168.1.1');
     });
 
     it('stores null metadata for empty metadata object', async () => {
@@ -481,7 +481,7 @@ describe('POST /v1/ingest (Simple API)', () => {
       expect(response.status).toBe(200);
 
       const [inserted] = await db.select().from(log).where(eq(log.projectId, project.id));
-      expect(inserted.metadata).toBeNull();
+      expect(inserted!.metadata).toBeNull();
     });
   });
 
@@ -553,22 +553,22 @@ describe('POST /v1/ingest (Simple API)', () => {
 
       const incidents = await db.select().from(incident).where(eq(incident.projectId, project.id));
       expect(incidents).toHaveLength(1);
-      expect(incidents[0].totalEvents).toBe(2);
+      expect(incidents[0]!.totalEvents).toBe(2);
 
       const logs = await db.select().from(log).where(eq(log.projectId, project.id));
       const errorLogs = logs.filter((entry) => entry.level === 'error');
       const infoLogs = logs.filter((entry) => entry.level === 'info');
 
       expect(errorLogs).toHaveLength(2);
-      expect(errorLogs[0].incidentId).toBe(incidents[0].id);
-      expect(errorLogs[1].incidentId).toBe(incidents[0].id);
-      expect(errorLogs[0].fingerprint).toBeTruthy();
-      expect(errorLogs[0].fingerprint).toBe(errorLogs[1].fingerprint);
-      expect(errorLogs[0].serviceName).toBe('api');
+      expect(errorLogs[0]!.incidentId).toBe(incidents[0]!.id);
+      expect(errorLogs[1]!.incidentId).toBe(incidents[0]!.id);
+      expect(errorLogs[0]!.fingerprint).toBeTruthy();
+      expect(errorLogs[0]!.fingerprint).toBe(errorLogs[1]!.fingerprint);
+      expect(errorLogs[0]!.serviceName).toBe('api');
 
       expect(infoLogs).toHaveLength(1);
-      expect(infoLogs[0].incidentId).toBeNull();
-      expect(infoLogs[0].fingerprint).toBeNull();
+      expect(infoLogs[0]!.incidentId).toBeNull();
+      expect(infoLogs[0]!.fingerprint).toBeNull();
     });
   });
 

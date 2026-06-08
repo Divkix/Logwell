@@ -148,9 +148,9 @@ describe('GET /api/projects/[id]/logs', () => {
 
       expect(body.logs).toHaveLength(3);
       // Logs should be ordered newest first (DESC)
-      expect(body.logs[0].id).toBe(log3.id);
-      expect(body.logs[1].id).toBe(log2.id);
-      expect(body.logs[2].id).toBe(log1.id);
+      expect(body.logs[0]!.id).toBe(log3.id);
+      expect(body.logs[1]!.id).toBe(log2.id);
+      expect(body.logs[2]!.id).toBe(log1.id);
     });
   });
 
@@ -190,7 +190,7 @@ describe('GET /api/projects/[id]/logs', () => {
       expect(body.logs).toHaveLength(200);
     });
 
-    it('clamps limit to minimum 100', async () => {
+    it('accepts limit of 50 (minimum is 1)', async () => {
       const testProject = await seedProject(db, { ownerId: userId });
       await seedLogs(db, testProject.id, 150);
 
@@ -204,8 +204,8 @@ describe('GET /api/projects/[id]/logs', () => {
       expect(response.status).toBe(200);
       const body = await response.json();
 
-      // Should clamp to minimum 100
-      expect(body.logs).toHaveLength(100);
+      // MIN_LIMIT is 1, so limit=50 returns 50 logs
+      expect(body.logs).toHaveLength(50);
     });
 
     it('clamps limit to maximum 500', async () => {
@@ -257,7 +257,7 @@ describe('GET /api/projects/[id]/logs', () => {
 
       // Should skip the first 2 logs (newest) and return remaining 3
       expect(body.logs).toHaveLength(3);
-      expect(body.logs[0].id).toBe(logs[2].id);
+      expect(body.logs[0]!.id).toBe(logs[2]!.id);
     });
   });
 
@@ -337,7 +337,7 @@ describe('GET /api/projects/[id]/logs', () => {
       const body = await response.json();
 
       expect(body.logs).toHaveLength(1);
-      expect(body.logs[0].id).toBe(recentLog.id);
+      expect(body.logs[0]!.id).toBe(recentLog.id);
     });
 
     it('filters by to timestamp', async () => {
@@ -368,7 +368,7 @@ describe('GET /api/projects/[id]/logs', () => {
       const body = await response.json();
 
       expect(body.logs).toHaveLength(1);
-      expect(body.logs[0].id).toBe(oldLog.id);
+      expect(body.logs[0]!.id).toBe(oldLog.id);
     });
 
     it('filters by both from and to timestamps', async () => {
@@ -403,7 +403,7 @@ describe('GET /api/projects/[id]/logs', () => {
       const body = await response.json();
 
       expect(body.logs).toHaveLength(1);
-      expect(body.logs[0].id).toBe(middleLog.id);
+      expect(body.logs[0]!.id).toBe(middleLog.id);
     });
   });
 
@@ -458,7 +458,7 @@ describe('GET /api/projects/[id]/logs', () => {
       const body = await response.json();
 
       expect(body.logs).toHaveLength(1);
-      expect(body.logs[0].metadata).toHaveProperty('service', 'payment-gateway');
+      expect(body.logs[0]!.metadata).toHaveProperty('service', 'payment-gateway');
     });
 
     it('handles multi-word search query', async () => {
@@ -503,7 +503,7 @@ describe('GET /api/projects/[id]/logs', () => {
       // Pipe is a tsquery operator; shared utility replaces it with space creating 'database & connection'
       // Inline buggy version strips it creating 'databaseconnection' which matches nothing
       expect(body.logs).toHaveLength(1);
-      expect(body.logs[0].message).toBe('Database connection failed');
+      expect(body.logs[0]!.message).toBe('Database connection failed');
     });
 
     it('preserves hyphens and underscores in search query', async () => {
@@ -527,7 +527,7 @@ describe('GET /api/projects/[id]/logs', () => {
 
       // Hyphens should be preserved by the shared utility; inline version strips them to 'userservice'
       expect(body.logs).toHaveLength(1);
-      expect(body.logs[0].metadata).toHaveProperty('service', 'user-service');
+      expect(body.logs[0]!.metadata).toHaveProperty('service', 'user-service');
     });
   });
 

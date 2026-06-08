@@ -9,8 +9,26 @@ export const DEFAULT_CONFIG = {
   flushInterval: 5000,
   maxQueueSize: 1000,
   maxRetries: 3,
+  timeout: 30000,
   captureSourceLocation: false,
 } as const;
+
+/**
+ * Resolved configuration with all defaults applied and required fields guaranteed
+ */
+export interface ResolvedConfig {
+  apiKey: string;
+  endpoint: string;
+  service?: string;
+  batchSize: number;
+  flushInterval: number;
+  maxQueueSize: number;
+  maxRetries: number;
+  timeout: number;
+  captureSourceLocation: boolean;
+  onError?: (error: Error) => void;
+  onFlush?: (count: number) => void;
+}
 
 /**
  * API key format regex: lw_[32 alphanumeric chars including - and _]
@@ -31,17 +49,20 @@ export function validateApiKeyFormat(apiKey: string): boolean {
 }
 
 /**
- * Validates a URL string
+ * Validates a URL string, requiring http or https protocol
  *
  * @param url - URL string to validate
- * @returns true if valid URL, false otherwise
+ * @throws LogwellError if the URL is invalid or uses a non-http/https scheme
  */
-function isValidUrl(url: string): boolean {
+function validateEndpointUrl(url: string): void {
+  let parsed: URL;
   try {
-    new URL(url);
-    return true;
+    parsed = new URL(url);
   } catch {
-    return false;
+    throw new LogwellError('Invalid endpoint URL', 'INVALID_CONFIG');
+  }
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw new LogwellError('endpoint must use http or https', 'INVALID_CONFIG');
   }
 }
 
@@ -49,10 +70,10 @@ function isValidUrl(url: string): boolean {
  * Validates configuration and returns merged config with defaults
  *
  * @param config - Partial configuration to validate
- * @returns Complete configuration with defaults applied
+ * @returns Complete configuration with all defaults applied
  * @throws LogwellError if configuration is invalid
  */
-export function validateConfig(config: Partial<LogwellConfig>): LogwellConfig {
+export function validateConfig(config: Partial<LogwellConfig>): ResolvedConfig {
   // Validate required fields
   if (!config.apiKey) {
     throw new LogwellError('apiKey is required', 'INVALID_CONFIG');
@@ -70,12 +91,10 @@ export function validateConfig(config: Partial<LogwellConfig>): LogwellConfig {
     );
   }
 
-  // Validate endpoint URL
-  if (!isValidUrl(config.endpoint)) {
-    throw new LogwellError('Invalid endpoint URL', 'INVALID_CONFIG');
-  }
+  // Validate endpoint URL (also checks protocol)
+  validateEndpointUrl(config.endpoint);
 
-  // Validate numeric options
+  // Validate numeric options — lower bounds
   if (config.batchSize !== undefined && config.batchSize <= 0) {
     throw new LogwellError('batchSize must be positive', 'INVALID_CONFIG');
   }
@@ -92,15 +111,36 @@ export function validateConfig(config: Partial<LogwellConfig>): LogwellConfig {
     throw new LogwellError('maxRetries must be non-negative', 'INVALID_CONFIG');
   }
 
-  // Return merged config with defaults
+  // Validate numeric options — upper bounds (TS-7)
+  if (config.batchSize !== undefined && config.batchSize > 100) {
+    throw new LogwellError('batchSize cannot exceed 100 (server limit)', 'INVALID_CONFIG');
+  }
+
+  if (config.maxQueueSize !== undefined && config.maxQueueSize > 100000) {
+    throw new LogwellError('maxQueueSize cannot exceed 100000', 'INVALID_CONFIG');
+  }
+
+  if (config.flushInterval !== undefined && config.flushInterval < 100) {
+    throw new LogwellError('flushInterval must be at least 100ms', 'INVALID_CONFIG');
+  }
+
+  if (config.flushInterval !== undefined && config.flushInterval > 60000) {
+    throw new LogwellError('flushInterval cannot exceed 60000ms', 'INVALID_CONFIG');
+  }
+
+  // Normalize endpoint: strip trailing slash
+  const endpoint = config.endpoint.replace(/\/$/, '');
+
+  // Return merged config with all defaults — typed as ResolvedConfig (no cast needed)
   return {
     apiKey: config.apiKey,
-    endpoint: config.endpoint,
+    endpoint,
     service: config.service,
     batchSize: config.batchSize ?? DEFAULT_CONFIG.batchSize,
     flushInterval: config.flushInterval ?? DEFAULT_CONFIG.flushInterval,
     maxQueueSize: config.maxQueueSize ?? DEFAULT_CONFIG.maxQueueSize,
     maxRetries: config.maxRetries ?? DEFAULT_CONFIG.maxRetries,
+    timeout: config.timeout ?? DEFAULT_CONFIG.timeout,
     captureSourceLocation: config.captureSourceLocation ?? DEFAULT_CONFIG.captureSourceLocation,
     onError: config.onError,
     onFlush: config.onFlush,

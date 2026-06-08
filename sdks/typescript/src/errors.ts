@@ -32,6 +32,7 @@ export class LogwellError extends Error {
     public readonly code: LogwellErrorCode,
     public readonly statusCode?: number,
     public readonly retryable: boolean = false,
+    public readonly retryAfterMs?: number,
   ) {
     super(message);
     this.name = 'LogwellError';

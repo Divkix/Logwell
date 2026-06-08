@@ -8,8 +8,9 @@ const UUID_REGEX = /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}
 /**
  * Hex identifier matcher.
  * Matches long hex chunks and 0x-prefixed values.
+ * Requires at least one a-f letter so pure numeric tokens fall through to NUMBER_REGEX.
  */
-const HEX_ID_REGEX = /\b0x[0-9a-f]+\b|\b[0-9a-f]{12,}\b/gi;
+const HEX_ID_REGEX = /\b0x[0-9a-f]+\b|\b(?=[0-9a-f]*[a-f])[0-9a-f]{12,}\b/gi;
 
 /**
  * IPv4 matcher.

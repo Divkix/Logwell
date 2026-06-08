@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { LOG_LEVELS, type LogLevel } from './log';
+import type { LogLevel } from './log';
 
 /**
  * Valid incident status values.
@@ -106,6 +106,3 @@ const LEVEL_RANK: Record<LogLevel, number> = {
 export function maxIncidentLevel(a: LogLevel, b: LogLevel): LogLevel {
   return LEVEL_RANK[a] >= LEVEL_RANK[b] ? a : b;
 }
-
-// Preserve runtime reference to LOG_LEVELS so bundlers keep a single source of truth.
-void LOG_LEVELS;

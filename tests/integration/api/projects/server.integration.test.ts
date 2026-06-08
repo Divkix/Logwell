@@ -135,7 +135,7 @@ describe('GET /api/projects', () => {
       const [project1, project2] = await seedProjects(db, 2, { ownerId: userId });
 
       // Add logs: 5 to project1, 0 to project2
-      await seedLogs(db, project1.id, 5);
+      await seedLogs(db, project1!.id, 5);
 
       const request = new Request('http://localhost/api/projects', {
         method: 'GET',
@@ -150,12 +150,12 @@ describe('GET /api/projects', () => {
       expect(body.projects).toHaveLength(2);
 
       // Find projects by id
-      const returnedProject1 = body.projects.find((p: { id: string }) => p.id === project1.id);
-      const returnedProject2 = body.projects.find((p: { id: string }) => p.id === project2.id);
+      const returnedProject1 = body.projects.find((p: { id: string }) => p.id === project1!.id);
+      const returnedProject2 = body.projects.find((p: { id: string }) => p.id === project2!.id);
 
       expect(returnedProject1).toBeDefined();
       expect(returnedProject1.logCount).toBe(5);
-      expect(returnedProject1.name).toBe(project1.name);
+      expect(returnedProject1.name).toBe(project1!.name);
       expect(returnedProject1).toHaveProperty('createdAt');
       expect(returnedProject1).toHaveProperty('updatedAt');
 
@@ -285,8 +285,8 @@ describe('POST /api/projects', () => {
       // Verify project was actually created in database
       const [dbProject] = await db.select().from(project).where(eq(project.id, body.id));
       expect(dbProject).toBeDefined();
-      expect(dbProject.name).toBe('my-new-project');
-      expect(dbProject.apiKey).toBe(body.apiKey);
+      expect(dbProject!.name).toBe('my-new-project');
+      expect(dbProject!.apiKey).toBe(body.apiKey);
     });
 
     it('returns 400 for duplicate name for same user', async () => {

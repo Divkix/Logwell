@@ -18,7 +18,8 @@ export const project = pgTable(
   {
     id: text('id').primaryKey(),
     name: text('name').notNull(),
-    apiKey: text('api_key').notNull().unique(),
+    apiKey: text('api_key').notNull().unique().$type<string>(),
+    apiKeyHash: text('api_key_hash').notNull().default('').unique(),
     // Owner of the project - required for authorization
     ownerId: text('owner_id')
       .notNull()
@@ -32,7 +33,6 @@ export const project = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
   },
   (table) => [
-    index('idx_project_api_key').on(table.apiKey),
     index('idx_project_owner_id').on(table.ownerId),
     uniqueIndex('uq_project_name_owner').on(table.name, table.ownerId),
   ],
@@ -119,7 +119,7 @@ export const log = pgTable(
     requestId: text('request_id'),
     userId: text('user_id'),
     ipAddress: text('ip_address'),
-    timestamp: timestamp('timestamp', { withTimezone: true }).defaultNow(),
+    timestamp: timestamp('timestamp', { withTimezone: true }).defaultNow().notNull(),
     search: tsvector('search').generatedAlwaysAs(
       (): SQL =>
         sql`setweight(to_tsvector('english', ${log.message}), 'A') ||
@@ -130,7 +130,6 @@ export const log = pgTable(
     ),
   },
   (table) => [
-    index('idx_log_project_id').on(table.projectId),
     index('idx_log_project_incident_timestamp').on(
       table.projectId,
       table.incidentId,
@@ -145,8 +144,8 @@ export const log = pgTable(
     index('idx_log_timestamp').on(table.timestamp),
     index('idx_log_level').on(table.level),
     index('idx_log_project_timestamp').on(table.projectId, table.timestamp),
-    // GIN index for full-text search (needs special handling in test-db.ts)
-    index('idx_log_search').on(table.search),
+    // GIN index for full-text search
+    index('idx_log_search').using('gin', table.search),
   ],
 );
 

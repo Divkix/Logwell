@@ -10,7 +10,7 @@ import type { PageServerLoad } from './$types';
 
 // Constants for pagination
 const DEFAULT_LIMIT = 100;
-const MIN_LIMIT = 100;
+const MIN_LIMIT = 1;
 const MAX_LIMIT = 500;
 
 /**
@@ -20,10 +20,7 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
-/**
- * Parse and validate level filter from query string
- * Returns array of valid log levels or null if no filter
- */
+// TODO(RT-10): deduplicate with api/projects/[id]/logs/+server.ts parseLevelFilter
 function parseLevelFilter(levelParam: string | null): LogLevel[] | null {
   if (!levelParam) return null;
 
@@ -35,9 +32,7 @@ function parseLevelFilter(levelParam: string | null): LogLevel[] | null {
   return levels.length > 0 ? levels : null;
 }
 
-/**
- * Get time range start date based on range parameter
- */
+// TODO(RT-10): deduplicate with $lib/utils/format getTimeRangeStart
 function getTimeRangeStart(range: string | null): Date | null {
   if (!range) return null;
 
@@ -109,9 +104,9 @@ export const load: PageServerLoad = async (event) => {
           and(eq(log.timestamp, cursorTimestamp), lt(log.id, cursorId)),
         ) as SQL,
       );
-    } catch {
-      // Invalid cursor - ignore it and continue without cursor pagination
-      // This provides better UX than throwing an error
+    } catch (err) {
+      // Invalid cursor - log and fall back to first page (consistent with API behavior)
+      console.error('[page/logs] invalid cursor, falling back to first page:', err);
     }
   }
 
@@ -172,10 +167,7 @@ export const load: PageServerLoad = async (event) => {
   // Compute next cursor if there are more logs
   const nextCursor =
     hasMore && logsToReturn.length > 0
-      ? encodeCursor(
-          logsToReturn[logsToReturn.length - 1].timestamp as Date,
-          logsToReturn[logsToReturn.length - 1].id,
-        )
+      ? encodeCursor(logsToReturn.at(-1)!.timestamp as Date, logsToReturn.at(-1)!.id)
       : null;
 
   return {
@@ -183,6 +175,7 @@ export const load: PageServerLoad = async (event) => {
       id: projectData.id,
       name: projectData.name,
       apiKey: projectData.apiKey,
+      apiKeyHash: projectData.apiKeyHash,
       retentionDays: projectData.retentionDays,
       createdAt: projectData.createdAt?.toISOString() ?? null,
       updatedAt: projectData.updatedAt?.toISOString() ?? null,

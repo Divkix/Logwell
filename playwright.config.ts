@@ -33,6 +33,7 @@ const config: PlaywrightTestConfig = {
     reuseExistingServer: !isCI,
     timeout: 180000,
     stdout: 'pipe',
+    stderr: 'pipe',
   },
 };
 

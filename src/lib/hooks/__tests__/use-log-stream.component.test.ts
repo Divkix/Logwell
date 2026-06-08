@@ -13,7 +13,7 @@ function createMockSSEResponse(events: Array<{ event: string; data: string }>): 
   const stream = new ReadableStream<Uint8Array>({
     pull(controller) {
       if (eventIndex < events.length) {
-        const event = events[eventIndex];
+        const event = events[eventIndex]!;
         const sseData = `event: ${event.event}\ndata: ${event.data}\n\n`;
         controller.enqueue(new TextEncoder().encode(sseData));
         eventIndex++;
@@ -44,7 +44,7 @@ function createDelayedMockSSEResponse(
   const stream = new ReadableStream<Uint8Array>({
     async pull(controller) {
       if (eventIndex < events.length) {
-        const event = events[eventIndex];
+        const event = events[eventIndex]!;
         if (event.delayMs) {
           await new Promise((resolve) => setTimeout(resolve, event.delayMs));
         }

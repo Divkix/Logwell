@@ -73,33 +73,3 @@ export function fillMissingBuckets(
 
   return result;
 }
-
-/**
- * Format a bucket timestamp for display on chart axis
- */
-export function formatBucketLabel(timestamp: Date, range: TimeRange): string {
-  const hours = timestamp.getUTCHours().toString().padStart(2, '0');
-  const minutes = timestamp.getUTCMinutes().toString().padStart(2, '0');
-
-  if (range === '7d') {
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    const month = months[timestamp.getUTCMonth()];
-    const day = timestamp.getUTCDate();
-    return `${month} ${day} ${hours}:${minutes}`;
-  }
-
-  return `${hours}:${minutes}`;
-}

@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import { and, eq, sql } from 'drizzle-orm';
 import { getDbClient, getQueryRows } from '$lib/server/db/db';
 import { incident, log } from '$lib/server/db/schema';
+import { apiError } from '$lib/server/utils/api-error';
 import { getIncidentStatus } from '$lib/server/utils/incidents';
 import { isErrorResponse, requireProjectOwnership } from '$lib/server/utils/project-guard';
 import type { RequestEvent } from './$types';
@@ -39,7 +40,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
     .where(and(eq(incident.projectId, projectId), eq(incident.id, incidentId)));
 
   if (!incidentRow) {
-    return json({ error: 'not_found', message: 'Incident not found' }, { status: 404 });
+    return apiError(404, 'not_found', 'Incident not found');
   }
 
   const logWhereClause = and(eq(log.projectId, projectId), eq(log.incidentId, incidentId));

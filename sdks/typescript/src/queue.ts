@@ -83,7 +83,8 @@ export class BatchQueue {
   /**
    * Flush all queued logs immediately
    *
-   * @returns Response from the server, or null if queue was empty
+   * Sends in chunks bounded by batchSize.
+   * @returns Last response from the server, or null if queue was empty
    */
   async flush(): Promise<IngestResponse | null> {
     // Prevent concurrent flushes
@@ -94,52 +95,64 @@ export class BatchQueue {
     this.flushing = true;
     this.stopTimer();
 
-    // Take current batch
-    const batch = this.queue.splice(0);
-    const count = batch.length;
-
+    // Snapshot current queue length so concurrent adds during flush are deferred
+    const snapshotLength = this.queue.length;
+    let sent = 0;
+    let lastResponse: IngestResponse | null = null;
     try {
-      const response = await this.sendBatch(batch);
-      this.config.onFlush?.(count);
-
-      // Restart timer if more logs remain (added during flush)
+      // Send in chunks bounded by batchSize, up to the snapshot count
+      while (sent < snapshotLength) {
+        const remaining = snapshotLength - sent;
+        const chunkSize = Math.min(this.config.batchSize, remaining);
+        const batch = this.queue.splice(0, chunkSize);
+        sent += batch.length;
+        try {
+          const response = await this.sendBatch(batch);
+          this.config.onFlush?.(batch.length);
+          lastResponse = response;
+        } catch (error) {
+          // Re-queue failed batch at front, respect maxQueueSize
+          const requeued = [...batch, ...this.queue];
+          this.queue.length = 0;
+          this.queue.push(...requeued.slice(0, this.config.maxQueueSize));
+          if (requeued.length > this.config.maxQueueSize) {
+            this.config.onError?.(
+              new LogwellError(
+                `Queue overflow: dropped ${requeued.length - this.config.maxQueueSize} logs`,
+                'QUEUE_OVERFLOW',
+              ),
+            );
+          }
+          this.config.onError?.(error as Error);
+          break; // stop flushing on error
+        }
+      }
+    } finally {
+      this.flushing = false;
       if (this.queue.length > 0 && !this.stopped) {
         this.startTimer();
       }
-
-      return response;
-    } catch (error) {
-      // Re-queue failed logs at the front
-      this.queue.unshift(...batch);
-      this.config.onError?.(error as Error);
-
-      // Restart timer to retry
-      if (!this.stopped) {
-        this.startTimer();
-      }
-
-      return null;
-    } finally {
-      this.flushing = false;
     }
+    return lastResponse;
   }
 
   /**
    * Flush remaining logs and stop the queue
+   *
+   * @returns Last response from the server, or null if queue was empty
    */
-  async shutdown(): Promise<void> {
+  async shutdown(): Promise<IngestResponse | null> {
     if (this.stopped) {
-      return;
+      return null;
     }
 
     this.stopped = true;
     this.stopTimer();
 
-    // Flush all remaining logs
     if (this.queue.length > 0) {
-      this.flushing = false; // Reset flushing flag
-      await this.flush();
+      return this.flush();
     }
+    return null;
   }
 
   private startTimer(): void {

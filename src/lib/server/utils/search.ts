@@ -24,8 +24,8 @@ export function buildSearchQuery(searchTerm: string): string {
   }
 
   // PostgreSQL tsquery special characters that need to be removed
-  // & | ! ( ) : * \ ' "
-  const specialCharsRegex = /[&|!():*\\'"]/g;
+  // & | ! ( ) : * \ ' " < >
+  const specialCharsRegex = /[&|!():*\\'"<>]/g;
 
   // Remove special characters, then split on whitespace
   const sanitized = searchTerm.replace(specialCharsRegex, ' ');
@@ -91,6 +91,23 @@ export async function searchLogs(
       level: log.level,
       message: log.message,
       metadata: log.metadata,
+      timeUnixNano: log.timeUnixNano,
+      observedTimeUnixNano: log.observedTimeUnixNano,
+      severityNumber: log.severityNumber,
+      severityText: log.severityText,
+      body: log.body,
+      droppedAttributesCount: log.droppedAttributesCount,
+      flags: log.flags,
+      traceId: log.traceId,
+      spanId: log.spanId,
+      resourceAttributes: log.resourceAttributes,
+      resourceDroppedAttributesCount: log.resourceDroppedAttributesCount,
+      resourceSchemaUrl: log.resourceSchemaUrl,
+      scopeName: log.scopeName,
+      scopeVersion: log.scopeVersion,
+      scopeAttributes: log.scopeAttributes,
+      scopeDroppedAttributesCount: log.scopeDroppedAttributesCount,
+      scopeSchemaUrl: log.scopeSchemaUrl,
       sourceFile: log.sourceFile,
       lineNumber: log.lineNumber,
       requestId: log.requestId,
@@ -98,7 +115,7 @@ export async function searchLogs(
       ipAddress: log.ipAddress,
       timestamp: log.timestamp,
       search: log.search,
-      // Calculate rank for ordering
+      // Calculate rank for ordering (computed once, referenced by alias in ORDER BY)
       rank: sql<number>`ts_rank(${log.search}, to_tsquery('english', ${query}))`,
     })
     .from(log)
@@ -114,5 +131,5 @@ export async function searchLogs(
     .limit(limit);
 
   // Remove the rank field from results (only used for ordering)
-  return results.map(({ rank, ...logData }) => logData) as Log[];
+  return results.map(({ rank: _rank, ...logData }) => logData);
 }

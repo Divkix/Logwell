@@ -12,6 +12,7 @@
 # -----------------------------------------------------------------------------
 # Stage 1: Base image with Bun runtime
 # -----------------------------------------------------------------------------
+# SECURITY: pin to digest for reproducible builds (e.g. oven/bun:1.2.15-alpine)
 FROM oven/bun:1-alpine AS base
 WORKDIR /app
 
@@ -128,7 +129,7 @@ ENV PORT=3000
 # Checks /api/health endpoint every 30 seconds
 # Allows 30 seconds for startup (migrations + seed), 10 second timeout per check
 # Marks unhealthy after 3 consecutive failures
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:3000/api/health || exit 1
 
 # Start the application via entrypoint (runs migrations + seed first)

@@ -28,12 +28,13 @@ export function escapeCSVField(field: unknown): string {
   let value = String(field);
 
   // Prefix formula-starting characters to prevent CSV injection (OWASP)
-  if (/^[=+\-@]/.test(value)) {
+  // Strip leading whitespace before testing to prevent whitespace bypass
+  if (/^[=+\-@]/.test(value.trimStart())) {
     value = `'${value}`;
   }
 
-  // Check if field needs quoting (contains comma, quote, or newline)
-  if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+  // Check if field needs quoting (contains comma, quote, newline, or carriage return)
+  if (value.includes(',') || value.includes('"') || value.includes('\n') || value.includes('\r')) {
     // Escape double quotes by doubling them
     const escaped = value.replace(/"/g, '""');
     return `"${escaped}"`;

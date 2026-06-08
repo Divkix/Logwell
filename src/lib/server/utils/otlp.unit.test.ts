@@ -52,7 +52,7 @@ describe('normalizeOtlpLogsRequest', () => {
 
     const { records } = normalizeOtlpLogsRequest(payload);
     expect(records).toHaveLength(1);
-    const record = records[0];
+    const record = records[0]!;
 
     expect(record.resourceAttributes).toEqual({
       'service.name': 'api',
@@ -99,7 +99,7 @@ describe('normalizeOtlpLogsRequest', () => {
 
     const { records } = normalizeOtlpLogsRequest(payload);
     expect(records).toHaveLength(1);
-    expect(records[0].message).toBe('{"action":"login","success":true}');
+    expect(records[0]!.message).toBe('{"action":"login","success":true}');
   });
 });
 
@@ -199,10 +199,10 @@ describe('normalizeOtlpLogsRequest edge cases', () => {
 
     const { records } = normalizeOtlpLogsRequest(payload);
     expect(records).toHaveLength(1);
-    expect(records[0].timeUnixNano).toBeNull();
+    expect(records[0]!.timeUnixNano).toBeNull();
     const now = new Date();
-    expect(records[0].timestamp.getTime()).toBeGreaterThanOrEqual(now.getTime() - 5000);
-    expect(records[0].timestamp.getTime()).toBeLessThanOrEqual(now.getTime() + 5000);
+    expect(records[0]!.timestamp.getTime()).toBeGreaterThanOrEqual(now.getTime() - 5000);
+    expect(records[0]!.timestamp.getTime()).toBeLessThanOrEqual(now.getTime() + 5000);
   });
 
   it('rejects negative observedTimeUnixNano and falls back to current timestamp', () => {
@@ -224,10 +224,10 @@ describe('normalizeOtlpLogsRequest edge cases', () => {
 
     const { records } = normalizeOtlpLogsRequest(payload);
     expect(records).toHaveLength(1);
-    expect(records[0].observedTimeUnixNano).toBeNull();
+    expect(records[0]!.observedTimeUnixNano).toBeNull();
     const now = new Date();
-    expect(records[0].timestamp.getTime()).toBeGreaterThanOrEqual(now.getTime() - 5000);
-    expect(records[0].timestamp.getTime()).toBeLessThanOrEqual(now.getTime() + 5000);
+    expect(records[0]!.timestamp.getTime()).toBeGreaterThanOrEqual(now.getTime() - 5000);
+    expect(records[0]!.timestamp.getTime()).toBeLessThanOrEqual(now.getTime() + 5000);
   });
 
   it('normalizes empty attributes to null', () => {
@@ -250,7 +250,7 @@ describe('normalizeOtlpLogsRequest edge cases', () => {
 
     const { records } = normalizeOtlpLogsRequest(payload);
     expect(records).toHaveLength(1);
-    expect(records[0].attributes).toBeNull();
+    expect(records[0]!.attributes).toBeNull();
   });
 
   it('handles extremely large timeUnixNano without producing Invalid Date', () => {
@@ -272,11 +272,11 @@ describe('normalizeOtlpLogsRequest edge cases', () => {
 
     const { records } = normalizeOtlpLogsRequest(payload);
     expect(records).toHaveLength(1);
-    expect(records[0].timeUnixNano).toBe('999999999999999999999999999999');
-    expect(Number.isNaN(records[0].timestamp.getTime())).toBe(false);
+    expect(records[0]!.timeUnixNano).toBe('999999999999999999999999999999');
+    expect(Number.isNaN(records[0]!.timestamp.getTime())).toBe(false);
     const now = new Date();
-    expect(records[0].timestamp.getTime()).toBeGreaterThanOrEqual(now.getTime() - 5000);
-    expect(records[0].timestamp.getTime()).toBeLessThanOrEqual(now.getTime() + 5000);
+    expect(records[0]!.timestamp.getTime()).toBeGreaterThanOrEqual(now.getTime() - 5000);
+    expect(records[0]!.timestamp.getTime()).toBeLessThanOrEqual(now.getTime() + 5000);
   });
 });
 

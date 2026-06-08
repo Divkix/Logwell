@@ -14,10 +14,10 @@ permissions:
   contents: write
   packages: write
 
-# Cancel in-progress releases for same tag
+# Do not cancel in-progress releases — partial releases can leave inconsistent state
 concurrency:
   group: release-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 env:
   # PostgreSQL connection for integration tests
@@ -43,7 +43,7 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.2.15"
 
       - name: Get bun cache directory
         id: bun-cache-dir
@@ -81,7 +81,7 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.2.15"
 
       - name: Get bun cache directory
         id: bun-cache-dir
@@ -116,7 +116,7 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.2.15"
 
       - name: Get bun cache directory
         id: bun-cache-dir
@@ -171,7 +171,7 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.2.15"
 
       - name: Get bun cache directory
         id: bun-cache-dir
@@ -247,7 +247,7 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.2.15"
 
       - name: Get bun cache directory
         id: bun-cache-dir

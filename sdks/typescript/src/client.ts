@@ -1,4 +1,4 @@
-import { validateConfig } from './config';
+import { type ResolvedConfig, validateConfig } from './config';
 import { BatchQueue, type QueueConfig } from './queue';
 import { captureSourceLocation } from './source-location';
 import { HttpTransport } from './transport';
@@ -10,29 +10,6 @@ import type { IngestResponse, LogEntry, LogwellConfig } from './types';
 export interface ChildLoggerOptions {
   service?: string;
   metadata?: Record<string, unknown>;
-}
-
-/**
- * Internal resolved config with all defaults applied
- */
-interface ResolvedConfig {
-  apiKey: string;
-  endpoint: string;
-  service?: string;
-  batchSize: number;
-  flushInterval: number;
-  maxQueueSize: number;
-  maxRetries: number;
-  captureSourceLocation: boolean;
-  onError?: (error: Error) => void;
-  onFlush?: (count: number) => void;
-}
-
-/**
- * Asserts that config has all required fields after validation
- */
-function asResolvedConfig(config: LogwellConfig): ResolvedConfig {
-  return config as ResolvedConfig;
 }
 
 /**
@@ -56,7 +33,7 @@ function asResolvedConfig(config: LogwellConfig): ResolvedConfig {
 export class Logwell {
   private readonly config: ResolvedConfig;
   private readonly queue: BatchQueue;
-  private readonly transport: HttpTransport;
+  private readonly transport?: HttpTransport;
   private readonly parentMetadata?: Record<string, unknown>;
   private stopped = false;
 
@@ -67,21 +44,22 @@ export class Logwell {
     existingQueue?: BatchQueue,
     parentMetadata?: Record<string, unknown>,
   ) {
-    // Validate and apply defaults
-    this.config = asResolvedConfig(validateConfig(config));
+    // Validate and apply defaults (returns ResolvedConfig directly, no cast needed)
+    this.config = validateConfig(config);
     this.parentMetadata = parentMetadata;
 
-    // Create transport
-    this.transport = new HttpTransport({
-      endpoint: this.config.endpoint,
-      apiKey: this.config.apiKey,
-      maxRetries: this.config.maxRetries,
-    });
-
-    // Use existing queue (for child loggers) or create new one
+    // Use existing queue (for child loggers) or create new one with its own transport
     if (existingQueue) {
       this.queue = existingQueue;
+      // transport is the parent's, accessed via queue's sendBatch — no allocation needed
     } else {
+      this.transport = new HttpTransport({
+        endpoint: this.config.endpoint,
+        apiKey: this.config.apiKey,
+        maxRetries: this.config.maxRetries,
+        timeout: this.config.timeout,
+      });
+
       const queueConfig: QueueConfig = {
         batchSize: this.config.batchSize,
         flushInterval: this.config.flushInterval,
@@ -89,7 +67,7 @@ export class Logwell {
         onError: this.config.onError,
         onFlush: this.config.onFlush,
       };
-      this.queue = new BatchQueue((logs) => this.transport.send(logs), queueConfig);
+      this.queue = new BatchQueue((logs) => this.transport!.send(logs), queueConfig);
     }
   }
 
@@ -186,10 +164,11 @@ export class Logwell {
    * Flush remaining logs and stop the client
    *
    * Call this before process exit to ensure all logs are sent.
+   * @returns Last response from the server, or null if queue was empty
    */
-  async shutdown(): Promise<void> {
+  async shutdown(): Promise<IngestResponse | null> {
     this.stopped = true;
-    await this.queue.shutdown();
+    return this.queue.shutdown();
   }
 
   /**

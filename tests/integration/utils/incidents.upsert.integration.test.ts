@@ -77,7 +77,7 @@ describe('Incident upsert race condition', () => {
       );
 
     expect(allIncidents).toHaveLength(1);
-    const incidentRow = allIncidents[0];
+    const incidentRow = allIncidents[0]!;
 
     // totalEvents should reflect the combined count from both batches
     expect(incidentRow.totalEvents).toBe(2);

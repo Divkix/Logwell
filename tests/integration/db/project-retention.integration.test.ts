@@ -56,7 +56,7 @@ describe('Project retention_days column', () => {
         .where(eq(project.id, createdProject.id))
         .returning();
 
-      expect(updatedProject.retentionDays).toBe(30);
+      expect(updatedProject!.retentionDays).toBe(30);
     });
 
     it('should update retention_days from positive value to null', async () => {
@@ -69,7 +69,7 @@ describe('Project retention_days column', () => {
         .where(eq(project.id, createdProject.id))
         .returning();
 
-      expect(updatedProject.retentionDays).toBeNull();
+      expect(updatedProject!.retentionDays).toBeNull();
     });
 
     it('should update retention_days from positive value to 0 (never delete)', async () => {
@@ -82,7 +82,7 @@ describe('Project retention_days column', () => {
         .where(eq(project.id, createdProject.id))
         .returning();
 
-      expect(updatedProject.retentionDays).toBe(0);
+      expect(updatedProject!.retentionDays).toBe(0);
     });
   });
 
@@ -95,7 +95,7 @@ describe('Project retention_days column', () => {
         .from(project)
         .where(eq(project.id, createdProject.id));
 
-      expect(foundProject.retentionDays).toBe(90);
+      expect(foundProject!.retentionDays).toBe(90);
     });
 
     it('should filter projects by retention_days', async () => {

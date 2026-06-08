@@ -5,20 +5,13 @@ echo "=== Logwell startup ==="
 
 # Run database migrations
 echo "Running database migrations..."
-if bun run drizzle-kit migrate 2>&1; then
-  echo "✓ Migrations completed successfully"
-else
-  echo "✗ Migration failed, but continuing (tables may already exist)"
-fi
+bun run drizzle-kit migrate || { echo "Migration failed! Aborting startup."; exit 1; }
+echo "✓ Migrations completed successfully"
 
 # Seed admin user (idempotent - skips if exists)
 if [ -n "$ADMIN_PASSWORD" ]; then
   echo "Seeding admin user..."
-  if bun run scripts/seed-admin.ts 2>&1; then
-    echo "✓ Admin seeding completed"
-  else
-    echo "✗ Admin seeding failed (user may already exist)"
-  fi
+  bun run db:seed || echo "Seed step failed (admin may already exist, continuing)"
 else
   echo "⚠ ADMIN_PASSWORD not set, skipping admin seed"
 fi

@@ -28,25 +28,6 @@ export class EnvValidationError extends Error {
   }
 }
 
-/**
- * Validation result type
- */
-export interface ValidationResult {
-  valid: boolean;
-  errors: Array<{ variable: string; message: string }>;
-}
-
-/**
- * Environment summary type (with masked sensitive values)
- */
-export interface EnvSummary {
-  DATABASE_URL: string;
-  BETTER_AUTH_SECRET: string;
-  ADMIN_PASSWORD: string;
-  ORIGIN: string;
-  NODE_ENV: string;
-}
-
 // Get NODE_ENV first for conditional validation
 const nodeEnv = process.env.NODE_ENV || 'development';
 const isProd = nodeEnv === 'production';
@@ -95,9 +76,10 @@ if (isProd) {
 // Throw aggregated error if validation failed
 if (validationErrors.length > 0) {
   const errorMessages = validationErrors.map((e) => `- ${e.variable}: ${e.message}`).join('\n');
+  const firstError = validationErrors[0];
   throw new EnvValidationError(
     `Environment validation failed:\n${errorMessages}`,
-    validationErrors[0].variable,
+    firstError?.variable ?? 'unknown',
   );
 }
 
@@ -136,8 +118,27 @@ export function isDevelopment(): boolean {
 }
 
 /**
- * Validate environment configuration
- * Returns validation result instead of throwing
+ * Validation result type
+ */
+export interface ValidationResult {
+  valid: boolean;
+  errors: Array<{ variable: string; message: string }>;
+}
+
+/**
+ * Environment summary type (with masked sensitive values)
+ */
+export interface EnvSummary {
+  DATABASE_URL: string;
+  BETTER_AUTH_SECRET: string;
+  ADMIN_PASSWORD: string;
+  ORIGIN: string;
+  NODE_ENV: string;
+}
+
+/**
+ * Validate environment configuration — returns result instead of throwing.
+ * Used in tests and diagnostics.
  */
 export function validateEnv(): ValidationResult {
   const errors: Array<{ variable: string; message: string }> = [];
@@ -168,40 +169,28 @@ export function validateEnv(): ValidationResult {
     }
   }
 
-  return {
-    valid: errors.length === 0,
-    errors,
-  };
+  return { valid: errors.length === 0, errors };
 }
 
-/**
- * Mask a sensitive value for logging
- */
-function maskValue(value: string | undefined, maskChar = '*'): string {
+function maskValue(value: string | undefined): string {
   if (!value) return '[not set]';
-  return maskChar.repeat(Math.min(value.length, 16));
+  return '*'.repeat(Math.min(value.length, 16));
 }
 
-/**
- * Mask a database URL (hide password)
- */
 function maskDatabaseUrl(url: string | undefined): string {
   if (!url) return '[not set]';
   try {
     const parsed = new URL(url);
-    if (parsed.password) {
-      parsed.password = '****';
-    }
+    if (parsed.password) parsed.password = '****';
     return parsed.toString();
   } catch {
-    // If URL parsing fails, just mask the whole thing
     return maskValue(url);
   }
 }
 
 /**
- * Get a summary of environment configuration with masked sensitive values
- * Useful for logging/debugging without exposing secrets
+ * Get a summary of environment configuration with masked sensitive values.
+ * Used in tests and diagnostics.
  */
 export function getEnvSummary(): EnvSummary {
   return {

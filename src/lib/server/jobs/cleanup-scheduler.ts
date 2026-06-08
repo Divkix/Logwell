@@ -3,6 +3,7 @@ import { cleanupOldLogs } from './log-cleanup';
 
 let cleanupStarted = false;
 let cleanupIntervalId: ReturnType<typeof setInterval> | null = null;
+let isRunning = false;
 
 /**
  * Starts the log cleanup scheduler.
@@ -22,10 +23,10 @@ export function startCleanupScheduler(): boolean {
   cleanupStarted = true;
 
   // Run immediately on startup
-  runCleanup();
+  runCleanupWithGuard();
 
   // Schedule periodic runs
-  cleanupIntervalId = setInterval(runCleanup, RETENTION_CONFIG.LOG_CLEANUP_INTERVAL_MS);
+  cleanupIntervalId = setInterval(runCleanupWithGuard, RETENTION_CONFIG.LOG_CLEANUP_INTERVAL_MS);
 
   console.log(
     `[cleanup-scheduler] Started with interval: ${RETENTION_CONFIG.LOG_CLEANUP_INTERVAL_MS}ms, retention: ${RETENTION_CONFIG.LOG_RETENTION_DAYS} days`,
@@ -51,6 +52,19 @@ export function stopCleanupScheduler(): void {
  */
 export function isCleanupSchedulerRunning(): boolean {
   return cleanupStarted;
+}
+
+/**
+ * Overlap guard: skips the cycle if a previous one is still running.
+ */
+async function runCleanupWithGuard(): Promise<void> {
+  if (isRunning) return;
+  isRunning = true;
+  try {
+    await runCleanup();
+  } finally {
+    isRunning = false;
+  }
 }
 
 /**

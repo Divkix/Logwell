@@ -11,6 +11,11 @@ import type { RequestEvent } from '@sveltejs/kit';
  *
  * This protects against cross-origin POST/PATCH/DELETE while avoiding false
  * positives for legitimate same-origin requests that don't send Origin.
+ *
+ * Note: requests with neither Origin nor Referer are allowed. This is intentional for
+ * API clients (e.g. SDKs, curl) that don't send these headers. Cross-origin browser
+ * requests always include Origin per spec. For additional protection on browser-only
+ * routes, consider requiring Origin when a session cookie is present.
  */
 export function checkCsrfOrigin(event: RequestEvent): Response | null {
   const method = event.request.method;

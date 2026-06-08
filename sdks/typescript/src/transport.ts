@@ -21,6 +21,13 @@ function delay(attempt: number, baseDelay = 100): Promise<void> {
 }
 
 /**
+ * Sleep for a given number of milliseconds
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
  * HTTP transport for sending logs to Logwell server
  *
  * Features:
@@ -32,7 +39,8 @@ export class HttpTransport {
   private readonly ingestUrl: string;
 
   constructor(private config: TransportConfig) {
-    this.ingestUrl = `${config.endpoint}/v1/ingest`;
+    const cleanEndpoint = config.endpoint.replace(/\/$/, '');
+    this.ingestUrl = `${cleanEndpoint}/v1/ingest`;
   }
 
   /**
@@ -54,7 +62,16 @@ export class HttpTransport {
       try {
         return await this.doRequest(logs);
       } catch (error) {
-        lastError = error as LogwellError;
+        if (error instanceof LogwellError) {
+          lastError = error;
+        } else {
+          lastError = new LogwellError(
+            `Unexpected error: ${(error as Error).message}`,
+            'NETWORK_ERROR',
+            undefined,
+            true,
+          );
+        }
 
         // Don't retry non-retryable errors
         if (!lastError.retryable) {
@@ -63,7 +80,13 @@ export class HttpTransport {
 
         // Don't delay after the last attempt
         if (attempt < this.config.maxRetries) {
-          await delay(attempt);
+          if (lastError.retryAfterMs !== undefined) {
+            // Honor Retry-After but cap it to the exponential backoff ceiling
+            const backoffMs = Math.min(100 * 2 ** attempt, 10000);
+            await sleep(Math.min(lastError.retryAfterMs, backoffMs));
+          } else {
+            await delay(attempt);
+          }
         }
       }
     }
@@ -82,8 +105,17 @@ export class HttpTransport {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(logs),
+        signal: AbortSignal.timeout(this.config.timeout ?? 30000),
+        keepalive: true,
       });
     } catch (error) {
+      // Timeout error (AbortError or TimeoutError)
+      if (
+        error instanceof Error &&
+        (error.name === 'AbortError' || error.name === 'TimeoutError')
+      ) {
+        throw new LogwellError('Request timed out', 'NETWORK_ERROR', undefined, true);
+      }
       // Network error (fetch failed)
       throw new LogwellError(
         `Network error: ${(error as Error).message}`,
@@ -96,7 +128,7 @@ export class HttpTransport {
     // Handle error responses
     if (!response.ok) {
       const errorBody = await this.tryParseError(response);
-      throw this.createError(response.status, errorBody);
+      throw this.createErrorWithRetryAfter(response, errorBody);
     }
 
     // Parse successful response
@@ -110,6 +142,22 @@ export class HttpTransport {
     } catch {
       return `HTTP ${response.status}`;
     }
+  }
+
+  private createErrorWithRetryAfter(response: Response, message: string): LogwellError {
+    const { status } = response;
+    if (status === 429) {
+      const retryAfterHeader = response.headers.get('Retry-After');
+      const retryAfterMs = retryAfterHeader ? parseFloat(retryAfterHeader) * 1000 : undefined;
+      return new LogwellError(
+        `Rate limited: ${message}`,
+        'RATE_LIMITED',
+        status,
+        true,
+        retryAfterMs,
+      );
+    }
+    return this.createError(status, message);
   }
 
   private createError(status: number, message: string): LogwellError {

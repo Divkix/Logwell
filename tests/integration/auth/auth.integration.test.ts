@@ -40,8 +40,8 @@ describe('better-auth Integration', () => {
       // Verify user exists in database
       const [createdUser] = await db.select().from(user).where(eq(user.email, email));
       expect(createdUser).toBeDefined();
-      expect(createdUser.email).toBe(email);
-      expect(createdUser.name).toBe(name);
+      expect(createdUser!.email).toBe(email);
+      expect(createdUser!.name).toBe(name);
     });
 
     it('should sign in with valid credentials and create session', async () => {
@@ -77,8 +77,8 @@ describe('better-auth Integration', () => {
       // Verify session was created in database
       const sessions = await db.select().from(session).where(eq(session.userId, result.user.id));
       expect(sessions.length).toBeGreaterThan(0);
-      expect(sessions[0].userId).toBe(result.user.id);
-      expect(sessions[0].token).toBe(result.token);
+      expect(sessions[0]!.userId).toBe(result.user.id);
+      expect(sessions[0]!.token).toBe(result.token);
     });
 
     it('should fail to sign in with invalid password', async () => {
@@ -152,7 +152,7 @@ describe('better-auth Integration', () => {
       // Verify session was created in database
       const sessions = await db.select().from(session).where(eq(session.userId, result.user.id));
       expect(sessions.length).toBe(1);
-      expect(sessions[0].userId).toBe(result.user.id);
+      expect(sessions[0]!.userId).toBe(result.user.id);
     });
   });
 
@@ -177,9 +177,9 @@ describe('better-auth Integration', () => {
         .from(session)
         .where(eq(session.userId, signUpResult.user.id));
       expect(sessions.length).toBeGreaterThan(0);
-      expect(sessions[0].token).toBeDefined();
-      expect(sessions[0].userId).toBe(signUpResult.user.id);
-      expect(sessions[0].expiresAt).toBeInstanceOf(Date);
+      expect(sessions[0]!.token).toBeDefined();
+      expect(sessions[0]!.userId).toBe(signUpResult.user.id);
+      expect(sessions[0]!.expiresAt).toBeInstanceOf(Date);
     });
 
     it('should store session with expiration date', async () => {
@@ -198,7 +198,7 @@ describe('better-auth Integration', () => {
       const sessions = await db.select().from(session).where(eq(session.userId, result.user.id));
       expect(sessions.length).toBe(1);
 
-      const sessionExpiry = sessions[0].expiresAt;
+      const sessionExpiry = sessions[0]!.expiresAt;
       const now = new Date();
 
       // Session should expire in the future (within 7 days based on config)
@@ -223,13 +223,13 @@ describe('better-auth Integration', () => {
 
       const [createdUser] = await db.select().from(user).where(eq(user.email, email));
 
-      expect(createdUser.id).toBeDefined();
-      expect(typeof createdUser.id).toBe('string');
-      expect(createdUser.name).toBe(name);
-      expect(createdUser.email).toBe(email);
-      expect(createdUser.emailVerified).toBe(false);
-      expect(createdUser.createdAt).toBeInstanceOf(Date);
-      expect(createdUser.updatedAt).toBeInstanceOf(Date);
+      expect(createdUser!.id).toBeDefined();
+      expect(typeof createdUser!.id).toBe('string');
+      expect(createdUser!.name).toBe(name);
+      expect(createdUser!.email).toBe(email);
+      expect(createdUser!.emailVerified).toBe(false);
+      expect(createdUser!.createdAt).toBeInstanceOf(Date);
+      expect(createdUser!.updatedAt).toBeInstanceOf(Date);
     });
 
     it('should enforce email uniqueness constraint', async () => {

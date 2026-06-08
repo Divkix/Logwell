@@ -69,14 +69,14 @@ describe('StatsSkeleton', () => {
       render(StatsSkeleton);
 
       const legendItems = screen.getAllByTestId('skeleton-legend-item');
-      expect(within(legendItems[0]).getByTestId('skeleton-legend-color')).toBeInTheDocument();
+      expect(within(legendItems[0]!).getByTestId('skeleton-legend-color')).toBeInTheDocument();
     });
 
     it('legend item has text placeholder', () => {
       render(StatsSkeleton);
 
       const legendItems = screen.getAllByTestId('skeleton-legend-item');
-      expect(within(legendItems[0]).getByTestId('skeleton-legend-text')).toBeInTheDocument();
+      expect(within(legendItems[0]!).getByTestId('skeleton-legend-text')).toBeInTheDocument();
     });
   });
 

@@ -4,10 +4,7 @@ import { log, project } from '$lib/server/db/schema';
 import { requireAuth } from '$lib/server/utils/auth-guard';
 import type { PageServerLoad } from './$types';
 
-/**
- * Get time range start date based on range parameter
- * Stats page defaults to 24h for broader overview
- */
+// TODO(RT-10): deduplicate with $lib/utils/format getTimeRangeStart
 function getTimeRangeStart(range: string | null): Date | null {
   if (!range) return null;
 

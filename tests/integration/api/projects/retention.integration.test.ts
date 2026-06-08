@@ -144,7 +144,7 @@ describe('PATCH /api/projects/[id] with retentionDays', () => {
 
       // Verify in database
       const [dbProject] = await db.select().from(project).where(eq(project.id, testProject.id));
-      expect(dbProject.retentionDays).toBeNull();
+      expect(dbProject!.retentionDays).toBeNull();
     });
 
     it('should update retentionDays to 0 (never delete)', async () => {
@@ -167,7 +167,7 @@ describe('PATCH /api/projects/[id] with retentionDays', () => {
 
       // Verify in database
       const [dbProject] = await db.select().from(project).where(eq(project.id, testProject.id));
-      expect(dbProject.retentionDays).toBe(0);
+      expect(dbProject!.retentionDays).toBe(0);
     });
 
     it('should update retentionDays to positive value', async () => {
@@ -190,7 +190,7 @@ describe('PATCH /api/projects/[id] with retentionDays', () => {
 
       // Verify in database
       const [dbProject] = await db.select().from(project).where(eq(project.id, testProject.id));
-      expect(dbProject.retentionDays).toBe(90);
+      expect(dbProject!.retentionDays).toBe(90);
     });
 
     it('should reject invalid retentionDays (negative)', async () => {
@@ -271,8 +271,8 @@ describe('PATCH /api/projects/[id] with retentionDays', () => {
 
       // Verify in database
       const [dbProject] = await db.select().from(project).where(eq(project.id, testProject.id));
-      expect(dbProject.retentionDays).toBe(45);
-      expect(dbProject.name).toBe('new-name');
+      expect(dbProject!.retentionDays).toBe(45);
+      expect(dbProject!.name).toBe('new-name');
     });
 
     it('should update both name and retentionDays together', async () => {
@@ -296,8 +296,8 @@ describe('PATCH /api/projects/[id] with retentionDays', () => {
 
       // Verify in database
       const [dbProject] = await db.select().from(project).where(eq(project.id, testProject.id));
-      expect(dbProject.name).toBe('updated-project');
-      expect(dbProject.retentionDays).toBe(60);
+      expect(dbProject!.name).toBe('updated-project');
+      expect(dbProject!.retentionDays).toBe(60);
     });
   });
 });

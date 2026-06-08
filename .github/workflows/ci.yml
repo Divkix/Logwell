@@ -10,7 +10,6 @@ on:
 
 permissions:
   contents: read
-  packages: write
 
 # Cancel in-progress runs on same branch/PR
 concurrency:
@@ -41,7 +40,7 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.2.15"
 
       - name: Get bun cache directory
         id: bun-cache-dir
@@ -79,7 +78,7 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.2.15"
 
       - name: Get bun cache directory
         id: bun-cache-dir
@@ -99,6 +98,12 @@ jobs:
       - name: Run unit tests
         run: bun run test:unit
 
+      - name: Run component tests
+        run: bun run test:component
+
+      - name: Run tests with coverage
+        run: bun run test:coverage
+
   # =============================================================================
   # Integration Tests (uses PGlite in-memory PostgreSQL)
   # =============================================================================
@@ -114,7 +119,7 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.2.15"
 
       - name: Get bun cache directory
         id: bun-cache-dir
@@ -164,7 +169,7 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.2.15"
 
       - name: Get bun cache directory
         id: bun-cache-dir
@@ -213,7 +218,7 @@ jobs:
           ADMIN_PASSWORD: adminpass
 
       - name: Run E2E tests
-        run: bunx playwright test --project=chromium
+        run: bun run test:e2e --project=chromium --project=firefox
 
       - name: Upload Playwright artifacts
         if: failure()
@@ -240,7 +245,7 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.2.15"
 
       - name: Get bun cache directory
         id: bun-cache-dir
@@ -269,6 +274,43 @@ jobs:
 
   # =============================================================================
   # Docker Build Verification
+  # =============================================================================
+  # Test that committed migration SQL files work against a real Postgres
+  # =============================================================================
+  test-migrations:
+    name: Test Production Migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_PASSWORD: testpassword
+          POSTGRES_DB: logwell_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.2.15"
+
+      - name: Install deps
+        run: bun install --frozen-lockfile
+
+      - name: Test production migrations
+        env:
+          DATABASE_URL: postgresql://postgres:testpassword@localhost:5432/logwell_test
+        run: bunx drizzle-kit migrate
+
   # =============================================================================
   docker-build:
     name: Docker Build
@@ -302,6 +344,8 @@ jobs:
     timeout-minutes: 20
     needs: [lint, test-unit, test-integration, test-e2e, build, docker-build]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      packages: write
     strategy:
       fail-fast: false
       matrix:
@@ -370,6 +414,8 @@ jobs:
     timeout-minutes: 10
     needs: [docker-publish]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      packages: write
     outputs:
       image-tags: ${{ steps.meta.outputs.tags }}
       image-digest: ${{ steps.digest.outputs.digest }}
@@ -446,7 +492,7 @@ jobs:
     name: CI Success
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [lint, test-unit, test-integration, test-e2e, build, docker-build, docker-publish, docker-merge]
+    needs: [lint, test-unit, test-integration, test-e2e, test-migrations, build, docker-build, docker-publish, docker-merge]
     if: always()
 
     steps:
@@ -457,6 +503,7 @@ jobs:
              [[ "${{ needs.test-unit.result }}" != "success" ]] || \
              [[ "${{ needs.test-integration.result }}" != "success" ]] || \
              [[ "${{ needs.test-e2e.result }}" != "success" ]] || \
+             [[ "${{ needs.test-migrations.result }}" != "success" ]] || \
              [[ "${{ needs.build.result }}" != "success" ]] || \
              [[ "${{ needs.docker-build.result }}" != "success" ]]; then
             echo "One or more CI jobs failed"

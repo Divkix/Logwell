@@ -70,8 +70,8 @@ describe('searchLogs Integration', () => {
     const results = await searchLogs(project1.id, 'database error', db);
 
     expect(results).toHaveLength(1);
-    expect(results[0].projectId).toBe(project1.id);
-    expect(results[0].message).toBe('Database error in project 1');
+    expect(results[0]!.projectId).toBe(project1.id);
+    expect(results[0]!.message).toBe('Database error in project 1');
   });
 
   it('respects limit option with default 100', async () => {
@@ -145,7 +145,7 @@ describe('searchLogs Integration', () => {
 
     expect(results).toHaveLength(2);
     // Log with "database connection" in message should rank higher
-    expect(results[0].message).toBe('Database connection failed');
+    expect(results[0]!.message).toBe('Database connection failed');
   });
 
   it('handles special characters in search terms', async () => {
@@ -160,7 +160,7 @@ describe('searchLogs Integration', () => {
     const results = await searchLogs(project1.id, 'database connection failed!', db);
 
     expect(results).toHaveLength(1);
-    expect(results[0].message).toBe('Error: database connection failed!');
+    expect(results[0]!.message).toBe('Error: database connection failed!');
   });
 
   it('performs case-insensitive search', async () => {
@@ -197,7 +197,7 @@ describe('searchLogs Integration', () => {
     const results = await searchLogs(project1.id, 'error', db);
 
     expect(results).toHaveLength(1);
-    expect(results[0].message).toBe('Error occurred');
+    expect(results[0]!.message).toBe('Error occurred');
   });
 
   it('returns empty array for empty search term', async () => {
@@ -241,8 +241,8 @@ describe('searchLogs Integration', () => {
 
     expect(results).toHaveLength(3);
     // Should be ordered by timestamp DESC (newest first)
-    expect(results[0].id).toBe(log3.id);
-    expect(results[1].id).toBe(log2.id);
-    expect(results[2].id).toBe(log1.id);
+    expect(results[0]!.id).toBe(log3.id);
+    expect(results[1]!.id).toBe(log2.id);
+    expect(results[2]!.id).toBe(log1.id);
   });
 });
