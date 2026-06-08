@@ -5,7 +5,7 @@ export { TIME_RANGES, TIME_RANGE_LABELS } from '$lib/utils/time-range';
 
 <script lang="ts">
 import { Button } from '$lib/components/ui/button/index.js';
-import { TIME_RANGE_LABELS, TIME_RANGES } from '$lib/utils/time-range';
+import { TIME_RANGE_LABELS, TIME_RANGES, type TimeRange } from '$lib/utils/time-range';
 
 interface Props {
   value?: TimeRange;

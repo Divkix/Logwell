@@ -78,8 +78,8 @@ ENV NODE_ENV=production
 
 # Build the SvelteKit app (creates /app/build directory)
 # Dummy env vars satisfy build-time validation; real values provided at runtime
-RUN DATABASE_URL=**********************************/build \
-    BETTER_AUTH_SECRET=************************************* \
+RUN DATABASE_URL=postgresql://build:build@localhost/build \
+    BETTER_AUTH_SECRET=build-time-placeholder-secret-32chars \
     bun run build
 
 # -----------------------------------------------------------------------------

@@ -66,9 +66,14 @@ export function useLogStream(options: UseLogStreamOptions): UseLogStreamReturn {
   } = options;
 
   // Internal state
-  let _isConnected = $state(false);
-  let _isConnecting = $state(false);
-  let _error = $state<Error | null>(null);
+  // NOTE: these are intentionally plain (non-reactive) variables. connect()/disconnect() mutate
+  // them and are invoked from a component $effect; making them $state caused the effect to take a
+  // reactive dependency on them (via connect()'s guard reads) while also writing them, producing an
+  // infinite update loop (effect_update_depth_exceeded) that broke page hydration. Connection state
+  // is surfaced reactively to the UI via the onConnectionChange callback instead.
+  let _isConnected = false;
+  let _isConnecting = false;
+  let _error: Error | null = null;
   let _abortController: AbortController | null = null;
   let _reconnectTimeoutId: ReturnType<typeof setTimeout> | null = null;
   let _reconnectAttempts = 0;
