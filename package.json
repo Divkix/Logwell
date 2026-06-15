@@ -34,8 +34,8 @@
     "sdk:version": "bun run --cwd sdks/typescript npm version"
   },
   "dependencies": {
-    "@lucide/svelte": "^1.17.0",
-    "better-auth": "^1.6.14",
+    "@lucide/svelte": "^1.18.0",
+    "better-auth": "^1.6.18",
     "clsx": "^2.1.1",
     "layerchart": "^1.0.13",
     "nanoid": "^5.1.11",
@@ -46,7 +46,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "^0.5.1",
+    "@electric-sql/pglite": "^0.5.2",
     "@internationalized/date": "^3.12.2",
     "@playwright/test": "^1.60.0",
     "@sveltejs/kit": "^2.63.0",
@@ -56,7 +56,7 @@
     "@testing-library/svelte": "^5.3.1",
     "@testing-library/user-event": "^14.6.1",
     "@types/d3-scale": "^4.0.9",
-    "@types/node": "^25.9.2",
+    "@types/node": "^25.9.3",
     "@vitest/coverage-v8": "^4.1.7",
     "@vitest/ui": "^4.1.7",
     "bits-ui": "^2.18.1",
