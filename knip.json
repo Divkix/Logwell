@@ -2,28 +2,15 @@
   "$schema": "https://unpkg.com/knip@5/schema.json",
   "entry": [
     "src/routes/**/+{page,server,page.server,error,layout,layout.server}{,@*}.{js,ts,svelte}",
-    "src/hooks.server.ts",
-    "src/lib/index.ts",
     "src/lib/server/db/index.ts",
     "src/lib/server/auth.ts",
     "src/lib/server/jobs/cleanup-scheduler.ts"
   ],
   "project": ["src/**/*.{js,ts,svelte}"],
-  "ignore": [
-    ".svelte-kit/**",
-    "build/**",
-    "dist/**",
-    "src/app.d.ts",
-    "src/lib/components/ui/**/index.ts"
-  ],
-  "ignoreDependencies": [
-    "tw-animate-css",
-    "@divkix/logwell",
-    "layerchart",
-    "@types/d3-scale",
-    "husky"
-  ],
-  "ignoreBinaries": ["jsr", "husky"],
+  "ignoreExportsUsedInFile": true,
+  "ignoreFiles": ["src/lib/server/db/test-utils.ts"],
+  "ignoreDependencies": ["tw-animate-css", "@divkix/logwell", "layerchart", "@types/d3-scale"],
+  "ignoreBinaries": ["jsr"],
   "ignoreUnresolved": ["\\$env/.+", "\\$\\{packageName\\}"],
   "drizzle": false
 }

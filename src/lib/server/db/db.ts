@@ -42,15 +42,3 @@ export async function getDbClient(locals: App.Locals): Promise<DatabaseClient> {
   const { db } = await import("./index");
   return db;
 }
-
-/**
- * Convenience helper for route handlers that call `db.execute(sql)`.
- * Normalises the return shape to a plain array.
- */
-export async function executeQuery<T>(
-  db: DatabaseClient,
-  query: Parameters<DatabaseClient["execute"]>[0],
-): Promise<T[]> {
-  const raw = await db.execute(query);
-  return getQueryRows(raw as QueryRows<T>);
-}

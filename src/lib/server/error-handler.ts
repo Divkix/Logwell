@@ -57,8 +57,3 @@ export function createErrorHandler(): (context: ErrorContext) => ErrorResponse {
     };
   };
 }
-
-/**
- * Default error handler instance
- */
-export const errorHandler = createErrorHandler();

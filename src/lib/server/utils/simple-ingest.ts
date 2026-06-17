@@ -7,19 +7,6 @@ import { mapOtlpAttributesToLogColumns } from "./otlp";
 const VALID_LEVELS: readonly LogLevel[] = ["debug", "info", "warn", "error", "fatal"] as const;
 
 /**
- * Input format for a single log entry from the simple API
- */
-export interface SimpleLogInput {
-  level: string;
-  message: string;
-  timestamp?: string;
-  service?: string;
-  metadata?: Record<string, unknown>;
-  sourceFile?: string;
-  lineNumber?: number;
-}
-
-/**
  * Normalized log entry ready for database insertion
  */
 export interface NormalizedSimpleLog {
