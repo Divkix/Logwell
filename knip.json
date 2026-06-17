@@ -13,8 +13,14 @@
     "src/app.d.ts",
     "src/lib/components/ui/**/index.ts"
   ],
-  "ignoreDependencies": ["tw-animate-css", "@divkix/logwell", "layerchart", "@types/d3-scale"],
-  "ignoreBinaries": ["jsr"],
+  "ignoreDependencies": [
+    "tw-animate-css",
+    "@divkix/logwell",
+    "layerchart",
+    "@types/d3-scale",
+    "husky"
+  ],
+  "ignoreBinaries": ["jsr", "husky"],
   "ignoreUnresolved": ["\\$env/.+", "\\$\\{packageName\\}"],
   "drizzle": false
 }
