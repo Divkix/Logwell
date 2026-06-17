@@ -7,10 +7,27 @@
  *
  * Usage:
  * ```ts
- * import { env, RETENTION_CONFIG } from '$lib/server/config';
+ * import { env, isProduction, SSE_CONFIG } from '$lib/server/config';
  * ```
  */
 
-export { env } from "./env";
+export {
+  type EnvSummary,
+  EnvValidationError,
+  env,
+  getEnvSummary,
+  isDevelopment,
+  isProduction,
+  type ValidationResult,
+  validateEnv,
+} from "./env";
 
-export { INCIDENT_CONFIG, RETENTION_CONFIG } from "./performance";
+export {
+  API_CONFIG,
+  INCIDENT_CONFIG,
+  LOG_STREAM_CONFIG,
+  RETENTION_CONFIG,
+  SSE_CONFIG,
+  type SSEConfigType,
+  validateSSEConfig,
+} from "./performance";
