@@ -30,7 +30,7 @@ export class EnvValidationError extends Error {
 
 // Get NODE_ENV first for conditional validation
 const nodeEnv = process.env.NODE_ENV || "development";
-const isProd = nodeEnv === "production";
+const isDevExplicit = nodeEnv === "development";
 
 // Collect validation errors
 const validationErrors: Array<{ variable: string; message: string }> = [];
@@ -59,11 +59,11 @@ function getDatabaseUrl(): string {
 
 // Validate BETTER_AUTH_SECRET
 const authSecret = process.env.BETTER_AUTH_SECRET;
-if (isProd) {
+if (!isDevExplicit) {
   if (!authSecret) {
     validationErrors.push({
       variable: "BETTER_AUTH_SECRET",
-      message: "BETTER_AUTH_SECRET environment variable is required in production",
+      message: "BETTER_AUTH_SECRET is required unless NODE_ENV=development",
     });
   } else if (authSecret.length < 32) {
     validationErrors.push({
@@ -90,8 +90,8 @@ export const env = {
   /** PostgreSQL connection string */
   DATABASE_URL: getDatabaseUrl(),
 
-  /** Secret key for better-auth sessions (defaults to dev secret in development) */
-  BETTER_AUTH_SECRET: authSecret || "default-secret-for-development-only",
+  /** Secret key for better-auth sessions (defaults to dev secret in explicit development) */
+  BETTER_AUTH_SECRET: authSecret ?? (isDevExplicit ? "default-secret-for-development-only" : ""),
 
   /** Password for seeding admin user (optional) */
   ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
@@ -155,11 +155,14 @@ export function validateEnv(): ValidationResult {
     });
   }
 
-  if (isProduction()) {
+  const currentNodeEnv = process.env.NODE_ENV || "development";
+  const currentIsDevExplicit = currentNodeEnv === "development";
+
+  if (!currentIsDevExplicit) {
     if (!process.env.BETTER_AUTH_SECRET) {
       errors.push({
         variable: "BETTER_AUTH_SECRET",
-        message: "BETTER_AUTH_SECRET is required in production",
+        message: "BETTER_AUTH_SECRET is required unless NODE_ENV=development",
       });
     } else if (process.env.BETTER_AUTH_SECRET.length < 32) {
       errors.push({
