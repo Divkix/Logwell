@@ -176,6 +176,10 @@ ORIGIN="https://your-domain.com"
 # LOG_RETENTION_DAYS="30"        # 0 = never auto-delete
 # LOG_CLEANUP_INTERVAL_MS="3600000"  # Cleanup job interval (1 hour)
 # INCIDENT_AUTO_RESOLVE_MINUTES="30" # Incident resolves after N quiet minutes
+
+# Rate limiting (optional, defaults shown)
+# RATE_LIMIT_INGEST_RPM="600"    # Max ingest requests per minute per API key
+# RATE_LIMIT_LOGIN_RPM="10"      # Max login attempts per minute per IP
 ```
 
 Generate a secure secret:
@@ -671,29 +675,30 @@ The app runs on port 3000 by default.
 
 ### Project Management (Session Auth)
 
-| Endpoint                                             | Method | Description                                   |
-| ---------------------------------------------------- | ------ | --------------------------------------------- |
-| `/api/projects`                                      | GET    | List all projects                             |
-| `/api/projects`                                      | POST   | Create project                                |
-| `/api/projects/[id]`                                 | GET    | Get project details                           |
-| `/api/projects/[id]`                                 | PATCH  | Update project (name, retention)              |
-| `/api/projects/[id]`                                 | DELETE | Delete project                                |
-| `/api/projects/[id]/regenerate`                      | POST   | Regenerate API key                            |
-| `/api/projects/[id]/logs`                            | GET    | Query logs                                    |
-| `/api/projects/[id]/logs/stream`                     | POST   | SSE stream                                    |
-| `/api/projects/[id]/incidents`                       | GET    | List incidents (open/resolved, range filters) |
-| `/api/projects/[id]/incidents/[incidentId]`          | GET    | Incident detail with root-cause candidates    |
-| `/api/projects/[id]/incidents/[incidentId]/timeline` | GET    | Incident timeline buckets + peak              |
-| `/api/projects/[id]/incidents/stream`                | POST   | SSE incident updates                          |
-| `/api/projects/[id]/stats`                           | GET    | Level distribution                            |
+| Endpoint                                             | Method | Description                                                  |
+| ---------------------------------------------------- | ------ | ------------------------------------------------------------ |
+| `/api/projects`                                      | GET    | List all projects                                            |
+| `/api/projects`                                      | POST   | Create project                                               |
+| `/api/projects/[id]`                                 | GET    | Get project details                                          |
+| `/api/projects/[id]`                                 | PATCH  | Update project (name, retention)                             |
+| `/api/projects/[id]`                                 | DELETE | Delete project                                               |
+| `/api/projects/[id]/regenerate`                      | POST   | Regenerate API key                                           |
+| `/api/projects/[id]/logs`                            | GET    | Query logs                                                   |
+| `/api/projects/[id]/logs/stream`                     | POST   | SSE stream                                                   |
+| `/api/projects/[id]/incidents`                       | GET    | List incidents (open/resolved, range filters)                |
+| `/api/projects/[id]/incidents/[incidentId]`          | GET    | Incident detail with root-cause candidates                   |
+| `/api/projects/[id]/incidents/[incidentId]/timeline` | GET    | Incident timeline buckets + peak                             |
+| `/api/projects/[id]/incidents/stream`                | POST   | SSE incident updates                                         |
+| `/api/projects/[id]/stats`                           | GET    | Level distribution                                           |
+| `/api/projects/[id]/logs/export`                     | GET    | Export logs as CSV or JSON (`?format=csv\|json`, max 10,000) |
 
 ## Current Limitations
 
-| Limitation           | Impact                         | Workaround                          |
-| -------------------- | ------------------------------ | ----------------------------------- |
-| **Single-user auth** | No team collaboration          | Share credentials (not recommended) |
-| **No log export**    | Can't backup to S3/file        | Direct database dumps via `pg_dump` |
-| **No rate limiting** | API keys have unlimited access | Implement at reverse proxy level    |
+| Limitation                      | Impact                                                                       | Workaround                                          |
+| ------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------- |
+| **Single-user auth**            | No team collaboration                                                        | Share credentials (not recommended)                 |
+| **No alerting / notifications** | Incidents are detected but not pushed (no webhook/email)                     | Poll the incidents API or SSE stream                |
+| **No programmatic read API**    | Logs are readable via the UI or session-auth endpoints only, not via API key | Use session-auth `/api/projects/[id]/logs` endpoint |
 
 ## Security
 
