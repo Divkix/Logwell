@@ -73,12 +73,10 @@ SDK toolchains (from `AGENTS.md`):
 
 - `sdks/typescript/package.json` — bump `engines.node`
 - `sdks/python/pyproject.toml` — bump `requires-python`, drop the 3.9 classifier, bump mypy/ruff targets
-- `sdks/python/uv.lock` — regenerated automatically when `requires-python` changes; expected artifact of the floor bump
-- `sdks/python/src/logwell/types.py` — permitted minimal fix: move `Callable` from `typing` to `collections.abc` (under `TYPE_CHECKING`) to satisfy the `UP035`/`TC003` rules newly activated by the `py310` ruff target
 
 **Out of scope** (do NOT touch):
 
-- All other SDK source code under `sdks/typescript/src/` or `sdks/python/src/`. Do NOT modernize syntax to use newer-runtime features beyond the minimal Callable fix above. If ruff's `UP`/`SIM` rules flag further code after the target bump, defer as a follow-up modernization task.
+- SDK source code under `sdks/typescript/src/` or `sdks/python/src/`. Do NOT modernize syntax to use newer-runtime features in this plan — this is a manifest/config change only. If ruff's `UP` rules now flag code after the target bump, see STOP conditions.
 - The Go SDK (`sdks/go/`) — its `go 1.25` directive is current; no change.
 - SDK version numbers — do not bump the package `version` field; release tagging is a separate manual process (see `AGENTS.md` Release Process).
 - The root app's Node/Bun versions.
@@ -131,8 +129,8 @@ Machine-checkable. ALL must hold:
 - [ ] `grep -q 'python_version = "3.10"' sdks/python/pyproject.toml` AND `grep -q 'target-version = "py310"' sdks/python/pyproject.toml`
 - [ ] TS SDK: `bun run check && bun run test && bun run build` succeed
 - [ ] Python SDK: `ruff check . && mypy src/ && pytest` succeed
-- [ ] Only `sdks/python/src/logwell/types.py` source change: `Callable` moved from `typing` to `collections.abc` under `TYPE_CHECKING` block (UP035/TC003 fix)
-- [ ] Only the permitted files modified: `sdks/typescript/package.json`, `sdks/python/pyproject.toml`, `sdks/python/uv.lock`, `sdks/python/src/logwell/types.py`
+- [ ] No SDK source files modified (`git diff --name-only sdks/*/src` empty)
+- [ ] Only the two manifest files modified (`git status`)
 - [ ] `plans/README.md` status row updated
 
 ## STOP conditions
@@ -140,12 +138,12 @@ Machine-checkable. ALL must hold:
 Stop and report back if:
 
 - Either manifest does not match the "Current state" excerpt (already bumped or changed).
-- After bumping the Python target, `ruff check .` reports `UP`/`SIM` violations beyond the already-resolved `UP035`/`TC003` on `types.py` — report remaining violations as a follow-up modernization task; do NOT modify other source files in this plan.
+- After bumping the Python target, `ruff check .` reports `UP`/`SIM` violations on existing source — report them as a follow-up modernization task; do NOT modify source in this plan.
 - Any existing SDK test fails at the raised floor (an incompatibility surfaced — report it).
 - The Python dev environment can't be created (`uv` unavailable) — report; do not fall back to a global install.
 
 ## Maintenance notes
 
-- For the reviewer: confirm `version` fields were NOT bumped (release tagging is separate) and only `sdks/python/src/logwell/types.py` changed in source (the one-line `Callable` UP035/TC003 fix).
+- For the reviewer: confirm `version` fields were NOT bumped (release tagging is separate) and no SDK source changed.
 - Follow-up (separate plan if desired): run `ruff check --fix` to apply `py310` modernizations to the Python source, and adopt Node 20+ APIs in the TS SDK where they simplify code.
 - Coordinate the actual npm/PyPI release via the tag-based workflow in `AGENTS.md` after these land.
