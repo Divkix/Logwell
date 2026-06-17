@@ -25,7 +25,7 @@ Legend: **P1** critical · **P2** high · **P3** medium. Effort **S**<½day · *
 | --- | ------------------------------------------------------------------------------------------------------------- | ------- | ---------------- | -------- | ------ | ------- | ------ |
 | 001 | [Fix husky pre-commit hook](001-fix-husky-precommit-hook.md)                                                  | F4      | dx               | P2       | S      | LOW     | done   |
 | 002 | [Fix README limitations + document rate-limit env](002-fix-readme-limitations-and-document-rate-limit-env.md) | F2      | docs             | P2       | S      | LOW     | done   |
-| 003 | [Pin vite-plus + toolchain versions](003-pin-vite-plus-toolchain-versions.md)                                 | F14     | migration (deps) | P2       | S      | LOW     | todo   |
+| 003 | [Pin vite-plus + toolchain versions](003-pin-vite-plus-toolchain-versions.md)                                 | F14     | migration (deps) | P2       | S      | LOW     | done   |
 | 004 | [Raise SDK runtime floors](004-raise-sdk-runtime-floors.md)                                                   | F15     | migration (deps) | P3       | S      | LOW     | todo   |
 | 005 | [Fix knip config + remove dead searchLogs](005-fix-knip-config-and-remove-dead-searchlogs.md)                 | F10+F5  | tech-debt        | P2       | S      | LOW-MED | todo   |
 | 006 | [Fix SSE backpressure dropping live events](006-fix-sse-backpressure-dropping-live-events.md)                 | F1      | bug              | P1       | S      | LOW     | todo   |
