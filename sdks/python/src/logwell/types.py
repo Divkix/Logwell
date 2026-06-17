@@ -6,7 +6,10 @@ and API responses using TypedDict for zero runtime overhead.
 
 from __future__ import annotations
 
-from typing import Any, Callable, Literal
+from typing import TYPE_CHECKING, Any, Literal
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 from typing_extensions import NotRequired, Required, TypedDict
 
