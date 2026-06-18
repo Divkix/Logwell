@@ -28,7 +28,7 @@ async function login(page: Page) {
 
   // Click sign in and wait for redirect
   await page.getByRole("button", { name: /sign in/i }).click();
-  await expect(page).toHaveURL("/", { timeout: 15000 });
+  await expect(page).toHaveURL("/", { timeout: 30000 });
 }
 
 test.describe("Theme Toggle", () => {

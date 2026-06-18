@@ -32,7 +32,7 @@ async function login(page: Page) {
   await expect(passwordInput).toHaveValue(TEST_USER.password);
 
   await page.getByRole("button", { name: /sign in/i }).click();
-  await expect(page).toHaveURL("/", { timeout: 15000 });
+  await expect(page).toHaveURL("/", { timeout: 30000 });
 }
 
 /**

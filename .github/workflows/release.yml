@@ -149,7 +149,7 @@ jobs:
   # E2E Tests (Playwright - all browsers)
   # =============================================================================
   test-e2e:
-    name: E2E Tests (${{ matrix.browser }})
+    name: E2E Tests (${{ matrix.browser }} ${{ matrix.shard }}/${{ matrix.total }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -157,6 +157,8 @@ jobs:
       fail-fast: false
       matrix:
         browser: [chromium, firefox]
+        shard: [1, 2, 3]
+        total: [3]
 
     services:
       postgres:
@@ -232,13 +234,13 @@ jobs:
           ADMIN_PASSWORD: adminpass
 
       - name: Run E2E tests
-        run: bunx playwright test --project=${{ matrix.browser }}
+        run: bunx playwright test --project=${{ matrix.browser }} --shard=${{ matrix.shard }}/${{ matrix.total }}
 
       - name: Upload Playwright artifacts
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: playwright-report-${{ matrix.browser }}-${{ github.run_id }}
+          name: playwright-report-${{ matrix.browser }}-${{ github.run_id }}-shard-${{ matrix.shard }}
           path: |
             playwright-report/
             test-results/

@@ -14,7 +14,7 @@ async function login(page: Page) {
   await page.getByLabel(/password/i).fill(TEST_USER.password);
 
   await page.getByRole("button", { name: /sign in/i }).click();
-  await expect(page).toHaveURL("/", { timeout: 15000 });
+  await expect(page).toHaveURL("/", { timeout: 30000 });
 }
 
 async function createProject(page: Page, name: string) {

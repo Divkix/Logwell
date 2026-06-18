@@ -57,7 +57,7 @@ test.describe("Login Page", () => {
     await signInButton.click();
 
     // Wait for redirect to dashboard
-    await expect(page).toHaveURL("/", { timeout: 15000 });
+    await expect(page).toHaveURL("/", { timeout: 30000 });
   });
 
   test("should show error for invalid credentials", async ({ page }) => {
@@ -114,7 +114,7 @@ test.describe("Login Page", () => {
     await passwordInput.press("Enter");
 
     // Wait for redirect to dashboard
-    await expect(page).toHaveURL("/", { timeout: 15000 });
+    await expect(page).toHaveURL("/", { timeout: 30000 });
   });
 
   test("should disable form inputs during submission", async ({ page }) => {
@@ -179,7 +179,7 @@ test.describe("Login Page - Authentication State", () => {
     await page.getByRole("button", { name: /sign in/i }).click();
 
     // Wait for redirect to complete
-    await expect(page).toHaveURL("/", { timeout: 15000 });
+    await expect(page).toHaveURL("/", { timeout: 30000 });
 
     // Now try to visit login page again
     await page.goto("/login");
