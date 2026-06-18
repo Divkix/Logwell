@@ -7,7 +7,7 @@ import { cappedLogCount } from "$lib/server/utils/capped-count";
 import { decodeCursor, encodeCursor } from "$lib/server/utils/cursor";
 import { isErrorResponse, requireProjectOwnership } from "$lib/server/utils/project-guard";
 import { buildSearchQuery } from "$lib/server/utils/search";
-import { LOG_LEVELS, type LogLevel } from "$lib/shared/types";
+import { parseLevelFilter } from "$lib/shared/schemas/log";
 import type { RequestEvent } from "./$types";
 
 // Constants for pagination limits
@@ -20,21 +20,6 @@ const MAX_LIMIT = 500;
  */
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
-}
-
-/**
- * Parse and validate level filter from query string
- * Returns array of valid log levels or null if no filter
- */
-function parseLevelFilter(levelParam: string | null): LogLevel[] | null {
-  if (!levelParam) return null;
-
-  const levels = levelParam
-    .split(",")
-    .map((l) => l.trim().toLowerCase())
-    .filter((l): l is LogLevel => LOG_LEVELS.includes(l as LogLevel));
-
-  return levels.length > 0 ? levels : null;
 }
 
 /**

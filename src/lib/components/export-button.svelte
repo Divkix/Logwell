@@ -4,6 +4,7 @@ import type { TimeRange } from '$lib/components/time-range-picker.svelte';
 import { Button } from '$lib/components/ui/button';
 import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 import type { LogLevel } from '$lib/shared/types';
+import { getTimeRangeStart } from '$lib/utils/format';
 import { toastError } from '$lib/utils/toast';
 
 interface Props {
@@ -14,27 +15,6 @@ interface Props {
 }
 
 const { projectId, level, search, range }: Props = $props();
-
-/**
- * Get time range start date based on range parameter
- */
-function getTimeRangeStart(timeRange: TimeRange | undefined): Date | null {
-  if (!timeRange) return null;
-
-  const now = Date.now();
-  switch (timeRange) {
-    case '15m':
-      return new Date(now - 15 * 60 * 1000);
-    case '1h':
-      return new Date(now - 60 * 60 * 1000);
-    case '24h':
-      return new Date(now - 24 * 60 * 60 * 1000);
-    case '7d':
-      return new Date(now - 7 * 24 * 60 * 60 * 1000);
-    default:
-      return null;
-  }
-}
 
 /**
  * Build export URL with current filters
@@ -52,7 +32,7 @@ function buildExportUrl(format: 'csv' | 'json'): string {
   }
 
   // Convert time range to from/to timestamps
-  const fromDate = getTimeRangeStart(range);
+  const fromDate = range ? getTimeRangeStart(range) : null;
   if (fromDate) {
     params.set('from', fromDate.toISOString());
   }
