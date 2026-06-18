@@ -28,79 +28,85 @@ export async function POST(event: RequestEvent): Promise<Response> {
   const projectId = event.params.id;
   let cleanupFn: (() => void) | null = null;
 
-  const stream = new ReadableStream({
-    start(controller) {
-      const encoder = new TextEncoder();
-      let batch: Incident[] = [];
-      let flushTimeout: ReturnType<typeof setTimeout> | null = null;
-      let isClosed = false;
+  // Use a CountQueuingStrategy with a generous highWaterMark so normal
+  // ingest bursts never drive desiredSize to 0; genuine backpressure only
+  // triggers when the queue actually exceeds the mark (desiredSize < 0).
+  const stream = new ReadableStream(
+    {
+      start(controller) {
+        const encoder = new TextEncoder();
+        let batch: Incident[] = [];
+        let flushTimeout: ReturnType<typeof setTimeout> | null = null;
+        let isClosed = false;
 
-      const sendEvent = (eventName: string, data: string): "sent" | "backpressure" | "closed" => {
-        if (isClosed) return "closed";
-        try {
-          const size = (controller as ReadableStreamDefaultController).desiredSize;
-          if (size !== null && size <= 0) {
-            // Stream backpressure: slow consumer — drop this event but keep the stream open
-            return "backpressure";
+        const sendEvent = (eventName: string, data: string): "sent" | "backpressure" | "closed" => {
+          if (isClosed) return "closed";
+          try {
+            const size = (controller as ReadableStreamDefaultController).desiredSize;
+            if (size !== null && size < 0) {
+              // Stream backpressure: slow consumer — drop this event but keep the stream open
+              return "backpressure";
+            }
+            controller.enqueue(encoder.encode(formatSSEEvent(eventName, data)));
+            return "sent";
+          } catch {
+            // Controller closed
+            return "closed";
           }
-          controller.enqueue(encoder.encode(formatSSEEvent(eventName, data)));
-          return "sent";
-        } catch {
-          // Controller closed
-          return "closed";
-        }
-      };
+        };
 
-      const flushBatch = () => {
-        if (batch.length > 0) {
-          // Only a closed controller is terminal; backpressure just drops this event.
-          if (sendEvent("incidents", JSON.stringify(batch)) === "closed") cleanup();
-          batch = [];
-        }
-        flushTimeout = null;
-      };
-
-      const handleIncident = (incident: Incident) => {
-        if (isClosed) return;
-        batch.push(incident);
-
-        if (!flushTimeout) {
-          flushTimeout = setTimeout(flushBatch, BATCH_WINDOW_MS);
-        }
-
-        if (batch.length >= MAX_BATCH_SIZE) {
-          if (flushTimeout) {
-            clearTimeout(flushTimeout);
-            flushTimeout = null;
+        const flushBatch = () => {
+          if (batch.length > 0) {
+            // Only a closed controller is terminal; backpressure just drops this event.
+            if (sendEvent("incidents", JSON.stringify(batch)) === "closed") cleanup();
+            batch = [];
           }
-          flushBatch();
-        }
-      };
+          flushTimeout = null;
+        };
 
-      const unsubscribe = logEventBus.onIncident(projectId, handleIncident);
-      const heartbeatInterval = setInterval(() => {
-        if (sendEvent("heartbeat", JSON.stringify({ ts: Date.now() })) === "closed") cleanup();
-      }, HEARTBEAT_INTERVAL_MS);
+        const handleIncident = (incident: Incident) => {
+          if (isClosed) return;
+          batch.push(incident);
 
-      const cleanup = () => {
-        if (isClosed) return;
-        isClosed = true;
-        unsubscribe();
-        clearInterval(heartbeatInterval);
-        if (flushTimeout) clearTimeout(flushTimeout);
-        try {
-          controller.close();
-        } catch {
-          // already closed
-        }
-      };
+          if (!flushTimeout) {
+            flushTimeout = setTimeout(flushBatch, BATCH_WINDOW_MS);
+          }
 
-      cleanupFn = cleanup;
+          if (batch.length >= MAX_BATCH_SIZE) {
+            if (flushTimeout) {
+              clearTimeout(flushTimeout);
+              flushTimeout = null;
+            }
+            flushBatch();
+          }
+        };
+
+        const unsubscribe = logEventBus.onIncident(projectId, handleIncident);
+        const heartbeatInterval = setInterval(() => {
+          if (sendEvent("heartbeat", JSON.stringify({ ts: Date.now() })) === "closed") cleanup();
+        }, HEARTBEAT_INTERVAL_MS);
+
+        const cleanup = () => {
+          if (isClosed) return;
+          isClosed = true;
+          unsubscribe();
+          clearInterval(heartbeatInterval);
+          if (flushTimeout) clearTimeout(flushTimeout);
+          try {
+            controller.close();
+          } catch {
+            // already closed
+          }
+        };
+
+        cleanupFn = cleanup;
+      },
+      cancel() {
+        if (cleanupFn) cleanupFn();
+      },
     },
-    cancel() {
-      if (cleanupFn) cleanupFn();
-    },
-  });
+    new CountQueuingStrategy({ highWaterMark: 256 }),
+  );
 
   return new Response(stream, {
     status: 200,

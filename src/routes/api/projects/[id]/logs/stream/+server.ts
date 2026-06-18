@@ -44,115 +44,122 @@ export async function POST(event: RequestEvent): Promise<Response> {
   // Store cleanup function outside the stream for cancel handler access
   let cleanupFn: (() => void) | null = null;
 
-  // Create a readable stream for SSE
-  const stream = new ReadableStream({
-    start(controller) {
-      const encoder = new TextEncoder();
+  // Create a readable stream for SSE.
+  // Use a CountQueuingStrategy with a generous highWaterMark so a 100-log
+  // burst (BATCH_INSERT_LIMIT) plus heartbeats never drive desiredSize to 0
+  // under normal operation, and genuine backpressure only triggers when the
+  // queue actually exceeds the mark (desiredSize < 0).
+  const stream = new ReadableStream(
+    {
+      start(controller) {
+        const encoder = new TextEncoder();
 
-      // Buffer for batching logs
-      let batch: Log[] = [];
-      let flushTimeout: ReturnType<typeof setTimeout> | null = null;
-      let isClosed = false;
+        // Buffer for batching logs
+        let batch: Log[] = [];
+        let flushTimeout: ReturnType<typeof setTimeout> | null = null;
+        let isClosed = false;
 
-      /**
-       * Send an SSE event to the client.
-       * Returns 'sent' | 'backpressure' | 'closed'.
-       * Backpressure (slow consumer) drops the event but keeps the stream open.
-       * 'closed' means the controller has errored and the stream should be torn down.
-       */
-      const sendEvent = (eventName: string, data: string): "sent" | "backpressure" | "closed" => {
-        if (isClosed) return "closed";
-        try {
-          const size = (controller as ReadableStreamDefaultController).desiredSize;
-          if (size !== null && size <= 0) {
-            // Stream backpressure: slow consumer, drop the event but keep the stream alive
-            console.debug("[logs/stream] backpressure detected, dropping batch");
-            return "backpressure";
+        /**
+         * Send an SSE event to the client.
+         * Returns 'sent' | 'backpressure' | 'closed'.
+         * Backpressure (slow consumer) drops the event but keeps the stream open.
+         * 'closed' means the controller has errored and the stream should be torn down.
+         */
+        const sendEvent = (eventName: string, data: string): "sent" | "backpressure" | "closed" => {
+          if (isClosed) return "closed";
+          try {
+            const size = (controller as ReadableStreamDefaultController).desiredSize;
+            if (size !== null && size < 0) {
+              // Stream backpressure: slow consumer, drop the event but keep the stream alive
+              console.debug("[logs/stream] backpressure detected, dropping batch");
+              return "backpressure";
+            }
+            controller.enqueue(encoder.encode(formatSSEEvent(eventName, data)));
+            return "sent";
+          } catch {
+            // Controller closed or errored
+            return "closed";
           }
-          controller.enqueue(encoder.encode(formatSSEEvent(eventName, data)));
-          return "sent";
-        } catch {
-          // Controller closed or errored
-          return "closed";
-        }
-      };
+        };
 
-      /**
-       * Flush the current batch to the client
-       */
-      const flushBatch = () => {
-        if (batch.length > 0) {
-          const result = sendEvent("logs", JSON.stringify(batch));
+        /**
+         * Flush the current batch to the client
+         */
+        const flushBatch = () => {
+          if (batch.length > 0) {
+            const result = sendEvent("logs", JSON.stringify(batch));
+            if (result === "closed") {
+              cleanup();
+            }
+            // On 'backpressure', drop the batch but don't close the stream
+            batch = [];
+          }
+          flushTimeout = null;
+        };
+
+        /**
+         * Handler for incoming logs from event bus
+         */
+        const handleLog = (log: Log) => {
+          if (isClosed) return;
+          batch.push(log);
+
+          // Start batch timer if not already running
+          if (!flushTimeout) {
+            flushTimeout = setTimeout(flushBatch, BATCH_WINDOW_MS);
+          }
+
+          // Flush immediately if batch is full
+          if (batch.length >= MAX_BATCH_SIZE) {
+            if (flushTimeout) {
+              clearTimeout(flushTimeout);
+              flushTimeout = null;
+            }
+            flushBatch();
+          }
+        };
+
+        // Subscribe to log events for this project
+        const unsubscribe = logEventBus.onLog(projectId, handleLog);
+
+        // Set up heartbeat to keep connection alive
+        const heartbeatInterval = setInterval(() => {
+          const result = sendEvent("heartbeat", JSON.stringify({ ts: Date.now() }));
           if (result === "closed") {
             cleanup();
           }
-          // On 'backpressure', drop the batch but don't close the stream
-          batch = [];
-        }
-        flushTimeout = null;
-      };
+        }, HEARTBEAT_INTERVAL_MS);
 
-      /**
-       * Handler for incoming logs from event bus
-       */
-      const handleLog = (log: Log) => {
-        if (isClosed) return;
-        batch.push(log);
-
-        // Start batch timer if not already running
-        if (!flushTimeout) {
-          flushTimeout = setTimeout(flushBatch, BATCH_WINDOW_MS);
-        }
-
-        // Flush immediately if batch is full
-        if (batch.length >= MAX_BATCH_SIZE) {
+        /**
+         * Cleanup function to unsubscribe and clear timers
+         */
+        const cleanup = () => {
+          if (isClosed) return;
+          isClosed = true;
+          unsubscribe();
+          clearInterval(heartbeatInterval);
           if (flushTimeout) {
             clearTimeout(flushTimeout);
-            flushTimeout = null;
           }
-          flushBatch();
-        }
-      };
+          try {
+            controller.close();
+          } catch {
+            // Already closed
+          }
+        };
 
-      // Subscribe to log events for this project
-      const unsubscribe = logEventBus.onLog(projectId, handleLog);
-
-      // Set up heartbeat to keep connection alive
-      const heartbeatInterval = setInterval(() => {
-        const result = sendEvent("heartbeat", JSON.stringify({ ts: Date.now() }));
-        if (result === "closed") {
-          cleanup();
+        // Store cleanup for cancel handler
+        cleanupFn = cleanup;
+      },
+      cancel() {
+        // Called when client disconnects
+        if (cleanupFn) {
+          cleanupFn();
         }
-      }, HEARTBEAT_INTERVAL_MS);
-
-      /**
-       * Cleanup function to unsubscribe and clear timers
-       */
-      const cleanup = () => {
-        if (isClosed) return;
-        isClosed = true;
-        unsubscribe();
-        clearInterval(heartbeatInterval);
-        if (flushTimeout) {
-          clearTimeout(flushTimeout);
-        }
-        try {
-          controller.close();
-        } catch {
-          // Already closed
-        }
-      };
-
-      // Store cleanup for cancel handler
-      cleanupFn = cleanup;
+      },
     },
-    cancel() {
-      // Called when client disconnects
-      if (cleanupFn) {
-        cleanupFn();
-      }
-    },
-  });
+    new CountQueuingStrategy({ highWaterMark: 256 }),
+  );
 
   return new Response(stream, {
     status: 200,
