@@ -390,6 +390,32 @@ describe("POST /api/projects/[id]/logs/stream", () => {
       expect(logs.some((l: Log) => l.message === "Batch log 3")).toBe(true);
     });
 
+    it("delivers all logs when a burst exceeds the batch size", async () => {
+      const project = await seedProject(db, { ownerId: userId });
+      const request = new Request(`http://localhost/api/projects/${project.id}/logs/stream`, {
+        method: "POST",
+      });
+      const event = createRequestEvent(request, db, { id: project.id }, true);
+      const { POST } =
+        await import("../../../../../../../src/routes/api/projects/[id]/logs/stream/+server");
+      const response = await POST(event as never);
+
+      await new Promise((r) => setTimeout(r, 50)); // let subscription set up
+
+      const TOTAL = 100;
+      for (let i = 0; i < TOTAL; i++) {
+        logEventBus.emitLog(createMockLog(project.id, { message: `burst ${i}` }));
+      }
+
+      // Collect enough events to cover all batches (first flush is 50, remainder follow)
+      const events = await collectSSEEvents(response, 5, 3000);
+      const received = events
+        .filter((e) => e.event === "logs")
+        .flatMap((e) => JSON.parse(e.data) as Log[]);
+
+      expect(received.length).toBe(TOTAL);
+    });
+
     it("flushes immediately when batch reaches 50 logs", async () => {
       const project = await seedProject(db, { ownerId: userId });
 

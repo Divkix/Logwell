@@ -28,7 +28,7 @@ Legend: **P1** critical · **P2** high · **P3** medium. Effort **S**<½day · *
 | 003 | [Pin vite-plus + toolchain versions](003-pin-vite-plus-toolchain-versions.md)                                 | F14     | migration (deps) | P2       | S      | LOW     | done   |
 | 004 | [Raise SDK runtime floors](004-raise-sdk-runtime-floors.md)                                                   | F15     | migration (deps) | P3       | S      | LOW     | done   |
 | 005 | [Fix knip config + remove dead searchLogs](005-fix-knip-config-and-remove-dead-searchlogs.md)                 | F10+F5  | tech-debt        | P2       | S      | LOW-MED | done   |
-| 006 | [Fix SSE backpressure dropping live events](006-fix-sse-backpressure-dropping-live-events.md)                 | F1      | bug              | P1       | S      | LOW     | todo   |
+| 006 | [Fix SSE backpressure dropping live events](006-fix-sse-backpressure-dropping-live-events.md)                 | F1      | bug              | P1       | S      | LOW     | done   |
 | 007 | [Fix OTLP zero-timestamp handling](007-fix-otlp-zero-timestamp.md)                                            | F17     | bug              | P2       | S      | LOW     | todo   |
 | 008 | [Harden fallback auth secret](008-harden-fallback-auth-secret.md)                                             | F6      | security         | P2       | S      | LOW     | done   |
 | 009 | [Tighten CSRF for cookie routes](009-tighten-csrf-for-cookie-routes.md)                                       | F16     | security         | P3       | S      | LOW     | done   |
