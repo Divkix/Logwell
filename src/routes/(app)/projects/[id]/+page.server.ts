@@ -6,7 +6,9 @@ import { requireAuth } from "$lib/server/utils/auth-guard";
 import { cappedLogCount } from "$lib/server/utils/capped-count";
 import { decodeCursor, encodeCursor } from "$lib/server/utils/cursor";
 import { buildSearchQuery } from "$lib/server/utils/search";
-import { LOG_LEVELS, type LogLevel } from "$lib/shared/types";
+import { parseLevelFilter } from "$lib/shared/schemas/log";
+import { getTimeRangeStart } from "$lib/utils/format";
+import { parseTimeRange } from "$lib/utils/time-range";
 import type { PageServerLoad } from "./$types";
 
 // Constants for pagination
@@ -19,37 +21,6 @@ const MAX_LIMIT = 500;
  */
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
-}
-
-// TODO(RT-10): deduplicate with api/projects/[id]/logs/+server.ts parseLevelFilter
-function parseLevelFilter(levelParam: string | null): LogLevel[] | null {
-  if (!levelParam) return null;
-
-  const levels = levelParam
-    .split(",")
-    .map((l) => l.trim().toLowerCase())
-    .filter((l): l is LogLevel => LOG_LEVELS.includes(l as LogLevel));
-
-  return levels.length > 0 ? levels : null;
-}
-
-// TODO(RT-10): deduplicate with $lib/utils/format getTimeRangeStart
-function getTimeRangeStart(range: string | null): Date | null {
-  if (!range) return null;
-
-  const now = Date.now();
-  switch (range) {
-    case "15m":
-      return new Date(now - 15 * 60 * 1000);
-    case "1h":
-      return new Date(now - 60 * 60 * 1000);
-    case "24h":
-      return new Date(now - 24 * 60 * 60 * 1000);
-    case "7d":
-      return new Date(now - 7 * 24 * 60 * 60 * 1000);
-    default:
-      return null;
-  }
 }
 
 export const load: PageServerLoad = async (event) => {
@@ -88,7 +59,8 @@ export const load: PageServerLoad = async (event) => {
 
   // Parse filters
   const levels = parseLevelFilter(levelParam);
-  const fromDate = getTimeRangeStart(rangeParam);
+  const range = parseTimeRange(rangeParam);
+  const fromDate = range ? getTimeRangeStart(range) : null;
 
   // Build WHERE conditions
   const conditions: SQL[] = [eq(log.projectId, projectId)];

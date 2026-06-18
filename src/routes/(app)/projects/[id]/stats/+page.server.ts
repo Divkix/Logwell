@@ -2,26 +2,9 @@ import { error } from "@sveltejs/kit";
 import { and, count, eq, gte, type SQL } from "drizzle-orm";
 import { log, project } from "$lib/server/db/schema";
 import { requireAuth } from "$lib/server/utils/auth-guard";
+import { getTimeRangeStart } from "$lib/utils/format";
+import { parseTimeRange } from "$lib/utils/time-range";
 import type { PageServerLoad } from "./$types";
-
-// TODO(RT-10): deduplicate with $lib/utils/format getTimeRangeStart
-function getTimeRangeStart(range: string | null): Date | null {
-  if (!range) return null;
-
-  const now = Date.now();
-  switch (range) {
-    case "15m":
-      return new Date(now - 15 * 60 * 1000);
-    case "1h":
-      return new Date(now - 60 * 60 * 1000);
-    case "24h":
-      return new Date(now - 24 * 60 * 60 * 1000);
-    case "7d":
-      return new Date(now - 7 * 24 * 60 * 60 * 1000);
-    default:
-      return null;
-  }
-}
 
 export const load: PageServerLoad = async (event) => {
   // Require session authentication
@@ -45,7 +28,8 @@ export const load: PageServerLoad = async (event) => {
   const rangeParam = url.searchParams.get("range") || "24h";
 
   // Calculate time range
-  const fromDate = getTimeRangeStart(rangeParam);
+  const range = parseTimeRange(rangeParam);
+  const fromDate = range ? getTimeRangeStart(range) : null;
 
   // Build WHERE conditions
   const conditions: SQL[] = [eq(log.projectId, projectId)];

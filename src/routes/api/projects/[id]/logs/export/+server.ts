@@ -6,7 +6,7 @@ import { apiError } from "$lib/server/utils/api-error";
 import { escapeCSVField } from "$lib/server/utils/csv-serializer";
 import { isErrorResponse, requireProjectOwnership } from "$lib/server/utils/project-guard";
 import { buildSearchQuery } from "$lib/server/utils/search";
-import { LOG_LEVELS, type LogLevel } from "$lib/shared/types";
+import { parseLevelFilter } from "$lib/shared/schemas/log";
 import type { ExportFormat } from "$lib/types/export";
 import type { RequestEvent } from "./$types";
 
@@ -24,18 +24,6 @@ const CSV_HEADERS = [
   "userId",
   "ipAddress",
 ] as const;
-
-// TODO: deduplicate with logs/+server.ts parseLevelFilter (RT-10)
-function parseLevelFilter(levelParam: string | null): LogLevel[] | null {
-  if (!levelParam) return null;
-
-  const levels = levelParam
-    .split(",")
-    .map((l) => l.trim().toLowerCase())
-    .filter((l): l is LogLevel => LOG_LEVELS.includes(l as LogLevel));
-
-  return levels.length > 0 ? levels : null;
-}
 
 /**
  * Validate export format parameter

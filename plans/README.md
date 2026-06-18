@@ -37,7 +37,7 @@ Legend: **P1** critical · **P2** high · **P3** medium. Effort **S**<½day · *
 | 012 | [Batch incident upsert + narrow returning](012-batch-incident-upsert-and-narrow-returning.md)                 | F3+F7   | perf             | P2       | M      | MED     | done   |
 | 013 | [Cap unbounded log COUNT(\*)](013-cap-unbounded-log-count.md)                                                 | F11     | perf             | P3       | M      | MED     | done   |
 | 014 | [Collapse tsvector to single parse](014-collapse-tsvector-to-single-parse.md)                                 | F18     | perf             | P3       | L      | HIGH    | done   |
-| 015 | [Dedup getTimeRangeStart + parseLevelFilter](015-dedup-timerange-and-levelfilter.md)                          | F12     | tech-debt        | P3       | M      | MED     | todo   |
+| 015 | [Dedup getTimeRangeStart + parseLevelFilter](015-dedup-timerange-and-levelfilter.md)                          | F12     | tech-debt        | P3       | M      | MED     | done   |
 | 016 | [Unify (app) loader ownership + DB seam](016-unify-app-loader-ownership-and-db-seam.md)                       | F13     | tech-debt        | P3       | M      | MED     | todo   |
 | 017 | [SPIKE: incident alerting webhooks](017-spike-incident-alerting-webhooks.md)                                  | D1      | direction        | P2       | L      | MED     | todo   |
 | 018 | [SPIKE: read/query API + SDKs](018-spike-read-query-api-and-sdks.md)                                          | D2      | direction        | P3       | L      | MED     | todo   |
