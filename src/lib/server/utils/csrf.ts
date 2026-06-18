@@ -7,15 +7,15 @@ import type { RequestEvent } from "@sveltejs/kit";
  * - GET/HEAD/OPTIONS are always allowed (no state change)
  * - If Origin header is present, it must match the site's origin exactly
  * - If Referer header is present, it must start with the site's origin + '/'
- * - If both are absent, the request is allowed (may be same-origin from some clients)
+ * - If BOTH are absent on a state-changing request, the request is rejected (403)
  *
- * This protects against cross-origin POST/PATCH/DELETE while avoiding false
- * positives for legitimate same-origin requests that don't send Origin.
+ * This protects against cross-origin POST/PATCH/DELETE on cookie-authenticated routes.
+ * Every caller of this function is a cookie-authenticated route; the bearer /v1 ingest
+ * routes do NOT call this function and are unaffected (SDK/curl legitimately omit headers).
  *
- * Note: requests with neither Origin nor Referer are allowed. This is intentional for
- * API clients (e.g. SDKs, curl) that don't send these headers. Cross-origin browser
- * requests always include Origin per spec. For additional protection on browser-only
- * routes, consider requiring Origin when a session cookie is present.
+ * Note: the previous allow-on-absence policy has been tightened. Requests with neither
+ * Origin nor Referer are now rejected to close the ambient-cookie CSRF soft spot.
+ * Same-origin browser requests always send at least one of these headers per spec.
  */
 export function checkCsrfOrigin(event: RequestEvent): Response | null {
   const method = event.request.method;
@@ -37,6 +37,17 @@ export function checkCsrfOrigin(event: RequestEvent): Response | null {
   if (referer && !referer.startsWith(`${expectedOrigin}/`)) {
     return new Response(
       JSON.stringify({ error: "csrf_error", message: "Invalid Referer header" }),
+      { status: 403, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
+  // Neither Origin nor Referer present on a state-changing request.
+  // Every caller of this function is cookie-authenticated, so a header-less
+  // cross-origin request must not be trusted. (Bearer /v1 ingest routes do not
+  // call this function and are unaffected.)
+  if (!origin && !referer) {
+    return new Response(
+      JSON.stringify({ error: "csrf_error", message: "Missing Origin and Referer headers" }),
       { status: 403, headers: { "Content-Type": "application/json" } },
     );
   }

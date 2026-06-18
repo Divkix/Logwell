@@ -152,7 +152,7 @@ describe("CSRF Origin/Referer checks", () => {
       expect(response.status).toBe(201);
     });
 
-    it("allows request without Origin or Referer (same-origin fallback)", async () => {
+    it("rejects request without Origin or Referer (cookie routes)", async () => {
       const request = new Request("http://localhost/api/projects", {
         method: "POST",
         headers: {
@@ -164,7 +164,9 @@ describe("CSRF Origin/Referer checks", () => {
       const event = createRequestEvent(request, db, authenticatedLocals);
       const response = await POST_PROJECTS(event as never);
 
-      expect(response.status).toBe(201);
+      expect(response.status).toBe(403);
+      const body = await response.json();
+      expect(body.error).toBe("csrf_error");
     });
   });
 

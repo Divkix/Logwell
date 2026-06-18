@@ -31,7 +31,7 @@ Legend: **P1** critical · **P2** high · **P3** medium. Effort **S**<½day · *
 | 006 | [Fix SSE backpressure dropping live events](006-fix-sse-backpressure-dropping-live-events.md)                 | F1      | bug              | P1       | S      | LOW     | todo   |
 | 007 | [Fix OTLP zero-timestamp handling](007-fix-otlp-zero-timestamp.md)                                            | F17     | bug              | P2       | S      | LOW     | todo   |
 | 008 | [Harden fallback auth secret](008-harden-fallback-auth-secret.md)                                             | F6      | security         | P2       | S      | LOW     | done   |
-| 009 | [Tighten CSRF for cookie routes](009-tighten-csrf-for-cookie-routes.md)                                       | F16     | security         | P3       | S      | LOW     | todo   |
+| 009 | [Tighten CSRF for cookie routes](009-tighten-csrf-for-cookie-routes.md)                                       | F16     | security         | P3       | S      | LOW     | done   |
 | 010 | [Test ingest rate-limit 429 wiring](010-test-ingest-rate-limit-429.md)                                        | F8      | tests            | P2       | S      | LOW     | todo   |
 | 011 | [Test incidents SSE stream](011-test-incidents-sse-stream.md)                                                 | F9      | tests            | P2       | M      | LOW     | todo   |
 | 012 | [Batch incident upsert + narrow returning](012-batch-incident-upsert-and-narrow-returning.md)                 | F3+F7   | perf             | P2       | M      | MED     | todo   |

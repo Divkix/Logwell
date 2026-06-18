@@ -10,7 +10,8 @@ import { seedProject } from "../../../../../../fixtures/db";
 // import { POST } from '../../../../../../../src/routes/api/projects/[id]/logs/stream/+server';
 
 /**
- * Helper to create a mock SvelteKit RequestEvent for SSE endpoint
+ * Helper to create a mock SvelteKit RequestEvent for SSE endpoint.
+ * Adds a same-origin Origin header to state-changing requests so they pass CSRF checks.
  */
 function createRequestEvent(
   request: Request,
@@ -18,8 +19,16 @@ function createRequestEvent(
   params: { id: string },
   authenticated = true,
 ) {
+  const safeMethod = ["GET", "HEAD", "OPTIONS"].includes(request.method);
+  const hasOrigin = request.headers.has("Origin");
+  const effectiveRequest =
+    !safeMethod && !hasOrigin
+      ? new Request(request, {
+          headers: { ...Object.fromEntries(request.headers), Origin: new URL(request.url).origin },
+        })
+      : request;
   return {
-    request,
+    request: effectiveRequest,
     locals: {
       db,
       user: authenticated ? { id: "test-user-id", email: "admin@test.com" } : null,
