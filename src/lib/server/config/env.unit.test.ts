@@ -194,14 +194,82 @@ describe("Environment Configuration", () => {
       expect(result.errors).toHaveLength(0);
     });
 
-    it("returns all validation errors at once", async () => {
-      delete process.env.DATABASE_URL;
-      process.env.NODE_ENV = "production";
+    it("returns invalid when NODE_ENV=production and secret is missing", async () => {
+      // Load module under development so it does not throw at import
+      process.env.DATABASE_URL = "postgres://localhost/test";
+      process.env.NODE_ENV = "development";
       delete process.env.BETTER_AUTH_SECRET;
 
-      // Can't test this via import since it throws, use internal validation
-      // This test validates that the validateEnv function returns all errors
-      // The actual implementation should collect all errors before throwing
+      const { validateEnv } = await import("./env");
+
+      // Now simulate production environment for the validateEnv call
+      process.env.NODE_ENV = "production";
+      const result = validateEnv();
+
+      expect(result.valid).toBe(false);
+      expect(result.errors.some((e) => e.variable === "BETTER_AUTH_SECRET")).toBe(true);
+    });
+
+    it("returns invalid when NODE_ENV=staging (non-dev, non-prod) and secret is missing", async () => {
+      // Load module under development so it does not throw at import
+      process.env.DATABASE_URL = "postgres://localhost/test";
+      process.env.NODE_ENV = "development";
+      delete process.env.BETTER_AUTH_SECRET;
+
+      const { validateEnv } = await import("./env");
+
+      // Now simulate staging environment for the validateEnv call
+      process.env.NODE_ENV = "staging";
+      const result = validateEnv();
+
+      expect(result.valid).toBe(false);
+      expect(result.errors.some((e) => e.variable === "BETTER_AUTH_SECRET")).toBe(true);
+    });
+
+    it("returns valid when NODE_ENV=development and secret is missing", async () => {
+      process.env.DATABASE_URL = "postgres://localhost/test";
+      process.env.NODE_ENV = "development";
+      delete process.env.BETTER_AUTH_SECRET;
+
+      const { validateEnv } = await import("./env");
+      const result = validateEnv();
+
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it("returns invalid when NODE_ENV=production and secret is too short", async () => {
+      // Load module under development so it does not throw at import
+      process.env.DATABASE_URL = "postgres://localhost/test";
+      process.env.NODE_ENV = "development";
+      delete process.env.BETTER_AUTH_SECRET;
+
+      const { validateEnv } = await import("./env");
+
+      // Now simulate production with short secret
+      process.env.NODE_ENV = "production";
+      process.env.BETTER_AUTH_SECRET = "too-short";
+      const result = validateEnv();
+
+      expect(result.valid).toBe(false);
+      expect(result.errors.some((e) => e.variable === "BETTER_AUTH_SECRET")).toBe(true);
+    });
+
+    it("returns valid when NODE_ENV=production and secret is 32+ chars", async () => {
+      // Load module under development so it does not throw at import
+      process.env.DATABASE_URL = "postgres://localhost/test";
+      process.env.NODE_ENV = "development";
+      delete process.env.BETTER_AUTH_SECRET;
+
+      const { validateEnv } = await import("./env");
+
+      // Now simulate production with valid secret
+      process.env.NODE_ENV = "production";
+      process.env.BETTER_AUTH_SECRET = "a".repeat(32);
+      const result = validateEnv();
+
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
     });
   });
 
