@@ -121,13 +121,16 @@ export const log = pgTable(
     userId: text("user_id"),
     ipAddress: text("ip_address"),
     timestamp: timestamp("timestamp", { withTimezone: true }).defaultNow().notNull(),
+    // NOTE: keep this expression in sync with the PGlite trigger in test-db.ts
+    // and any new migration that recreates this column (see drizzle/0010_*.sql).
     search: tsvector("search").generatedAlwaysAs(
       (): SQL =>
-        sql`setweight(to_tsvector('english', ${log.message}), 'A') ||
-        setweight(to_tsvector('english', COALESCE(${log.body}::text, '')), 'B') ||
-        setweight(to_tsvector('english', COALESCE(${log.metadata}::text, '')), 'B') ||
-        setweight(to_tsvector('english', COALESCE(${log.resourceAttributes}::text, '')), 'C') ||
-        setweight(to_tsvector('english', COALESCE(${log.scopeAttributes}::text, '')), 'C')`,
+        sql`to_tsvector('english',
+        COALESCE(${log.message}, '') || ' ' ||
+        COALESCE(${log.body}::text, '') || ' ' ||
+        COALESCE(${log.metadata}::text, '') || ' ' ||
+        COALESCE(${log.resourceAttributes}::text, '') || ' ' ||
+        COALESCE(${log.scopeAttributes}::text, ''))`,
     ),
   },
   (table) => [
