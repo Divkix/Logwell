@@ -1,10 +1,10 @@
-import { error } from "@sveltejs/kit";
 import { and, desc, eq, gte, inArray, lt, or, type SQL, sql } from "drizzle-orm";
 import { env } from "$lib/server/config";
-import { log, project } from "$lib/server/db/schema";
-import { requireAuth } from "$lib/server/utils/auth-guard";
+import { getDbClient } from "$lib/server/db/db";
+import { log } from "$lib/server/db/schema";
 import { cappedLogCount } from "$lib/server/utils/capped-count";
 import { decodeCursor, encodeCursor } from "$lib/server/utils/cursor";
+import { requireProjectOwnershipPage } from "$lib/server/utils/project-guard";
 import { buildSearchQuery } from "$lib/server/utils/search";
 import { parseLevelFilter } from "$lib/shared/schemas/log";
 import { getTimeRangeStart } from "$lib/utils/format";
@@ -24,21 +24,9 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 export const load: PageServerLoad = async (event) => {
-  // Require session authentication
-  const { user } = await requireAuth(event);
-
-  const { db } = await import("$lib/server/db");
   const projectId = event.params.id;
-
-  // Fetch project data - verify ownership
-  const [projectData] = await db
-    .select()
-    .from(project)
-    .where(and(eq(project.id, projectId), eq(project.ownerId, user.id)));
-
-  if (!projectData) {
-    throw error(404, { message: "Project not found" });
-  }
+  const { project: projectData } = await requireProjectOwnershipPage(event, projectId);
+  const db = await getDbClient(event.locals);
 
   // Parse query parameters
   const url = event.url;

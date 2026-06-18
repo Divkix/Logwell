@@ -1,27 +1,15 @@
-import { error } from "@sveltejs/kit";
 import { and, count, eq, gte, type SQL } from "drizzle-orm";
-import { log, project } from "$lib/server/db/schema";
-import { requireAuth } from "$lib/server/utils/auth-guard";
+import { getDbClient } from "$lib/server/db/db";
+import { log } from "$lib/server/db/schema";
+import { requireProjectOwnershipPage } from "$lib/server/utils/project-guard";
 import { getTimeRangeStart } from "$lib/utils/format";
 import { parseTimeRange } from "$lib/utils/time-range";
 import type { PageServerLoad } from "./$types";
 
 export const load: PageServerLoad = async (event) => {
-  // Require session authentication
-  const { user } = await requireAuth(event);
-
-  const { db } = await import("$lib/server/db");
   const projectId = event.params.id;
-
-  // Fetch project data - verify ownership
-  const [projectData] = await db
-    .select()
-    .from(project)
-    .where(and(eq(project.id, projectId), eq(project.ownerId, user.id)));
-
-  if (!projectData) {
-    throw error(404, { message: "Project not found" });
-  }
+  const { project: projectData } = await requireProjectOwnershipPage(event, projectId);
+  const db = await getDbClient(event.locals);
 
   // Parse query parameters - default to 24h for stats overview
   const url = event.url;

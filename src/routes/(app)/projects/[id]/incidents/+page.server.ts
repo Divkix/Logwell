@@ -1,9 +1,9 @@
-import { error } from "@sveltejs/kit";
 import { and, count, desc, eq, gte, lt, or, type SQL } from "drizzle-orm";
 import { INCIDENT_CONFIG } from "$lib/server/config";
-import { incident, project } from "$lib/server/db/schema";
-import { requireAuth } from "$lib/server/utils/auth-guard";
+import { getDbClient } from "$lib/server/db/db";
+import { incident } from "$lib/server/db/schema";
 import { decodeCursor, encodeCursor } from "$lib/server/utils/cursor";
+import { requireProjectOwnershipPage } from "$lib/server/utils/project-guard";
 import { getIncidentStatus } from "$lib/server/utils/incidents";
 import {
   INCIDENT_RANGES,
@@ -23,18 +23,9 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 export const load: PageServerLoad = async (event) => {
-  const { user } = await requireAuth(event);
-  const { db } = await import("$lib/server/db");
   const projectId = event.params.id;
-
-  const [projectData] = await db
-    .select()
-    .from(project)
-    .where(and(eq(project.id, projectId), eq(project.ownerId, user.id)));
-
-  if (!projectData) {
-    throw error(404, { message: "Project not found" });
-  }
+  const { project: projectData } = await requireProjectOwnershipPage(event, projectId);
+  const db = await getDbClient(event.locals);
 
   const params = event.url.searchParams;
   const limit = clamp(
