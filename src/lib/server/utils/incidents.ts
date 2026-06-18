@@ -197,11 +197,11 @@ export async function upsertIncidentsForPreparedLogs(
   const incidentByFingerprint = new Map<string, Incident>();
   const touchedIncidents: Incident[] = [];
 
-  for (const aggregate of aggregates) {
-    const now = new Date();
-    const [result] = await db
-      .insert(incident)
-      .values({
+  const now = new Date();
+  const rows = await db
+    .insert(incident)
+    .values(
+      aggregates.map((aggregate) => ({
         id: nanoid(),
         projectId,
         fingerprint: aggregate.fingerprint,
@@ -216,30 +216,29 @@ export async function upsertIncidentsForPreparedLogs(
         totalEvents: aggregate.totalEvents,
         createdAt: now,
         updatedAt: now,
-      })
-      .onConflictDoUpdate({
-        target: [incident.projectId, incident.fingerprint],
-        set: {
-          highestLevel: sql`(
+      })),
+    )
+    .onConflictDoUpdate({
+      target: [incident.projectId, incident.fingerprint],
+      set: {
+        highestLevel: sql`(
             CASE
               WHEN ${incident.highestLevel}::text = 'fatal' OR excluded.highest_level::text = 'fatal'
                 THEN 'fatal'
               ELSE 'error'
             END
           )::log_level`,
-          firstSeen: sql`LEAST(${incident.firstSeen}, excluded.first_seen)`,
-          lastSeen: sql`GREATEST(${incident.lastSeen}, excluded.last_seen)`,
-          totalEvents: sql`${incident.totalEvents} + excluded.total_events`,
-          updatedAt: now,
-        },
-      })
-      .returning();
+        firstSeen: sql`LEAST(${incident.firstSeen}, excluded.first_seen)`,
+        lastSeen: sql`GREATEST(${incident.lastSeen}, excluded.last_seen)`,
+        totalEvents: sql`${incident.totalEvents} + excluded.total_events`,
+        updatedAt: now,
+      },
+    })
+    .returning();
 
-    if (!result) {
-      throw new Error(`Incident upsert returned no row for fingerprint: ${aggregate.fingerprint}`);
-    }
-    incidentByFingerprint.set(aggregate.fingerprint, result);
-    touchedIncidents.push(result);
+  for (const row of rows) {
+    incidentByFingerprint.set(row.fingerprint, row);
+    touchedIncidents.push(row);
   }
 
   return { incidentByFingerprint, touchedIncidents };

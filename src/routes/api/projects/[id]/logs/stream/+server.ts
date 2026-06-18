@@ -1,6 +1,5 @@
 import { SSE_CONFIG } from "$lib/server/config/performance";
-import type { Log } from "$lib/server/db/schema";
-import { logEventBus } from "$lib/server/events";
+import { logEventBus, type StreamLog } from "$lib/server/events";
 import { checkCsrfOrigin } from "$lib/server/utils/csrf";
 import { isErrorResponse, requireProjectOwnership } from "$lib/server/utils/project-guard";
 import type { RequestEvent } from "./$types";
@@ -55,7 +54,7 @@ export async function POST(event: RequestEvent): Promise<Response> {
         const encoder = new TextEncoder();
 
         // Buffer for batching logs
-        let batch: Log[] = [];
+        let batch: StreamLog[] = [];
         let flushTimeout: ReturnType<typeof setTimeout> | null = null;
         let isClosed = false;
 
@@ -100,7 +99,7 @@ export async function POST(event: RequestEvent): Promise<Response> {
         /**
          * Handler for incoming logs from event bus
          */
-        const handleLog = (log: Log) => {
+        const handleLog = (log: StreamLog) => {
           if (isClosed) return;
           batch.push(log);
 

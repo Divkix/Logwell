@@ -4,7 +4,7 @@ import { nanoid } from "nanoid";
 import { API_CONFIG } from "$lib/server/config/performance";
 import { getDbClient } from "$lib/server/db/db";
 import { log, project } from "$lib/server/db/schema";
-import { logEventBus } from "$lib/server/events";
+import { logEventBus, type StreamLog } from "$lib/server/events";
 import { ApiKeyError, validateApiKey } from "$lib/server/utils/api-key";
 import { requireJsonContentType } from "$lib/server/utils/content-type";
 import {
@@ -165,7 +165,46 @@ export const POST: RequestHandler = async ({ request, locals }) => {
             };
           });
 
-          const insertedLogs = await tx.insert(log).values(logEntries).returning();
+          // The union DatabaseClient type prevents TypeScript from resolving the
+          // .returning(fields) overload on the transaction builder. The cast is
+          // necessary; the explicit column map is the source of truth and
+          // ensures `search` (the generated tsvector) is never fetched.
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const insertedLogs: StreamLog[] = await (
+            tx.insert(log).values(logEntries) as any
+          ).returning({
+            id: log.id,
+            projectId: log.projectId,
+            incidentId: log.incidentId,
+            fingerprint: log.fingerprint,
+            serviceName: log.serviceName,
+            level: log.level,
+            message: log.message,
+            metadata: log.metadata,
+            timeUnixNano: log.timeUnixNano,
+            observedTimeUnixNano: log.observedTimeUnixNano,
+            severityNumber: log.severityNumber,
+            severityText: log.severityText,
+            body: log.body,
+            droppedAttributesCount: log.droppedAttributesCount,
+            flags: log.flags,
+            traceId: log.traceId,
+            spanId: log.spanId,
+            resourceAttributes: log.resourceAttributes,
+            resourceDroppedAttributesCount: log.resourceDroppedAttributesCount,
+            resourceSchemaUrl: log.resourceSchemaUrl,
+            scopeName: log.scopeName,
+            scopeVersion: log.scopeVersion,
+            scopeAttributes: log.scopeAttributes,
+            scopeDroppedAttributesCount: log.scopeDroppedAttributesCount,
+            scopeSchemaUrl: log.scopeSchemaUrl,
+            sourceFile: log.sourceFile,
+            lineNumber: log.lineNumber,
+            requestId: log.requestId,
+            userId: log.userId,
+            ipAddress: log.ipAddress,
+            timestamp: log.timestamp,
+          });
           return { insertedLogs, touchedIncidents };
         })
       : { insertedLogs: [], touchedIncidents: [] };

@@ -139,4 +139,119 @@ describe("Incident upsert race condition", () => {
 
     expect(allIncidents).toHaveLength(2);
   });
+
+  it("batches multiple distinct fingerprints in a single upsert call", async () => {
+    const project = await seedProject(db);
+    const now = new Date();
+
+    // Two distinct fingerprints each appearing twice, plus one appearing once
+    const logs: PreparedIncidentLog[] = [
+      {
+        level: "error",
+        message: "Cache miss",
+        timestamp: now,
+        sourceFile: "src/cache.ts",
+        lineNumber: 10,
+        resourceAttributes: null,
+        metadata: null,
+        serviceName: "cache-svc",
+        fingerprint: "fp-cache",
+        normalizedMessage: "cache miss",
+        incidentTitle: "Cache miss",
+        incidentId: null,
+      },
+      {
+        level: "error",
+        message: "DB timeout",
+        timestamp: new Date(now.getTime() + 500),
+        sourceFile: "src/db.ts",
+        lineNumber: 20,
+        resourceAttributes: null,
+        metadata: null,
+        serviceName: "db-svc",
+        fingerprint: "fp-db",
+        normalizedMessage: "db timeout",
+        incidentTitle: "DB timeout",
+        incidentId: null,
+      },
+      {
+        level: "fatal",
+        message: "Auth failure",
+        timestamp: new Date(now.getTime() + 1000),
+        sourceFile: "src/auth.ts",
+        lineNumber: 30,
+        resourceAttributes: null,
+        metadata: null,
+        serviceName: "auth-svc",
+        fingerprint: "fp-auth",
+        normalizedMessage: "auth failure",
+        incidentTitle: "Auth failure",
+        incidentId: null,
+      },
+      // repeat fp-cache and fp-db to accumulate totalEvents
+      {
+        level: "error",
+        message: "Cache miss again",
+        timestamp: new Date(now.getTime() + 1500),
+        sourceFile: "src/cache.ts",
+        lineNumber: 10,
+        resourceAttributes: null,
+        metadata: null,
+        serviceName: "cache-svc",
+        fingerprint: "fp-cache",
+        normalizedMessage: "cache miss",
+        incidentTitle: "Cache miss",
+        incidentId: null,
+      },
+      {
+        level: "error",
+        message: "DB timeout again",
+        timestamp: new Date(now.getTime() + 2000),
+        sourceFile: "src/db.ts",
+        lineNumber: 20,
+        resourceAttributes: null,
+        metadata: null,
+        serviceName: "db-svc",
+        fingerprint: "fp-db",
+        normalizedMessage: "db timeout",
+        incidentTitle: "DB timeout",
+        incidentId: null,
+      },
+    ];
+
+    const result = await upsertIncidentsForPreparedLogs(db, project.id, logs);
+
+    // Three distinct fingerprints → three incident rows
+    expect(result.touchedIncidents).toHaveLength(3);
+    expect(result.incidentByFingerprint.size).toBe(3);
+    expect(result.incidentByFingerprint.has("fp-cache")).toBe(true);
+    expect(result.incidentByFingerprint.has("fp-db")).toBe(true);
+    expect(result.incidentByFingerprint.has("fp-auth")).toBe(true);
+
+    const allIncidents = await db
+      .select()
+      .from(schema.incident)
+      .where(eq(schema.incident.projectId, project.id));
+
+    expect(allIncidents).toHaveLength(3);
+
+    const cacheIncident = allIncidents.find((i) => i.fingerprint === "fp-cache")!;
+    const dbIncident = allIncidents.find((i) => i.fingerprint === "fp-db")!;
+    const authIncident = allIncidents.find((i) => i.fingerprint === "fp-auth")!;
+
+    // fp-cache appeared twice → totalEvents = 2
+    expect(cacheIncident.totalEvents).toBe(2);
+    // fp-db appeared twice → totalEvents = 2
+    expect(dbIncident.totalEvents).toBe(2);
+    // fp-auth appeared once → totalEvents = 1
+    expect(authIncident.totalEvents).toBe(1);
+
+    // fatal-level fp-auth must have highestLevel = 'fatal'
+    expect(authIncident.highestLevel).toBe("fatal");
+    // error-level fp-cache must have highestLevel = 'error'
+    expect(cacheIncident.highestLevel).toBe("error");
+
+    // lastSeen for fp-cache should equal the second occurrence timestamp
+    expect(cacheIncident.lastSeen.getTime()).toBe(now.getTime() + 1500);
+  });
 });
