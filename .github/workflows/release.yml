@@ -160,6 +160,12 @@ jobs:
         shard: [1, 2, 3]
         total: [3]
 
+    env:
+      # Match ci.yml: the e2e suite performs many logins; without this the
+      # default per-IP login rate limit (10/min) 429s sign-ins mid-run, so
+      # `toHaveURL("/")` never resolves and shards fail/time out.
+      RATE_LIMIT_LOGIN_RPM: 10000
+
     services:
       postgres:
         image: postgres:18-alpine
