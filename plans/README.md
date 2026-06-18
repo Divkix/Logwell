@@ -33,7 +33,7 @@ Legend: **P1** critical · **P2** high · **P3** medium. Effort **S**<½day · *
 | 008 | [Harden fallback auth secret](008-harden-fallback-auth-secret.md)                                             | F6      | security         | P2       | S      | LOW     | done   |
 | 009 | [Tighten CSRF for cookie routes](009-tighten-csrf-for-cookie-routes.md)                                       | F16     | security         | P3       | S      | LOW     | done   |
 | 010 | [Test ingest rate-limit 429 wiring](010-test-ingest-rate-limit-429.md)                                        | F8      | tests            | P2       | S      | LOW     | todo   |
-| 011 | [Test incidents SSE stream](011-test-incidents-sse-stream.md)                                                 | F9      | tests            | P2       | M      | LOW     | todo   |
+| 011 | [Test incidents SSE stream](011-test-incidents-sse-stream.md)                                                 | F9      | tests            | P2       | M      | LOW     | done   |
 | 012 | [Batch incident upsert + narrow returning](012-batch-incident-upsert-and-narrow-returning.md)                 | F3+F7   | perf             | P2       | M      | MED     | todo   |
 | 013 | [Cap unbounded log COUNT(\*)](013-cap-unbounded-log-count.md)                                                 | F11     | perf             | P3       | M      | MED     | todo   |
 | 014 | [Collapse tsvector to single parse](014-collapse-tsvector-to-single-parse.md)                                 | F18     | perf             | P3       | L      | HIGH    | todo   |
