@@ -129,8 +129,14 @@ function parseIntValue(value: unknown): number | string | null {
   return null;
 }
 
+function nonZeroNano(value: string | null): string | null {
+  // Treat an explicit zero ("0", "00", ...) as unset so observedTime / now() win.
+  if (value === null) return null;
+  return /^0+$/.test(value) ? null : value;
+}
+
 function parseTimestamp(timeUnixNano: string | null, observedTimeUnixNano: string | null): Date {
-  const candidate = timeUnixNano ?? observedTimeUnixNano;
+  const candidate = nonZeroNano(timeUnixNano) ?? nonZeroNano(observedTimeUnixNano);
   if (!candidate) {
     return new Date();
   }
