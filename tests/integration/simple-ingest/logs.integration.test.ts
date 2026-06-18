@@ -7,6 +7,7 @@ import { incident, log, project as projectTable } from "../../../src/lib/server/
 import { setupTestDatabase } from "../../../src/lib/server/db/test-db";
 import { logEventBus } from "../../../src/lib/server/events";
 import { clearApiKeyCache, validateApiKey } from "../../../src/lib/server/utils/api-key";
+import { checkRateLimit, INGEST_RPM } from "../../../src/lib/server/utils/rate-limit";
 import { POST } from "../../../src/routes/v1/ingest/+server";
 import { seedProjectWithApiKey } from "../../fixtures/db";
 
@@ -604,6 +605,81 @@ describe("POST /v1/ingest (Simple API)", () => {
       expect(response.status).toBe(401);
       const body = await response.json();
       expect(body.error).toBe("unauthorized");
+    });
+  });
+
+  describe("Rate limiting", () => {
+    it("returns 429 with Retry-After when bucket is exhausted, and writes no logs", async () => {
+      // Fresh project = fresh bucket key; no bleed from other tests
+      const project = await seedProjectWithApiKey(db);
+
+      // Drain the bucket for this project key directly via the same module-level map
+      while (checkRateLimit(`ingest:${project.id}`, INGEST_RPM)) {
+        // keep consuming tokens until the bucket is empty
+      }
+
+      const request = new Request("http://localhost/v1/ingest", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${project.apiKey}`,
+        },
+        body: JSON.stringify({ level: "info", message: "should be rate limited" }),
+      });
+
+      const event = createRequestEvent(request, db);
+      const response = await POST(event as never);
+
+      expect(response.status).toBe(429);
+      expect(response.headers.get("Retry-After")).toBe("60");
+      const body = await response.json();
+      expect(body.error).toBe("rate_limited");
+
+      // Confirm nothing was written to the DB
+      const rows = await db.select().from(log).where(eq(log.projectId, project.id));
+      expect(rows.length).toBe(0);
+    });
+
+    it("limits key A but allows key B (per-project isolation)", async () => {
+      const projectA = await seedProjectWithApiKey(db);
+      const projectB = await seedProjectWithApiKey(db);
+
+      // Drain only project A's bucket
+      while (checkRateLimit(`ingest:${projectA.id}`, INGEST_RPM)) {
+        // consume until empty
+      }
+
+      // Project A should now be rate limited
+      const requestA = new Request("http://localhost/v1/ingest", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${projectA.apiKey}`,
+        },
+        body: JSON.stringify({ level: "info", message: "A limited" }),
+      });
+      const eventA = createRequestEvent(requestA, db);
+      const responseA = await POST(eventA as never);
+      expect(responseA.status).toBe(429);
+
+      // Project B should still be allowed
+      const requestB = new Request("http://localhost/v1/ingest", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${projectB.apiKey}`,
+        },
+        body: JSON.stringify({ level: "info", message: "B allowed" }),
+      });
+      const eventB = createRequestEvent(requestB, db);
+      const responseB = await POST(eventB as never);
+      expect(responseB.status).toBe(200);
+
+      // Confirm one log was written for B, none for A
+      const rowsA = await db.select().from(log).where(eq(log.projectId, projectA.id));
+      const rowsB = await db.select().from(log).where(eq(log.projectId, projectB.id));
+      expect(rowsA.length).toBe(0);
+      expect(rowsB.length).toBe(1);
     });
   });
 });
