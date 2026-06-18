@@ -289,14 +289,14 @@ async function createTriggers(db: PgliteDatabase<typeof schema>): Promise<void> 
       BEGIN
         -- NOTE: keep this expression in sync with the generatedAlwaysAs in schema.ts
         -- and the migration that recreates the column (drizzle/0010_*.sql).
+        -- Uses || + COALESCE (not concat_ws) to match the IMMUTABLE expression
+        -- required by the Postgres STORED generated column.
         NEW.search := to_tsvector('english',
-          concat_ws(' ',
-            NEW.message,
-            NEW.body::text,
-            NEW.metadata::text,
-            NEW.resource_attributes::text,
-            NEW.scope_attributes::text
-          ));
+          COALESCE(NEW.message, '') || ' ' ||
+          COALESCE(NEW.body::text, '') || ' ' ||
+          COALESCE(NEW.metadata::text, '') || ' ' ||
+          COALESCE(NEW.resource_attributes::text, '') || ' ' ||
+          COALESCE(NEW.scope_attributes::text, ''));
         RETURN NEW;
       END
       $$ LANGUAGE plpgsql;

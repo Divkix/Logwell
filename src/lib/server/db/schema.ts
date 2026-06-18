@@ -126,13 +126,11 @@ export const log = pgTable(
     search: tsvector("search").generatedAlwaysAs(
       (): SQL =>
         sql`to_tsvector('english',
-        concat_ws(' ',
-          ${log.message},
-          ${log.body}::text,
-          ${log.metadata}::text,
-          ${log.resourceAttributes}::text,
-          ${log.scopeAttributes}::text
-        ))`,
+        COALESCE(${log.message}, '') || ' ' ||
+        COALESCE(${log.body}::text, '') || ' ' ||
+        COALESCE(${log.metadata}::text, '') || ' ' ||
+        COALESCE(${log.resourceAttributes}::text, '') || ' ' ||
+        COALESCE(${log.scopeAttributes}::text, ''))`,
     ),
   },
   (table) => [

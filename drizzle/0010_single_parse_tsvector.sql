@@ -24,17 +24,16 @@
 ALTER TABLE "log" DROP COLUMN "search";
 --> statement-breakpoint
 
--- Recreate with the single-parse expression. concat_ws skips NULL arguments,
--- so COALESCE per field is unnecessary.
+-- Recreate with the single-parse expression. Uses IMMUTABLE || + COALESCE
+-- instead of concat_ws (which is only STABLE) so that Postgres accepts the
+-- expression in a STORED generated column (requires IMMUTABLE).
 ALTER TABLE "log" ADD COLUMN "search" "tsvector" GENERATED ALWAYS AS (
   to_tsvector('english',
-    concat_ws(' ',
-      "message",
-      "body"::text,
-      "metadata"::text,
-      "resource_attributes"::text,
-      "scope_attributes"::text
-    )
+    COALESCE("message", '') || ' ' ||
+    COALESCE("body"::text, '') || ' ' ||
+    COALESCE("metadata"::text, '') || ' ' ||
+    COALESCE("resource_attributes"::text, '') || ' ' ||
+    COALESCE("scope_attributes"::text, '')
   )
 ) STORED;
 --> statement-breakpoint

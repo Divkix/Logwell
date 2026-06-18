@@ -303,7 +303,7 @@
           "primaryKey": false,
           "notNull": false,
           "generated": {
-            "as": "to_tsvector('english',\n        concat_ws(' ',\n          \"log\".\"message\",\n          \"log\".\"body\"::text,\n          \"log\".\"metadata\"::text,\n          \"log\".\"resource_attributes\"::text,\n          \"log\".\"scope_attributes\"::text\n        ))",
+            "as": "to_tsvector('english',\n        COALESCE(\"log\".\"message\", '') || ' ' ||\n        COALESCE(\"log\".\"body\"::text, '') || ' ' ||\n        COALESCE(\"log\".\"metadata\"::text, '') || ' ' ||\n        COALESCE(\"log\".\"resource_attributes\"::text, '') || ' ' ||\n        COALESCE(\"log\".\"scope_attributes\"::text, ''))",
             "type": "stored"
           }
         }
