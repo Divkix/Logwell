@@ -14,6 +14,11 @@ const config: PlaywrightTestConfig = {
   reporter: isCI ? "github" : "list",
   use: {
     baseURL: `http://localhost:${port}`,
+    // Send a same-origin Origin header on every request (mirrors what a real
+    // browser does). Playwright's `page.request` API client otherwise omits it,
+    // which the CSRF guard (reject state changes lacking both Origin & Referer)
+    // correctly rejects with 403. Real UI fetches always carry Origin.
+    extraHTTPHeaders: { Origin: `http://localhost:${port}` },
     trace: "on-first-retry",
     screenshot: "only-on-failure",
   },
