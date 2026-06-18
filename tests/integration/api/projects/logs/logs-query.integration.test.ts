@@ -463,7 +463,7 @@ describe("GET /api/projects/[id]/logs", () => {
 
     // Plan 014: verify the single-parse to_tsvector still indexes all five source fields.
     // Each test seeds a log whose searchable term appears ONLY in one non-message field,
-    // confirming the concat_ws concatenation covers that field.
+    // confirming the COALESCE/|| concatenation covers that field.
     // The sentinel log gets a unique message prefix ("bodyonly-", "resonly-", "scopeonly-")
     // so we can distinguish it from other logs returned by the search via the message field
     // (body/resourceAttributes/scopeAttributes are not projected by the logs API).
