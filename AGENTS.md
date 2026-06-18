@@ -196,27 +196,59 @@ Docker images: `ghcr.io/divkix/logwell:latest`
 
 ## Release Process
 
+The **main app** and each **SDK** are versioned and released **independently** — each has its own version line (the app is not in lockstep with the SDKs). Commits and tags are GPG-signed (`commit.gpgsign` / `tag.gpgsign` are enabled), so signing must be available locally.
+
+Two distinct trigger models, do not mix them up:
+
+- **App** → **tag-triggered**: merging to `main` does NOT release; pushing a `v*` tag does.
+- **SDKs (TS/Python)** → **merge-triggered**: pushing a version bump under `sdks/<lang>/**` to `main` runs the SDK workflow, which publishes whatever version is new. The `sdks/...@vX.Y.Z` tags are only git release **markers** — they do NOT trigger publishing. Publish jobs are idempotent: they check the registry and skip if the version already exists, so re-runs are safe.
+
+### Main app — Docker image + GitHub Release (`release.yml`)
+
+1. Bump `version` in the root `package.json` and merge to `main`. (The root `bun.lock` does not record the app version, so `--frozen-lockfile` is unaffected — no lockfile change needed.)
+2. Tag the merge commit and push the tag:
+   ```bash
+   git tag -a v1.1.0 -m "Release v1.1.0"
+   git push origin v1.1.0
+   ```
+   The `v*` tag triggers `release.yml` → multi-platform Docker images (`linux/amd64`, `linux/arm64`) to GHCR + a GitHub Release with auto-generated notes.
+
+### TypeScript SDK — npm + JSR (`sdk-typescript.yml`, on push to `main` under `sdks/typescript/**`)
+
+1. **Bump BOTH version fields** — they are separate and easy to desync:
+   - `sdks/typescript/package.json` → `version` (read by the **npm** publish)
+   - `sdks/typescript/jsr.json` → `version` (read by the **JSR** publish)
+
+   If you bump only `package.json`, npm gets the new version while JSR silently stays on the old one (the JSR step finds the old version already published and skips).
+
+2. Merge to `main`. The workflow publishes to npm (OIDC) if `package.json`'s version is new, and to JSR (`npx jsr publish`, OIDC) if `jsr.json`'s version is new.
+3. (Optional) push the marker tag:
+   ```bash
+   git tag -a "sdks/typescript@v1.1.0" -m "Release sdks/typescript v1.1.0"
+   git push origin "sdks/typescript@v1.1.0"
+   ```
+
+### Python SDK — PyPI (`sdk-python.yml`, on push to `main` under `sdks/python/**`)
+
+1. Bump `version` in `sdks/python/pyproject.toml`, then sync the lockfile (it records the project version, and CI runs `uv lock --check`):
+   ```bash
+   cd sdks/python && uv lock
+   ```
+2. Merge to `main` → publishes to PyPI (OIDC) if the version is new.
+3. (Optional) marker tag:
+   ```bash
+   git tag -a "sdks/python@v1.1.0" -m "Release sdks/python v1.1.0"
+   git push origin "sdks/python@v1.1.0"
+   ```
+
+### Go SDK — tag-resolved by `go get` (no publish workflow)
+
+Use the **slash** tag format so the Go toolchain can resolve the subdirectory module via `go get github.com/Divkix/Logwell/sdks/go@vX.Y.Z`:
+
 ```bash
-# Main app — triggers Docker multi-platform build (release.yml)
-git tag -a v1.0.7 -m "Release v1.0.7"
-git push origin v1.0.7
-
-# TypeScript SDK — triggers sdk-typescript.yml → npm + JSR publish
-git tag -a "sdks/typescript@v1.0.5" -m "Release sdks/typescript v1.0.5"
-git push origin "sdks/typescript@v1.0.5"
-
-# Python SDK — triggers sdk-python.yml → PyPI publish
-git tag -a "sdks/python@v1.0.5" -m "Release sdks/python v1.0.5"
-git push origin "sdks/python@v1.0.5"
-
-# Go SDK — MUST use slash format (sdks/go/vX.Y.Z) so the Go toolchain can
-# resolve the subdirectory module via `go get github.com/Divkix/Logwell/sdks/go@vX.Y.Z`
-git tag -a "sdks/go/v1.0.5" -m "Release sdks/go v1.0.5"
-git push origin "sdks/go/v1.0.5"
+git tag -a "sdks/go/v1.1.0" -m "Release sdks/go v1.1.0"
+git push origin "sdks/go/v1.1.0"
 ```
-
-Release workflow builds multi-platform Docker images (`linux/amd64`, `linux/arm64`).
-SDK workflows check the version in each SDK's manifest and skip publish if already released.
 
 <!--VITE PLUS START-->
 
