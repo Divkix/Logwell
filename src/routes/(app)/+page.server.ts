@@ -1,5 +1,5 @@
 import { count, desc, eq, max } from "drizzle-orm";
-import { db } from "$lib/server/db";
+import { getDbClient } from "$lib/server/db/db";
 import { log, project } from "$lib/server/db/schema";
 import { requireAuth } from "$lib/server/utils/auth-guard";
 import type { PageServerLoad } from "./$types";
@@ -11,6 +11,7 @@ import type { PageServerLoad } from "./$types";
 export const load: PageServerLoad = async (event) => {
   // Require session authentication
   const { user } = await requireAuth(event);
+  const db = await getDbClient(event.locals);
 
   // Query only projects owned by the current user
   const projects = await db
