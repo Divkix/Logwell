@@ -10,11 +10,12 @@ async function login(page: Page) {
   await page.goto("/login");
   await page.waitForSelector("form");
 
-  await page.getByLabel(/username/i).fill(TEST_USER.username);
-  await page.getByLabel(/password/i).fill(TEST_USER.password);
-
-  await page.getByRole("button", { name: /sign in/i }).click();
-  await expect(page).toHaveURL("/", { timeout: 30000 });
+  await expect(async () => {
+    await page.getByLabel(/username/i).fill(TEST_USER.username);
+    await page.getByLabel(/password/i).fill(TEST_USER.password);
+    await page.getByRole("button", { name: /sign in/i }).click();
+    await expect(page).toHaveURL("/", { timeout: 10000 });
+  }).toPass({ timeout: 45000 });
 }
 
 async function createProject(page: Page, name: string) {

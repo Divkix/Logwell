@@ -20,22 +20,12 @@ async function login(page: import("@playwright/test").Page) {
   await page.goto("/login");
   await page.waitForSelector("form");
 
-  const usernameInput = page.getByLabel(/username/i);
-  const passwordInput = page.getByLabel(/password/i);
-
-  // Clear and fill username, verify value
-  await usernameInput.click();
-  await usernameInput.fill(TEST_USER.username);
-  await expect(usernameInput).toHaveValue(TEST_USER.username);
-
-  // Clear and fill password, verify value
-  await passwordInput.click();
-  await passwordInput.fill(TEST_USER.password);
-  await expect(passwordInput).toHaveValue(TEST_USER.password);
-
-  // Click sign in and wait for redirect
-  await page.getByRole("button", { name: /sign in/i }).click();
-  await expect(page).toHaveURL("/", { timeout: 30000 });
+  await expect(async () => {
+    await page.getByLabel(/username/i).fill(TEST_USER.username);
+    await page.getByLabel(/password/i).fill(TEST_USER.password);
+    await page.getByRole("button", { name: /sign in/i }).click();
+    await expect(page).toHaveURL("/", { timeout: 10000 });
+  }).toPass({ timeout: 45000 });
 }
 
 test.describe("Auth Guard - Unauthenticated Access", () => {

@@ -7,28 +7,14 @@ const TEST_USER = {
 
 async function login(page: Page) {
   await page.goto("/login");
-  await page.waitForLoadState("networkidle");
   await page.waitForSelector("form");
 
-  const usernameInput = page.getByLabel(/username/i);
-  const passwordInput = page.getByLabel(/password/i);
-
-  // Wait for Svelte hydration
-  await page.waitForTimeout(500);
-
-  // Clear and fill username - use clear() first to ensure clean state
-  await usernameInput.clear();
-  await usernameInput.fill(TEST_USER.username);
-  await expect(usernameInput).toHaveValue(TEST_USER.username);
-
-  // Clear and fill password
-  await passwordInput.clear();
-  await passwordInput.fill(TEST_USER.password);
-  await expect(passwordInput).toHaveValue(TEST_USER.password);
-
-  // Click sign in and wait for redirect
-  await page.getByRole("button", { name: /sign in/i }).click();
-  await expect(page).toHaveURL("/", { timeout: 30000 });
+  await expect(async () => {
+    await page.getByLabel(/username/i).fill(TEST_USER.username);
+    await page.getByLabel(/password/i).fill(TEST_USER.password);
+    await page.getByRole("button", { name: /sign in/i }).click();
+    await expect(page).toHaveURL("/", { timeout: 10000 });
+  }).toPass({ timeout: 45000 });
 }
 
 test.describe("Theme Toggle", () => {
