@@ -71,6 +71,13 @@
       "when": 1780876800000,
       "tag": "0009_hash_only_api_keys",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1781654400000,
+      "tag": "0010_single_parse_tsvector",
+      "breakpoints": true
     }
   ]
 }

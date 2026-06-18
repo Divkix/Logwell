@@ -461,6 +461,96 @@ describe("GET /api/projects/[id]/logs", () => {
       expect(body.logs[0]!.metadata).toHaveProperty("service", "payment-gateway");
     });
 
+    // Plan 014: verify the single-parse to_tsvector still indexes all five source fields.
+    // Each test seeds a log whose searchable term appears ONLY in one non-message field,
+    // confirming the concat_ws concatenation covers that field.
+    // The sentinel log gets a unique message prefix ("bodyonly-", "resonly-", "scopeonly-")
+    // so we can distinguish it from other logs returned by the search via the message field
+    // (body/resourceAttributes/scopeAttributes are not projected by the logs API).
+    it("performs full-text search on body (single-parse tsvector covers body field)", async () => {
+      const testProject = await seedProject(db, { ownerId: userId });
+
+      // "glacier" only appears in body — message is generic
+      await seedLog(db, testProject.id, {
+        message: "bodyonly-sentinel log entry",
+        body: { text: "glacier mountain alpine" },
+      });
+      await seedLog(db, testProject.id, {
+        message: "unrelated log without body term",
+        body: null,
+      });
+
+      const request = new Request(
+        `http://localhost/api/projects/${testProject.id}/logs?search=glacier`,
+        { method: "GET" },
+      );
+
+      const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+      const response = await GET(event as never);
+
+      expect(response.status).toBe(200);
+      const body = await response.json();
+
+      expect(body.logs).toHaveLength(1);
+      expect(body.logs[0]!.message).toBe("bodyonly-sentinel log entry");
+    });
+
+    it("performs full-text search on resource_attributes (single-parse tsvector covers resource_attributes field)", async () => {
+      const testProject = await seedProject(db, { ownerId: userId });
+
+      // "archipelago" only appears in resource_attributes
+      await seedLog(db, testProject.id, {
+        message: "resonly-sentinel log entry",
+        resourceAttributes: { "service.name": "archipelago-service" },
+      });
+      await seedLog(db, testProject.id, {
+        message: "unrelated log without resource term",
+        resourceAttributes: null,
+      });
+
+      const request = new Request(
+        `http://localhost/api/projects/${testProject.id}/logs?search=archipelago`,
+        { method: "GET" },
+      );
+
+      const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+      const response = await GET(event as never);
+
+      expect(response.status).toBe(200);
+      const body = await response.json();
+
+      expect(body.logs).toHaveLength(1);
+      expect(body.logs[0]!.message).toBe("resonly-sentinel log entry");
+    });
+
+    it("performs full-text search on scope_attributes (single-parse tsvector covers scope_attributes field)", async () => {
+      const testProject = await seedProject(db, { ownerId: userId });
+
+      // "phosphorescent" only appears in scope_attributes
+      await seedLog(db, testProject.id, {
+        message: "scopeonly-sentinel log entry",
+        scopeAttributes: { library: "phosphorescent-sdk" },
+      });
+      await seedLog(db, testProject.id, {
+        message: "unrelated log without scope term",
+        scopeAttributes: null,
+      });
+
+      const request = new Request(
+        `http://localhost/api/projects/${testProject.id}/logs?search=phosphorescent`,
+        { method: "GET" },
+      );
+
+      const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+      const response = await GET(event as never);
+
+      expect(response.status).toBe(200);
+      const body = await response.json();
+
+      expect(body.logs).toHaveLength(1);
+      expect(body.logs[0]!.message).toBe("scopeonly-sentinel log entry");
+    });
+
     it("handles multi-word search query", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
 

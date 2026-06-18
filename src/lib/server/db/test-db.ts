@@ -287,11 +287,16 @@ async function createTriggers(db: PgliteDatabase<typeof schema>): Promise<void> 
       sql.raw(`
       CREATE OR REPLACE FUNCTION log_search_trigger() RETURNS trigger AS $$
       BEGIN
-        NEW.search := setweight(to_tsvector('english', NEW.message), 'A') ||
-                      setweight(to_tsvector('english', COALESCE(NEW.body::text, '')), 'B') ||
-                      setweight(to_tsvector('english', COALESCE(NEW.metadata::text, '')), 'B') ||
-                      setweight(to_tsvector('english', COALESCE(NEW.resource_attributes::text, '')), 'C') ||
-                      setweight(to_tsvector('english', COALESCE(NEW.scope_attributes::text, '')), 'C');
+        -- NOTE: keep this expression in sync with the generatedAlwaysAs in schema.ts
+        -- and the migration that recreates the column (drizzle/0010_*.sql).
+        NEW.search := to_tsvector('english',
+          concat_ws(' ',
+            NEW.message,
+            NEW.body::text,
+            NEW.metadata::text,
+            NEW.resource_attributes::text,
+            NEW.scope_attributes::text
+          ));
         RETURN NEW;
       END
       $$ LANGUAGE plpgsql;
