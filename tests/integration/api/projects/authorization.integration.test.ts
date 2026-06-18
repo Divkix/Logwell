@@ -30,8 +30,16 @@ function createRequestEvent(
   params: Record<string, string> = {},
   locals: Partial<App.Locals> = {},
 ) {
+  const safeMethod = ["GET", "HEAD", "OPTIONS"].includes(request.method);
+  const hasOrigin = request.headers.has("Origin");
+  const effectiveRequest =
+    !safeMethod && !hasOrigin
+      ? new Request(request, {
+          headers: { ...Object.fromEntries(request.headers), Origin: new URL(request.url).origin },
+        })
+      : request;
   return {
-    request,
+    request: effectiveRequest,
     locals: { db, ...locals },
     params,
     url: new URL(request.url),

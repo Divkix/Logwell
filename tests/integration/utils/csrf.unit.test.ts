@@ -47,9 +47,19 @@ describe("checkCsrfOrigin", () => {
       expect(checkCsrfOrigin(event)).toBeNull();
     });
 
-    it("allows POST with no Origin and no Referer (intentional policy for API clients)", () => {
+    it("rejects POST with neither Origin nor Referer (cookie routes)", async () => {
       const event = makeEvent("POST", "http://localhost/api/projects");
-      // Per policy: requests with neither header are allowed (API clients, curl)
+      const result = checkCsrfOrigin(event);
+      expect(result).not.toBeNull();
+      expect(result?.status).toBe(403);
+      const body = await result!.json();
+      expect(body.error).toBe("csrf_error");
+    });
+
+    it("allows POST with matching Origin and no Referer", () => {
+      const event = makeEvent("POST", "http://localhost/api/projects", {
+        Origin: "http://localhost",
+      });
       expect(checkCsrfOrigin(event)).toBeNull();
     });
 

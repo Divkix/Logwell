@@ -12,15 +12,24 @@ import { GET, POST } from "../../../../src/routes/api/projects/+server";
 import { seedLogs, seedProject, seedProjects } from "../../../fixtures/db";
 
 /**
- * Helper to create a mock SvelteKit RequestEvent for session-authenticated routes
+ * Helper to create a mock SvelteKit RequestEvent for session-authenticated routes.
+ * Adds a same-origin Origin header to state-changing requests so they pass CSRF checks.
  */
 function createRequestEvent(
   request: Request,
   db: PgliteDatabase<typeof schema>,
   locals: Partial<App.Locals> = {},
 ) {
+  const safeMethod = ["GET", "HEAD", "OPTIONS"].includes(request.method);
+  const hasOrigin = request.headers.has("Origin");
+  const effectiveRequest =
+    !safeMethod && !hasOrigin
+      ? new Request(request, {
+          headers: { ...Object.fromEntries(request.headers), Origin: new URL(request.url).origin },
+        })
+      : request;
   return {
-    request,
+    request: effectiveRequest,
     locals: { db, ...locals },
     params: {},
     url: new URL(request.url),
