@@ -1,6 +1,13 @@
 import type { Incident, Log } from "./db/schema";
 
-export type LogListener = (log: Log) => void;
+/**
+ * Log shape emitted on the event bus — every column except the generated
+ * `search` tsvector, which is never used by SSE consumers and would bloat
+ * the JSON payload unnecessarily.
+ */
+export type StreamLog = Omit<Log, "search">;
+
+export type LogListener = (log: StreamLog) => void;
 export type IncidentListener = (incident: Incident) => void;
 
 /**
@@ -39,9 +46,9 @@ class LogEventBus {
 
   /**
    * Emit a log event to all listeners subscribed to its project.
-   * @param log - The log entry to emit
+   * @param log - The log entry to emit (search tsvector excluded)
    */
-  emitLog(log: Log): void {
+  emitLog(log: StreamLog): void {
     const projectListeners = this.listeners.get(log.projectId);
     if (projectListeners) {
       for (const listener of projectListeners) {
