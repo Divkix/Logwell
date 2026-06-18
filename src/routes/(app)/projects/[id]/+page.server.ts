@@ -1,8 +1,9 @@
 import { error } from "@sveltejs/kit";
-import { and, count, desc, eq, gte, inArray, lt, or, type SQL, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lt, or, type SQL, sql } from "drizzle-orm";
 import { env } from "$lib/server/config";
 import { log, project } from "$lib/server/db/schema";
 import { requireAuth } from "$lib/server/utils/auth-guard";
+import { cappedLogCount } from "$lib/server/utils/capped-count";
 import { decodeCursor, encodeCursor } from "$lib/server/utils/cursor";
 import { buildSearchQuery } from "$lib/server/utils/search";
 import { LOG_LEVELS, type LogLevel } from "$lib/shared/types";
@@ -130,9 +131,12 @@ export const load: PageServerLoad = async (event) => {
 
   const whereClause = and(...conditions);
 
-  // Get total count
-  const [countResult] = await db.select({ count: count() }).from(log).where(whereClause);
-  const total = countResult?.count ?? 0;
+  // Skip count on cursor pages (subsequent pages); mirrors the API optimisation.
+  // On the first page use a bounded count so the query stops scanning after
+  // LOG_COUNT_CEILING rows even for expensive predicates (e.g. full-text search).
+  const pageCountResult = cursorParam ? undefined : await cappedLogCount(db, whereClause);
+  const total = pageCountResult?.total ?? 0;
+  const totalIsCapped = pageCountResult?.capped ?? false;
 
   // Fetch logs (query one extra to detect hasMore)
   const logs = await db
@@ -185,6 +189,7 @@ export const load: PageServerLoad = async (event) => {
     })),
     pagination: {
       total,
+      totalIsCapped,
       hasMore,
       limit,
       offset,
