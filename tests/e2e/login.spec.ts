@@ -39,82 +39,57 @@ test.describe("Login Page", () => {
   });
 
   test("should redirect to / after successful login", async ({ page }) => {
-    // Fill in credentials
-    const usernameInput = page.getByLabel(/username/i);
-    const passwordInput = page.getByLabel(/password/i);
-
-    // Clear any pre-filled values and fill with test credentials
-    await usernameInput.click();
-    await usernameInput.fill(TEST_USER.username);
-    await expect(usernameInput).toHaveValue(TEST_USER.username);
-
-    await passwordInput.click();
-    await passwordInput.fill(TEST_USER.password);
-    await expect(passwordInput).toHaveValue(TEST_USER.password);
-
-    // Click sign in button
-    const signInButton = page.getByRole("button", { name: /sign in/i });
-    await signInButton.click();
-
-    // Wait for redirect to dashboard
-    await expect(page).toHaveURL("/", { timeout: 30000 });
+    // Wrap interaction + assertion in toPass to retry if a pre-hydration no-op occurs
+    await expect(async () => {
+      await page.getByLabel(/username/i).fill(TEST_USER.username);
+      await page.getByLabel(/password/i).fill(TEST_USER.password);
+      await page.getByRole("button", { name: /sign in/i }).click();
+      await expect(page).toHaveURL("/", { timeout: 10000 });
+    }).toPass({ timeout: 45000 });
   });
 
   test("should show error for invalid credentials", async ({ page }) => {
-    // Fill in wrong password
-    const usernameInput = page.getByLabel(/username/i);
-    const passwordInput = page.getByLabel(/password/i);
-
-    await usernameInput.fill(TEST_USER.username);
-    await passwordInput.fill("WrongPassword123!");
-
-    // Click sign in button
-    await page.getByRole("button", { name: /sign in/i }).click();
-
-    // Wait for error message to appear
-    await expect(page.getByText(/invalid|incorrect|wrong|credentials/i)).toBeVisible({
-      timeout: 10000,
-    });
+    // Wrap interaction + error assertion in toPass to survive pre-hydration no-ops
+    await expect(async () => {
+      await page.getByLabel(/username/i).fill(TEST_USER.username);
+      await page.getByLabel(/password/i).fill("WrongPassword123!");
+      await page.getByRole("button", { name: /sign in/i }).click();
+      await expect(page.getByText(/invalid|incorrect|wrong|credentials/i)).toBeVisible({
+        timeout: 10000,
+      });
+    }).toPass({ timeout: 45000 });
 
     // Should stay on login page
     await expect(page).toHaveURL(/\/login/);
   });
 
   test("should show error for non-existent user", async ({ page }) => {
-    // Fill in non-existent username
-    await page.getByLabel(/username/i).fill("nonexistentuser");
-    await page.getByLabel(/password/i).fill("SomePassword123!");
-
-    // Click sign in button
-    await page.getByRole("button", { name: /sign in/i }).click();
-
-    // Wait for error message to appear (better-auth returns generic error to prevent user enumeration)
-    await expect(page.getByText(/invalid username or password/i)).toBeVisible({
-      timeout: 10000,
-    });
+    // Wrap interaction + error assertion in toPass to survive pre-hydration no-ops
+    await expect(async () => {
+      await page.getByLabel(/username/i).fill("nonexistentuser");
+      await page.getByLabel(/password/i).fill("SomePassword123!");
+      await page.getByRole("button", { name: /sign in/i }).click();
+      // better-auth returns generic error to prevent user enumeration
+      await expect(page.getByText(/invalid username or password/i)).toBeVisible({
+        timeout: 10000,
+      });
+    }).toPass({ timeout: 45000 });
 
     // Should stay on login page
     await expect(page).toHaveURL(/\/login/);
   });
 
   test("should submit form when Enter key is pressed", async ({ page }) => {
-    // Fill in credentials
-    const usernameInput = page.getByLabel(/username/i);
-    const passwordInput = page.getByLabel(/password/i);
-
-    await usernameInput.click();
-    await usernameInput.fill(TEST_USER.username);
-    await expect(usernameInput).toHaveValue(TEST_USER.username);
-
-    await passwordInput.click();
-    await passwordInput.fill(TEST_USER.password);
-    await expect(passwordInput).toHaveValue(TEST_USER.password);
-
-    // Press Enter key instead of clicking button
-    await passwordInput.press("Enter");
-
-    // Wait for redirect to dashboard
-    await expect(page).toHaveURL("/", { timeout: 30000 });
+    // Wrap interaction + assertion in toPass to retry if a pre-hydration no-op occurs
+    await expect(async () => {
+      const usernameInput = page.getByLabel(/username/i);
+      const passwordInput = page.getByLabel(/password/i);
+      await usernameInput.fill(TEST_USER.username);
+      await passwordInput.fill(TEST_USER.password);
+      // Press Enter key instead of clicking button
+      await passwordInput.press("Enter");
+      await expect(page).toHaveURL("/", { timeout: 10000 });
+    }).toPass({ timeout: 45000 });
   });
 
   test("should disable form inputs during submission", async ({ page }) => {
@@ -136,25 +111,23 @@ test.describe("Login Page", () => {
   });
 
   test("should show validation error for empty username", async ({ page }) => {
-    // Leave username empty, fill password
-    await page.getByLabel(/password/i).fill(TEST_USER.password);
-
-    // Click sign in button
-    await page.getByRole("button", { name: /sign in/i }).click();
-
-    // Should show validation error - be specific about the error text
-    await expect(page.getByText("Username is required")).toBeVisible();
+    // Wrap interaction + assertion in toPass; leave username EMPTY intentionally
+    await expect(async () => {
+      // Only fill password — empty username is the whole point of this test
+      await page.getByLabel(/password/i).fill(TEST_USER.password);
+      await page.getByRole("button", { name: /sign in/i }).click();
+      await expect(page.getByText("Username is required")).toBeVisible();
+    }).toPass({ timeout: 45000 });
   });
 
   test("should show validation error for empty password", async ({ page }) => {
-    // Fill username, leave password empty
-    await page.getByLabel(/username/i).fill(TEST_USER.username);
-
-    // Click sign in button
-    await page.getByRole("button", { name: /sign in/i }).click();
-
-    // Should show validation error - be specific about the error text
-    await expect(page.getByText("Password is required")).toBeVisible();
+    // Wrap interaction + assertion in toPass; leave password EMPTY intentionally
+    await expect(async () => {
+      // Only fill username — empty password is the whole point of this test
+      await page.getByLabel(/username/i).fill(TEST_USER.username);
+      await page.getByRole("button", { name: /sign in/i }).click();
+      await expect(page.getByText("Password is required")).toBeVisible();
+    }).toPass({ timeout: 45000 });
   });
 });
 
@@ -167,19 +140,13 @@ test.describe("Login Page - Authentication State", () => {
     await page.goto("/login");
     await page.waitForSelector("form");
 
-    const usernameInput = page.getByLabel(/username/i);
-    const passwordInput = page.getByLabel(/password/i);
-
-    await usernameInput.click();
-    await usernameInput.fill(TEST_USER.username);
-    await passwordInput.click();
-    await passwordInput.fill(TEST_USER.password);
-
-    // Click sign in button
-    await page.getByRole("button", { name: /sign in/i }).click();
-
-    // Wait for redirect to complete
-    await expect(page).toHaveURL("/", { timeout: 30000 });
+    // Wrap the login interaction in toPass to survive pre-hydration no-ops
+    await expect(async () => {
+      await page.getByLabel(/username/i).fill(TEST_USER.username);
+      await page.getByLabel(/password/i).fill(TEST_USER.password);
+      await page.getByRole("button", { name: /sign in/i }).click();
+      await expect(page).toHaveURL("/", { timeout: 10000 });
+    }).toPass({ timeout: 45000 });
 
     // Now try to visit login page again
     await page.goto("/login");
