@@ -518,7 +518,7 @@ function handleKeyboardShortcut(event: KeyboardEvent) {
     <!-- Pagination Info -->
     {#if data.pagination.total > 0}
       <div class="text-xs sm:text-sm text-muted-foreground">
-        Showing {Math.min(allLogs.length, data.pagination.limit)} of {data.pagination.total} logs
+        Showing {Math.min(allLogs.length, data.pagination.limit)} of {data.pagination.totalIsCapped ? `${data.pagination.total.toLocaleString()}+` : data.pagination.total.toLocaleString()} logs
         {#if data.pagination.hasMore}
           <span class="ml-2">(more available)</span>
         {/if}

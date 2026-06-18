@@ -1,8 +1,9 @@
 import { json } from "@sveltejs/kit";
-import { and, count, desc, eq, gte, inArray, lt, lte, or, type SQL, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lt, lte, or, type SQL, sql } from "drizzle-orm";
 import { getDbClient } from "$lib/server/db/db";
 import { log } from "$lib/server/db/schema";
 import { apiError } from "$lib/server/utils/api-error";
+import { cappedLogCount } from "$lib/server/utils/capped-count";
 import { decodeCursor, encodeCursor } from "$lib/server/utils/cursor";
 import { isErrorResponse, requireProjectOwnership } from "$lib/server/utils/project-guard";
 import { buildSearchQuery } from "$lib/server/utils/search";
@@ -147,10 +148,12 @@ export async function GET(event: RequestEvent): Promise<Response> {
 
   const whereClause = and(...conditions);
 
-  // Skip COUNT(*) when a cursor is provided (subsequent pages); saves a DB round-trip
-  const total = cursorParam
-    ? undefined
-    : ((await db.select({ count: count() }).from(log).where(whereClause))[0]?.count ?? 0);
+  // Skip COUNT(*) when a cursor is provided (subsequent pages); saves a DB round-trip.
+  // On the first page use a bounded count (capped at LOG_COUNT_CEILING) so the query
+  // stops scanning after that many rows even for expensive predicates (e.g. full-text search).
+  const countResult = cursorParam ? undefined : await cappedLogCount(db, whereClause);
+  const total = countResult?.total;
+  const totalIsCapped = countResult?.capped ?? false;
 
   // Fetch logs with pagination (query one extra to detect hasMore)
   const logs = await db
@@ -194,6 +197,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
       timestamp: l.timestamp?.toISOString(),
     })),
     total: total ?? null,
+    total_is_capped: totalIsCapped,
     has_more: hasMore,
     nextCursor,
   });
