@@ -179,6 +179,112 @@ describe("parseUint64String", () => {
   });
 });
 
+describe("zero timeUnixNano handling", () => {
+  it('treats timeUnixNano "0" as unset and uses observedTimeUnixNano instead', () => {
+    // observedTimeUnixNano corresponds to 2023-11-14T22:13:20.000Z (1700000000000 ms)
+    const payload = {
+      resourceLogs: [
+        {
+          scopeLogs: [
+            {
+              logRecords: [
+                {
+                  timeUnixNano: "0",
+                  observedTimeUnixNano: "1700000000000000000",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const { records } = normalizeOtlpLogsRequest(payload);
+    expect(records).toHaveLength(1);
+    const record = records[0]!;
+    // The raw stored column should still be "0" (unchanged by the fix)
+    expect(record.timeUnixNano).toBe("0");
+    // The derived timestamp must NOT be epoch 1970 — it should equal observedTimeUnixNano
+    expect(record.timestamp.toISOString()).toBe(new Date(1700000000000).toISOString());
+  });
+
+  it("treats timeUnixNano 0 (number) as unset and uses observedTimeUnixNano instead", () => {
+    const payload = {
+      resourceLogs: [
+        {
+          scopeLogs: [
+            {
+              logRecords: [
+                {
+                  timeUnixNano: 0,
+                  observedTimeUnixNano: "1700000000000000000",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const { records } = normalizeOtlpLogsRequest(payload);
+    expect(records).toHaveLength(1);
+    const record = records[0]!;
+    // parseUint64String(0) returns "0"; nonZeroNano maps it to null
+    expect(record.timestamp.toISOString()).toBe(new Date(1700000000000).toISOString());
+  });
+
+  it('treats timeUnixNano "0" and missing observedTimeUnixNano as ~now (not epoch)', () => {
+    const before = Date.now();
+    const payload = {
+      resourceLogs: [
+        {
+          scopeLogs: [
+            {
+              logRecords: [
+                {
+                  timeUnixNano: "0",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const { records } = normalizeOtlpLogsRequest(payload);
+    const after = Date.now();
+    expect(records).toHaveLength(1);
+    const ts = records[0]!.timestamp.getTime();
+    expect(ts).toBeGreaterThanOrEqual(before - 1000);
+    expect(ts).toBeLessThanOrEqual(after + 1000);
+    // Must NOT be epoch 0 (1970)
+    expect(ts).toBeGreaterThan(1_000_000_000_000);
+  });
+
+  it("regression: valid non-zero timeUnixNano still produces the correct date", () => {
+    const payload = {
+      resourceLogs: [
+        {
+          scopeLogs: [
+            {
+              logRecords: [
+                {
+                  timeUnixNano: "1700000000000000000",
+                  observedTimeUnixNano: "1700000000001000000",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const { records } = normalizeOtlpLogsRequest(payload);
+    expect(records).toHaveLength(1);
+    expect(records[0]!.timestamp.toISOString()).toBe(new Date(1700000000000).toISOString());
+  });
+});
+
 describe("normalizeOtlpLogsRequest edge cases", () => {
   it("rejects negative timeUnixNano and falls back to current timestamp", () => {
     const payload = {
