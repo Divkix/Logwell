@@ -1,0 +1,62 @@
+# osv-scanner configuration for Logwell.
+#
+# These overrides suppress advisories for transitive dependencies that exist
+# ONLY in build / dev / test tooling and never run in the production runtime
+# that ships to users. Each entry records the dependency path (verified with
+# `bun pm why <pkg>`) and why it is not production-reachable.
+#
+# Production-reachable advisories are FIXED, not suppressed: see the "overrides"
+# block in package.json (cookie, kysely, defu, lodash, lodash-es pinned to
+# patched versions). Do not add production packages here.
+#
+# ecosystem = "npm" scopes every override to the JS lockfile (bun.lock) so the
+# Go and Python SDK manifests are unaffected.
+
+# --- Prisma toolchain: optional peer of better-auth's prisma-adapter ----------
+# Logwell authenticates with the better-auth *drizzle* adapter
+# (src/lib/server/auth.ts) and never imports Prisma. bun still resolves
+# `prisma` -> `@prisma/dev` as an optional peer, dragging in hono and effect.
+# None of this is imported or executed by the app.
+[[PackageOverrides]]
+name = "hono"
+ecosystem = "npm"
+ignore = true
+reason = "Transitive of prisma->@prisma/dev (optional peer of better-auth's prisma-adapter). App uses the drizzle adapter; Prisma/hono never run in production."
+
+[[PackageOverrides]]
+name = "@hono/node-server"
+ecosystem = "npm"
+ignore = true
+reason = "Transitive of prisma->@prisma/dev (optional peer). Never imported or run; app uses the better-auth drizzle adapter."
+
+[[PackageOverrides]]
+name = "effect"
+ecosystem = "npm"
+ignore = true
+reason = "Transitive of prisma->@prisma/config (optional peer). Prisma is never imported; not in the production runtime."
+
+# --- Test tooling -------------------------------------------------------------
+[[PackageOverrides]]
+name = "undici"
+ecosystem = "npm"
+ignore = true
+reason = "Transitive of jsdom (devDependency, test DOM environment). Not shipped in the production runtime."
+
+[[PackageOverrides]]
+name = "ws"
+ecosystem = "npm"
+ignore = true
+reason = "Transitive of the vitest test runner (devDependency). Not shipped in the production runtime."
+
+# --- Build tooling ------------------------------------------------------------
+[[PackageOverrides]]
+name = "esbuild"
+ecosystem = "npm"
+ignore = true
+reason = "Build-time transform tool (vite/drizzle-kit/tsx/@esbuild-kit). The vulnerable 0.18.20 copy is a dev-server CORS issue; esbuild is not part of the shipped runtime."
+
+[[PackageOverrides]]
+name = "picomatch"
+ecosystem = "npm"
+ignore = true
+reason = "Glob matcher used only by build/dev tooling (knip, micromatch, tinyglobby, chokidar, fdir). Not in the production runtime."

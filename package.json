@@ -77,6 +77,12 @@
     "vitest": "npm:@voidzero-dev/vite-plus-test@0.1.24"
   },
   "overrides": {
+    "cookie": "^0.7.0",
+    "defu": "^6.1.5",
+    "kysely": "^0.28.17",
+    "lodash": "^4.18.0",
+    "lodash-es": "^4.18.0",
+    "postcss": "^8.5.15",
     "vite": "npm:@voidzero-dev/vite-plus-core@0.1.24",
     "vitest": "npm:@voidzero-dev/vite-plus-test@0.1.24"
   },

@@ -1,0 +1,38 @@
+# gitleaks configuration for Logwell.
+#
+# Extends the default gitleaks ruleset and allowlists ONLY verified false
+# positives: synthetic sample API keys, a documented non-production CI
+# placeholder secret, and API-usage examples in documentation. No real secret
+# exists in any allowlisted location. Allowlists are scoped to the specific
+# rules that misfire (targetRules) so other secret types are still detected
+# everywhere, including in tests and docs.
+title = "Logwell gitleaks config"
+
+[extend]
+useDefault = true
+
+# Synthetic Logwell API keys (lw_ + sample chars) shown in docs and used as
+# fixtures in SDK / component tests. Illustrative placeholders, never real.
+[[allowlists]]
+description = "Synthetic lw_ sample API keys in docs and tests"
+targetRules = ["generic-api-key", "curl-auth-header"]
+regexes = ['''lw_[A-Za-z0-9_-]{0,64}''', '''Bearer\s+lw_''']
+
+# Documented placeholder auth secret used only in CI; see the "not used in
+# production" comments in .github/workflows/ci.yml and release.yml.
+[[allowlists]]
+description = "Non-production CI placeholder BETTER_AUTH_SECRET"
+targetRules = ["generic-api-key"]
+regexes = ['''ci-test-secret-key-must-be-at-least-32-characters-long''']
+
+# Documentation and test-fixture files hold example tokens only. Scoped to the
+# two misfiring rules so genuine secret types remain detected in these paths.
+[[allowlists]]
+description = "Docs and test fixtures contain example tokens, not secrets"
+targetRules = ["generic-api-key", "curl-auth-header"]
+paths = [
+  '''README\.md$''',
+  '''(^|/)dev-docs/.*\.md$''',
+  '''(^|/)sdks/go/logwell/config_test\.go$''',
+  '''(^|/)src/lib/components/__tests__/.*\.test\.ts$''',
+]
