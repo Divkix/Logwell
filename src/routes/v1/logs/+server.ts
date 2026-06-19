@@ -7,6 +7,7 @@ import { log, project } from "$lib/server/db/schema";
 import { logEventBus, type StreamLog } from "$lib/server/events";
 import { ApiKeyError, validateApiKey } from "$lib/server/utils/api-key";
 import { requireJsonContentType } from "$lib/server/utils/content-type";
+import { buildIngestResponse, LOG_RETURNING_COLUMNS } from "$lib/server/utils/ingest";
 import {
   assignIncidentIds,
   prepareLogsForIncidents,
@@ -19,15 +20,6 @@ import {
   OtlpValidationError,
 } from "$lib/server/utils/otlp";
 import { checkRateLimit, INGEST_RPM } from "$lib/server/utils/rate-limit";
-
-function buildIngestResponse(accepted: number, rejected: number, errors: string[]) {
-  const response: { accepted: number; rejected?: number; errors?: string[] } = { accepted };
-  if (rejected > 0) {
-    response.rejected = rejected;
-    response.errors = errors;
-  }
-  return response;
-}
 
 /**
  * POST /v1/logs (OTLP/HTTP JSON)
@@ -172,39 +164,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const insertedLogs: StreamLog[] = await (
             tx.insert(log).values(logEntries) as any
-          ).returning({
-            id: log.id,
-            projectId: log.projectId,
-            incidentId: log.incidentId,
-            fingerprint: log.fingerprint,
-            serviceName: log.serviceName,
-            level: log.level,
-            message: log.message,
-            metadata: log.metadata,
-            timeUnixNano: log.timeUnixNano,
-            observedTimeUnixNano: log.observedTimeUnixNano,
-            severityNumber: log.severityNumber,
-            severityText: log.severityText,
-            body: log.body,
-            droppedAttributesCount: log.droppedAttributesCount,
-            flags: log.flags,
-            traceId: log.traceId,
-            spanId: log.spanId,
-            resourceAttributes: log.resourceAttributes,
-            resourceDroppedAttributesCount: log.resourceDroppedAttributesCount,
-            resourceSchemaUrl: log.resourceSchemaUrl,
-            scopeName: log.scopeName,
-            scopeVersion: log.scopeVersion,
-            scopeAttributes: log.scopeAttributes,
-            scopeDroppedAttributesCount: log.scopeDroppedAttributesCount,
-            scopeSchemaUrl: log.scopeSchemaUrl,
-            sourceFile: log.sourceFile,
-            lineNumber: log.lineNumber,
-            requestId: log.requestId,
-            userId: log.userId,
-            ipAddress: log.ipAddress,
-            timestamp: log.timestamp,
-          });
+          ).returning(LOG_RETURNING_COLUMNS);
           return { insertedLogs, touchedIncidents };
         })
       : { insertedLogs: [], touchedIncidents: [] };
