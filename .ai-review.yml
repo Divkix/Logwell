@@ -1,0 +1,4 @@
+version: 1
+ignore:
+  - "drizzle/**"
+  - "src/lib/components/ui/**"
