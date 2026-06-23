@@ -3,7 +3,7 @@ import { svelteKitHandler } from "better-auth/svelte-kit";
 import { building } from "$app/environment";
 import { auth, initAuth } from "$lib/server/auth";
 import { db } from "$lib/server/db";
-import { createErrorHandler } from "$lib/server/error-handler";
+import { handleError as buildErrorResponse } from "$lib/server/error-handler";
 import { startCleanupScheduler, stopCleanupScheduler } from "$lib/server/jobs/cleanup-scheduler";
 import { checkRateLimit, LOGIN_RPM } from "$lib/server/utils/rate-limit";
 
@@ -101,10 +101,8 @@ export const handle: Handle = async ({ event, resolve }) => {
  * - Returns sanitized error messages to clients
  * - Generates unique error IDs for tracking
  */
-const errorHandler = createErrorHandler();
-
 export const handleError: HandleServerError = ({ error, event, status, message }) => {
-  return errorHandler({
+  return buildErrorResponse({
     error,
     url: event.url.href,
     method: event.request.method,

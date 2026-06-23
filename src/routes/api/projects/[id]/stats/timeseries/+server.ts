@@ -5,10 +5,9 @@ import { type BucketCountRow, getDbClient, getQueryRows } from "$lib/server/db/d
 import { log } from "$lib/server/db/schema";
 import { isErrorResponse, requireProjectOwnership } from "$lib/server/utils/project-guard";
 import { getTimeRangeStart } from "$lib/utils/format";
+import { parseTimeRange } from "$lib/utils/time-range";
 import { fillMissingBuckets, getTimeBucketConfig } from "$lib/utils/timeseries";
 import type { RequestEvent } from "./$types";
-
-const VALID_RANGES: TimeRange[] = ["15m", "1h", "24h", "7d"];
 
 /**
  * GET /api/projects/[id]/stats/timeseries
@@ -43,10 +42,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
   const projectId = event.params.id;
 
   // Parse range parameter (default to 24h)
-  const rangeParam = event.url.searchParams.get("range") || "24h";
-  const range: TimeRange = VALID_RANGES.includes(rangeParam as TimeRange)
-    ? (rangeParam as TimeRange)
-    : "24h";
+  const range: TimeRange = parseTimeRange(event.url.searchParams.get("range")) ?? "24h";
 
   // Parse optional from parameter (to sync with page server's time range)
   const fromParam = event.url.searchParams.get("from");

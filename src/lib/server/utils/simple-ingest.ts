@@ -1,10 +1,5 @@
-import type { LogLevel } from "../db/schema";
+import { LOG_LEVELS, type LogLevel } from "../../shared/schemas/log";
 import { mapOtlpAttributesToLogColumns } from "./otlp";
-
-/**
- * Valid log levels for simple ingestion API
- */
-const VALID_LEVELS: readonly LogLevel[] = ["debug", "info", "warn", "error", "fatal"] as const;
 
 /**
  * Input format for a single log entry from the simple API
@@ -59,7 +54,7 @@ export class SimpleIngestError extends Error {
  * Validates that a value is a valid log level
  */
 function isValidLevel(level: unknown): level is LogLevel {
-  return typeof level === "string" && VALID_LEVELS.includes(level as LogLevel);
+  return typeof level === "string" && LOG_LEVELS.includes(level as LogLevel);
 }
 
 /**
@@ -100,7 +95,7 @@ function validateLogEntry(
   if (!isValidLevel(entry.level)) {
     return {
       log: null,
-      error: `Entry at index ${index}: invalid level '${String(entry.level)}' (must be one of: ${VALID_LEVELS.join(", ")})`,
+      error: `Entry at index ${index}: invalid level '${String(entry.level)}' (must be one of: ${LOG_LEVELS.join(", ")})`,
     };
   }
 

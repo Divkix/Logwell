@@ -79,7 +79,8 @@ await cleanup(); // Truncates all tables
 
 ```typescript
 import type { PgliteDatabase } from "drizzle-orm/pglite";
-import { afterEach, beforeEach, describe, it } from "vitest";
+import { afterEach, beforeEach, describe, it } from "vite-plus/test";
+import { seedProject } from "../../../../tests/fixtures/db";
 import * as schema from "./schema";
 import { setupTestDatabase } from "./test-db";
 
@@ -98,15 +99,11 @@ describe("Database Tests", () => {
   });
 
   it("should work with database", async () => {
-    const result = await db.insert(schema.user).values({ age: 25 }).returning();
+    const project = await seedProject(db, { name: "my-project" });
     // Test assertions...
   });
 });
 ```
-
-### `test-utils.ts`
-
-Re-exports from `test-db.ts` for backward compatibility. New code should import from `test-db.ts` directly.
 
 ## Database Schema Updates
 

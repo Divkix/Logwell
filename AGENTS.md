@@ -72,7 +72,7 @@ src/
       jobs/                 # log-cleanup.ts, cleanup-scheduler.ts (retention sweeps)
       utils/                # api-key, csrf, rate-limit, cursor, search, incidents, otlp, simple-ingest, ...
       events.ts             # logEventBus singleton (SSE pub/sub)
-      error-handler.ts      # createErrorHandler() — sanitized errors + error IDs
+      error-handler.ts      # handleError() — sanitized errors + error IDs
     shared/schemas/         # Zod schemas shared by client/server/SDKs (project, log, incident)
     stores/                 # logs.svelte.ts (runes store)
     hooks/                  # use-log-stream / use-incident-stream (runes; SSE consumers)
@@ -194,7 +194,7 @@ The `search` tsvector is a Postgres **STORED generated column**: `to_tsvector('e
   - `incident` is upserted on `uniqueIndex("uq_incident_project_fingerprint").on(projectId, fingerprint)` (the `ON CONFLICT` target); `highestLevel` reuses the `log_level` enum. Heavy indexing on `log` for project+timestamp, project+incident+timestamp, project+fingerprint, level, etc.
 - **Config** (`drizzle.config.ts`): `postgresql` dialect, `strict`, requires `DATABASE_URL`.
 - **Migrations** live in `drizzle/`. Edit `schema.ts` → `bun run db:generate` → commit the SQL. **Prod/CI apply with `db:migrate` (idempotent, ordered) — never `db:push` in prod** (`push` diffs live and is for dev/CI ephemeral DBs only). `entrypoint.sh` runs `drizzle-kit migrate` at container start; CI `test-migrations` job applies the committed SQL against a real Postgres to catch broken migrations.
-- **Driver seam** (`db.ts`): single `DatabaseClient = PostgresJsDatabase | PgliteDatabase`. All handlers use `getDbClient(locals)`; `executeQuery`/`getQueryRows` normalize the two drivers' raw-result shapes (`T[]` vs `{rows: T[]}`).
+- **Driver seam** (`db.ts`): single `DatabaseClient = PostgresJsDatabase | PgliteDatabase`. All handlers use `getDbClient(locals)`; `getQueryRows` normalizes the two drivers' raw-result shapes (`T[]` vs `{rows: T[]}`).
 
 ---
 
@@ -287,7 +287,7 @@ TS from repo root: `bun run sdk:test` / `sdk:build` / `sdk:lint`. Python: `cd sd
 ## Tooling
 
 - **Vite+ / `vp`** (`vite.config.ts`): unified toolchain (oxlint + oxfmt + Vitest + build). `vp check` = format+lint+typecheck (`--fix` to fix). 2-space indent, single quotes, trailing commas; Svelte files have relaxed rules (unused vars allowed). Inline disable: `// oxlint-disable-next-line <rule>`. **Pinned exact**: `vite`/`vitest` are aliased to `@voidzero-dev/vite-plus-core@0.1.24` / `-test@0.1.24` (note the `overrides` in `package.json`); `vite-plus@0.1.24`. Don't bump these casually.
-- **knip** (`knip.json`): dead-code/dependency check. Entry points include SvelteKit route files + `db/index.ts`, `auth.ts`, `cleanup-scheduler.ts`. Has explicit ignores (`test-utils.ts`, certain exports in `db.ts`/`error-handler.ts`, deps like `tw-animate-css`/`layerchart`, the `jsr` binary). Run `bun run knip` pre-commit.
+- **knip** (`knip.json`): dead-code/dependency check. Entry points include SvelteKit route files + `db/index.ts`, `auth.ts`, `cleanup-scheduler.ts`. Has explicit ignores (the `simple-ingest.ts` types, deps like `tw-animate-css`/`layerchart`, the `jsr` binary). Run `bun run knip` pre-commit.
 - **husky** (`.husky/`): installed via the `prepare` script (`vp config && husky && svelte-kit sync`). `.husky/pre-commit` runs `vp check && bun run knip`; a separate `.vite-hooks/pre-commit` (from `vp config`) runs the lighter `vp staged`. `husky` runs last in `prepare`, so `.husky/pre-commit` is the effective gate.
 - **seed-admin** (`scripts/seed-admin.ts`): idempotent admin creation through better-auth using `ADMIN_USERNAME`/`ADMIN_PASSWORD`; email auto-derived `<user>@logwell.local` (`.local` because `localhost` fails email validation).
 - **Pinned versions**: Bun `1.3.14` (pkg manager) / `1.2.15` (CI setup-bun) / `1.3.14-alpine` (Docker, with digest). Postgres `18-alpine` everywhere. Pinning is for reproducible builds.
@@ -433,7 +433,7 @@ The `plans/` directory is the durable **decision record** — self-contained han
 10. **e2e prerequisites**: needs a real Postgres + a seeded admin (`ADMIN_PASSWORD`). Login specs must use the `expect().toPass()` retry pattern and benefit from `RATE_LIMIT_LOGIN_RPM=10000`.
 11. **`test-db.ts` approximations**: schema comes from reflection (not `drizzle/*.sql`); `VARCHAR` is forced to 255; unique indexes become UNIQUE constraints. New schema column types may need the generator's type map / FK `tableOrder` updated or the table is silently skipped.
 12. **Don't copy `tests/integration/api/health/health.integration.test.ts`'s inline CREATE TABLE** — it's a bespoke legacy setup (references an `api_key` column), not the shared `setupTestDatabase()` path.
-13. **Stale companion docs**: `tests/README.md` (mentions a non-existent `.browser.test.ts` tier / `test:browser`, old `test-utils.ts` API, a `users` table) and `tests/fixtures/README.md` (mentions `createUserFactory`/age fields) are **out of date**. Trust this file, `vitest.config.ts`, `test-db.ts`, and `tests/fixtures/db.ts` instead — and fix the stale docs when you touch that area.
+13. **Test-doc sources of truth**: trust this file, `vitest.config.ts`, `test-db.ts`, and `tests/fixtures/db.ts` for the testing setup. `tests/README.md` and `src/lib/server/db/README.md` were corrected (the phantom `.browser.test.ts` tier and the old `test-utils.ts`/`createUserFactory`/age-field examples are gone); the fictional `tests/fixtures/README.md` was deleted. Keep these docs aligned with `db.ts` factories when you touch that area.
 14. **Pinned Vite+/Bun/Postgres versions** are intentional for reproducibility; don't bump without reason. (CI's `setup-bun` pins **1.2.15** while the Docker image is **1.3.14** — CI and the prod image run different Bun versions by design.)
 15. **`src/lib/server/session.ts` is TEST-ONLY** — `getSession()` skips HMAC signature verification. Never call it from a route; production uses `auth.api.getSession()`.
 16. **Incident auto-resolve threshold is duplicated**: the server reads `INCIDENT_AUTO_RESOLVE_MINUTES`, but `incidents/+page.svelte` hardcodes `30 * 60 * 1000`. Keep the env at **30** or server/UI status disagree.

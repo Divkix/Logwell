@@ -167,23 +167,3 @@ export const INCIDENT_CONFIG = {
     INCIDENT_BOUNDS.AUTO_RESOLVE_MINUTES.max,
   ),
 } as const;
-
-/**
- * Type for SSE configuration object.
- */
-export type SSEConfigType = {
-  BATCH_WINDOW_MS: number;
-  MAX_BATCH_SIZE: number;
-  HEARTBEAT_INTERVAL_MS: number;
-};
-
-/**
- * Validates SSE configuration values.
- * Returns true if all values are within acceptable bounds.
- */
-export function validateSSEConfig(config: SSEConfigType): boolean {
-  if (config.BATCH_WINDOW_MS < SSE_BOUNDS.BATCH_WINDOW_MS.min) return false;
-  if (config.MAX_BATCH_SIZE < SSE_BOUNDS.MAX_BATCH_SIZE.min) return false;
-  if (config.HEARTBEAT_INTERVAL_MS < SSE_BOUNDS.HEARTBEAT_INTERVAL_MS.min) return false;
-  return true;
-}

@@ -1,4 +1,5 @@
 import type { RequestEvent } from "@sveltejs/kit";
+import { apiError } from "./api-error";
 
 /**
  * Checks Origin and Referer headers for CSRF protection on state-changing requests.
@@ -27,18 +28,12 @@ export function checkCsrfOrigin(event: RequestEvent): Response | null {
 
   const origin = event.request.headers.get("Origin");
   if (origin && origin !== expectedOrigin) {
-    return new Response(JSON.stringify({ error: "csrf_error", message: "Invalid Origin header" }), {
-      status: 403,
-      headers: { "Content-Type": "application/json" },
-    });
+    return apiError(403, "csrf_error", "Invalid Origin header");
   }
 
   const referer = event.request.headers.get("Referer");
   if (referer && !referer.startsWith(`${expectedOrigin}/`)) {
-    return new Response(
-      JSON.stringify({ error: "csrf_error", message: "Invalid Referer header" }),
-      { status: 403, headers: { "Content-Type": "application/json" } },
-    );
+    return apiError(403, "csrf_error", "Invalid Referer header");
   }
 
   // Neither Origin nor Referer present on a state-changing request.
@@ -46,10 +41,7 @@ export function checkCsrfOrigin(event: RequestEvent): Response | null {
   // cross-origin request must not be trusted. (Bearer /v1 ingest routes do not
   // call this function and are unaffected.)
   if (!origin && !referer) {
-    return new Response(
-      JSON.stringify({ error: "csrf_error", message: "Missing Origin and Referer headers" }),
-      { status: 403, headers: { "Content-Type": "application/json" } },
-    );
+    return apiError(403, "csrf_error", "Missing Origin and Referer headers");
   }
 
   return null;

@@ -218,22 +218,11 @@ export async function validateApiKey(request: Request, dbClient?: DatabaseClient
 }
 
 /**
- * Invalidates a specific API key from the cache
+ * Invalidates a specific API key from the cache by its SHA-256 hash.
  * Should be called when:
  * - API key is regenerated
  * - Project is deleted
  * - Manual cache invalidation needed
- *
- * @param apiKey - API key to remove from cache
- */
-export function invalidateApiKeyCache(apiKey: string): void {
-  invalidateApiKeyCacheByHash(hashApiKey(apiKey));
-}
-
-/**
- * Invalidates a specific API key from the cache by its SHA-256 hash.
- * Useful when only the stored hash is available (e.g. regenerating a key where
- * the previous plaintext is no longer persisted).
  *
  * @param keyHash - SHA-256 hash of the API key to remove from cache
  */

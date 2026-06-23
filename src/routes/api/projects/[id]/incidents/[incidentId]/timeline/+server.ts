@@ -4,8 +4,9 @@ import { type BucketCountRow, getDbClient, getQueryRows } from "$lib/server/db/d
 import { incident, log } from "$lib/server/db/schema";
 import { apiError } from "$lib/server/utils/api-error";
 import { isErrorResponse, requireProjectOwnership } from "$lib/server/utils/project-guard";
-import { INCIDENT_RANGES, type IncidentRange } from "$lib/shared/types";
+import type { IncidentRange } from "$lib/shared/types";
 import { getTimeRangeStart } from "$lib/utils/format";
+import { parseTimeRange } from "$lib/utils/time-range";
 import { fillMissingBuckets, getTimeBucketConfig } from "$lib/utils/timeseries";
 import type { RequestEvent } from "./$types";
 
@@ -33,10 +34,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
     return apiError(404, "not_found", "Incident not found");
   }
 
-  const rangeParam = event.url.searchParams.get("range") || "24h";
-  const range: IncidentRange = INCIDENT_RANGES.includes(rangeParam as IncidentRange)
-    ? (rangeParam as IncidentRange)
-    : "24h";
+  const range: IncidentRange = parseTimeRange(event.url.searchParams.get("range")) ?? "24h";
 
   const rangeEnd = new Date();
   const rangeStart = getTimeRangeStart(range, rangeEnd);

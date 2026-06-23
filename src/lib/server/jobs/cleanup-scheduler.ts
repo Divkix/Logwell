@@ -1,4 +1,4 @@
-import { RETENTION_CONFIG } from "$lib/server/config";
+import { RETENTION_CONFIG } from "$lib/server/config/performance";
 import { cleanupOldLogs } from "./log-cleanup";
 
 let cleanupStarted = false;
@@ -45,13 +45,6 @@ export function stopCleanupScheduler(): void {
     cleanupIntervalId = null;
   }
   cleanupStarted = false;
-}
-
-/**
- * Returns whether the scheduler is currently running.
- */
-export function isCleanupSchedulerRunning(): boolean {
-  return cleanupStarted;
 }
 
 /**

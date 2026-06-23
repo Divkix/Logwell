@@ -1,5 +1,5 @@
 import { count, eq, min } from "drizzle-orm";
-import { RETENTION_CONFIG } from "$lib/server/config";
+import { RETENTION_CONFIG } from "$lib/server/config/performance";
 import { getDbClient } from "$lib/server/db/db";
 import { log } from "$lib/server/db/schema";
 import { requireProjectOwnershipPage } from "$lib/server/utils/project-guard";

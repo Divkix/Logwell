@@ -9,7 +9,7 @@ import {
   clearApiKeyCache,
   generateApiKey,
   hashApiKey,
-  invalidateApiKeyCache,
+  invalidateApiKeyCacheByHash,
   validateApiKey,
 } from "../../../src/lib/server/utils/api-key";
 import { getOrCreateDefaultUser } from "../../fixtures/db";
@@ -219,7 +219,7 @@ describe("API Key Validation with Database", () => {
     Date.now = originalDateNow;
   });
 
-  it("invalidateApiKeyCache removes cached entry", async () => {
+  it("invalidateApiKeyCacheByHash removes cached entry", async () => {
     const projectId = nanoid();
     const apiKey = generateApiKey();
     const projectName = "invalidate-test";
@@ -242,7 +242,7 @@ describe("API Key Validation with Database", () => {
     await validateApiKey(request, db);
 
     // Invalidate the cache
-    invalidateApiKeyCache(apiKey);
+    invalidateApiKeyCacheByHash(hashApiKey(apiKey));
 
     // Delete project from database
     await db.delete(project).where(eq(project.id, projectId));

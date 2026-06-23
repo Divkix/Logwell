@@ -8,10 +8,7 @@
   ],
   "project": ["src/**/*.{js,ts,svelte}"],
   "ignoreExportsUsedInFile": true,
-  "ignoreFiles": ["src/lib/server/db/test-utils.ts"],
   "ignoreIssues": {
-    "src/lib/server/db/db.ts": ["exports"],
-    "src/lib/server/error-handler.ts": ["exports"],
     "src/lib/server/utils/simple-ingest.ts": ["types"]
   },
   "ignoreDependencies": ["tw-animate-css", "@divkix/logwell", "layerchart", "@types/d3-scale"],

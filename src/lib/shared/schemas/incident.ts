@@ -78,7 +78,10 @@ export interface IncidentTimelineResponse {
   peakBucket: IncidentTimelinePoint | null;
 }
 
-const INCIDENT_GROUPED_LEVELS: readonly LogLevel[] = ["error", "fatal"] as const;
+/**
+ * Log levels that are grouped into incidents (error/fatal only).
+ */
+export const INCIDENT_GROUPED_LEVELS: readonly LogLevel[] = ["error", "fatal"] as const;
 
 /**
  * Type guard for grouped levels.

@@ -1,5 +1,6 @@
 import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
+import { INCIDENT_GROUPED_LEVELS } from "../../shared/schemas/incident";
 import type { DatabaseClient } from "$lib/server/db/db";
 import { type Incident, incident, type LogLevel, log } from "$lib/server/db/schema";
 import {
@@ -8,8 +9,6 @@ import {
   groupPreparedLogsByFingerprint,
   prepareLogsForIncidents,
 } from "./incidents";
-
-const GROUPED_LEVELS: LogLevel[] = ["error", "fatal"];
 
 export interface BackfillProjectResult {
   processedLogs: number;
@@ -45,7 +44,7 @@ export async function backfillProjectIncidents(
       and(
         eq(log.projectId, projectId),
         gte(log.timestamp, since),
-        inArray(log.level, GROUPED_LEVELS),
+        inArray(log.level, [...INCIDENT_GROUPED_LEVELS]),
       ),
     )
     .orderBy(log.timestamp);

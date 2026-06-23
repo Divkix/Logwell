@@ -20,12 +20,12 @@ Located in `tests/integration/`. Tests server-side code with database interactio
 bun run test:integration
 ```
 
-### Browser Tests (`.browser.test.ts`)
+### Component Tests (`.component.test.ts`)
 
-Tests Svelte components in a real browser environment using Playwright.
+Located alongside source files in `src/`. Tests Svelte components in jsdom using `@testing-library/svelte`.
 
 ```bash
-bun run test:browser
+bun run test:component
 ```
 
 ### E2E Tests
@@ -47,8 +47,8 @@ bun run test
 
 # Run specific test types
 bun run test:unit
+bun run test:component
 bun run test:integration
-bun run test:browser
 bun run test:e2e
 
 # Generate coverage report
@@ -60,18 +60,19 @@ bun run test:ui
 
 ## Test Database
 
-Integration tests use PGlite, an in-memory PostgreSQL database. Test utilities are available in `src/lib/server/db/test-utils.ts`:
+Integration tests use PGlite, an in-memory PostgreSQL database. The engine lives in `src/lib/server/db/test-db.ts`:
 
 - `createTestDatabase()` - Creates a fresh PGlite instance
 - `cleanDatabase()` - Truncates all tables
 - `setupTestDatabase()` - Returns db and cleanup function
-- `seedTestData()` - Helpers to populate test data
+
+Seeding helpers live in `tests/fixtures/db.ts` (`seedProject`, `seedLog`, `seedProjectWithApiKey`, `getOrCreateDefaultUser`).
 
 ### Example Integration Test
 
 ```typescript
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { setupTestDatabase } from "../../src/lib/server/db/test-utils";
+import { describe, it, expect, beforeEach, afterEach } from "vite-plus/test";
+import { setupTestDatabase } from "../../src/lib/server/db/test-db";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
 import * as schema from "../../src/lib/server/db/schema";
 

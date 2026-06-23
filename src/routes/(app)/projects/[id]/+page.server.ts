@@ -1,5 +1,5 @@
 import { and, desc, eq, gte, inArray, lt, or, type SQL, sql } from "drizzle-orm";
-import { env } from "$lib/server/config";
+import { env } from "$lib/server/config/env";
 import { getDbClient } from "$lib/server/db/db";
 import { log } from "$lib/server/db/schema";
 import { cappedLogCount } from "$lib/server/utils/capped-count";

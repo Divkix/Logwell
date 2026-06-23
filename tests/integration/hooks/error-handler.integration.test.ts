@@ -1,13 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
-import { createErrorHandler, type ErrorContext } from "$lib/server/error-handler";
+import { type ErrorContext, handleError } from "$lib/server/error-handler";
 
 describe("Global Error Handler", () => {
   let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
-  let handleError: ReturnType<typeof createErrorHandler>;
 
   beforeEach(() => {
     consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    handleError = createErrorHandler();
   });
 
   afterEach(() => {
@@ -118,7 +116,7 @@ describe("Global Error Handler", () => {
 
       // ID should be URL-safe (nanoid uses A-Za-z0-9_-)
       expect(result.id).toMatch(/^[A-Za-z0-9_-]+$/);
-      // ID should be exactly 12 characters (as specified in createErrorHandler)
+      // ID should be exactly 12 characters (as specified in handleError)
       expect(result.id.length).toBe(12);
     });
   });

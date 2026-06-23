@@ -1,17 +1,13 @@
 import { and, count, desc, eq, gte, lt, or, type SQL } from "drizzle-orm";
-import { INCIDENT_CONFIG } from "$lib/server/config";
+import { INCIDENT_CONFIG } from "$lib/server/config/performance";
 import { getDbClient } from "$lib/server/db/db";
 import { incident } from "$lib/server/db/schema";
 import { decodeCursor, encodeCursor } from "$lib/server/utils/cursor";
 import { requireProjectOwnershipPage } from "$lib/server/utils/project-guard";
 import { getIncidentStatus } from "$lib/server/utils/incidents";
-import {
-  INCIDENT_RANGES,
-  INCIDENT_STATUSES,
-  type IncidentRange,
-  type IncidentStatus,
-} from "$lib/shared/types";
+import { INCIDENT_STATUSES, type IncidentRange, type IncidentStatus } from "$lib/shared/types";
 import { getTimeRangeStart } from "$lib/utils/format";
+import { parseTimeRange } from "$lib/utils/time-range";
 import type { PageServerLoad } from "./$types";
 
 const DEFAULT_LIMIT = 50;
@@ -40,10 +36,7 @@ export const load: PageServerLoad = async (event) => {
   const status: IncidentStatus = INCIDENT_STATUSES.includes(statusParam as IncidentStatus)
     ? (statusParam as IncidentStatus)
     : "open";
-  const rangeParam = params.get("range") || "24h";
-  const range: IncidentRange = INCIDENT_RANGES.includes(rangeParam as IncidentRange)
-    ? (rangeParam as IncidentRange)
-    : "24h";
+  const range: IncidentRange = parseTimeRange(params.get("range")) ?? "24h";
 
   const rangeStart = getTimeRangeStart(range);
   const resolvedThreshold = new Date(Date.now() - INCIDENT_CONFIG.AUTO_RESOLVE_MINUTES * 60 * 1000);

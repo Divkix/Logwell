@@ -92,7 +92,6 @@ export default defineConfig({
         "src/lib/types/**",
         "src/lib/shared/types.ts",
         "src/lib/auth-client.ts",
-        "src/lib/server/db/test-utils.ts",
       ],
       thresholds: {
         lines: 75,

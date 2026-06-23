@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { RETENTION_CONFIG } from "$lib/server/config";
+import { RETENTION_CONFIG } from "$lib/server/config/performance";
 import type { DatabaseClient } from "$lib/server/db/db";
 import { getQueryRows } from "$lib/server/db/db";
 import { project } from "$lib/server/db/schema";

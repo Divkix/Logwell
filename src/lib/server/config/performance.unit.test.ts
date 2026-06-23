@@ -114,31 +114,4 @@ describe("Performance Configuration", () => {
       expect(INCIDENT_CONFIG.AUTO_RESOLVE_MINUTES).toBe(1);
     });
   });
-
-  describe("Configuration Validation", () => {
-    it("validateSSEConfig returns true for valid config", async () => {
-      const { validateSSEConfig, SSE_CONFIG } = await import("./performance");
-      expect(validateSSEConfig(SSE_CONFIG)).toBe(true);
-    });
-
-    it("validateSSEConfig returns false for invalid batch window", async () => {
-      const { validateSSEConfig } = await import("./performance");
-      const invalidConfig = {
-        BATCH_WINDOW_MS: -1,
-        MAX_BATCH_SIZE: 50,
-        HEARTBEAT_INTERVAL_MS: 30000,
-      };
-      expect(validateSSEConfig(invalidConfig)).toBe(false);
-    });
-
-    it("validateSSEConfig returns false for invalid batch size", async () => {
-      const { validateSSEConfig } = await import("./performance");
-      const invalidConfig = {
-        BATCH_WINDOW_MS: 1500,
-        MAX_BATCH_SIZE: 0,
-        HEARTBEAT_INTERVAL_MS: 30000,
-      };
-      expect(validateSSEConfig(invalidConfig)).toBe(false);
-    });
-  });
 });
