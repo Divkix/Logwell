@@ -441,6 +441,20 @@ The `plans/` directory is the durable **decision record** — self-contained han
 18. **API keys are write-only**: there is no read/query API by key (logs read only via the session UI). **Project names are unique per-owner**, not globally.
 19. **Per-log ingest errors are not request failures**: `/v1/ingest` returns **200** `{accepted, rejected, errors[]}` for bad records; only batch-level issues (`invalid_json`, `batch_too_large`, auth, rate-limit) return 4xx.
 
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked in GitHub Issues (`Divkix/Logwell`). External PRs are not treated as a triage surface. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default canonical labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context layout: one `CONTEXT.md` at the repo root, plus `docs/adr/` for architectural decisions. See `docs/agents/domain.md`.
+
 <!--VITE PLUS START-->
 
 # Using Vite+, the Unified Toolchain for the Web
