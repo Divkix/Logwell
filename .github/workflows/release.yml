@@ -53,7 +53,7 @@ jobs:
         run: echo "dir=$(bun pm cache)" >> $GITHUB_OUTPUT
 
       - name: Cache bun dependencies
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ${{ steps.bun-cache-dir.outputs.dir }}
           key: ${{ runner.os }}-bun-${{ github.sha }}-${{ hashFiles('**/bun.lock') }}
@@ -94,7 +94,7 @@ jobs:
         run: echo "dir=$(bun pm cache)" >> $GITHUB_OUTPUT
 
       - name: Cache bun dependencies
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ${{ steps.bun-cache-dir.outputs.dir }}
           key: ${{ runner.os }}-bun-${{ github.sha }}-${{ hashFiles('**/bun.lock') }}
@@ -132,7 +132,7 @@ jobs:
         run: echo "dir=$(bun pm cache)" >> $GITHUB_OUTPUT
 
       - name: Cache bun dependencies
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ${{ steps.bun-cache-dir.outputs.dir }}
           key: ${{ runner.os }}-bun-${{ github.sha }}-${{ hashFiles('**/bun.lock') }}
@@ -198,7 +198,7 @@ jobs:
         run: echo "dir=$(bun pm cache)" >> $GITHUB_OUTPUT
 
       - name: Cache bun dependencies
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ${{ steps.bun-cache-dir.outputs.dir }}
           key: ${{ runner.os }}-bun-${{ github.sha }}-${{ hashFiles('**/bun.lock') }}
@@ -213,7 +213,7 @@ jobs:
         run: echo "version=$(bunx playwright --version | cut -d' ' -f2)" >> $GITHUB_OUTPUT
 
       - name: Cache Playwright browsers
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
@@ -277,7 +277,7 @@ jobs:
         run: echo "dir=$(bun pm cache)" >> $GITHUB_OUTPUT
 
       - name: Cache bun dependencies
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ${{ steps.bun-cache-dir.outputs.dir }}
           key: ${{ runner.os }}-bun-${{ github.sha }}-${{ hashFiles('**/bun.lock') }}
