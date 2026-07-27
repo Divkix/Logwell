@@ -60,14 +60,14 @@
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.2",
-    "@size-limit/preset-small-lib": "^12.1.0",
+    "@size-limit/preset-small-lib": "^13.0.1",
     "@vitest/coverage-v8": "^4.1.6",
     "msw": "^2.14.6",
-    "size-limit": "^12.1.0",
+    "size-limit": "^13.0.1",
     "tsup": "^8.5.1",
-    "typescript": "^6.0.3",
+    "typescript": "^7.0.2",
     "vite": "npm:@voidzero-dev/vite-plus-core@0.1.24",
-    "vite-plus": "0.1.24",
+    "vite-plus": "0.2.6",
     "vitest": "npm:@voidzero-dev/vite-plus-test@0.1.24"
   },
   "overrides": {
