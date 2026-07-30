@@ -1,7 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 import * as matchers from "@testing-library/jest-dom/matchers";
-import { cleanup } from "@testing-library/svelte";
-import { afterEach, expect } from "vite-plus/test";
+import { expect } from "vite-plus/test";
 
 // Ensure DATABASE_URL is set for tests (PGlite doesn't need real connection)
 if (!process.env.DATABASE_URL) {
@@ -15,8 +14,3 @@ if (!process.env.BETTER_AUTH_SECRET) {
 
 // Extend Vitest's expect with jest-dom matchers
 expect.extend(matchers);
-
-// Global cleanup after each test
-afterEach(() => {
-  cleanup();
-});

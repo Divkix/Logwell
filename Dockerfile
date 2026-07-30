@@ -12,7 +12,7 @@
 # -----------------------------------------------------------------------------
 # Stage 1: Base image with Bun runtime
 # -----------------------------------------------------------------------------
-# SECURITY: pinned to an exact version + digest for reproducible builds (matches CI's Bun 1.2.15)
+# SECURITY: pinned to an exact version + digest for reproducible builds (matches CI's Bun 1.3.14)
 FROM oven/bun:1.3.14-alpine@sha256:5acc90a93e91ff07bf72aa90a7c9f0fa189765aec90b47bdbf2152d2196383c0 AS base
 WORKDIR /app
 

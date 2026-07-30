@@ -15,18 +15,20 @@ import asyncio
 from logwell import Logwell
 
 # Initialize client
-client = Logwell({
-    'api_key': 'lw_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-    'endpoint': 'https://logs.example.com',
-    'service': 'my-app',
-})
+client = Logwell(
+    {
+        "api_key": "lw_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "endpoint": "https://logs.example.com",
+        "service": "my-app",
+    }
+)
 
 # Log messages at different levels
-client.debug('Debug message')
-client.info('User logged in', {'user_id': '123'})
-client.warn('Disk space low', {'available_gb': 5})
-client.error('Failed to process request', {'request_id': 'abc'})
-client.fatal('Database connection lost')
+client.debug("Debug message")
+client.info("User logged in", {"user_id": "123"})
+client.warn("Disk space low", {"available_gb": 5})
+client.error("Failed to process request", {"request_id": "abc"})
+client.fatal("Database connection lost")
 
 # Ensure logs are sent before exit
 asyncio.run(client.shutdown())
@@ -52,24 +54,29 @@ asyncio.run(client.shutdown())
 ```python
 from logwell import Logwell
 
+
 def on_error(err):
-    print(f'Logging error: {err}')
+    print(f"Logging error: {err}")
+
 
 def on_flush(count):
-    print(f'Flushed {count} logs')
+    print(f"Flushed {count} logs")
 
-client = Logwell({
-    'api_key': 'lw_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-    'endpoint': 'https://logs.example.com',
-    'service': 'my-app',
-    'batch_size': 100,
-    'flush_interval': 10.0,
-    'max_queue_size': 5000,
-    'max_retries': 5,
-    'capture_source_location': True,
-    'on_error': on_error,
-    'on_flush': on_flush,
-})
+
+client = Logwell(
+    {
+        "api_key": "lw_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "endpoint": "https://logs.example.com",
+        "service": "my-app",
+        "batch_size": 100,
+        "flush_interval": 10.0,
+        "max_queue_size": 5000,
+        "max_retries": 5,
+        "capture_source_location": True,
+        "on_error": on_error,
+        "on_flush": on_flush,
+    }
+)
 ```
 
 ## API Reference
@@ -105,12 +112,12 @@ Create child loggers to add persistent context:
 
 ```python
 # Create child logger with request context
-request_logger = client.child({'request_id': 'abc-123'})
-request_logger.info('Processing request')  # Includes request_id
+request_logger = client.child({"request_id": "abc-123"})
+request_logger.info("Processing request")  # Includes request_id
 
 # Override service name
-db_logger = client.child(service='my-app-db')
-db_logger.info('Query executed', {'duration_ms': 45})
+db_logger = client.child(service="my-app-db")
+db_logger.info("Query executed", {"duration_ms": 45})
 ```
 
 ### Log Entry
@@ -119,13 +126,15 @@ db_logger.info('Query executed', {'duration_ms': 45})
 from logwell import LogLevel
 
 # Using log() with explicit entry
-client.log({
-    'level': 'info',
-    'message': 'Custom log',
-    'metadata': {'key': 'value'},
-    'service': 'override-service',
-    'timestamp': '2024-01-01T00:00:00Z',  # Optional, auto-generated
-})
+client.log(
+    {
+        "level": "info",
+        "message": "Custom log",
+        "metadata": {"key": "value"},
+        "service": "override-service",
+        "timestamp": "2024-01-01T00:00:00Z",  # Optional, auto-generated
+    }
+)
 ```
 
 ### LogLevel
@@ -142,9 +151,9 @@ Response from the server after flushing logs:
 
 ```python
 {
-    'accepted': 50,      # Logs accepted
-    'rejected': 0,       # Logs rejected (optional)
-    'errors': [],        # Error messages (optional)
+    "accepted": 50,  # Logs accepted
+    "rejected": 0,  # Logs rejected (optional)
+    "errors": [],  # Error messages (optional)
 }
 ```
 
@@ -158,12 +167,12 @@ All SDK errors are wrapped in `LogwellError`:
 from logwell import Logwell, LogwellError, LogwellErrorCode
 
 try:
-    client = Logwell({'api_key': 'invalid', 'endpoint': 'https://example.com'})
+    client = Logwell({"api_key": "invalid", "endpoint": "https://example.com"})
 except LogwellError as e:
-    print(e.message)      # Human-readable message
-    print(e.code)         # LogwellErrorCode enum
+    print(e.message)  # Human-readable message
+    print(e.code)  # LogwellErrorCode enum
     print(e.status_code)  # HTTP status (if applicable)
-    print(e.retryable)    # Whether operation can be retried
+    print(e.retryable)  # Whether operation can be retried
 ```
 
 ### Error Codes
@@ -186,15 +195,18 @@ Handle errors without try/catch:
 def handle_error(err: Exception):
     if isinstance(err, LogwellError):
         if err.code == LogwellErrorCode.NETWORK_ERROR:
-            print('Network issue, logs will be retried')
+            print("Network issue, logs will be retried")
         elif err.code == LogwellErrorCode.QUEUE_OVERFLOW:
-            print('Queue full, some logs dropped')
+            print("Queue full, some logs dropped")
 
-client = Logwell({
-    'api_key': 'lw_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-    'endpoint': 'https://logs.example.com',
-    'on_error': handle_error,
-})
+
+client = Logwell(
+    {
+        "api_key": "lw_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "endpoint": "https://logs.example.com",
+        "on_error": handle_error,
+    }
+)
 ```
 
 ## Async Usage
@@ -205,20 +217,24 @@ The SDK uses async for flush and shutdown operations:
 import asyncio
 from logwell import Logwell
 
-async def main():
-    client = Logwell({
-        'api_key': 'lw_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-        'endpoint': 'https://logs.example.com',
-    })
 
-    client.info('Starting app')
+async def main():
+    client = Logwell(
+        {
+            "api_key": "lw_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "endpoint": "https://logs.example.com",
+        }
+    )
+
+    client.info("Starting app")
 
     # Manual flush
     response = await client.flush()
-    print(f'Sent {response["accepted"]} logs')
+    print(f"Sent {response['accepted']} logs")
 
     # Shutdown gracefully
     await client.shutdown()
+
 
 asyncio.run(main())
 ```
@@ -228,13 +244,15 @@ asyncio.run(main())
 Enable automatic file/line capture:
 
 ```python
-client = Logwell({
-    'api_key': 'lw_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-    'endpoint': 'https://logs.example.com',
-    'capture_source_location': True,
-})
+client = Logwell(
+    {
+        "api_key": "lw_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "endpoint": "https://logs.example.com",
+        "capture_source_location": True,
+    }
+)
 
-client.info('This log includes file and line number')
+client.info("This log includes file and line number")
 # Log includes: source_file='app.py', line_number=42
 ```
 

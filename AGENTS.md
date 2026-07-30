@@ -85,7 +85,8 @@ tests/
   integration/             # *.integration.test.ts (PGlite, route handlers)
   e2e/                      # Playwright specs + helpers/ (EXCLUDED from Vitest)
   fixtures/db.ts            # seedProject / seedLog / seedProjectWithApiKey factories
-  setup.ts                 # global Vitest setup (jest-dom, cleanup, fallback env)
+  setup.ts                 # shared Vitest setup (jest-dom + fallback env)
+  setup-component.ts       # component-only Svelte Testing Library cleanup
 scripts/                   # seed-admin.ts, backfill-incidents.ts (+ *.test.ts run as integration)
 sdks/                      # typescript/ python/ go/ — independent packages
 drizzle/                   # committed migration SQL + journal
@@ -248,7 +249,7 @@ Tier is chosen by **filename suffix**, not directory. Vitest runs three projects
 | Integration | `tests/integration/**/*.integration.test.ts` + `scripts/**/*.test.ts` | node                                                    | **PGlite (in-memory)** | `bun run test:integration` |
 | E2E         | `tests/e2e/**` (Playwright)                                           | real browser                                            | **real Postgres**      | `bun run test:e2e`         |
 
-**Global setup** `tests/setup.ts`: jest-dom matchers, `@testing-library/svelte` `cleanup()` afterEach, fallback `DATABASE_URL` + `BETTER_AUTH_SECRET` (dummy — PGlite needs no real connection). Import test primitives from **`vite-plus/test`**, not `vitest`.
+**Global setup** `tests/setup.ts`: jest-dom matchers and fallback `DATABASE_URL` + `BETTER_AUTH_SECRET` (dummy — PGlite needs no real connection). `tests/setup-component.ts` registers `@testing-library/svelte` `cleanup()` afterEach only for the jsdom component project: its source package imports `.svelte` files, which node-env unit/integration projects cannot transform. Import test primitives from **`vite-plus/test`**, not `vitest`.
 
 **Integration DB engine** (`src/lib/server/db/test-db.ts`): `setupTestDatabase()` → `createTestDatabase()` boots a fresh in-memory PGlite and **reflects `schema.ts` into hand-generated CREATE ENUM/TABLE/INDEX/TRIGGER SQL** in FK-dependency order (`user, project, incident, session, account, verification, log`) — it does **not** run `drizzle/*.sql`. PGlite workarounds, all deliberate: the `search` tsvector is reproduced via a `BEFORE INSERT/UPDATE` trigger (`log_search_trigger`) instead of a STORED generated column; unique indexes are emitted as table-level `UNIQUE` constraints (so `ON CONFLICT` upserts resolve); `VARCHAR` is hardcoded to `VARCHAR(255)`. `cleanup()` TRUNCATEs all tables CASCADE in reverse order. (Why PGlite over Docker: zero startup, fresh isolated DB per test. Why reflection over migrations: keeps `schema.ts` the single source and sidesteps PGlite's incompatibility with STORED/`IMMUTABLE` tsvector SQL. Tradeoff: not 100% Postgres parity — hence e2e runs real Postgres.)
 
@@ -286,11 +287,11 @@ TS from repo root: `bun run sdk:test` / `sdk:build` / `sdk:lint`. Python: `cd sd
 
 ## Tooling
 
-- **Vite+ / `vp`** (`vite.config.ts`): unified toolchain (oxlint + oxfmt + Vitest + build). `vp check` = format+lint+typecheck (`--fix` to fix). 2-space indent, single quotes, trailing commas; Svelte files have relaxed rules (unused vars allowed). Inline disable: `// oxlint-disable-next-line <rule>`. **Pinned exact**: `vite`/`vitest` are aliased to `@voidzero-dev/vite-plus-core@0.1.24` / `-test@0.1.24` (note the `overrides` in `package.json`); `vite-plus@0.1.24`. Don't bump these casually.
+- **Vite+ / `vp`** (`vite.config.ts`): unified toolchain (oxlint + oxfmt + Vitest + build). `vp check` = format+lint+typecheck (`--fix` to fix). 2-space indent, single quotes, trailing commas; Svelte files have relaxed rules (unused vars allowed). Inline disable: `// oxlint-disable-next-line <rule>`. **Pinned exact** via `package.json` `overrides`: `vite` → `@voidzero-dev/vite-plus-core@0.2.6`, `vitest` → `4.1.10`, and the `vite-plus` CLI at `0.2.6`. Vite+ 0.2 removed its `@voidzero-dev/vite-plus-test` wrapper; use real Vitest at the version Vite+ bundles. The root keeps TypeScript 6 plus `@typescript/native` 7 for `svelte-check --tsgo` compatibility; the TS SDK also stays on TypeScript 6 because tsup's declaration bundler is not TS 7 compatible. Don't bump these casually.
 - **knip** (`knip.json`): dead-code/dependency check. Entry points include SvelteKit route files + `db/index.ts`, `auth.ts`, `cleanup-scheduler.ts`. Has explicit ignores (the `simple-ingest.ts` types, deps like `tw-animate-css`/`layerchart`, the `jsr` binary). Run `bun run knip` pre-commit.
 - **husky** (`.husky/`): installed via the `prepare` script (`vp config && husky && svelte-kit sync`). `.husky/pre-commit` runs `vp check && bun run knip`; a separate `.vite-hooks/pre-commit` (from `vp config`) runs the lighter `vp staged`. `husky` runs last in `prepare`, so `.husky/pre-commit` is the effective gate.
 - **seed-admin** (`scripts/seed-admin.ts`): idempotent admin creation through better-auth using `ADMIN_USERNAME`/`ADMIN_PASSWORD`; email auto-derived `<user>@logwell.local` (`.local` because `localhost` fails email validation).
-- **Pinned versions**: Bun `1.3.14` (pkg manager) / `1.2.15` (CI setup-bun) / `1.3.14-alpine` (Docker, with digest). Postgres `18-alpine` everywhere. Pinning is for reproducible builds.
+- **Pinned versions**: Bun `1.3.14` (pkg manager + CI setup-bun) / `1.3.14-alpine` (Docker, with digest). Postgres `18-alpine` everywhere (PG 19 is beta-only as of 2026-07; do not bump to a beta). Pinning is for reproducible builds.
 
 ---
 
@@ -434,7 +435,7 @@ The `plans/` directory is the durable **decision record** — self-contained han
 11. **`test-db.ts` approximations**: schema comes from reflection (not `drizzle/*.sql`); `VARCHAR` is forced to 255; unique indexes become UNIQUE constraints. New schema column types may need the generator's type map / FK `tableOrder` updated or the table is silently skipped.
 12. **Don't copy `tests/integration/api/health/health.integration.test.ts`'s inline CREATE TABLE** — it's a bespoke legacy setup (references an `api_key` column), not the shared `setupTestDatabase()` path.
 13. **Test-doc sources of truth**: trust this file, `vitest.config.ts`, `test-db.ts`, and `tests/fixtures/db.ts` for the testing setup. `tests/README.md` and `src/lib/server/db/README.md` were corrected (the phantom `.browser.test.ts` tier and the old `test-utils.ts`/`createUserFactory`/age-field examples are gone); the fictional `tests/fixtures/README.md` was deleted. Keep these docs aligned with `db.ts` factories when you touch that area.
-14. **Pinned Vite+/Bun/Postgres versions** are intentional for reproducibility; don't bump without reason. (CI's `setup-bun` pins **1.2.15** while the Docker image is **1.3.14** — CI and the prod image run different Bun versions by design.)
+14. **Pinned Vite+/Bun/Postgres versions** are intentional for reproducibility; don't bump without reason. (CI's `setup-bun` and the Docker image both pin **Bun 1.3.14**; Postgres stays on **18-alpine** because PG 19 is beta-only.)
 15. **`src/lib/server/session.ts` is TEST-ONLY** — `getSession()` skips HMAC signature verification. Never call it from a route; production uses `auth.api.getSession()`.
 16. **Incident auto-resolve threshold is duplicated**: the server reads `INCIDENT_AUTO_RESOLVE_MINUTES`, but `incidents/+page.svelte` hardcodes `30 * 60 * 1000`. Keep the env at **30** or server/UI status disagree.
 17. **Never make the SSE stream hooks' `_isConnected`/`_isConnecting` `$state`** — it triggers an `effect_update_depth_exceeded` hydration-breaking loop; surface connection state via the `onConnectionChange` callback instead.

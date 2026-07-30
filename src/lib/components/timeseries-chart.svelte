@@ -88,7 +88,7 @@ function formatTooltipDate(date: Date): string {
             yScale={scaleLinear()}
             yNice={true}
             padding={{ top: 20, right: 20, bottom: 40, left: 50 }}
-            tooltip={{ mode: 'band' }}
+            tooltipContext={{ mode: 'band' }}
           >
             <Svg>
               <Axis placement="bottom" format={formatAxisLabel} />
