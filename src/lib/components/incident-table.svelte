@@ -26,6 +26,13 @@ const SKELETON_COUNT = 8;
 function selectIncident(id: string) {
   onSelect?.(id);
 }
+
+function handleKeyDown(event: KeyboardEvent, id: string) {
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault();
+    selectIncident(id);
+  }
+}
 </script>
 
 <div data-testid="incident-table" class={cn('w-full', className)}>
@@ -100,7 +107,10 @@ function selectIncident(id: string) {
               'cursor-pointer border-b transition-colors hover:bg-muted/40',
               selectedIncidentId === item.id && 'bg-primary/10 ring-1 ring-primary/40',
             )}
+            role="button"
+            tabindex="0"
             onclick={() => selectIncident(item.id)}
+            onkeydown={(e) => handleKeyDown(e, item.id)}
           >
             <td class="px-4 py-3">
               <div class="flex items-center gap-2">

@@ -77,7 +77,7 @@ let pendingIncidentUpdates: ClientIncident[] = [];
 let detailRequestId = 0;
 
 function computeStatus(lastSeenIso: string): IncidentStatus {
-  const thresholdMs = 30 * 60 * 1000;
+  const thresholdMs = data.autoResolveMinutes * 60 * 1000;
   const diff = Date.now() - new Date(lastSeenIso).getTime();
   return diff <= thresholdMs ? 'open' : 'resolved';
 }
@@ -133,12 +133,26 @@ const incidentStream = useIncidentStream({
 });
 
 $effect(() => {
+  incidentStream.setProjectId(data.project.id);
   incidentStream.connect();
   return () => {
     incidentStream.disconnect();
     if (refreshTimeout) clearTimeout(refreshTimeout);
     pendingIncidentUpdates = [];
   };
+});
+
+// svelte-ignore state_referenced_locally
+$effect(() => {
+  incidents = [...data.incidents];
+  // svelte-ignore state_referenced_locally
+  nextCursor = data.pagination.nextCursor ?? null;
+  // svelte-ignore state_referenced_locally
+  selectedStatus = data.filters.status as IncidentStatus;
+  // svelte-ignore state_referenced_locally
+  selectedRange = data.filters.range as IncidentRange;
+  // svelte-ignore state_referenced_locally
+  selectedIncidentId = data.filters.selectedIncidentId ?? null;
 });
 
 async function fetchIncidentDetail(incidentId: string) {

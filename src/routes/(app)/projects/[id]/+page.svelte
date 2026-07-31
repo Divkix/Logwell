@@ -31,10 +31,17 @@ import type { PageData } from './$types';
 
 const { data }: { data: PageData } = $props();
 
+// Hard cap on in-memory streamed logs per client (matches LOG_STREAM_CONFIG.MAX_LOGS_UPPER_LIMIT)
+const MAX_STREAMED_LOGS = 10000;
+
 // Show skeleton when navigating TO this page (project logs page, not stats)
+const navTo = $navigating?.to?.url.pathname;
 const isNavigating = $derived(
-  $navigating?.to?.url.pathname.includes('/projects/') &&
-    !$navigating?.to?.url.pathname.endsWith('/stats'),
+  !!navTo &&
+    navTo.includes('/projects/') &&
+    !navTo.endsWith('/stats') &&
+    !navTo.endsWith('/incidents') &&
+    !navTo.endsWith('/settings'),
 );
 
 // Convert server data logs (with string timestamps) to Log type (with Date timestamps)
@@ -114,14 +121,16 @@ function handleIncomingLogs(logs: ClientLog[]) {
   // Remove highlight after 3s; track timer for cleanup
   const timer = setTimeout(() => {
     newLogIds = new Set([...newLogIds].filter((id) => !ids.includes(id)));
+    highlightTimers.splice(highlightTimers.indexOf(timer), 1);
   }, 3000);
   highlightTimers.push(timer);
 
-  streamedLogs = [...parsedLogs, ...streamedLogs];
+  streamedLogs = [...parsedLogs, ...streamedLogs].slice(0, MAX_STREAMED_LOGS);
 }
 
 // Track SSE connection state reactively for UI
 let sseConnected = $state(false);
+let streamError = $state<Error | null>(null);
 
 // Use the SSE hook for log streaming (connection managed reactively via $effect below)
 // svelte-ignore state_referenced_locally
@@ -131,11 +140,16 @@ const logStream = useLogStream({
   onLogs: handleIncomingLogs,
   onConnectionChange: (connected) => {
     sseConnected = connected;
+    if (connected) streamError = null;
+  },
+  onError: (e) => {
+    streamError = e;
   },
 });
 
 // Manage stream connection based on liveEnabled and pause state
 $effect(() => {
+  logStream.setProjectId(data.project.id);
   if (liveEnabled && !isLivePaused) {
     logStream.connect();
   } else {
@@ -213,20 +227,23 @@ function handleTimeRangeChange(range: TimeRange) {
 
 async function updateFilters() {
   loading = true;
-  streamedLogs = []; // Clear streamed logs on filter change
+  try {
+    streamedLogs = []; // Clear streamed logs on filter change
 
-  const params = new URLSearchParams();
-  if (searchValue) params.set('search', searchValue);
-  if (selectedLevels.length > 0) params.set('level', selectedLevels.join(','));
-  params.set('range', selectedRange);
+    const params = new URLSearchParams();
+    if (searchValue) params.set('search', searchValue);
+    if (selectedLevels.length > 0) params.set('level', selectedLevels.join(','));
+    params.set('range', selectedRange);
 
-  const queryString = params.toString();
-  const url = queryString
-    ? `/projects/${data.project.id}?${queryString}`
-    : `/projects/${data.project.id}`;
+    const queryString = params.toString();
+    const url = queryString
+      ? `/projects/${data.project.id}?${queryString}`
+      : `/projects/${data.project.id}`;
 
-  await goto(url, { replaceState: true, noScroll: true });
-  loading = false;
+    await goto(url, { replaceState: true, noScroll: true });
+  } finally {
+    loading = false;
+  }
 }
 
 function handleLogClick(log: Log) {
@@ -424,7 +441,10 @@ function handleKeyboardShortcut(event: KeyboardEvent) {
       <LiveToggle bind:enabled={liveEnabled} disabled={isLivePaused} isConnected={sseConnected} />
 
       <!-- Connection Status -->
-      <ConnectionStatus isConnecting={logStream.isConnecting} error={logStream.error} />
+      <ConnectionStatus
+        isConnecting={liveEnabled && !sseConnected && !streamError}
+        error={streamError}
+      />
 
       {#if isLivePaused}
         <span

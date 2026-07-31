@@ -17,6 +17,7 @@ import {
   mapOtlpAttributesToLogColumns,
   type NormalizedOtlpLogsResult,
   normalizeOtlpLogsRequest,
+  OtlpBatchTooLargeError,
   OtlpValidationError,
 } from "$lib/server/utils/otlp";
 import { checkRateLimit, INGEST_RPM } from "$lib/server/utils/rate-limit";
@@ -79,6 +80,15 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   try {
     normalized = normalizeOtlpLogsRequest(body);
   } catch (err) {
+    if (err instanceof OtlpBatchTooLargeError) {
+      return json(
+        {
+          error: "batch_too_large",
+          message: err.message,
+        },
+        { status: 400 },
+      );
+    }
     if (err instanceof OtlpValidationError) {
       return json({ error: "validation_error", message: err.message }, { status: 400 });
     }

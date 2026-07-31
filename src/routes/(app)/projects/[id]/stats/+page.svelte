@@ -59,6 +59,11 @@ $effect(() => {
   fetchController = new AbortController();
   const signal = fetchController.signal;
   fetchTimeseries(selectedRange, data.filters.from, signal);
+
+  // Abort the last in-flight request on unmount
+  return () => {
+    fetchController?.abort();
+  };
 });
 
 // Show skeleton when navigating TO this page
@@ -78,8 +83,11 @@ async function updateFilters() {
   const queryString = params.toString();
   const url = `/projects/${data.project.id}/stats?${queryString}`;
 
-  await goto(url, { replaceState: true, noScroll: true });
-  loading = false;
+  try {
+    await goto(url, { replaceState: true, noScroll: true });
+  } finally {
+    loading = false;
+  }
 }
 
 // Prepare chart data

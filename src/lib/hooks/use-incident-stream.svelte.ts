@@ -34,6 +34,7 @@ export interface UseIncidentStreamReturn {
   error: Error | null;
   connect: () => void;
   disconnect: () => void;
+  setProjectId: (id: string) => void;
 }
 
 const DEFAULT_MAX_RECONNECT_ATTEMPTS = 5;
@@ -62,6 +63,8 @@ export function useIncidentStream(options: UseIncidentStreamOptions): UseInciden
   let _reconnectTimeoutId: ReturnType<typeof setTimeout> | null = null;
   let _reconnectAttempts = 0;
   let _isDisconnected = true;
+  let _projectId = projectId;
+  let _epoch = 0;
 
   function setConnected(connected: boolean): void {
     if (_isConnected !== connected) {
@@ -70,30 +73,30 @@ export function useIncidentStream(options: UseIncidentStreamOptions): UseInciden
     }
   }
 
-  function parseSSEBuffer(buffer: string): {
-    events: Array<{ event: string; data: string }>;
-    remaining: string;
-  } {
-    const lines = buffer.split("\n");
-    const remaining = lines.pop() || "";
-    const events: Array<{ event: string; data: string }> = [];
+  function processSSEBuffer(buffer: string): string {
+    let frameEnd = buffer.indexOf("\n\n");
+    while (frameEnd !== -1) {
+      const frame = buffer.slice(0, frameEnd);
+      let event = "";
+      let data = "";
 
-    let currentEvent = "";
-    let currentData = "";
-
-    for (const line of lines) {
-      if (line.startsWith("event: ")) {
-        currentEvent = line.slice(7);
-      } else if (line.startsWith("data: ")) {
-        currentData = line.slice(6);
-      } else if (line === "" && currentEvent && currentData) {
-        events.push({ event: currentEvent, data: currentData });
-        currentEvent = "";
-        currentData = "";
+      for (const line of frame.split("\n")) {
+        const normalizedLine = line.endsWith("\r") ? line.slice(0, -1) : line;
+        if (normalizedLine.startsWith("event: ")) {
+          event = normalizedLine.slice(7);
+        } else if (normalizedLine.startsWith("data: ")) {
+          data = normalizedLine.slice(6);
+        }
       }
-    }
 
-    return { events, remaining };
+      if (event && data) {
+        processSSEEvents([{ event, data }]);
+      }
+
+      buffer = buffer.slice(frameEnd + 2);
+      frameEnd = buffer.indexOf("\n\n");
+    }
+    return buffer;
   }
 
   function processSSEEvents(events: Array<{ event: string; data: string }>): void {
@@ -128,13 +131,15 @@ export function useIncidentStream(options: UseIncidentStreamOptions): UseInciden
     _isConnecting = true;
     _error = null;
     _abortController = new AbortController();
+    const myEpoch = ++_epoch;
 
-    fetch(`/api/projects/${projectId}/incidents/stream`, {
+    fetch(`/api/projects/${_projectId}/incidents/stream`, {
       method: "POST",
       credentials: "same-origin",
       signal: _abortController.signal,
     })
       .then(async (response) => {
+        if (myEpoch !== _epoch) return;
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
@@ -154,14 +159,13 @@ export function useIncidentStream(options: UseIncidentStreamOptions): UseInciden
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
+            if (myEpoch !== _epoch) return;
 
             buffer += decoder.decode(value, { stream: true });
-            const { events, remaining } = parseSSEBuffer(buffer);
-            buffer = remaining;
-            processSSEEvents(events);
+            buffer = processSSEBuffer(buffer);
           }
         } catch (error) {
-          if (!_isDisconnected) {
+          if (myEpoch === _epoch && !_isDisconnected) {
             _error = error instanceof Error ? error : new Error(String(error));
             onError?.(_error);
           }
@@ -169,12 +173,13 @@ export function useIncidentStream(options: UseIncidentStreamOptions): UseInciden
           reader.releaseLock();
         }
 
-        if (!_isDisconnected) {
+        if (myEpoch === _epoch && !_isDisconnected) {
           setConnected(false);
           scheduleReconnect();
         }
       })
       .catch((error) => {
+        if (myEpoch !== _epoch) return;
         _isConnecting = false;
         if (error?.name === "AbortError" && _isDisconnected) return;
 
@@ -190,6 +195,7 @@ export function useIncidentStream(options: UseIncidentStreamOptions): UseInciden
   }
 
   function disconnect(): void {
+    _epoch++;
     _isDisconnected = true;
 
     if (_reconnectTimeoutId) {
@@ -204,6 +210,15 @@ export function useIncidentStream(options: UseIncidentStreamOptions): UseInciden
     _isConnecting = false;
     _reconnectAttempts = 0;
     setConnected(false);
+  }
+
+  function setProjectId(id: string): void {
+    if (id === _projectId) return;
+    _projectId = id;
+    if (!_isDisconnected) {
+      disconnect();
+      connect();
+    }
   }
 
   if (enabled && typeof window !== "undefined") {
@@ -222,5 +237,6 @@ export function useIncidentStream(options: UseIncidentStreamOptions): UseInciden
     },
     connect,
     disconnect,
+    setProjectId,
   };
 }

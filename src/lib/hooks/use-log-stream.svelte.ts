@@ -34,6 +34,8 @@ export interface UseLogStreamReturn {
   connect: () => void;
   /** Manually disconnect */
   disconnect: () => void;
+  /** Change the project subscribed to by the stream */
+  setProjectId: (id: string) => void;
 }
 
 /**
@@ -78,6 +80,8 @@ export function useLogStream(options: UseLogStreamOptions): UseLogStreamReturn {
   let _reconnectTimeoutId: ReturnType<typeof setTimeout> | null = null;
   let _reconnectAttempts = 0;
   let _isDisconnected = true;
+  let _projectId = projectId;
+  let _epoch = 0;
 
   /**
    * Updates connection state and triggers callback
@@ -89,34 +93,30 @@ export function useLogStream(options: UseLogStreamOptions): UseLogStreamReturn {
     }
   }
 
-  /**
-   * Parses SSE events from a buffer string
-   * Returns parsed events and remaining buffer
-   */
-  function parseSSEBuffer(buffer: string): {
-    events: Array<{ event: string; data: string }>;
-    remaining: string;
-  } {
-    const lines = buffer.split("\n");
-    const remaining = lines.pop() || "";
-    const events: Array<{ event: string; data: string }> = [];
+  function processSSEBuffer(buffer: string): string {
+    let frameEnd = buffer.indexOf("\n\n");
+    while (frameEnd !== -1) {
+      const frame = buffer.slice(0, frameEnd);
+      let event = "";
+      let data = "";
 
-    let currentEvent = "";
-    let currentData = "";
-
-    for (const line of lines) {
-      if (line.startsWith("event: ")) {
-        currentEvent = line.slice(7);
-      } else if (line.startsWith("data: ")) {
-        currentData = line.slice(6);
-      } else if (line === "" && currentEvent && currentData) {
-        events.push({ event: currentEvent, data: currentData });
-        currentEvent = "";
-        currentData = "";
+      for (const line of frame.split("\n")) {
+        const normalizedLine = line.endsWith("\r") ? line.slice(0, -1) : line;
+        if (normalizedLine.startsWith("event: ")) {
+          event = normalizedLine.slice(7);
+        } else if (normalizedLine.startsWith("data: ")) {
+          data = normalizedLine.slice(6);
+        }
       }
-    }
 
-    return { events, remaining };
+      if (event && data) {
+        processSSEEvents([{ event, data }]);
+      }
+
+      buffer = buffer.slice(frameEnd + 2);
+      frameEnd = buffer.indexOf("\n\n");
+    }
+    return buffer;
   }
 
   /**
@@ -164,13 +164,15 @@ export function useLogStream(options: UseLogStreamOptions): UseLogStreamReturn {
     _isConnecting = true;
     _error = null;
     _abortController = new AbortController();
+    const myEpoch = ++_epoch;
 
-    fetch(`/api/projects/${projectId}/logs/stream`, {
+    fetch(`/api/projects/${_projectId}/logs/stream`, {
       method: "POST",
       credentials: "same-origin",
       signal: _abortController.signal,
     })
       .then(async (response) => {
+        if (myEpoch !== _epoch) return;
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
@@ -191,16 +193,14 @@ export function useLogStream(options: UseLogStreamOptions): UseLogStreamReturn {
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
+            if (myEpoch !== _epoch) return;
 
             buffer += decoder.decode(value, { stream: true });
-            const { events, remaining } = parseSSEBuffer(buffer);
-            buffer = remaining;
-
-            processSSEEvents(events);
+            buffer = processSSEBuffer(buffer);
           }
         } catch (error) {
           // Stream was aborted or errored
-          if (!_isDisconnected) {
+          if (myEpoch === _epoch && !_isDisconnected) {
             _error = error instanceof Error ? error : new Error(String(error));
             onError?.(_error);
           }
@@ -209,12 +209,13 @@ export function useLogStream(options: UseLogStreamOptions): UseLogStreamReturn {
         }
 
         // Connection closed (stream ended)
-        if (!_isDisconnected) {
+        if (myEpoch === _epoch && !_isDisconnected) {
           setConnected(false);
           scheduleReconnect();
         }
       })
       .catch((error) => {
+        if (myEpoch !== _epoch) return;
         _isConnecting = false;
 
         // Ignore abort errors from intentional disconnection
@@ -238,6 +239,7 @@ export function useLogStream(options: UseLogStreamOptions): UseLogStreamReturn {
    * Disconnects from the SSE endpoint
    */
   function disconnect(): void {
+    _epoch++;
     _isDisconnected = true;
 
     // Clear any pending reconnection
@@ -255,6 +257,15 @@ export function useLogStream(options: UseLogStreamOptions): UseLogStreamReturn {
     _isConnecting = false;
     _reconnectAttempts = 0;
     setConnected(false);
+  }
+
+  function setProjectId(id: string): void {
+    if (id === _projectId) return;
+    _projectId = id;
+    if (!_isDisconnected) {
+      disconnect();
+      connect();
+    }
   }
 
   // Auto-connect if enabled on creation (only in browser)
@@ -277,5 +288,6 @@ export function useLogStream(options: UseLogStreamOptions): UseLogStreamReturn {
     },
     connect,
     disconnect,
+    setProjectId,
   };
 }

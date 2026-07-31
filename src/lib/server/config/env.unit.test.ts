@@ -114,13 +114,13 @@ describe("Environment Configuration", () => {
       expect(env.ORIGIN).toBeUndefined();
     });
 
-    it("exports NODE_ENV with default of development", async () => {
+    it("exports NODE_ENV with a secure default of production when unset", async () => {
       process.env.DATABASE_URL = "postgres://localhost/test";
       process.env.BETTER_AUTH_SECRET = "a".repeat(32);
       delete process.env.NODE_ENV;
 
       const { env } = await import("./env");
-      expect(env.NODE_ENV).toBe("development");
+      expect(env.NODE_ENV).toBe("production");
     });
   });
 
@@ -143,13 +143,13 @@ describe("Environment Configuration", () => {
       expect(isProduction()).toBe(false);
     });
 
-    it("returns false when NODE_ENV is not set", async () => {
+    it("returns true when NODE_ENV is not set (secure default)", async () => {
       process.env.DATABASE_URL = "postgres://localhost/test";
       process.env.BETTER_AUTH_SECRET = "a".repeat(32);
       delete process.env.NODE_ENV;
 
       const { isProduction } = await import("./env");
-      expect(isProduction()).toBe(false);
+      expect(isProduction()).toBe(true);
     });
   });
 
@@ -163,13 +163,13 @@ describe("Environment Configuration", () => {
       expect(isDevelopment()).toBe(true);
     });
 
-    it("returns true when NODE_ENV is not set", async () => {
+    it("returns false when NODE_ENV is not set (secure default is production)", async () => {
       process.env.DATABASE_URL = "postgres://localhost/test";
       process.env.BETTER_AUTH_SECRET = "a".repeat(32);
       delete process.env.NODE_ENV;
 
       const { isDevelopment } = await import("./env");
-      expect(isDevelopment()).toBe(true);
+      expect(isDevelopment()).toBe(false);
     });
 
     it("returns false when NODE_ENV is production", async () => {

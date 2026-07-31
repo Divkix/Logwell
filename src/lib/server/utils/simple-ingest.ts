@@ -114,13 +114,18 @@ function validateLogEntry(
   const timestamp = parseTimestamp(entry.timestamp);
   const service = typeof entry.service === "string" ? entry.service : null;
   const rawMetadata =
-    entry.metadata && typeof entry.metadata === "object"
+    entry.metadata && typeof entry.metadata === "object" && !Array.isArray(entry.metadata)
       ? (entry.metadata as Record<string, unknown>)
       : null;
   const metadata = rawMetadata && Object.keys(rawMetadata).length > 0 ? rawMetadata : null;
   const sourceFile = typeof entry.sourceFile === "string" ? entry.sourceFile : null;
   const lineNumber =
-    typeof entry.lineNumber === "number" && entry.lineNumber > 0 ? entry.lineNumber : null;
+    typeof entry.lineNumber === "number" &&
+    Number.isInteger(entry.lineNumber) &&
+    entry.lineNumber > 0 &&
+    entry.lineNumber <= 2147483647
+      ? entry.lineNumber
+      : null;
 
   const mapped = mapOtlpAttributesToLogColumns(metadata);
 

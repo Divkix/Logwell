@@ -29,8 +29,8 @@ export class EnvValidationError extends Error {
 }
 
 // Get NODE_ENV first for conditional validation
-const nodeEnv = process.env.NODE_ENV || "development";
-const isDevExplicit = nodeEnv === "development";
+const nodeEnv = process.env.NODE_ENV ?? "production";
+const isDevExplicit = nodeEnv === "development" || nodeEnv === "test";
 
 // Collect validation errors
 const validationErrors: Array<{ variable: string; message: string }> = [];

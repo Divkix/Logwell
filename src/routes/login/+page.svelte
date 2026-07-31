@@ -81,7 +81,6 @@ async function handleSubmit(event: Event) {
         onError: (ctx) => {
           // Handle error from better-auth
           error = ctx.error?.message || 'Invalid credentials';
-          isLoading = false;
         },
       },
     );
@@ -89,7 +88,6 @@ async function handleSubmit(event: Event) {
     if (signInError) {
       // Show error message
       error = signInError.message || 'Invalid credentials';
-      isLoading = false;
       return;
     }
 
@@ -101,6 +99,7 @@ async function handleSubmit(event: Event) {
   } catch (err) {
     // Handle unexpected errors
     error = 'An unexpected error occurred. Please try again.';
+  } finally {
     isLoading = false;
   }
 }

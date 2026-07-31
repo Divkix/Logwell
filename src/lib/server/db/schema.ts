@@ -31,7 +31,9 @@ export const project = pgTable(
     // - >0: delete logs older than N days
     retentionDays: integer("retention_days"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date()),
   },
   (table) => [
     index("idx_project_owner_id").on(table.ownerId),
@@ -72,7 +74,9 @@ export const incident = pgTable(
     lastSeen: timestamp("last_seen", { withTimezone: true }).notNull(),
     totalEvents: integer("total_events").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date()),
   },
   (table) => [
     index("idx_incident_project_last_seen").on(table.projectId, table.lastSeen),

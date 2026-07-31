@@ -87,6 +87,7 @@ export const load: PageServerLoad = async (event) => {
       id: projectData.id,
       name: projectData.name,
     },
+    autoResolveMinutes: INCIDENT_CONFIG.AUTO_RESOLVE_MINUTES,
     incidents: incidentsToReturn.map((i) => ({
       id: i.id,
       projectId: i.projectId,

@@ -39,6 +39,9 @@ export async function POST(event: RequestEvent): Promise<Response> {
   // returned once below and cannot be retrieved later.
   const newApiKey = generateApiKey();
 
+  // Invalidate the old API key's cache entry before replacing its stored hash
+  invalidateApiKeyCacheByHash(projectData.apiKeyHash);
+
   // Update project with the new API key hash
   await db
     .update(project)
@@ -47,9 +50,6 @@ export async function POST(event: RequestEvent): Promise<Response> {
       updatedAt: new Date(),
     })
     .where(eq(project.id, projectId));
-
-  // Invalidate the old API key's cache entry by its stored hash
-  invalidateApiKeyCacheByHash(projectData.apiKeyHash);
 
   return json({
     apiKey: newApiKey,

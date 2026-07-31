@@ -1,9 +1,23 @@
 import type { LogLevel } from "$lib/shared/types";
+import { API_CONFIG } from "../config/performance";
 
 export class OtlpValidationError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "OtlpValidationError";
+  }
+}
+
+/**
+ * Specialized validation error for batches that exceed the server's
+ * BATCH_INSERT_LIMIT. Routes map this to a `batch_too_large` response
+ * (distinct from a generic `validation_error`) so clients can distinguish
+ * the two.
+ */
+export class OtlpBatchTooLargeError extends OtlpValidationError {
+  constructor(limit: number) {
+    super(`Batch exceeds maximum limit of ${limit} logs.`);
+    this.name = "OtlpBatchTooLargeError";
   }
 }
 
@@ -81,7 +95,14 @@ const TRACE_ID_REGEX = /^[0-9a-f]{32}$/i;
 const SPAN_ID_REGEX = /^[0-9a-f]{16}$/i;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function clampInt32(value: number): number | null {
+  if (!Number.isFinite(value)) return null;
+  const t = Math.trunc(value);
+  if (t < -2147483648 || t > 2147483647) return null;
+  return t;
 }
 
 export function parseUint64String(value: unknown): string | null {
@@ -104,11 +125,11 @@ export function parseUint64String(value: unknown): string | null {
 
 function parseOptionalNumber(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
+    return clampInt32(value);
   }
   if (typeof value === "string" && value.trim()) {
     const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : null;
+    return Number.isFinite(parsed) ? clampInt32(parsed) : null;
   }
   return null;
 }
@@ -156,7 +177,8 @@ function parseTimestamp(timeUnixNano: string | null, observedTimeUnixNano: strin
 function parseSeverityNumber(value: unknown): number | null {
   const numberValue = parseOptionalNumber(value);
   if (numberValue === null) return null;
-  const rounded = Math.trunc(numberValue);
+  const rounded = clampInt32(numberValue);
+  if (rounded === null) return null;
   if (rounded < 0) return null;
   return rounded;
 }
@@ -210,12 +232,12 @@ function attributeInt(attributes: Record<string, unknown> | null, keys: string[]
   for (const key of keys) {
     const value = attributes[key];
     if (typeof value === "number" && Number.isSafeInteger(value)) {
-      return value;
+      return value > 0 ? clampInt32(value) : null;
     }
     if (typeof value === "string" && value.trim()) {
       const parsed = Number.parseInt(value, 10);
       if (Number.isSafeInteger(parsed)) {
-        return parsed;
+        return parsed > 0 ? clampInt32(parsed) : null;
       }
     }
   }
@@ -310,7 +332,7 @@ function deriveMessage(body: unknown, attributes: Record<string, unknown> | null
   try {
     return JSON.stringify(body);
   } catch {
-    return JSON.stringify(body);
+    return "[unserializable body]";
   }
 }
 
@@ -335,8 +357,12 @@ export function normalizeOtlpLogsRequest(body: unknown): NormalizedOtlpLogsResul
   let rejectedLogRecords = 0;
   const errors: string[] = [];
 
-  for (const resourceLog of resourceLogs) {
+  let recordCount = 0;
+
+  for (const [resourceIndex, resourceLog] of resourceLogs.entries()) {
     if (!isRecord(resourceLog)) {
+      rejectedLogRecords += 1;
+      errors.push(`Malformed resourceLog at index ${resourceIndex}`);
       continue;
     }
 
@@ -348,8 +374,10 @@ export function normalizeOtlpLogsRequest(body: unknown): NormalizedOtlpLogsResul
 
     const scopeLogs = Array.isArray(resourceLog.scopeLogs) ? resourceLog.scopeLogs : [];
 
-    for (const scopeLog of scopeLogs) {
+    for (const [scopeIndex, scopeLog] of scopeLogs.entries()) {
       if (!isRecord(scopeLog)) {
+        rejectedLogRecords += 1;
+        errors.push(`Malformed scopeLog at index ${scopeIndex}`);
         continue;
       }
 
@@ -384,6 +412,11 @@ export function normalizeOtlpLogsRequest(body: unknown): NormalizedOtlpLogsResul
         const timestamp = parseTimestamp(timeUnixNano, observedTimeUnixNano);
         const level = deriveLevel(severityNumber, severityText);
         const message = deriveMessage(bodyValue, attributes);
+
+        recordCount += 1;
+        if (recordCount > API_CONFIG.BATCH_INSERT_LIMIT) {
+          throw new OtlpBatchTooLargeError(API_CONFIG.BATCH_INSERT_LIMIT);
+        }
 
         records.push({
           timeUnixNano,

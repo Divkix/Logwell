@@ -441,6 +441,7 @@ The `plans/` directory is the durable **decision record** — self-contained han
 17. **Never make the SSE stream hooks' `_isConnected`/`_isConnecting` `$state`** — it triggers an `effect_update_depth_exceeded` hydration-breaking loop; surface connection state via the `onConnectionChange` callback instead.
 18. **API keys are write-only**: there is no read/query API by key (logs read only via the session UI). **Project names are unique per-owner**, not globally.
 19. **Per-log ingest errors are not request failures**: `/v1/ingest` returns **200** `{accepted, rejected, errors[]}` for bad records; only batch-level issues (`invalid_json`, `batch_too_large`, auth, rate-limit) return 4xx.
+20. **Login rate-limit proxy trust**: `event.getClientAddress()` trusts the first `X-Forwarded-For`, so per-IP login limiting is effective only behind a trusted proxy that overwrites XFF; direct deployments should set `RATE_LIMIT_LOGIN_RPM` accordingly or use such a proxy.
 
 ## Agent skills
 
