@@ -60,7 +60,17 @@ async function seedAdmin() {
       console.log("  You can now sign in with the admin credentials");
     } catch (e) {
       const msg = e instanceof Error ? e.message.toLowerCase() : "";
-      if (msg.includes("unique") || msg.includes("already exists") || msg.includes("23505")) {
+      // Treat "user already exists" as success so the seed is idempotent across
+      // container restarts. Covers DB unique-constraint errors (23505) and
+      // better-auth's username plugin error ("Username is already taken",
+      // code USERNAME_IS_ALREADY_TAKEN), which returns 400 instead of a DB error.
+      if (
+        msg.includes("unique") ||
+        msg.includes("already exists") ||
+        msg.includes("already taken") ||
+        msg.includes("23505") ||
+        msg.includes("username_is_already_taken")
+      ) {
         console.log("✓ Admin user already exists, skipping seed.");
       } else {
         throw e;

@@ -179,4 +179,40 @@ describe("seed-admin", () => {
       "ADMIN_PASSWORD must be at least 8 characters long",
     );
   });
+
+  it("signUpEmail rejects a duplicate username with a message the seed script treats as idempotent", async () => {
+    // The real seed-admin.ts catches signUpEmail failures and treats them as
+    // "already exists" (skip) only when the error message matches its
+    // idempotency check. A container restart re-runs the seed against an
+    // existing admin, so better-auth's duplicate-username error must match.
+    // This test pins both sides: the error text AND the script's match set.
+    const auth = createAuth(db);
+    const adminPassword = "test-admin-password-123";
+
+    // First signup succeeds.
+    await seedAdmin(db, adminPassword);
+
+    // Second signup with the same username must throw.
+    const duplicateSignup = auth.api.signUpEmail({
+      body: {
+        email: `${ADMIN_USERNAME}@logwell.local`,
+        password: adminPassword,
+        name: "Admin",
+        username: ADMIN_USERNAME,
+      },
+    });
+
+    await expect(duplicateSignup).rejects.toThrow();
+    await duplicateSignup.catch((e: unknown) => {
+      const msg = (e instanceof Error ? e.message : String(e)).toLowerCase();
+      // These are the substrings seed-admin.ts recognizes as "already exists".
+      const idempotent =
+        msg.includes("unique") ||
+        msg.includes("already exists") ||
+        msg.includes("already taken") ||
+        msg.includes("23505") ||
+        msg.includes("username_is_already_taken");
+      expect(idempotent).toBe(true);
+    });
+  });
 });
