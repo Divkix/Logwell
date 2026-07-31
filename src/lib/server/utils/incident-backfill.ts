@@ -1,8 +1,8 @@
 import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { INCIDENT_GROUPED_LEVELS } from "../../shared/schemas/incident";
-import type { DatabaseClient } from "$lib/server/db/db";
-import { type Incident, incident, type LogLevel, log } from "$lib/server/db/schema";
+import type { DatabaseClient } from "../db/db";
+import { type Incident, incident, type LogLevel, log } from "../db/schema";
 import {
   assignIncidentIds,
   buildIncidentTitle,

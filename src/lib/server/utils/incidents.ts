@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
-import type { DatabaseClient } from "$lib/server/db/db";
+import type { DatabaseClient } from "../db/db";
 import { type IncidentStatus, isIncidentGroupedLevel, maxIncidentLevel } from "../../shared/types";
 import { INCIDENT_CONFIG } from "../config/performance";
 import { type Incident, incident, type LogLevel } from "../db/schema";
