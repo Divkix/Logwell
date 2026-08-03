@@ -44,8 +44,8 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "build": "tsup",
-    "dev": "tsup --watch",
+    "build": "vp pack",
+    "dev": "vp pack --watch",
     "check": "vp check",
     "lint": "vp check",
     "lint:fix": "vp check --fix",
@@ -64,10 +64,9 @@
     "@vitest/coverage-v8": "^4.1.10",
     "msw": "^2.15.0",
     "size-limit": "^13.0.3",
-    "tsup": "^8.5.1",
-    "typescript": "^6.0.3",
+    "typescript": "^7.0.2",
     "vite": "npm:@voidzero-dev/vite-plus-core@0.2.6",
-    "vite-plus": "0.2.6",
+    "vite-plus": "0.2.7",
     "vitest": "4.1.10"
   },
   "overrides": {
