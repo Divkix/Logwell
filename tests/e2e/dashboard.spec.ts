@@ -246,8 +246,9 @@ test.describe("Dashboard - Create Project Modal", () => {
       .getByRole("button", { name: /^create$/i })
       .click();
 
-    // Should show validation error
-    await expect(page.getByText(/name.*required|required/i)).toBeVisible();
+    // Should show validation error (schema min(1) → "Project name cannot be empty")
+    await expect(page.getByTestId("error-message")).toBeVisible();
+    await expect(page.getByTestId("error-message")).toHaveText(/cannot be empty/i);
   });
 
   test("should show error for duplicate project name", async ({ page }) => {
