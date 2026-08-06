@@ -556,3 +556,76 @@ func TestQueue_TimerAfterFlush(t *testing.T) {
 		t.Errorf("flushed = %d, want 1", flushed)
 	}
 }
+
+// TestQueue_TimerRestartsAfterFire tests that an entry enqueued after the
+// previous timer already fired (its callback ran to completion) still gets a
+// fresh pending timer. A fired timer must never be Reset into a live state;
+// the queue must stop-and-recreate it so entries are never stranded without a
+// live auto-flush timer.
+func TestQueue_TimerRestartsAfterFire(t *testing.T) {
+	var flushed int32
+	flushFn := func() {
+		atomic.AddInt32(&flushed, 1)
+	}
+
+	q := newBatchQueue(50*time.Millisecond, flushFn, 0, nil)
+
+	// First entry starts timer 1.
+	q.add(LogEntry{Level: LevelInfo, Message: "1"})
+
+	// Wait for timer 1 to fire and its callback to complete.
+	time.Sleep(100 * time.Millisecond)
+	if atomic.LoadInt32(&flushed) != 1 {
+		t.Fatalf("flushed = %d, want 1", flushed)
+	}
+
+	// Enqueue a second entry. The previous timer has fired; the queue must
+	// stop-and-recreate a fresh timer rather than Reset the dead one.
+	q.add(LogEntry{Level: LevelInfo, Message: "2"})
+
+	// Wait for the fresh timer to fire.
+	time.Sleep(100 * time.Millisecond)
+
+	if atomic.LoadInt32(&flushed) != 2 {
+		t.Errorf("flushed = %d, want 2 (second entry must be flushed by a fresh timer)", flushed)
+	}
+}
+
+// TestQueue_TimerRecreatedMidCallback tests that enqueuing while a timer
+// callback is mid-flight stops the fired timer and starts a fresh pending one,
+// so the new entry is always covered by a live timer and never stranded.
+func TestQueue_TimerRecreatedMidCallback(t *testing.T) {
+	var flushed int32
+	callbackStarted := make(chan struct{})
+	releaseCallback := make(chan struct{})
+	var once sync.Once
+
+	flushFn := func() {
+		once.Do(func() { close(callbackStarted) })
+		<-releaseCallback
+		atomic.AddInt32(&flushed, 1)
+	}
+
+	q := newBatchQueue(50*time.Millisecond, flushFn, 0, nil)
+
+	// First entry starts timer 1.
+	q.add(LogEntry{Level: LevelInfo, Message: "1"})
+
+	// Wait until timer 1 fires and its callback is mid-flight (blocked).
+	<-callbackStarted
+
+	// Enqueue while the callback is mid-flight. The fired timer must be stopped
+	// and replaced with a fresh pending timer.
+	q.add(LogEntry{Level: LevelInfo, Message: "2"})
+
+	// Release the in-flight callback.
+	close(releaseCallback)
+
+	// The fresh timer must fire and flush the second entry.
+	time.Sleep(100 * time.Millisecond)
+
+	got := atomic.LoadInt32(&flushed)
+	if got != 2 {
+		t.Errorf("flushed = %d, want 2 (in-flight callback + fresh timer)", got)
+	}
+}

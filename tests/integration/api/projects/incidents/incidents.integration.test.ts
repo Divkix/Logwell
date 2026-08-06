@@ -1,4 +1,5 @@
 import type { HttpError } from "@sveltejs/kit";
+import { sql } from "drizzle-orm";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { createAuth } from "$lib/server/auth";
@@ -497,5 +498,51 @@ describe("Incident APIs", () => {
 
     const body = await response.json();
     expect(body).toHaveProperty("error", "not_found");
+  });
+
+  it("does not skip incidents that share the cursor's millisecond", async () => {
+    const project = await seedProject(db, { ownerId: userId });
+
+    // 25 open incidents whose lastSeen all fall within the same millisecond
+    // but at distinct microsecond offsets — the scenario where a
+    // millisecond-truncated cursor timestamp makes the next page empty.
+    const nowSecs = Date.now() / 1000;
+    const baseEpoch = Math.floor(nowSecs) + 0.123456;
+    const seededIds: string[] = [];
+    for (let i = 0; i < 25; i++) {
+      const id = `inc-same-ms-${i}`;
+      seededIds.push(id);
+      await db.execute(sql`
+        INSERT INTO "incident"
+          ("id", "project_id", "fingerprint", "title", "normalized_message", "highest_level", "first_seen", "last_seen", "total_events")
+        VALUES (${id}, ${project.id}, ${`fp-same-ms-${i}`}, ${`Incident ${i}`}, ${`incident ${i}`}, 'error', to_timestamp(${baseEpoch + i * 0.000001}), to_timestamp(${baseEpoch + i * 0.000001}), 1)
+      `);
+    }
+
+    // Paginate through 10 at a time, following the cursor.
+    const collectedIds: string[] = [];
+    let cursor: string | null = null;
+    for (let page = 0; page < 10; page++) {
+      const url = cursor
+        ? `http://localhost/api/projects/${project.id}/incidents?limit=10&cursor=${encodeURIComponent(cursor)}`
+        : `http://localhost/api/projects/${project.id}/incidents?limit=10`;
+      const request = new Request(url);
+      const event = createRequestEvent(request, db, { id: project.id }, authenticatedLocals);
+      const response = await GET_LIST(event as never);
+      expect(response.status).toBe(200);
+      const body = await response.json();
+
+      collectedIds.push(...body.incidents.map((i: { id: string }) => i.id));
+
+      if (!body.has_more) break;
+      cursor = body.nextCursor;
+    }
+
+    // Every row returned, exactly once, with nothing skipped or duplicated.
+    expect(collectedIds).toHaveLength(25);
+    expect(new Set(collectedIds).size).toBe(25);
+    for (const id of seededIds) {
+      expect(collectedIds.filter((c) => c === id)).toHaveLength(1);
+    }
   });
 });

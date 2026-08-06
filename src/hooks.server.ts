@@ -58,6 +58,14 @@ export const handle: Handle = async ({ event, resolve }) => {
 
   // Brute-force protection: rate limit login attempts per client IP.
   if (event.request.method === "POST" && pathname.startsWith("/api/auth/sign-in")) {
+    // Run the CSRF origin check BEFORE consuming a login rate-limit token so a
+    // cross-origin attacker can't burn the victim's login budget with forged
+    // requests (the victim's session cookie is sent automatically). Legitimate
+    // same-origin requests carry an Origin/Referer and pass unchanged; the
+    // later `/api/auth/*` CSRF gate still applies to the other auth endpoints.
+    const csrfError = checkCsrfOrigin(event);
+    if (csrfError) return csrfError;
+
     if (!checkRateLimit(`login:${event.getClientAddress()}`, LOGIN_RPM)) {
       return new Response(
         JSON.stringify({

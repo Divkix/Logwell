@@ -108,6 +108,20 @@ describe("BatchQueue", () => {
 
       expect(mockSendBatch).toHaveBeenCalledTimes(2);
     });
+
+    it("startTimer is idempotent: a second call does not stack a duplicate timer", async () => {
+      const queue = new BatchQueue(mockSendBatch, defaultConfig);
+      const flushSpy = vi.spyOn(queue, "flush");
+
+      queue.add(createLogFixture()); // schedules timer A
+      queue["startTimer"](); // must clear timer A, not add timer B on top
+
+      await vi.advanceTimersByTimeAsync(1000);
+
+      // Only one timer fires: a stacked duplicate would trigger a second
+      // (empty) flush.
+      expect(flushSpy).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe("flush", () => {
@@ -245,6 +259,52 @@ describe("BatchQueue", () => {
 
       // Logs should be re-queued
       expect(queue.size).toBe(1);
+    });
+
+    it("reports onFlush errors via onError without re-queuing delivered logs", async () => {
+      const onFlush = vi.fn(() => {
+        throw new Error("callback failed");
+      });
+      const onError = vi.fn();
+      const config = { ...defaultConfig, onFlush, onError };
+      const queue = new BatchQueue(mockSendBatch, config);
+
+      queue.add(createLogFixture());
+      await queue.flush();
+
+      // The send succeeded: the log is delivered, not re-queued.
+      expect(mockSendBatch).toHaveBeenCalledTimes(1);
+      expect(onFlush).toHaveBeenCalledWith(1);
+      expect(queue.size).toBe(0);
+      // The callback failure is reported without being treated as a send failure.
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect((onError.mock.calls[0][0] as Error).message).toBe("callback failed");
+    });
+
+    it("onFlush throwing does not break send error handling", async () => {
+      const onFlush = vi.fn(() => {
+        throw new Error("callback failed");
+      });
+      const onError = vi.fn();
+      const sendError = new Error("Send failed");
+      mockSendBatch = vi
+        .fn()
+        .mockResolvedValueOnce({ accepted: 1 })
+        .mockRejectedValueOnce(sendError);
+      const config = { ...defaultConfig, onFlush, onError };
+      const queue = new BatchQueue(mockSendBatch, config);
+
+      // First flush: send succeeds, onFlush throws -> onError, no re-queue.
+      queue.add(createLogFixture());
+      await queue.flush();
+      expect(queue.size).toBe(0);
+
+      // Second flush: send fails -> the batch is re-queued and onError gets
+      // the send error (not the callback error).
+      queue.add(createLogFixture());
+      await queue.flush();
+      expect(queue.size).toBe(1);
+      expect(onError).toHaveBeenLastCalledWith(sendError);
     });
   });
 

@@ -1106,6 +1106,174 @@ func TestClientRequeueOrderOnFailure(t *testing.T) {
 	}
 }
 
+// TestClientFlushChunksLargeBatch tests that a flush with more entries than
+// BatchSize is split into multiple requests, each carrying at most BatchSize
+// entries. This guards against the server-400 regression: the ingest endpoint
+// rejects batches over its limit with a 400 batch_too_large, so a single
+// oversized request would lose the whole flush.
+func TestClientFlushChunksLargeBatch(t *testing.T) {
+	ts := newTestServer()
+	defer ts.Close()
+
+	batchSize := 30
+	client, err := New(
+		ts.URL,
+		validAPIKey(),
+		WithBatchSize(batchSize),
+		WithFlushInterval(1*time.Minute), // Long interval to avoid timer flush
+	)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	defer client.Shutdown(context.Background())
+
+	// Queue more entries than a single batch can carry (> 100 and > BatchSize)
+	// directly, bypassing enqueue's batch-size auto-flush (the queue can grow
+	// this large in production when producers outpace async flushes).
+	total := 130
+	for i := 0; i < total; i++ {
+		client.queue.add(LogEntry{Level: LevelInfo, Message: fmt.Sprintf("message %d", i)})
+	}
+
+	err = client.Flush(context.Background())
+	if err != nil {
+		t.Fatalf("Flush() error = %v", err)
+	}
+
+	// 130 entries / 30 per chunk = 5 requests (30, 30, 30, 30, 10).
+	requests := ts.getRequests()
+	if len(requests) != 5 {
+		t.Fatalf("expected 5 requests, got %d", len(requests))
+	}
+
+	// Every request must carry at most BatchSize entries.
+	sent := 0
+	for i, req := range requests {
+		if len(req) > batchSize {
+			t.Errorf("request %d has %d entries, want <= %d", i, len(req), batchSize)
+		}
+		sent += len(req)
+	}
+	if sent != total {
+		t.Errorf("total entries sent = %d, want %d", sent, total)
+	}
+
+	// Order must be preserved across chunks.
+	logs := ts.getLogs()
+	if len(logs) != total {
+		t.Fatalf("expected %d logs, got %d", len(logs), total)
+	}
+	for i, log := range logs {
+		want := fmt.Sprintf("message %d", i)
+		if log.Message != want {
+			t.Errorf("logs[%d].Message = %q, want %q", i, log.Message, want)
+		}
+	}
+}
+
+// TestClientFlushChunksRequeueOnFailure tests that when a chunk fails, the
+// failed chunk plus all not-yet-sent chunks are re-queued at the front in
+// order, sending stops, and a later flush delivers them all.
+func TestClientFlushChunksRequeueOnFailure(t *testing.T) {
+	ts := newTestServer()
+	defer ts.Close()
+
+	// Fail the second chunk, accept everything else.
+	var requestCount int32
+	ts.setHandler(func(w http.ResponseWriter, r *http.Request) {
+		if atomic.AddInt32(&requestCount, 1) == 2 {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": "batch too large"})
+			return
+		}
+		var raw []map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		var entries []LogEntry
+		for _, item := range raw {
+			entry, err := mapToLogEntry(item)
+			if err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			entries = append(entries, entry)
+		}
+		ts.mu.Lock()
+		ts.requests = append(ts.requests, entries)
+		ts.logs = append(ts.logs, entries...)
+		ts.mu.Unlock()
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(IngestResponse{Accepted: len(entries)})
+	})
+
+	var errorCount int32
+	client, err := New(
+		ts.URL,
+		validAPIKey(),
+		WithBatchSize(30),
+		WithFlushInterval(1*time.Minute),
+		WithMaxRetries(0), // 400 is non-retryable anyway; keep the test fast
+		WithOnError(func(e *Error) {
+			atomic.AddInt32(&errorCount, 1)
+		}),
+	)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	defer client.Shutdown(context.Background())
+
+	total := 130 // chunks: 30, 30, 30, 30, 10
+	for i := 0; i < total; i++ {
+		client.queue.add(LogEntry{Level: LevelInfo, Message: fmt.Sprintf("message %d", i)})
+	}
+
+	// First chunk succeeds, second fails: only 2 requests may be made.
+	err = client.Flush(context.Background())
+	if err == nil {
+		t.Fatal("Flush() expected error for failed chunk")
+	}
+	logwellErr, ok := err.(*Error)
+	if !ok || logwellErr.Code != ErrValidationError {
+		t.Fatalf("error = %v, want VALIDATION_ERROR", err)
+	}
+	if got := atomic.LoadInt32(&requestCount); got != 2 {
+		t.Fatalf("requests made = %d, want 2 (sending must stop on first chunk failure)", got)
+	}
+	if got := atomic.LoadInt32(&errorCount); got != 1 {
+		t.Fatalf("OnError calls = %d, want 1", got)
+	}
+
+	// The failed chunk plus all unsent chunks (2nd..5th, 100 entries) must be
+	// re-queued at the front in order.
+	if got := client.queue.size(); got != total-30 {
+		t.Fatalf("queue size after failed flush = %d, want %d", got, total-30)
+	}
+
+	// Recovery: accept everything and flush again.
+	ts.setHandler(nil)
+	err = client.Flush(context.Background())
+	if err != nil {
+		t.Fatalf("recovery Flush() error = %v", err)
+	}
+
+	logs := ts.getLogs()
+	if len(logs) != total {
+		t.Fatalf("expected %d logs after recovery, got %d", len(logs), total)
+	}
+	// The first 30 (sent pre-failure) plus the re-queued 100 in original order.
+	for i, log := range logs {
+		want := fmt.Sprintf("message %d", i)
+		if log.Message != want {
+			t.Errorf("logs[%d].Message = %q, want %q", i, log.Message, want)
+		}
+	}
+	if got := client.queue.size(); got != 0 {
+		t.Errorf("queue size after recovery flush = %d, want 0", got)
+	}
+}
+
 // TestClientTimerFlush tests timer-based auto-flush.
 func TestClientTimerFlush(t *testing.T) {
 	ts := newTestServer()

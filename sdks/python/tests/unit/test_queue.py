@@ -689,6 +689,160 @@ class TestBatchQueueShutdown:
         # Timer should not have fired again (only shutdown flush)
         assert len(captured) == 1
 
+    @pytest.mark.asyncio
+    async def test_shutdown_awaits_in_flight_flush(self) -> None:
+        """shutdown() waits for the actual in-flight flush before stopping the loop."""
+        flush_started = threading.Event()
+        flush_continue = threading.Event()
+        captured: list[list[LogEntry]] = []
+
+        async def slow_send(batch: list[LogEntry]) -> IngestResponse:
+            captured.append(batch)
+            flush_started.set()
+            while not flush_continue.is_set():
+                await asyncio.sleep(0.01)
+            return {"accepted": len(batch)}
+
+        queue = BatchQueue(MagicMock(side_effect=slow_send), QueueConfig(batch_size=100))
+        queue.add(make_log_entry("one"))
+        queue.add(make_log_entry("two"))
+
+        # Start a manual flush that blocks inside send_batch on the queue loop.
+        flush_task = asyncio.create_task(queue.flush())
+        while not flush_started.is_set():
+            await asyncio.sleep(0.01)
+
+        # shutdown() must block until the in-flight flush completes.
+        shutdown_task = asyncio.create_task(queue.shutdown())
+
+        await asyncio.sleep(0.05)
+        assert not shutdown_task.done()
+
+        flush_continue.set()
+        await shutdown_task
+        await flush_task
+
+        # All entries were delivered and the queue loop is stopped.
+        assert [e["message"] for batch in captured for e in batch] == ["one", "two"]
+        assert queue._queue_loop is None
+
+    @pytest.mark.asyncio
+    async def test_shutdown_awaits_triggered_flush(self) -> None:
+        """shutdown() waits for an auto-triggered flush (via _trigger_flush)."""
+        flush_started = threading.Event()
+        flush_continue = threading.Event()
+        captured: list[list[LogEntry]] = []
+
+        async def slow_send(batch: list[LogEntry]) -> IngestResponse:
+            captured.append(batch)
+            flush_started.set()
+            while not flush_continue.is_set():
+                await asyncio.sleep(0.01)
+            return {"accepted": len(batch)}
+
+        # batch_size=1 so add() auto-triggers a flush via _trigger_flush.
+        queue = BatchQueue(MagicMock(side_effect=slow_send), QueueConfig(batch_size=1))
+        queue.add(make_log_entry("one"))
+        while not flush_started.is_set():
+            await asyncio.sleep(0.01)
+
+        shutdown_task = asyncio.create_task(queue.shutdown())
+        await asyncio.sleep(0.05)
+        assert not shutdown_task.done()
+
+        flush_continue.set()
+        await shutdown_task
+
+        assert [e["message"] for batch in captured for e in batch] == ["one"]
+        assert queue._queue_loop is None
+
+
+# =============================================================================
+# Flush Future Gating Tests
+# =============================================================================
+
+
+class TestFlushFutureGating:
+    """Tests for gating flush scheduling while a flush is in flight (PY-M6)."""
+
+    @pytest.mark.asyncio
+    async def test_no_new_flush_future_while_in_flight(self) -> None:
+        """A second trigger while flushing schedules no new flush future."""
+        flush_started = threading.Event()
+        flush_continue = threading.Event()
+        captured: list[list[LogEntry]] = []
+
+        async def slow_send(batch: list[LogEntry]) -> IngestResponse:
+            captured.append(batch)
+            flush_started.set()
+            while not flush_continue.is_set():
+                await asyncio.sleep(0.01)
+            return {"accepted": len(batch)}
+
+        # batch_size=1 so every add() calls _trigger_flush.
+        config = QueueConfig(batch_size=1, flush_interval=0.05)
+        queue = BatchQueue(MagicMock(side_effect=slow_send), config)
+
+        queue.add(make_log_entry("one"))
+        while not flush_started.is_set():
+            await asyncio.sleep(0.01)
+
+        first_future = queue._flush_future
+        assert first_future is not None
+        assert queue._flushing is True
+
+        # Batch size is reached again while the first flush is still in flight.
+        queue.add(make_log_entry("two"))
+
+        # No second flush future was scheduled; the in-flight one is untouched.
+        assert queue._flush_future is first_future
+        assert queue._flushing is True
+        # Only one send has happened so far.
+        assert len(captured) == 1
+
+        flush_continue.set()
+        # First flush completes; the timer then delivers the second entry.
+        deadline = time.monotonic() + 1.0
+        while len(captured) < 2 and time.monotonic() < deadline:
+            await asyncio.sleep(0.01)
+
+        assert len(captured) == 2
+        assert [e["message"] for batch in captured for e in batch] == ["one", "two"]
+        await queue.shutdown()
+
+    @pytest.mark.asyncio
+    async def test_flush_returns_none_while_in_flight(self) -> None:
+        """flush() while another flush is in flight returns None without scheduling."""
+        flush_started = threading.Event()
+        flush_continue = threading.Event()
+        call_count = 0
+
+        async def slow_send(batch: list[LogEntry]) -> IngestResponse:
+            nonlocal call_count
+            call_count += 1
+            flush_started.set()
+            while not flush_continue.is_set():
+                await asyncio.sleep(0.01)
+            return {"accepted": len(batch)}
+
+        queue = BatchQueue(MagicMock(side_effect=slow_send), QueueConfig(batch_size=100))
+        queue.add(make_log_entry())
+        queue.add(make_log_entry())
+
+        flush_task = asyncio.create_task(queue.flush())
+        while not flush_started.is_set():
+            await asyncio.sleep(0.01)
+
+        # Second flush() is rejected while the first is in flight.
+        result = await queue.flush()
+        assert result is None
+        assert call_count == 1
+
+        flush_continue.set()
+        await flush_task
+        assert call_count == 1
+        await queue.shutdown()
+
 
 # =============================================================================
 # Thread Safety Tests

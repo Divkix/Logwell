@@ -488,6 +488,36 @@ class TestValidateConfigNumericBounds:
         result = validate_config(config)  # type: ignore[arg-type]
         assert result["flush_interval"] == 10
 
+    def test_flush_interval_too_large(self, valid_config: LogwellConfig) -> None:
+        """Raises LogwellError when flush_interval exceeds 60 seconds."""
+        config = dict(valid_config)
+        config["flush_interval"] = 61.0
+
+        with pytest.raises(LogwellError) as exc_info:
+            validate_config(config)  # type: ignore[arg-type]
+
+        assert exc_info.value.code == LogwellErrorCode.INVALID_CONFIG
+        assert "flush_interval" in exc_info.value.message
+
+    def test_flush_interval_boundary_60_accepted(self, valid_config: LogwellConfig) -> None:
+        """Accepts flush_interval at the upper boundary (60 seconds)."""
+        config = dict(valid_config)
+        config["flush_interval"] = 60.0
+
+        result = validate_config(config)  # type: ignore[arg-type]
+        assert result["flush_interval"] == 60.0
+
+    def test_flush_interval_boundary_60_1_rejected(self, valid_config: LogwellConfig) -> None:
+        """Raises LogwellError when flush_interval is just above 60 seconds."""
+        config = dict(valid_config)
+        config["flush_interval"] = 60.1
+
+        with pytest.raises(LogwellError) as exc_info:
+            validate_config(config)  # type: ignore[arg-type]
+
+        assert exc_info.value.code == LogwellErrorCode.INVALID_CONFIG
+        assert "flush_interval" in exc_info.value.message
+
     # max_queue_size tests
     def test_max_queue_size_negative(self, valid_config: LogwellConfig) -> None:
         """Raises LogwellError when max_queue_size is negative."""
@@ -518,6 +548,36 @@ class TestValidateConfigNumericBounds:
 
         result = validate_config(config)  # type: ignore[arg-type]
         assert result["max_queue_size"] == 1
+
+    def test_max_queue_size_too_large(self, valid_config: LogwellConfig) -> None:
+        """Raises LogwellError when max_queue_size exceeds 100000."""
+        config = dict(valid_config)
+        config["max_queue_size"] = 100001
+
+        with pytest.raises(LogwellError) as exc_info:
+            validate_config(config)  # type: ignore[arg-type]
+
+        assert exc_info.value.code == LogwellErrorCode.INVALID_CONFIG
+        assert "max_queue_size" in exc_info.value.message
+
+    def test_max_queue_size_boundary_100000_accepted(self, valid_config: LogwellConfig) -> None:
+        """Accepts max_queue_size at the upper boundary (100000)."""
+        config = dict(valid_config)
+        config["max_queue_size"] = 100000
+
+        result = validate_config(config)  # type: ignore[arg-type]
+        assert result["max_queue_size"] == 100000
+
+    def test_max_queue_size_boundary_100001_rejected(self, valid_config: LogwellConfig) -> None:
+        """Raises LogwellError when max_queue_size is just above 100000."""
+        config = dict(valid_config)
+        config["max_queue_size"] = 100001
+
+        with pytest.raises(LogwellError) as exc_info:
+            validate_config(config)  # type: ignore[arg-type]
+
+        assert exc_info.value.code == LogwellErrorCode.INVALID_CONFIG
+        assert "max_queue_size" in exc_info.value.message
 
     # max_retries tests
     def test_max_retries_negative(self, valid_config: LogwellConfig) -> None:

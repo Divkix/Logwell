@@ -40,7 +40,7 @@ func newBatchQueue(flushInterval time.Duration, flushFn func(), maxQueueSize int
 }
 
 // add appends a log entry to the queue.
-// If timer-based auto-flush is configured, starts or resets the timer.
+// Starts a fresh auto-flush timer if auto-flush is enabled.
 // If the queue is at max capacity, drops the oldest entry and calls onError.
 func (q *batchQueue) add(entry LogEntry) {
 	q.mu.Lock()
@@ -61,23 +61,8 @@ func (q *batchQueue) add(entry LogEntry) {
 
 	q.entries = append(q.entries, entry)
 
-	// Start or reset the flush timer if auto-flush is enabled
-	if q.flushInterval > 0 && q.flushFn != nil {
-		if q.timer == nil {
-			// Start new timer with current generation
-			gen := atomic.LoadInt64(&q.generation)
-			flushFn := q.flushFn
-			q.timer = time.AfterFunc(q.flushInterval, func() {
-				if atomic.LoadInt64(&q.generation) != gen {
-					return // stale callback, ignore
-				}
-				flushFn()
-			})
-		} else {
-			// Reset existing timer
-			q.timer.Reset(q.flushInterval)
-		}
-	}
+	// Start a fresh auto-flush timer if enabled
+	q.startTimerLocked()
 
 	q.mu.Unlock()
 }
@@ -85,7 +70,7 @@ func (q *batchQueue) add(entry LogEntry) {
 // prepend adds entries to the front of the queue.
 // Used to re-queue entries after a failed flush.
 // Enforces maxQueueSize by truncating combined entries if needed.
-// Starts or resets the flush timer if auto-flush is enabled.
+// Starts a fresh auto-flush timer if auto-flush is enabled.
 func (q *batchQueue) prepend(entries []LogEntry) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -113,21 +98,40 @@ func (q *batchQueue) prepend(entries []LogEntry) {
 	}
 	q.entries = combined
 
-	// Start or reset the flush timer if auto-flush is enabled
-	if q.flushInterval > 0 && q.flushFn != nil {
-		if q.timer == nil {
-			gen := atomic.LoadInt64(&q.generation)
-			flushFn := q.flushFn
-			q.timer = time.AfterFunc(q.flushInterval, func() {
-				if atomic.LoadInt64(&q.generation) != gen {
-					return // stale callback, ignore
-				}
-				flushFn()
-			})
-		} else {
-			q.timer.Reset(q.flushInterval)
-		}
+	// Start a fresh auto-flush timer if enabled
+	q.startTimerLocked()
+}
+
+// startTimerLocked stops any existing auto-flush timer and starts a fresh one
+// with a new generation. Must be called with q.mu held.
+//
+// A fired timer is never Reset: once a timer has fired its callback has been
+// dispatched, and Reset on such a timer without stopping it first is racy — it
+// may fail to re-arm, stranding entries without a live timer. Stopping the old
+// timer (bumping the generation so any stale in-flight callback becomes a
+// no-op) and creating a fresh timer guarantees that a pending auto-flush timer
+// always exists after enqueue.
+func (q *batchQueue) startTimerLocked() {
+	if q.flushInterval <= 0 || q.flushFn == nil {
+		return
 	}
+
+	if q.timer != nil {
+		// Stop the previous timer; bump the generation so a callback from a
+		// fired/stopped timer is invalidated.
+		atomic.AddInt64(&q.generation, 1)
+		q.timer.Stop()
+		q.timer = nil
+	}
+
+	gen := atomic.LoadInt64(&q.generation)
+	flushFn := q.flushFn
+	q.timer = time.AfterFunc(q.flushInterval, func() {
+		if atomic.LoadInt64(&q.generation) != gen {
+			return // stale callback, ignore
+		}
+		flushFn()
+	})
 }
 
 // flush returns all queued entries and clears the queue.

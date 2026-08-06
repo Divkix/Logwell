@@ -1,5 +1,7 @@
 import type { PgliteDatabase } from "drizzle-orm/pglite";
 import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
+import { sql } from "drizzle-orm";
+import { nanoid } from "nanoid";
 import { createAuth } from "$lib/server/auth";
 import type * as schema from "$lib/server/db/schema";
 import { setupTestDatabase } from "$lib/server/db/test-db";
@@ -207,7 +209,7 @@ describe("Cursor-based Pagination", () => {
 
       expect(response.status).toBe(400);
       const body = await response.json();
-      expect(body.code).toBe("invalid_cursor");
+      expect(body.error).toBe("invalid_cursor");
     });
   });
 
@@ -384,6 +386,54 @@ describe("Cursor-based Pagination", () => {
 
         expect(body2.logs).toHaveLength(0);
         expect(body2.nextCursor).toBeNull();
+      }
+    });
+  });
+
+  describe("Same-millisecond pagination", () => {
+    it("does not skip rows that share the cursor's millisecond", async () => {
+      const testProject = await seedProject(db, { ownerId: userId });
+
+      // 25 logs whose timestamps all fall within the same millisecond but at
+      // distinct microsecond offsets. A millisecond-truncated cursor timestamp
+      // breaks the `timestamp = <cursorTs>` equality check for such rows, so
+      // the next page comes back empty — everything past the first page is
+      // silently skipped.
+      const baseEpoch = 1767225600.123456; // 2026-01-01T00:00:00.123456Z
+      const seededIds: string[] = [];
+      for (let i = 0; i < 25; i++) {
+        const id = nanoid();
+        seededIds.push(id);
+        await db.execute(sql`
+          INSERT INTO "log" ("id", "project_id", "level", "message", "timestamp")
+          VALUES (${id}, ${testProject.id}, 'info', ${`same-ms-${i}`}, to_timestamp(${baseEpoch + i * 0.000001}))
+        `);
+      }
+
+      // Paginate through 10 at a time, following the cursor.
+      const collectedIds: string[] = [];
+      let cursor: string | null = null;
+      for (let page = 0; page < 10; page++) {
+        const url = cursor
+          ? `http://localhost/api/projects/${testProject.id}/logs?limit=10&cursor=${encodeURIComponent(cursor)}`
+          : `http://localhost/api/projects/${testProject.id}/logs?limit=10`;
+        const request = new Request(url, { method: "GET" });
+        const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+        const response = await GET(event as never);
+        expect(response.status).toBe(200);
+        const body = await response.json();
+
+        collectedIds.push(...body.logs.map((l: { id: string }) => l.id));
+
+        if (!body.has_more) break;
+        cursor = body.nextCursor;
+      }
+
+      // Every row returned, exactly once, with nothing skipped or duplicated.
+      expect(collectedIds).toHaveLength(25);
+      expect(new Set(collectedIds).size).toBe(25);
+      for (const id of seededIds) {
+        expect(collectedIds.filter((c) => c === id)).toHaveLength(1);
       }
     });
   });

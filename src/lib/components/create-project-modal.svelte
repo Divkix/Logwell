@@ -1,5 +1,6 @@
 <script lang="ts">
 import XIcon from '@lucide/svelte/icons/x';
+import { projectCreatePayloadSchema } from '$lib/shared/schemas/project';
 import { cn } from '$lib/utils';
 import { focusTrap } from '$lib/utils/focus-trap';
 import Button from './ui/button/button.svelte';
@@ -56,17 +57,12 @@ async function handleSubmit(event: Event) {
   event.preventDefault();
   error = '';
 
-  // Validate name
+  // Validate name against the shared project create schema (single source of
+  // truth with POST /api/projects).
   const trimmedName = name.trim();
-  if (!trimmedName) {
-    error = 'Project name is required';
-    return;
-  }
-
-  // Validate format (alphanumeric, hyphens, underscores, 1-50 chars)
-  const validNameRegex = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,49}$/;
-  if (!validNameRegex.test(trimmedName)) {
-    error = 'Name must be 1-50 characters, alphanumeric with hyphens/underscores';
+  const validation = projectCreatePayloadSchema.safeParse({ name: trimmedName });
+  if (!validation.success) {
+    error = validation.error.issues?.[0]?.message ?? 'Project name is required';
     return;
   }
 

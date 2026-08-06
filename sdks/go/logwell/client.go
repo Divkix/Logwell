@@ -282,16 +282,13 @@ func (c *Client) flush() {
 		return
 	}
 
-	count := len(entries)
-
-	// Send logs with retry
+	// Send logs in BatchSize chunks (the server rejects batches over its
+	// ingest limit) with retry per chunk.
 	ctx := context.Background()
-	_, err := c.transport.sendWithRetry(ctx, entries)
+	sent, err := c.flushChunks(ctx, entries)
 
 	// Call callbacks (non-blocking)
 	if err != nil {
-		// Re-queue failed entries at the front for retry
-		c.queue.prepend(entries)
 		if c.config.OnError != nil {
 			var logwellErr *Error
 			if errors.As(err, &logwellErr) {
@@ -304,8 +301,37 @@ func (c *Client) flush() {
 	}
 
 	if c.config.OnFlush != nil {
-		c.config.OnFlush(count)
+		c.config.OnFlush(sent)
 	}
+}
+
+// flushChunks sends entries to the server in chunks of at most BatchSize
+// entries. On the first chunk failure it re-queues the failed chunk plus all
+// not-yet-sent chunks (preserving order) at the front of the queue and stops
+// sending further chunks. Returns the number of entries successfully sent and
+// the transport error (nil on full success).
+func (c *Client) flushChunks(ctx context.Context, entries []LogEntry) (int, error) {
+	batchSize := c.config.BatchSize
+	if batchSize < 1 {
+		batchSize = 1
+	}
+
+	sent := 0
+	for i := 0; i < len(entries); i += batchSize {
+		end := i + batchSize
+		if end > len(entries) {
+			end = len(entries)
+		}
+		chunk := entries[i:end]
+
+		if _, err := c.transport.sendWithRetry(ctx, chunk); err != nil {
+			// Re-queue the failed chunk plus all not-yet-sent chunks in order.
+			c.queue.prepend(entries[i:])
+			return sent, err
+		}
+		sent += len(chunk)
+	}
+	return sent, nil
 }
 
 // Flush sends all queued log entries immediately.
@@ -318,13 +344,12 @@ func (c *Client) Flush(ctx context.Context) error {
 		return nil
 	}
 
-	count := len(entries)
-	_, err := c.transport.sendWithRetry(ctx, entries)
+	// Send logs in BatchSize chunks (the server rejects batches over its
+	// ingest limit) with retry per chunk.
+	sent, err := c.flushChunks(ctx, entries)
 
 	// Call callbacks (non-blocking)
 	if err != nil {
-		// Re-queue failed entries at the front for retry
-		c.queue.prepend(entries)
 		if c.config.OnError != nil {
 			var logwellErr *Error
 			if errors.As(err, &logwellErr) {
@@ -337,7 +362,7 @@ func (c *Client) Flush(ctx context.Context) error {
 	}
 
 	if c.config.OnFlush != nil {
-		c.config.OnFlush(count)
+		c.config.OnFlush(sent)
 	}
 
 	return nil

@@ -17,6 +17,7 @@ import type {
   IncidentTimelineResponse,
 } from '$lib/shared/types';
 import { INCIDENT_RANGES, INCIDENT_STATUSES } from '$lib/shared/types';
+import { toastError } from '$lib/utils/toast';
 import type { PageData } from './$types';
 
 const incidentDetailSchema = z
@@ -58,8 +59,16 @@ const projectId = data.project.id;
 
 const isNavigating = $derived($navigating?.to?.url.pathname.endsWith('/incidents') ?? false);
 
+// Base incident list from server data (reflects the current status/range filter).
 // svelte-ignore state_referenced_locally
 let incidents = $state<IncidentListItem[]>([...data.incidents]);
+
+// Incidents loaded via "Load More". Kept separate so the reset effect below
+// only wipes them when the actual status/range filters change, not when the
+// `?incident=` selection param changes (which would otherwise discard loaded
+// items when the user clicks an incident row to select it).
+let loadedMore = $state<IncidentListItem[]>([]);
+
 // svelte-ignore state_referenced_locally
 let nextCursor = $state<string | null>(data.pagination.nextCursor ?? null);
 let isLoadingMore = $state(false);
@@ -75,6 +84,29 @@ let detailLoading = $state(false);
 let refreshTimeout: ReturnType<typeof setTimeout> | null = null;
 let pendingIncidentUpdates: ClientIncident[] = [];
 let detailRequestId = 0;
+
+// Previous filter values tracked privately (not reactive) so the reset effect
+// can distinguish real filter changes from `?incident=` URL updates.
+let prevProjectId: string | null = null;
+let prevStatus: IncidentStatus | null = null;
+let prevRange: IncidentRange | null = null;
+
+// Merge base + loaded-more, dedup by id (base wins), filter by status, and
+// sort by lastSeen descending. This is the displayed list.
+const displayedIncidents = $derived.by(() => {
+  const byId = new Map<string, IncidentListItem>();
+  for (const item of incidents) byId.set(item.id, item);
+  for (const item of loadedMore) {
+    if (!byId.has(item.id)) byId.set(item.id, item);
+  }
+  return [...byId.values()]
+    .filter((item) => {
+      if (selectedStatus === 'open') return item.status === 'open';
+      if (selectedStatus === 'resolved') return item.status === 'resolved';
+      return true;
+    })
+    .sort((a, b) => new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime());
+});
 
 function computeStatus(lastSeenIso: string): IncidentStatus {
   const thresholdMs = data.autoResolveMinutes * 60 * 1000;
@@ -106,14 +138,7 @@ function mergeIncidentUpdates(updates: ClientIncident[]) {
   for (const item of normalized) {
     byId.set(item.id, item);
   }
-
-  incidents = [...byId.values()]
-    .filter((item) => {
-      if (selectedStatus === 'open') return item.status === 'open';
-      if (selectedStatus === 'resolved') return item.status === 'resolved';
-      return true;
-    })
-    .sort((a, b) => new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime());
+  incidents = [...byId.values()];
 }
 
 const incidentStream = useIncidentStream({
@@ -142,17 +167,40 @@ $effect(() => {
   };
 });
 
+// Reset effect — only clears the incident list + loaded-more when the project
+// or the status/range filters actually change.  A `?incident=` selection
+// navigation (which changes `data.filters.selectedIncidentId` but keeps
+// status/range identical) must NOT wipe loaded-more items.
 // svelte-ignore state_referenced_locally
 $effect(() => {
-  incidents = [...data.incidents];
   // svelte-ignore state_referenced_locally
-  nextCursor = data.pagination.nextCursor ?? null;
+  const nextProjectId = data.project.id;
   // svelte-ignore state_referenced_locally
-  selectedStatus = data.filters.status as IncidentStatus;
+  const nextStatus = data.filters.status as IncidentStatus;
   // svelte-ignore state_referenced_locally
-  selectedRange = data.filters.range as IncidentRange;
+  const nextRange = data.filters.range as IncidentRange;
   // svelte-ignore state_referenced_locally
-  selectedIncidentId = data.filters.selectedIncidentId ?? null;
+  const nextSelectedId = data.filters.selectedIncidentId ?? null;
+
+  const filtersChanged =
+    prevProjectId !== null &&
+    (nextProjectId !== prevProjectId || nextStatus !== prevStatus || nextRange !== prevRange);
+
+  if (filtersChanged) {
+    incidents = [...data.incidents];
+    loadedMore = [];
+    nextCursor = data.pagination.nextCursor ?? null;
+  }
+
+  prevProjectId = nextProjectId;
+  prevStatus = nextStatus;
+  prevRange = nextRange;
+  // svelte-ignore state_referenced_locally
+  selectedStatus = nextStatus;
+  // svelte-ignore state_referenced_locally
+  selectedRange = nextRange;
+  // svelte-ignore state_referenced_locally
+  selectedIncidentId = nextSelectedId;
 });
 
 async function fetchIncidentDetail(incidentId: string) {
@@ -243,11 +291,16 @@ async function loadMore() {
     params.set('status', selectedStatus);
     params.set('range', selectedRange);
     const response = await fetch(`/api/projects/${projectId}/incidents?${params.toString()}`);
-    if (!response.ok) return;
+    if (!response.ok) {
+      toastError('Failed to load more incidents');
+      return;
+    }
 
     const result = await response.json();
-    incidents = [...incidents, ...result.incidents];
+    loadedMore = [...loadedMore, ...result.incidents];
     nextCursor = result.nextCursor;
+  } catch {
+    toastError('Failed to load more incidents');
   } finally {
     isLoadingMore = false;
   }
@@ -305,7 +358,11 @@ async function loadMore() {
     </div>
 
     <div class="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
-      <IncidentTable incidents={incidents} selectedIncidentId={selectedIncidentId} onSelect={selectIncident} />
+      <IncidentTable
+        incidents={displayedIncidents}
+        selectedIncidentId={selectedIncidentId}
+        onSelect={selectIncident}
+      />
 
       <IncidentTimelinePanel
         {detail}

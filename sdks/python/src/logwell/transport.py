@@ -52,6 +52,23 @@ class TransportConfig:
         )
 
 
+def _backoff_seconds(attempt: int, base_delay: float = 0.1) -> float:
+    """Exponential backoff ceiling in seconds for a given attempt (no jitter).
+
+    Args:
+        attempt: Current attempt number (0-indexed)
+        base_delay: Base delay in seconds (default: 100ms)
+
+    Returns:
+        min(base_delay * 2^attempt, 10) — the ceiling used both by _delay
+        and as the cap for Retry-After sleeps (mirrors the TS SDK).
+
+    Note: `1 << attempt` is used instead of `2 ** attempt` because mypy
+    types `int ** int` as Any (no-any-return under --strict).
+    """
+    return min(base_delay * (1 << attempt), 10.0)
+
+
 async def _delay(attempt: int, base_delay: float = 0.1) -> None:
     """Delay with exponential backoff and jitter.
 
@@ -61,7 +78,7 @@ async def _delay(attempt: int, base_delay: float = 0.1) -> None:
 
     Formula: min(base_delay * 2^attempt, 10) + 30% jitter
     """
-    delay_secs = min(base_delay * (2**attempt), 10.0)
+    delay_secs = _backoff_seconds(attempt, base_delay)
     jitter = random.random() * delay_secs * 0.3
     await asyncio.sleep(delay_secs + jitter)
 
@@ -134,10 +151,13 @@ class HttpTransport:
 
                 # Don't delay after the last attempt
                 if attempt < self._config.max_retries:
-                    # Honor Retry-After header for 429 responses (PY-14)
+                    # Honor Retry-After header for 429 responses (PY-14), but cap
+                    # the sleep at the exponential backoff ceiling so a huge
+                    # Retry-After can't stall the retry loop longer than the
+                    # normal backoff would (mirrors TS).
                     retry_after = getattr(error, "retry_after", None)
                     if retry_after is not None:
-                        await asyncio.sleep(retry_after)
+                        await asyncio.sleep(min(retry_after, _backoff_seconds(attempt)))
                     else:
                         await _delay(attempt)
 

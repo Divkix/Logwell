@@ -200,6 +200,53 @@ describe("POST /v1/logs (OTLP)", () => {
     expect(body.errors[0]).toContain("rejected");
   });
 
+  it("rejects records whose derived message is empty or whitespace-only", async () => {
+    const project = await seedProjectWithApiKey(db);
+
+    const payload = {
+      resourceLogs: [
+        {
+          scopeLogs: [
+            {
+              logRecords: [
+                // No body and no message attribute → empty derived message
+                {},
+                // Whitespace-only body
+                { body: { stringValue: "   " } },
+                { body: { stringValue: "valid message" } },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const request = new Request("http://localhost/v1/logs", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${project.apiKey}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const event = createRequestEvent(request, db);
+    const response = await POST(event as never);
+
+    // Mirrors simple-ingest: per-record failures still yield a 200 with
+    // accepted/rejected/errors; only the valid records are inserted.
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.accepted).toBe(1);
+    expect(body.rejected).toBe(2);
+    expect(body.errors).toHaveLength(2);
+    expect(body.errors.every((e: string) => e.includes("message cannot be empty"))).toBe(true);
+
+    const rows = await db.select().from(log).where(eq(log.projectId, project.id));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.message).toBe("valid message");
+  });
+
   it("returns accepted count in unified response shape on full success", async () => {
     const project = await seedProjectWithApiKey(db);
 

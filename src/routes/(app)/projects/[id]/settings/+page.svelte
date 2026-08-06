@@ -7,6 +7,7 @@ import { goto } from '$app/navigation';
 import Button from '$lib/components/ui/button/button.svelte';
 import * as Select from '$lib/components/ui/select';
 import Separator from '$lib/components/ui/separator/separator.svelte';
+import { projectUpdatePayloadSchema } from '$lib/shared/schemas/project';
 import { announceToScreenReader } from '$lib/utils/focus-trap';
 import { toastError, toastSuccess } from '$lib/utils/toast';
 
@@ -140,14 +141,11 @@ async function handleSaveName() {
   nameError = '';
   const trimmedName = editedName.trim();
 
-  if (!trimmedName) {
-    nameError = 'Project name cannot be empty';
-    return;
-  }
-
-  const validNameRegex = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,49}$/;
-  if (!validNameRegex.test(trimmedName)) {
-    nameError = 'Name must be 1-50 characters, alphanumeric with hyphens/underscores';
+  // Validate against the shared project update schema (single source of truth
+  // with PATCH /api/projects/[id]).
+  const validation = projectUpdatePayloadSchema.safeParse({ name: trimmedName });
+  if (!validation.success) {
+    nameError = validation.error.issues?.[0]?.message ?? 'Project name cannot be empty';
     return;
   }
 

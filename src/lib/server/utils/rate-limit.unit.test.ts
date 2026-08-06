@@ -23,4 +23,21 @@ describe("checkRateLimit token bucket", () => {
     expect(checkRateLimit("k2", 1)).toBe(false);
     expect(checkRateLimit("k3", 1)).toBe(true);
   });
+
+  it("fails closed when rpm is zero", () => {
+    expect(checkRateLimit("zero", 0)).toBe(false);
+    expect(checkRateLimit("zero", 0)).toBe(false);
+  });
+
+  it("fails closed when rpm is negative", () => {
+    expect(checkRateLimit("negative", -5)).toBe(false);
+  });
+
+  it("fails closed when rpm is NaN", () => {
+    expect(checkRateLimit("nan", Number.NaN)).toBe(false);
+  });
+
+  it("fails closed when rpm is not a finite number", () => {
+    expect(checkRateLimit("infinity", Number.POSITIVE_INFINITY)).toBe(false);
+  });
 });

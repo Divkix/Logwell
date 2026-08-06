@@ -307,14 +307,14 @@ func TestConfigValidateBatchSize(t *testing.T) {
 	}{
 		// Valid values
 		{"minimum valid (1)", 1, false},
-		{"maximum valid (500)", 500, false},
-		{"mid range (100)", 100, false},
+		{"maximum valid (100)", 100, false},
+		{"mid range (50)", 50, false},
 		{"default value (50)", 50, false},
 
 		// Invalid values
 		{"zero", 0, true},
 		{"negative", -1, true},
-		{"above max (501)", 501, true},
+		{"above max (101)", 101, true},
 		{"way above max (1000)", 1000, true},
 	}
 
@@ -381,15 +381,15 @@ func TestConfigValidateMaxQueueSize(t *testing.T) {
 	}{
 		// Valid values
 		{"minimum valid (1)", 1, false},
-		{"maximum valid (10000)", 10000, false},
+		{"maximum valid (100000)", 100000, false},
 		{"mid range (5000)", 5000, false},
 		{"default value (1000)", 1000, false},
 
 		// Invalid values
 		{"zero", 0, true},
 		{"negative", -1, true},
-		{"above max (10001)", 10001, true},
-		{"way above max (20000)", 20000, true},
+		{"above max (100001)", 100001, true},
+		{"way above max (200000)", 200000, true},
 	}
 
 	for _, tt := range tests {
@@ -545,8 +545,8 @@ func TestConfigValidationBounds(t *testing.T) {
 		if MinBatchSize != 1 {
 			t.Errorf("MinBatchSize = %d, want 1", MinBatchSize)
 		}
-		if MaxBatchSize != 500 {
-			t.Errorf("MaxBatchSize = %d, want 500", MaxBatchSize)
+		if MaxBatchSize != 100 {
+			t.Errorf("MaxBatchSize = %d, want 100", MaxBatchSize)
 		}
 
 		// FlushInterval bounds
@@ -561,8 +561,8 @@ func TestConfigValidationBounds(t *testing.T) {
 		if MinMaxQueueSize != 1 {
 			t.Errorf("MinMaxQueueSize = %d, want 1", MinMaxQueueSize)
 		}
-		if MaxMaxQueueSize != 10000 {
-			t.Errorf("MaxMaxQueueSize = %d, want 10000", MaxMaxQueueSize)
+		if MaxMaxQueueSize != 100000 {
+			t.Errorf("MaxMaxQueueSize = %d, want 100000", MaxMaxQueueSize)
 		}
 
 		// MaxRetries bounds

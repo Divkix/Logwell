@@ -18,11 +18,11 @@ const (
 // Validation bounds.
 const (
 	MinBatchSize     = 1
-	MaxBatchSize     = 500
+	MaxBatchSize     = 100
 	MinFlushInterval = 100 * time.Millisecond
 	MaxFlushInterval = 60 * time.Second
 	MinMaxQueueSize  = 1
-	MaxMaxQueueSize  = 10000
+	MaxMaxQueueSize  = 100000
 	MinMaxRetries    = 0
 	MaxMaxRetries    = 10
 )
@@ -45,7 +45,7 @@ type Config struct {
 	Metadata map[string]any
 
 	// BatchSize is the number of logs to batch before sending.
-	// Default: 50, Range: 1-500.
+	// Default: 50, Range: 1-100.
 	BatchSize int
 
 	// FlushInterval is the maximum time to wait before flushing.
@@ -53,7 +53,7 @@ type Config struct {
 	FlushInterval time.Duration
 
 	// MaxQueueSize is the maximum number of logs to hold in queue.
-	// Default: 1000, Range: 1-10000.
+	// Default: 1000, Range: 1-100000.
 	MaxQueueSize int
 
 	// MaxRetries is the maximum number of retry attempts for failed requests.
@@ -79,7 +79,7 @@ type Config struct {
 type Option func(*Config)
 
 // WithBatchSize sets the batch size for log batching.
-// Must be between 1 and 500.
+// Must be between 1 and 100.
 func WithBatchSize(n int) Option {
 	return func(c *Config) {
 		c.BatchSize = n
@@ -95,7 +95,7 @@ func WithFlushInterval(d time.Duration) Option {
 }
 
 // WithMaxQueueSize sets the maximum queue size.
-// Must be between 1 and 10000.
+// Must be between 1 and 100000.
 func WithMaxQueueSize(n int) Option {
 	return func(c *Config) {
 		c.MaxQueueSize = n
@@ -204,7 +204,7 @@ func validateAPIKey(apiKey string) error {
 // validateBatchSize validates the batch size configuration.
 func validateBatchSize(batchSize int) error {
 	if batchSize < MinBatchSize || batchSize > MaxBatchSize {
-		return NewError(ErrInvalidConfig, "batchSize must be between 1 and 500")
+		return NewError(ErrInvalidConfig, "batchSize must be between 1 and 100")
 	}
 	return nil
 }
@@ -220,7 +220,7 @@ func validateFlushInterval(flushInterval time.Duration) error {
 // validateMaxQueueSize validates the max queue size configuration.
 func validateMaxQueueSize(maxQueueSize int) error {
 	if maxQueueSize < MinMaxQueueSize || maxQueueSize > MaxMaxQueueSize {
-		return NewError(ErrInvalidConfig, "maxQueueSize must be between 1 and 10000")
+		return NewError(ErrInvalidConfig, "maxQueueSize must be between 1 and 100000")
 	}
 	return nil
 }

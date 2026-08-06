@@ -35,6 +35,7 @@ export class Logwell {
   private readonly queue: BatchQueue;
   private readonly transport?: HttpTransport;
   private readonly parentMetadata?: Record<string, unknown>;
+  private readonly ownsQueue: boolean;
   private stopped = false;
 
   constructor(config: LogwellConfig);
@@ -51,8 +52,10 @@ export class Logwell {
     // Use existing queue (for child loggers) or create new one with its own transport
     if (existingQueue) {
       this.queue = existingQueue;
+      this.ownsQueue = false;
       // transport is the parent's, accessed via queue's sendBatch — no allocation needed
     } else {
+      this.ownsQueue = true;
       this.transport = new HttpTransport({
         endpoint: this.config.endpoint,
         apiKey: this.config.apiKey,
@@ -168,6 +171,11 @@ export class Logwell {
    */
   async shutdown(): Promise<IngestResponse | null> {
     this.stopped = true;
+    if (!this.ownsQueue) {
+      // Child loggers share the parent's queue; shutting one down must not
+      // flush or stop the shared queue (matches the Go/Python child contract).
+      return null;
+    }
     return this.queue.shutdown();
   }
 
@@ -191,10 +199,18 @@ export class Logwell {
       service: options.service ?? this.config.service,
     };
 
-    const childMetadata = {
+    const mergedMetadata = {
       ...this.parentMetadata,
       ...options.metadata,
     };
+    // Preserve `undefined` metadata when neither the parent nor the options
+    // provide any (an empty merge must stay `undefined`, not become `{}`).
+    const childMetadata =
+      this.parentMetadata === undefined && options.metadata === undefined
+        ? undefined
+        : Object.keys(mergedMetadata).length > 0
+          ? mergedMetadata
+          : undefined;
 
     return new Logwell(childConfig, this.queue, childMetadata);
   }

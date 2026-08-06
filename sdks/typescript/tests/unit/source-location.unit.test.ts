@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { captureSourceLocation, parseStackFrame } from "../../src/source-location";
 
 describe("parseStackFrame", () => {
@@ -188,5 +188,76 @@ describe("captureSourceLocation", () => {
   it("returns undefined when skipFrames exceeds stack depth", () => {
     const result = captureSourceLocation(1000);
     expect(result).toBeUndefined();
+  });
+});
+
+describe("captureSourceLocation - stack header detection", () => {
+  /**
+   * Builds an Error whose stack is the given lines, to exercise the V8-vs-
+   * SpiderMonkey header detection without depending on the runtime format.
+   */
+  function fakeErrorWithStack(lines: string[]): { new (): Error } {
+    return class extends Error {
+      constructor() {
+        super();
+        Object.defineProperty(this, "stack", {
+          value: lines.join("\n"),
+          configurable: true,
+          writable: true,
+        });
+      }
+    };
+  }
+
+  it("detects a V8 header even when the message contains @", () => {
+    vi.stubGlobal(
+      "Error",
+      fakeErrorWithStack([
+        "Error: failed @ step 3",
+        "    at captureSourceLocation (/sdk/src/source-location.ts:50:5)",
+        "    at wrapper (/app/caller.ts:12:3)",
+      ]),
+    );
+    try {
+      // The "@" inside the header must not misclassify the stack as
+      // headerless (old behavior skipped the header incorrectly).
+      const result = captureSourceLocation(0);
+      expect(result).toEqual({ sourceFile: "/app/caller.ts", lineNumber: 12 });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("detects a bare Error header line", () => {
+    vi.stubGlobal(
+      "Error",
+      fakeErrorWithStack([
+        "Error",
+        "    at captureSourceLocation (/sdk/src/source-location.ts:50:5)",
+        "    at wrapper (/app/caller.ts:12:3)",
+      ]),
+    );
+    try {
+      const result = captureSourceLocation(0);
+      expect(result).toEqual({ sourceFile: "/app/caller.ts", lineNumber: 12 });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("treats a SpiderMonkey-style stack (no Error header) as headerless", () => {
+    vi.stubGlobal(
+      "Error",
+      fakeErrorWithStack([
+        "captureSourceLocation@/sdk/src/source-location.ts:50:5",
+        "wrapper@/app/caller.ts:12:3",
+      ]),
+    );
+    try {
+      const result = captureSourceLocation(0);
+      expect(result).toEqual({ sourceFile: "/app/caller.ts", lineNumber: 12 });
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

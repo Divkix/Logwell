@@ -108,10 +108,9 @@ export class BatchQueue {
           const chunkSize = Math.min(this.config.batchSize, remaining);
           const batch = this.queue.splice(0, chunkSize);
           sent += batch.length;
+          let response: IngestResponse;
           try {
-            const response = await this.sendBatch(batch);
-            this.config.onFlush?.(batch.length);
-            lastResponse = response;
+            response = await this.sendBatch(batch);
           } catch (error) {
             // Re-queue failed batch at front, respect maxQueueSize
             const requeued = [...batch, ...this.queue];
@@ -127,6 +126,15 @@ export class BatchQueue {
             }
             this.config.onError?.(error as Error);
             break; // stop flushing on error
+          }
+          lastResponse = response;
+          // onFlush is a user callback — a throw must not look like a send
+          // failure (no re-queue, no interrupted flush), so report it via
+          // onError instead.
+          try {
+            this.config.onFlush?.(batch.length);
+          } catch (error) {
+            this.config.onError?.(error as Error);
           }
         }
       } finally {
@@ -184,9 +192,19 @@ export class BatchQueue {
   }
 
   private startTimer(): void {
-    this.flushTimer = setTimeout(() => {
+    // Idempotent: clear any pending timer first so startTimer can never
+    // stack a duplicate flush timer.
+    this.stopTimer();
+    const timer = setTimeout(() => {
       void this.flush();
     }, this.config.flushInterval);
+    // Allow Node processes to exit while a flush is merely pending. Bun's
+    // timer objects don't expose unref(), so guard the call at runtime.
+    const refable = timer as { unref?: () => void } | null;
+    if (typeof refable === "object" && refable !== null && "unref" in refable) {
+      refable.unref?.();
+    }
+    this.flushTimer = timer;
   }
 
   private stopTimer(): void {

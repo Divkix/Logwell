@@ -7,12 +7,21 @@ interface Bucket {
 const buckets = new Map<string, Bucket>();
 
 /**
- * Parse an RPM env value into a finite positive integer, falling back to the
- * default when the value is missing, non-numeric, zero, or negative.
+ * Parse an RPM env value into a finite positive integer.
+ *
+ * A missing/empty value falls back to the default. An explicitly configured
+ * non-positive or non-numeric value fails closed (returns 0 → capacity 0) so
+ * a misconfigured limit can never silently relax into an unlimited bucket.
  */
 function parsePositiveRpm(raw: string | undefined, fallback: number): number {
+  if (raw === undefined || raw === "") {
+    return fallback;
+  }
   const n = Number(raw);
-  return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
+  if (Number.isFinite(n) && n > 0) {
+    return Math.floor(n);
+  }
+  return 0;
 }
 
 export const INGEST_RPM = parsePositiveRpm(process.env.RATE_LIMIT_INGEST_RPM, 600); // 600 req/min per key
@@ -28,8 +37,9 @@ setInterval(() => {
 }, CLEANUP_INTERVAL).unref?.();
 
 export function checkRateLimit(key: string, rpm: number): boolean {
-  // Guard against NaN / non-positive capacities reaching the bucket math.
-  const capacity = Number.isFinite(rpm) && rpm > 0 ? Math.floor(rpm) : 1;
+  // Guard against NaN / non-positive capacities: fail closed (capacity 0) so
+  // every check is denied rather than letting a broken limit pass requests.
+  const capacity = Number.isFinite(rpm) && rpm > 0 ? Math.floor(rpm) : 0;
   const now = Date.now();
   const bucket = buckets.get(key) ?? { tokens: capacity, last: now };
   const elapsed = (now - bucket.last) / 60000; // minutes

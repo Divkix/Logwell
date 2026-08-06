@@ -147,11 +147,27 @@ def validate_config(config: LogwellConfig) -> LogwellConfig:
             LogwellErrorCode.INVALID_CONFIG,
         )
 
+    if "flush_interval" in config and config["flush_interval"] > 60.0:
+        raise LogwellError(
+            f"Invalid flush_interval: {config['flush_interval']}. "
+            "flush_interval must not exceed 60.0 seconds (60000ms), "
+            "matching the shared SDK contract.",
+            LogwellErrorCode.INVALID_CONFIG,
+        )
+
     if "max_queue_size" in config and config["max_queue_size"] <= 0:
         raise LogwellError(
             f"Invalid max_queue_size: {config['max_queue_size']}. "
             "max_queue_size must be a positive integer (e.g., 1000). "
             "When exceeded, oldest logs are dropped to prevent memory issues.",
+            LogwellErrorCode.INVALID_CONFIG,
+        )
+
+    if "max_queue_size" in config and config["max_queue_size"] > 100000:
+        raise LogwellError(
+            f"Invalid max_queue_size: {config['max_queue_size']}. "
+            "max_queue_size must not exceed 100000, "
+            "matching the shared SDK contract.",
             LogwellErrorCode.INVALID_CONFIG,
         )
 

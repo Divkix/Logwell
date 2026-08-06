@@ -69,18 +69,18 @@ func main() {
 
 Configure the client using functional options:
 
-| Option                         | Type             | Default              | Description                                     |
-| ------------------------------ | ---------------- | -------------------- | ----------------------------------------------- |
-| `WithService(s)`               | `string`         | `""`                 | Service name attached to all logs               |
-| `WithMetadata(m)`              | `map[string]any` | `nil`                | Default metadata for all logs                   |
-| `WithBatchSize(n)`             | `int`            | `50`                 | Logs per batch (1-500)                          |
-| `WithFlushInterval(d)`         | `time.Duration`  | `5s`                 | Auto-flush interval (100ms-60s)                 |
-| `WithMaxQueueSize(n)`          | `int`            | `1000`               | Max queue size before dropping oldest (1-10000) |
-| `WithMaxRetries(n)`            | `int`            | `3`                  | Retry attempts for failed requests (0-10)       |
-| `WithCaptureSourceLocation(b)` | `bool`           | `false`              | Capture file/line info                          |
-| `WithHTTPClient(c)`            | `*http.Client`   | `http.DefaultClient` | Custom HTTP client                              |
-| `WithOnError(fn)`              | `func(*Error)`   | `nil`                | Error callback                                  |
-| `WithOnFlush(fn)`              | `func(int)`      | `nil`                | Flush callback (receives count)                 |
+| Option                         | Type             | Default              | Description                                      |
+| ------------------------------ | ---------------- | -------------------- | ------------------------------------------------ |
+| `WithService(s)`               | `string`         | `""`                 | Service name attached to all logs                |
+| `WithMetadata(m)`              | `map[string]any` | `nil`                | Default metadata for all logs                    |
+| `WithBatchSize(n)`             | `int`            | `50`                 | Logs per batch (1-100)                           |
+| `WithFlushInterval(d)`         | `time.Duration`  | `5s`                 | Auto-flush interval (100ms-60s)                  |
+| `WithMaxQueueSize(n)`          | `int`            | `1000`               | Max queue size before dropping oldest (1-100000) |
+| `WithMaxRetries(n)`            | `int`            | `3`                  | Retry attempts for failed requests (0-10)        |
+| `WithCaptureSourceLocation(b)` | `bool`           | `false`              | Capture file/line info                           |
+| `WithHTTPClient(c)`            | `*http.Client`   | `http.DefaultClient` | Custom HTTP client                               |
+| `WithOnError(fn)`              | `func(*Error)`   | `nil`                | Error callback                                   |
+| `WithOnFlush(fn)`              | `func(int)`      | `nil`                | Flush callback (receives count)                  |
 
 ### Example with all options
 

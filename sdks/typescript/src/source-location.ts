@@ -125,10 +125,14 @@ export function captureSourceLocation(skipFrames: number): SourceLocation | unde
   const lines = stack.split("\n");
 
   // Detect stack format:
-  // - V8 (Node/Bun/Chrome): Has "Error" header line, frames start with "at"
-  // - SpiderMonkey/JSC (Firefox/Safari): No header, frames contain "@"
+  // - V8 (Node/Bun/Chrome): frames start with "at", and the first line is an
+  //   Error header like "Error", "Error: message", or "TypeError: message".
+  //   Detect the header by that pattern rather than by the absence of "@":
+  //   SpiderMonkey/JSC frames use "@", and a V8 header message may itself
+  //   contain "@".
+  // - SpiderMonkey/JSC (Firefox/Safari): no header; frames contain "@"
   const firstLine = lines[0] || "";
-  const hasErrorHeader = !firstLine.includes("@") && !/^\s*at\s/.test(firstLine);
+  const hasErrorHeader = /^[\w$]*Error(:|$)/.test(firstLine);
 
   // Calculate target frame index:
   // Skip: header (if present) + captureSourceLocation frame + skipFrames

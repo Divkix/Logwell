@@ -1,10 +1,15 @@
 import { json } from "@sveltejs/kit";
-import { and, desc, eq, gte, inArray, lt, lte, or, type SQL, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte, type SQL, sql } from "drizzle-orm";
 import { getDbClient } from "$lib/server/db/db";
 import { log } from "$lib/server/db/schema";
 import { apiError } from "$lib/server/utils/api-error";
 import { cappedLogCount } from "$lib/server/utils/capped-count";
-import { decodeCursor, encodeCursor } from "$lib/server/utils/cursor";
+import {
+  decodeCursor,
+  encodeCursor,
+  cursorRowLessThan,
+  microsColumn,
+} from "$lib/server/utils/cursor";
 import { isErrorResponse, requireProjectOwnership } from "$lib/server/utils/project-guard";
 import { buildSearchQuery } from "$lib/server/utils/search";
 import { parseLevelFilter } from "$lib/shared/schemas/log";
@@ -91,16 +96,13 @@ export async function GET(event: RequestEvent): Promise<Response> {
   // Cursor-based pagination condition
   if (cursorParam) {
     try {
-      const { timestamp: cursorTimestamp, id: cursorId } = decodeCursor(cursorParam);
+      const { micros: cursorMicros, id: cursorId } = decodeCursor(cursorParam);
 
-      // Query: WHERE (timestamp < cursor_timestamp OR (timestamp = cursor_timestamp AND id < cursor_id))
-      // This ensures we get logs older than the cursor position
-      conditions.push(
-        or(
-          lt(log.timestamp, cursorTimestamp),
-          and(eq(log.timestamp, cursorTimestamp), lt(log.id, cursorId)),
-        ) as SQL,
-      );
+      // Row-value comparison: (timestamp, id) < (cursorTimestamp, cursorId).
+      // Comparing the full row (instead of a millisecond-truncated timestamp
+      // with an id tie-break) means rows that share the cursor's millisecond
+      // are tie-broken on id and never skipped.
+      conditions.push(cursorRowLessThan(log.timestamp, log.id, cursorMicros, cursorId));
     } catch (error) {
       return apiError(
         400,
@@ -140,7 +142,9 @@ export async function GET(event: RequestEvent): Promise<Response> {
   const total = countResult?.total;
   const totalIsCapped = countResult?.capped ?? false;
 
-  // Fetch logs with pagination (query one extra to detect hasMore)
+  // Fetch logs with pagination (query one extra to detect hasMore).
+  // `micros` carries the row's exact microsecond timestamp so the cursor can
+  // tie-break rows that share the same millisecond.
   const logs = await db
     .select({
       id: log.id,
@@ -157,6 +161,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
       userId: log.userId,
       ipAddress: log.ipAddress,
       timestamp: log.timestamp,
+      micros: microsColumn(log.timestamp),
     })
     .from(log)
     .where(whereClause)
@@ -173,12 +178,24 @@ export async function GET(event: RequestEvent): Promise<Response> {
   // Compute next cursor if there are more logs
   const nextCursor =
     hasMore && logsToReturn.length > 0
-      ? encodeCursor(logsToReturn.at(-1)!.timestamp as Date, logsToReturn.at(-1)!.id)
+      ? encodeCursor(Math.round(logsToReturn.at(-1)!.micros), logsToReturn.at(-1)!.id)
       : null;
 
   return json({
     logs: logsToReturn.map((l) => ({
-      ...l,
+      id: l.id,
+      projectId: l.projectId,
+      incidentId: l.incidentId,
+      fingerprint: l.fingerprint,
+      serviceName: l.serviceName,
+      level: l.level,
+      message: l.message,
+      metadata: l.metadata,
+      sourceFile: l.sourceFile,
+      lineNumber: l.lineNumber,
+      requestId: l.requestId,
+      userId: l.userId,
+      ipAddress: l.ipAddress,
       timestamp: l.timestamp?.toISOString(),
     })),
     total: total ?? null,

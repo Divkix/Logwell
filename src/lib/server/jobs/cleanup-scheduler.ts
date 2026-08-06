@@ -45,6 +45,10 @@ export function stopCleanupScheduler(): void {
     cleanupIntervalId = null;
   }
   cleanupStarted = false;
+  // Clear the overlap guard so a later startCleanupScheduler() can run an
+  // immediate cycle again (otherwise a cycle still in flight — or one whose
+  // promise never settled — would make the next start a no-op).
+  isRunning = false;
 }
 
 /**

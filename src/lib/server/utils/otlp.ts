@@ -413,6 +413,15 @@ export function normalizeOtlpLogsRequest(body: unknown): NormalizedOtlpLogsResul
         const level = deriveLevel(severityNumber, severityText);
         const message = deriveMessage(bodyValue, attributes);
 
+        // Records whose derived message is empty or whitespace-only carry no
+        // signal; reject them per-record (mirrors simple-ingest's handling)
+        // so the request still succeeds with an `accepted/rejected` response.
+        if (!message.trim()) {
+          rejectedLogRecords += 1;
+          errors.push(`Log record rejected: message cannot be empty`);
+          continue;
+        }
+
         recordCount += 1;
         if (recordCount > API_CONFIG.BATCH_INSERT_LIMIT) {
           throw new OtlpBatchTooLargeError(API_CONFIG.BATCH_INSERT_LIMIT);

@@ -26,6 +26,7 @@ import type { Log, LogLevel, Project } from '$lib/server/db/schema';
 import type { ClientLog } from '$lib/stores/logs.svelte';
 import { announceToScreenReader } from '$lib/utils/focus-trap';
 import { shouldBlockShortcut } from '$lib/utils/keyboard';
+import { sortLogs, type SortField, type SortDirection } from '$lib/utils/log-sort';
 import { toastError } from '$lib/utils/toast';
 import type { PageData } from './$types';
 
@@ -95,6 +96,11 @@ let loadedMoreLogs = $state<Log[]>([]);
 // svelte-ignore state_referenced_locally
 let nextCursor = $state<string | null>(data.pagination.nextCursor ?? null);
 let isLoadingMore = $state(false);
+
+// Sort state owned by the page so j/k navigation walks the same order the
+// table renders. Bound into LogTable, which drives the header-click UI.
+let sortKey = $state<SortField | null>(null);
+let sortDirection = $state<SortDirection>(null);
 
 // Count active filters for badge
 const activeFilterCount = $derived(
@@ -207,6 +213,10 @@ const allLogs = $derived.by(() => {
   return result;
 });
 
+// Sorted view used by j/k keyboard navigation — must match what LogTable
+// renders (it sorts the same `allLogs` with the same bound sort state).
+const sortedAllLogs = $derived(sortLogs(allLogs, sortKey, sortDirection));
+
 function handleSearch(value: string) {
   searchValue = value;
   selectedLogId = null;
@@ -272,6 +282,10 @@ async function loadMore() {
     params.set('range', selectedRange);
 
     const response = await fetch(`/api/projects/${data.project.id}/logs?${params}`);
+    if (!response.ok) {
+      toastError('Failed to load more logs');
+      return;
+    }
     const result = await response.json();
 
     loadedMoreLogs = [...loadedMoreLogs, ...result.logs.map(parseLogTimestamp)];
@@ -331,33 +345,33 @@ function handleKeyboardShortcut(event: KeyboardEvent) {
   switch (event.key) {
     case 'j': {
       // Skip navigation when loading or no logs
-      if (isLoading || allLogs.length === 0) return;
+      if (isLoading || sortedAllLogs.length === 0) return;
       // Navigate to next log
-      const currentIdxJ = selectedLogId ? allLogs.findIndex((l) => l.id === selectedLogId) : -1;
-      const nextIdxJ = currentIdxJ < allLogs.length - 1 ? currentIdxJ + 1 : currentIdxJ;
+      const currentIdxJ = selectedLogId ? sortedAllLogs.findIndex((l) => l.id === selectedLogId) : -1;
+      const nextIdxJ = currentIdxJ < sortedAllLogs.length - 1 ? currentIdxJ + 1 : currentIdxJ;
       if (nextIdxJ !== currentIdxJ || currentIdxJ === -1) {
         const newIdx = currentIdxJ === -1 ? 0 : nextIdxJ;
-        selectedLogId = allLogs[newIdx]?.id ?? null;
+        selectedLogId = sortedAllLogs[newIdx]?.id ?? null;
         scrollSelectedIntoView();
-        announceToScreenReader(`Log ${newIdx + 1} of ${allLogs.length}`);
+        announceToScreenReader(`Log ${newIdx + 1} of ${sortedAllLogs.length}`);
       }
       break;
     }
     case 'k': {
       // Skip navigation when loading or no logs
-      if (isLoading || allLogs.length === 0) return;
+      if (isLoading || sortedAllLogs.length === 0) return;
       // Navigate to previous log
-      const currentIdxK = selectedLogId ? allLogs.findIndex((l) => l.id === selectedLogId) : -1;
+      const currentIdxK = selectedLogId ? sortedAllLogs.findIndex((l) => l.id === selectedLogId) : -1;
       if (currentIdxK > 0) {
-        selectedLogId = allLogs[currentIdxK - 1]?.id ?? null;
+        selectedLogId = sortedAllLogs[currentIdxK - 1]?.id ?? null;
         scrollSelectedIntoView();
-        announceToScreenReader(`Log ${currentIdxK} of ${allLogs.length}`);
+        announceToScreenReader(`Log ${currentIdxK} of ${sortedAllLogs.length}`);
       }
       break;
     }
     case 'Enter': {
       // Open modal for selected log (only when a log is selected)
-      const selectedForEnter = selectedLogId ? allLogs.find((l) => l.id === selectedLogId) : null;
+      const selectedForEnter = selectedLogId ? sortedAllLogs.find((l) => l.id === selectedLogId) : null;
       if (selectedForEnter) {
         selectedLog = selectedForEnter;
         showDetailModal = true;
@@ -514,6 +528,8 @@ function handleKeyboardShortcut(event: KeyboardEvent) {
       project={projectData}
       appUrl={data.appUrl ?? undefined}
       selectedId={selectedLogId}
+      bind:sortKey
+      bind:sortDirection
     />
 
     <!-- Load More Button -->

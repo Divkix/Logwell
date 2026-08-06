@@ -140,5 +140,33 @@ describe("cursor utilities", () => {
         expect(result.timestamp.toISOString()).toBe(timestamp.toISOString());
       }
     });
+
+    it("roundtrips microsecond-precision timestamps exactly", () => {
+      const micros = 1767225600123456; // 2026-01-01T00:00:00.123456Z
+      const id = "log_123";
+
+      const cursor = encodeCursor(micros, id);
+      const result = decodeCursor(cursor);
+
+      expect(result.micros).toBe(micros);
+      expect(result.id).toBe(id);
+      // Convenience timestamp is millisecond-truncated (2026-01-01T00:00:00.123Z)
+      expect(result.timestamp.toISOString()).toBe("2026-01-01T00:00:00.123Z");
+    });
+
+    it("decodes a number-overload cursor through the Date overload path", () => {
+      const timestamp = new Date("2024-01-15T10:30:00.000Z");
+      const micros = timestamp.getTime() * 1000;
+      const id = "log_123";
+
+      // Number-encoded and Date-encoded cursors for the same instant must
+      // decode to the same value (interop between API routes and page loaders).
+      const fromMicros = decodeCursor(encodeCursor(micros, id));
+      const fromDate = decodeCursor(encodeCursor(timestamp, id));
+
+      expect(fromMicros.micros).toBe(micros);
+      expect(fromMicros.micros).toBe(fromDate.micros);
+      expect(fromMicros.timestamp.toISOString()).toBe(fromDate.timestamp.toISOString());
+    });
   });
 });

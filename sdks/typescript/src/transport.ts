@@ -12,10 +12,19 @@ export interface TransportConfig {
 }
 
 /**
+ * Exponential backoff ceiling in milliseconds, mirroring the Python SDK's
+ * `_backoff_seconds` (scaled to ms). Caps at 10s so a long Retry-After or a
+ * high attempt count can't stall the sender indefinitely.
+ */
+function backoffMs(attempt: number, baseDelay = 100): number {
+  return Math.min(baseDelay * 2 ** attempt, 10000);
+}
+
+/**
  * Delay helper with exponential backoff
  */
 function delay(attempt: number, baseDelay = 100): Promise<void> {
-  const ms = Math.min(baseDelay * 2 ** attempt, 10000);
+  const ms = backoffMs(attempt, baseDelay);
   const jitter = Math.random() * ms * 0.3;
   return new Promise((resolve) => setTimeout(resolve, ms + jitter));
 }
@@ -109,8 +118,7 @@ export class HttpTransport {
         if (attempt < this.config.maxRetries) {
           if (lastError.retryAfterMs !== undefined) {
             // Honor Retry-After but cap it to the exponential backoff ceiling
-            const backoffMs = Math.min(100 * 2 ** attempt, 10000);
-            await sleep(Math.min(lastError.retryAfterMs, backoffMs));
+            await sleep(Math.min(lastError.retryAfterMs, backoffMs(attempt)));
           } else {
             await delay(attempt);
           }
@@ -122,14 +130,27 @@ export class HttpTransport {
   }
 
   private async doRequest(logs: LogEntry[]): Promise<IngestResponse> {
+    // Serialize BEFORE the fetch try: a serialization failure (e.g. BigInt in
+    // the payload) is a client-side validation problem, not a network error.
+    let body: string;
+    try {
+      body = JSON.stringify(logs);
+    } catch (error) {
+      throw new LogwellError(
+        `Failed to serialize payload: ${(error as Error).message}`,
+        "VALIDATION_ERROR",
+        400,
+        false,
+      );
+    }
+    // The Fetch spec caps keepalive request bodies at 64 KiB; enabling it for
+    // larger payloads makes the request fail outright in browsers and undici.
+    // Only opt in under that limit so large batches still send reliably.
+    const useKeepalive = new TextEncoder().encode(body).length < 60_000;
+
     let response: Response;
 
     try {
-      const body = JSON.stringify(logs);
-      // The Fetch spec caps keepalive request bodies at 64 KiB; enabling it for
-      // larger payloads makes the request fail outright in browsers and undici.
-      // Only opt in under that limit so large batches still send reliably.
-      const useKeepalive = new TextEncoder().encode(body).length < 60_000;
       response = await fetch(this.ingestUrl, {
         method: "POST",
         headers: {
@@ -197,11 +218,19 @@ export class HttpTransport {
         return new LogwellError(`Unauthorized: ${message}`, "UNAUTHORIZED", status, false);
       case 400:
         return new LogwellError(`Validation error: ${message}`, "VALIDATION_ERROR", status, false);
-      case 429:
-        return new LogwellError(`Rate limited: ${message}`, "RATE_LIMITED", status, true);
       default:
         if (status >= 500) {
           return new LogwellError(`Server error: ${message}`, "SERVER_ERROR", status, true);
+        }
+        // 429 is handled (once) in createErrorWithRetryAfter; every other 4xx
+        // is a request the server will not accept as-is — non-retryable.
+        if (status >= 400) {
+          return new LogwellError(
+            `Validation error: ${message}`,
+            "VALIDATION_ERROR",
+            status,
+            false,
+          );
         }
         return new LogwellError(`HTTP error ${status}: ${message}`, "SERVER_ERROR", status, false);
     }

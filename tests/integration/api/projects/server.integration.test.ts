@@ -1,7 +1,7 @@
 import type { HttpError } from "@sveltejs/kit";
 import { eq } from "drizzle-orm";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
-import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { createAuth } from "$lib/server/auth";
 import type * as schema from "$lib/server/db/schema";
 import { project } from "$lib/server/db/schema";
@@ -193,6 +193,38 @@ describe("GET /api/projects", () => {
       // Newest first
       expect(body.projects[0].id).toBe(newProject.id);
       expect(body.projects[1].id).toBe(oldProject.id);
+    });
+
+    it("computes log counts with a single GROUP BY query (no per-project COUNT loop)", async () => {
+      const [project1, project2] = await seedProjects(db, 2, { ownerId: userId });
+      await seedLogs(db, project1!.id, 5);
+
+      // The count query must GROUP BY projectId in one pass. A per-project
+      // COUNT loop selects `{ count }` without a projectId — that shape must
+      // never reach the database.
+      const originalSelect = db.select.bind(db);
+      vi.spyOn(db, "select").mockImplementation(((fields?: unknown) => {
+        if (fields && typeof fields === "object" && "count" in fields && !("projectId" in fields)) {
+          throw new Error("project list must aggregate log counts in SQL");
+        }
+        return originalSelect(fields as never);
+      }) as typeof db.select);
+
+      const request = new Request("http://localhost/api/projects", {
+        method: "GET",
+      });
+
+      const event = createRequestEvent(request, db, authenticatedLocals);
+      const response = await GET(event as never);
+
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.projects).toHaveLength(2);
+
+      const returnedProject1 = body.projects.find((p: { id: string }) => p.id === project1!.id);
+      const returnedProject2 = body.projects.find((p: { id: string }) => p.id === project2!.id);
+      expect(returnedProject1.logCount).toBe(5);
+      expect(returnedProject2.logCount).toBe(0);
     });
 
     it("does not expose API keys in list response", async () => {

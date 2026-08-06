@@ -1,10 +1,15 @@
 import { json } from "@sveltejs/kit";
-import { and, count, desc, eq, gte, lt, or, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, gte, lt, type SQL } from "drizzle-orm";
 import { INCIDENT_CONFIG } from "$lib/server/config/performance";
 import { getDbClient } from "$lib/server/db/db";
 import { incident } from "$lib/server/db/schema";
 import { apiError } from "$lib/server/utils/api-error";
-import { decodeCursor, encodeCursor } from "$lib/server/utils/cursor";
+import {
+  decodeCursor,
+  encodeCursor,
+  cursorRowLessThan,
+  microsColumn,
+} from "$lib/server/utils/cursor";
 import { getIncidentStatus } from "$lib/server/utils/incidents";
 import { isErrorResponse, requireProjectOwnership } from "$lib/server/utils/project-guard";
 import { INCIDENT_STATUSES, type IncidentRange } from "$lib/shared/types";
@@ -58,13 +63,10 @@ export async function GET(event: RequestEvent): Promise<Response> {
 
   if (cursorParam) {
     try {
-      const { timestamp: cursorTimestamp, id: cursorId } = decodeCursor(cursorParam);
-      conditions.push(
-        or(
-          lt(incident.lastSeen, cursorTimestamp),
-          and(eq(incident.lastSeen, cursorTimestamp), lt(incident.id, cursorId)),
-        ) as SQL,
-      );
+      const { micros: cursorMicros, id: cursorId } = decodeCursor(cursorParam);
+      // Row-value comparison so same-millisecond rows tie-break on id and are
+      // never skipped (see logs route for details).
+      conditions.push(cursorRowLessThan(incident.lastSeen, incident.id, cursorMicros, cursorId));
     } catch (error) {
       return apiError(
         400,
@@ -81,7 +83,21 @@ export async function GET(event: RequestEvent): Promise<Response> {
     : ((await db.select({ count: count() }).from(incident).where(whereClause))[0]?.count ?? 0);
 
   const incidents = await db
-    .select()
+    .select({
+      id: incident.id,
+      projectId: incident.projectId,
+      fingerprint: incident.fingerprint,
+      title: incident.title,
+      normalizedMessage: incident.normalizedMessage,
+      serviceName: incident.serviceName,
+      sourceFile: incident.sourceFile,
+      lineNumber: incident.lineNumber,
+      highestLevel: incident.highestLevel,
+      firstSeen: incident.firstSeen,
+      lastSeen: incident.lastSeen,
+      totalEvents: incident.totalEvents,
+      micros: microsColumn(incident.lastSeen),
+    })
     .from(incident)
     .where(whereClause)
     .orderBy(desc(incident.lastSeen), desc(incident.id))
@@ -92,7 +108,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
 
   const nextCursor =
     hasMore && incidentsToReturn.length > 0
-      ? encodeCursor(incidentsToReturn.at(-1)!.lastSeen as Date, incidentsToReturn.at(-1)!.id)
+      ? encodeCursor(Math.round(incidentsToReturn.at(-1)!.micros), incidentsToReturn.at(-1)!.id)
       : null;
 
   return json({

@@ -1,8 +1,9 @@
-import { and, count, desc, eq, gte, inArray, lt, lte, or, type SQL, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, lte, type SQL, sql } from "drizzle-orm";
 import { EXPORT_CONFIG } from "$lib/server/config/performance";
 import { getDbClient } from "$lib/server/db/db";
 import { log } from "$lib/server/db/schema";
 import { apiError } from "$lib/server/utils/api-error";
+import { cursorRowLessThan, microsColumn } from "$lib/server/utils/cursor";
 import { escapeCSVField } from "$lib/server/utils/csv-serializer";
 import { isErrorResponse, requireProjectOwnership } from "$lib/server/utils/project-guard";
 import { buildSearchQuery } from "$lib/server/utils/search";
@@ -150,19 +151,18 @@ export async function GET(event: RequestEvent): Promise<Response> {
         try {
           ctrl.enqueue(encoder.encode(`${CSV_HEADERS.join(",")}\n`));
 
-          // Cursor-based pagination to avoid loading all rows at once
-          let cursorTimestamp: Date | null = null;
+          // Cursor-based pagination to avoid loading all rows at once.
+          // `micros` keeps exact microsecond precision so same-millisecond
+          // rows tie-break on id and are never skipped.
+          let cursorMicros: number | null = null;
           let cursorId: string | null = null;
           let fetched = 0;
 
           while (fetched < EXPORT_CONFIG.MAX_LOGS) {
             const batchConditions: SQL[] = [...conditions];
-            if (cursorTimestamp !== null && cursorId !== null) {
+            if (cursorMicros !== null && cursorId !== null) {
               batchConditions.push(
-                or(
-                  lt(log.timestamp, cursorTimestamp),
-                  and(eq(log.timestamp, cursorTimestamp), lt(log.id, cursorId)),
-                ) as SQL,
+                cursorRowLessThan(log.timestamp, log.id, cursorMicros, cursorId),
               );
             }
 
@@ -178,6 +178,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
                 userId: log.userId,
                 ipAddress: log.ipAddress,
                 timestamp: log.timestamp,
+                micros: microsColumn(log.timestamp),
               })
               .from(log)
               .where(and(...batchConditions))
@@ -204,7 +205,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
 
             fetched += batch.length;
             const last = batch.at(-1)!;
-            cursorTimestamp = last.timestamp as Date;
+            cursorMicros = Math.round(last.micros);
             cursorId = last.id;
 
             if (batch.length < EXPORT_BATCH_SIZE) break;
@@ -232,20 +233,15 @@ export async function GET(event: RequestEvent): Promise<Response> {
       try {
         ctrl.enqueue(encoder.encode("["));
 
-        let cursorTimestamp: Date | null = null;
+        let cursorMicros: number | null = null;
         let cursorId: string | null = null;
         let fetched = 0;
         let first = true;
 
         while (fetched < EXPORT_CONFIG.MAX_LOGS) {
           const batchConditions: SQL[] = [...conditions];
-          if (cursorTimestamp !== null && cursorId !== null) {
-            batchConditions.push(
-              or(
-                lt(log.timestamp, cursorTimestamp),
-                and(eq(log.timestamp, cursorTimestamp), lt(log.id, cursorId)),
-              ) as SQL,
-            );
+          if (cursorMicros !== null && cursorId !== null) {
+            batchConditions.push(cursorRowLessThan(log.timestamp, log.id, cursorMicros, cursorId));
           }
 
           const batch = await db
@@ -260,6 +256,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
               userId: log.userId,
               ipAddress: log.ipAddress,
               timestamp: log.timestamp,
+              micros: microsColumn(log.timestamp),
             })
             .from(log)
             .where(and(...batchConditions))
@@ -274,7 +271,9 @@ export async function GET(event: RequestEvent): Promise<Response> {
               level: l.level,
               message: l.message,
               timestamp: l.timestamp?.toISOString() ?? "",
-              metadata: l.metadata ? JSON.stringify(l.metadata) : null,
+              // Pass the parsed metadata through as an object (JSON.stringify
+              // on the whole row keeps it structured; CSV needs the string).
+              metadata: l.metadata ?? null,
               sourceFile: l.sourceFile,
               lineNumber: l.lineNumber,
               requestId: l.requestId,
@@ -287,7 +286,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
 
           fetched += batch.length;
           const last = batch.at(-1)!;
-          cursorTimestamp = last.timestamp as Date;
+          cursorMicros = Math.round(last.micros);
           cursorId = last.id;
 
           if (batch.length < EXPORT_BATCH_SIZE) break;

@@ -101,6 +101,33 @@ describe("normalizeOtlpLogsRequest", () => {
     expect(records).toHaveLength(1);
     expect(records[0]!.message).toBe('{"action":"login","success":true}');
   });
+
+  it("rejects records with an empty or whitespace-only derived message", () => {
+    const payload = {
+      resourceLogs: [
+        {
+          scopeLogs: [
+            {
+              logRecords: [
+                // No body and no message attribute → empty derived message
+                {},
+                // Whitespace-only body
+                { body: { stringValue: "   " } },
+                { body: { stringValue: "ok" } },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const result = normalizeOtlpLogsRequest(payload);
+    expect(result.records).toHaveLength(1);
+    expect(result.rejectedLogRecords).toBe(2);
+    expect(result.errors).toHaveLength(2);
+    expect(result.errors.every((e) => e.includes("message cannot be empty"))).toBe(true);
+    expect(result.records[0]!.message).toBe("ok");
+  });
 });
 
 describe("parseOtlpAnyValue", () => {
@@ -191,6 +218,7 @@ describe("zero timeUnixNano handling", () => {
                 {
                   timeUnixNano: "0",
                   observedTimeUnixNano: "1700000000000000000",
+                  body: { stringValue: "test message" },
                 },
               ],
             },
@@ -218,6 +246,7 @@ describe("zero timeUnixNano handling", () => {
                 {
                   timeUnixNano: 0,
                   observedTimeUnixNano: "1700000000000000000",
+                  body: { stringValue: "test message" },
                 },
               ],
             },
@@ -243,6 +272,7 @@ describe("zero timeUnixNano handling", () => {
               logRecords: [
                 {
                   timeUnixNano: "0",
+                  body: { stringValue: "test message" },
                 },
               ],
             },
@@ -271,6 +301,7 @@ describe("zero timeUnixNano handling", () => {
                 {
                   timeUnixNano: "1700000000000000000",
                   observedTimeUnixNano: "1700000000001000000",
+                  body: { stringValue: "test message" },
                 },
               ],
             },
@@ -295,6 +326,7 @@ describe("normalizeOtlpLogsRequest edge cases", () => {
               logRecords: [
                 {
                   timeUnixNano: "-1000000",
+                  body: { stringValue: "test message" },
                 },
               ],
             },
@@ -320,6 +352,7 @@ describe("normalizeOtlpLogsRequest edge cases", () => {
               logRecords: [
                 {
                   observedTimeUnixNano: "-1000000",
+                  body: { stringValue: "test message" },
                 },
               ],
             },
@@ -346,6 +379,7 @@ describe("normalizeOtlpLogsRequest edge cases", () => {
                 {
                   timeUnixNano: "1700000000000000000",
                   attributes: [],
+                  body: { stringValue: "test message" },
                 },
               ],
             },
@@ -368,6 +402,7 @@ describe("normalizeOtlpLogsRequest edge cases", () => {
               logRecords: [
                 {
                   timeUnixNano: "999999999999999999999999999999",
+                  body: { stringValue: "test message" },
                 },
               ],
             },

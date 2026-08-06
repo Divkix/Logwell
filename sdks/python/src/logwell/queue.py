@@ -157,9 +157,20 @@ class BatchQueue:
 
         This method schedules the flush to run in the background
         without blocking the caller.
+
+        Never schedules a second flush while one is already in flight: the
+        `_flushing` flag is set under `_lock` BEFORE the coroutine is
+        scheduled, so `_flush_future` always tracks the real in-flight flush
+        and a late trigger cannot overwrite it with a no-op future (PY-M6).
         """
-        loop = self._ensure_loop()
-        self._flush_future = asyncio.run_coroutine_threadsafe(self._do_flush(), loop)
+        with self._lock:
+            if self._flushing or self._stopped:
+                return
+            self._flushing = True
+            # Schedule + record the future under the same lock so `_flush_future`
+            # is always the ACTUAL in-flight future whenever `_flushing` is True.
+            loop = self._ensure_loop()
+            self._flush_future = asyncio.run_coroutine_threadsafe(self._do_flush(), loop)
 
     async def flush(self) -> IngestResponse | None:
         """Flush all queued logs immediately.
@@ -168,10 +179,21 @@ class BatchQueue:
             Response from the server, or None if queue was empty or flush in progress
         """
         if threading.current_thread() is self._queue_thread:
+            with self._lock:
+                if self._flushing:
+                    return None
+                self._flushing = True
             return await self._do_flush()
 
         loop = self._ensure_loop()
-        future = asyncio.run_coroutine_threadsafe(self._do_flush(), loop)
+        with self._lock:
+            if self._flushing:
+                return None
+            self._flushing = True
+            # Schedule + record the future under the same lock so `_flush_future`
+            # is always the ACTUAL in-flight future whenever `_flushing` is True.
+            future = asyncio.run_coroutine_threadsafe(self._do_flush(), loop)
+            self._flush_future = future
         try:
             asyncio.get_running_loop()
             return await asyncio.wrap_future(future)
@@ -184,13 +206,16 @@ class BatchQueue:
         Sends the snapshotted queue in chunks bounded by batch_size so a single
         request never exceeds the server's per-request limit (PY-1/PY-2 isolation
         preserved: callbacks run OUTSIDE self._lock).
+
+        The caller (`flush()` or `_trigger_flush()`) must set `_flushing = True`
+        before scheduling this coroutine; this method clears it on every exit
+        path (PY-M6).
         """
         with self._lock:
-            # Prevent concurrent flushes
-            if self._flushing or len(self._queue) == 0:
+            if len(self._queue) == 0:
+                self._flushing = False
                 return None
 
-            self._flushing = True
             self._stop_timer()
 
             # Snapshot current queue and clear it
@@ -261,11 +286,29 @@ class BatchQueue:
         # Await any in-flight flush so logs already moved out of the queue are not
         # lost when _stop_loop() kills the background loop. Only do this from a
         # different thread than the queue loop to avoid awaiting our own future.
-        in_flight = self._flush_future
-        if in_flight is not None and threading.current_thread() is not self._queue_thread:
-            # Errors are already surfaced via on_error; suppress here.
-            with contextlib.suppress(Exception):
-                await asyncio.wrap_future(in_flight)
+        # Loop on _flushing (not just on a single _flush_future snapshot) so
+        # shutdown always waits for the ACTUAL in-flight future (PY-M6).
+        if threading.current_thread() is not self._queue_thread:
+            while True:
+                with self._lock:
+                    flushing = self._flushing
+                    in_flight = self._flush_future
+                if not flushing:
+                    break
+                if in_flight is not None and in_flight.done():
+                    # The in-flight flush terminated without clearing the flag
+                    # (only possible if an on_error callback raised inside
+                    # _do_flush). The error was already surfaced via on_error;
+                    # clear the flag and move on so shutdown cannot hang.
+                    with self._lock:
+                        if self._flushing:
+                            self._flushing = False
+                    break
+                if in_flight is not None:
+                    with contextlib.suppress(Exception):
+                        await asyncio.wrap_future(in_flight)
+                else:
+                    await asyncio.sleep(0.01)
 
         # Flush all remaining logs
         if self.size > 0:

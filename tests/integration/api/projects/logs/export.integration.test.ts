@@ -335,7 +335,11 @@ describe("GET /api/projects/[id]/logs/export", () => {
 
       // Hyphens should be preserved by the shared utility; inline version strips them to 'userservice'
       expect(body).toHaveLength(1);
-      expect(body[0].metadata).toContain('"service":"user-service"');
+      // JSON export passes metadata through as an object (not a double-encoded string)
+      expect(body[0].metadata).toEqual({
+        service: "user-service",
+        error_code: "USER_PROFILE_404",
+      });
     });
   });
 

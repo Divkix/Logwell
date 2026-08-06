@@ -1,5 +1,5 @@
 import { json } from "@sveltejs/kit";
-import { and, count, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, inArray } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { getDbClient } from "$lib/server/db/db";
 import { log, project } from "$lib/server/db/schema";
@@ -48,23 +48,27 @@ export async function GET(event: RequestEvent): Promise<Response> {
     .where(eq(project.ownerId, user.id))
     .orderBy(desc(project.createdAt));
 
-  // Get log counts for each project
-  const projectsWithCounts = await Promise.all(
-    projects.map(async (p) => {
-      const [logCountResult] = await db
-        .select({ count: count() })
-        .from(log)
-        .where(eq(log.projectId, p.id));
+  // Get log counts for all projects in a single GROUP BY query instead of a
+  // per-project COUNT loop. This keeps the query count constant regardless of
+  // how many projects the user owns.
+  const projectIds = projects.map((p) => p.id);
+  const logCounts =
+    projectIds.length > 0
+      ? await db
+          .select({ projectId: log.projectId, count: count() })
+          .from(log)
+          .where(inArray(log.projectId, projectIds))
+          .groupBy(log.projectId)
+      : [];
+  const logCountByProject = new Map(logCounts.map((c) => [c.projectId, c.count]));
 
-      return {
-        id: p.id,
-        name: p.name,
-        logCount: logCountResult?.count ?? 0,
-        createdAt: p.createdAt?.toISOString(),
-        updatedAt: p.updatedAt?.toISOString(),
-      };
-    }),
-  );
+  const projectsWithCounts = projects.map((p) => ({
+    id: p.id,
+    name: p.name,
+    logCount: logCountByProject.get(p.id) ?? 0,
+    createdAt: p.createdAt?.toISOString(),
+    updatedAt: p.updatedAt?.toISOString(),
+  }));
 
   return json({ projects: projectsWithCounts });
 }

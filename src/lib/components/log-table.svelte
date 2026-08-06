@@ -4,6 +4,7 @@ import ArrowUpIcon from '@lucide/svelte/icons/arrow-up';
 import ArrowUpDownIcon from '@lucide/svelte/icons/arrow-up-down';
 import type { Log } from '$lib/server/db/schema';
 import { cn } from '$lib/utils';
+import { sortLogs, type SortField, type SortDirection } from '$lib/utils/log-sort';
 import EmptyStateQuickstart from './empty-state-quickstart.svelte';
 import LogCard from './log-card.svelte';
 import LogRow from './log-row.svelte';
@@ -19,9 +20,15 @@ interface Props {
   appUrl?: string;
   selectedIndex?: number;
   selectedId?: string | null;
+  /**
+   * Bindable sort state. When the parent binds these, the parent can use the
+   * same sorted order as the rendered table (e.g. j/k keyboard navigation).
+   */
+  sortKey?: SortField | null;
+  sortDirection?: SortDirection;
 }
 
-const {
+let {
   logs,
   loading = false,
   hasFilters,
@@ -32,6 +39,8 @@ const {
   appUrl,
   selectedIndex = -1,
   selectedId = null,
+  sortKey = $bindable(null),
+  sortDirection = $bindable(null),
 }: Props = $props();
 
 // Show quick start empty state when no filters and project/appUrl provided
@@ -43,59 +52,30 @@ const SKELETON_ROW_COUNT = 8;
 const emptyStateMessage = $derived(hasFilters ? 'No logs match your filters' : 'No logs yet');
 const emptyStateTestId = $derived(hasFilters ? 'log-table-no-results' : 'log-table-empty');
 
-// Sorting state and logic
-type SortField = 'timestamp' | 'level' | 'message';
-type SortDirection = 'asc' | 'desc' | null;
-
-let sortField = $state<SortField | null>(null);
-let sortDirection = $state<SortDirection>(null);
-
-const levelPriority: Record<string, number> = {
-  fatal: 5,
-  error: 4,
-  warn: 3,
-  info: 2,
-  debug: 1,
-};
-
 function handleSort(field: SortField) {
-  if (sortField === field) {
+  if (sortKey === field) {
     if (sortDirection === 'asc') {
       sortDirection = 'desc';
     } else if (sortDirection === 'desc') {
-      sortField = null;
+      sortKey = null;
       sortDirection = null;
     } else {
       sortDirection = 'asc';
     }
   } else {
-    sortField = field;
+    sortKey = field;
     sortDirection = 'asc';
   }
 }
 
 function getAriaSort(field: SortField): 'ascending' | 'descending' | 'none' {
-  if (sortField !== field) return 'none';
+  if (sortKey !== field) return 'none';
   if (sortDirection === 'asc') return 'ascending';
   if (sortDirection === 'desc') return 'descending';
   return 'none';
 }
 
-const sortedLogs = $derived.by(() => {
-  if (!sortField || !sortDirection) return logs;
-
-  return [...logs].sort((a, b) => {
-    let comparison = 0;
-    if (sortField === 'timestamp') {
-      comparison = (a.timestamp?.getTime() ?? 0) - (b.timestamp?.getTime() ?? 0);
-    } else if (sortField === 'level') {
-      comparison = (levelPriority[a.level] ?? 0) - (levelPriority[b.level] ?? 0);
-    } else if (sortField === 'message') {
-      comparison = a.message.localeCompare(b.message);
-    }
-    return sortDirection === 'desc' ? -comparison : comparison;
-  });
-});
+const sortedLogs = $derived(sortLogs(logs, sortKey, sortDirection));
 </script>
 
 <div data-testid="log-table" class={cn('w-full', className)}>
@@ -139,7 +119,7 @@ const sortedLogs = $derived.by(() => {
             onclick={() => handleSort('timestamp')}
           >
             Time
-            {#if sortField === 'timestamp'}
+            {#if sortKey === 'timestamp'}
               {#if sortDirection === 'asc'}
                 <ArrowUpIcon class="h-4 w-4" />
               {:else}
@@ -158,7 +138,7 @@ const sortedLogs = $derived.by(() => {
             onclick={() => handleSort('level')}
           >
             Level
-            {#if sortField === 'level'}
+            {#if sortKey === 'level'}
               {#if sortDirection === 'asc'}
                 <ArrowUpIcon class="h-4 w-4" />
               {:else}
@@ -177,7 +157,7 @@ const sortedLogs = $derived.by(() => {
             onclick={() => handleSort('message')}
           >
             Message
-            {#if sortField === 'message'}
+            {#if sortKey === 'message'}
               {#if sortDirection === 'asc'}
                 <ArrowUpIcon class="h-4 w-4" />
               {:else}
