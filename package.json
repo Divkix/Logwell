@@ -54,7 +54,7 @@
     "@tailwindcss/vite": "^4.3.3",
     "@testing-library/jest-dom": "^7.0.0",
     "@testing-library/svelte": "^5.4.2",
-    "@testing-library/user-event": "^14.6.1",
+    "@testing-library/user-event": "^14.6.3",
     "@types/d3-scale": "^4.0.9",
     "@types/node": "^26.1.2",
     "@typescript/native": "npm:typescript@^7.0.2",
