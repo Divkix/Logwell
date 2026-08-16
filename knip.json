@@ -16,6 +16,7 @@
     "tw-animate-css",
     "@divkix/logwell",
     "layerchart",
+    "d3-scale",
     "@types/d3-scale",
     "@typescript/native"
   ],
