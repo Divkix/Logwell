@@ -34,10 +34,10 @@
     "sdk:version": "bun run --cwd sdks/typescript npm version"
   },
   "dependencies": {
-    "@lucide/svelte": "^1.31.0",
-    "better-auth": "^1.6.29",
+    "@lucide/svelte": "^1.33.0",
+    "better-auth": "^1.7.1",
     "clsx": "^2.1.1",
-    "layerchart": "^2.2.0",
+    "layerchart": "^2.3.0",
     "nanoid": "^6.0.1",
     "postgres": "^3.4.9",
     "tailwind-merge": "^3.6.0",
@@ -60,7 +60,7 @@
     "@typescript/native": "npm:typescript@^7.0.2",
     "@vitest/coverage-v8": "^4.1.10",
     "@vitest/ui": "^4.1.10",
-    "bits-ui": "^2.18.1",
+    "bits-ui": "^2.19.0",
     "drizzle-kit": "^0.31.10",
     "drizzle-orm": "^0.45.2",
     "husky": "^9.1.7",
