@@ -422,7 +422,7 @@ The `plans/` directory is the durable **decision record** — self-contained han
 
 ## Common Gotchas
 
-1. **Ports**: dev = 5173, preview/production = 3000.
+1. **Ports**: dev = 5173, preview/production = 3000. `vp dev` without `--host` binds **IPv6 `::1` only**, so `http://127.0.0.1:5173` fails; pass `--host 127.0.0.1` (or `--host`) when a browser or IPv4 client must connect.
 2. **Bun, not npm**: always `bun run …`; lockfile is `bun.lock`. Engines require Bun ≥1.2.0.
 3. **Adapter**: `svelte-adapter-bun`, not the Node adapter. The prod entry is `build/index.js` run by Bun.
 4. **`db:migrate` vs `db:push`**: prod/CI-real-Postgres apply committed migrations (`migrate`); `push` is for dev/ephemeral DBs only. After editing `schema.ts`, run `db:generate` and commit the SQL.
@@ -442,6 +442,26 @@ The `plans/` directory is the durable **decision record** — self-contained han
 18. **API keys are write-only**: there is no read/query API by key (logs read only via the session UI). **Project names are unique per-owner**, not globally.
 19. **Per-log ingest errors are not request failures**: `/v1/ingest` returns **200** `{accepted, rejected, errors[]}` for bad records; only batch-level issues (`invalid_json`, `batch_too_large`, auth, rate-limit) return 4xx.
 20. **Login rate-limit proxy trust**: `event.getClientAddress()` trusts the first `X-Forwarded-For`, so per-IP login limiting is effective only behind a trusted proxy that overwrites XFF; direct deployments should set `RATE_LIMIT_LOGIN_RPM` accordingly or use such a proxy.
+21. **`vp dev` does not load `.env` into `process.env`.** `src/lib/server/config/env.ts` reads `process.env` at module load. Bun scripts (`db:migrate`, `db:seed`) auto-load `.env`; `vp dev` runs on Node and does not. Export `DATABASE_URL` / `BETTER_AUTH_SECRET` / `NODE_ENV=development` into the process environment before `bun run dev` (`set -a; . ./.env; set +a`). `db:push` is TTY-interactive and fails in non-interactive shells — use `db:migrate` instead.
+
+## Cursor Cloud specific instructions
+
+Cloud Agent VMs **do not have Docker**. Do not run `bun run db:start` / `docker compose`. Postgres 18 runs as the `ubuntu` user via `pg_ctl`:
+
+- Binaries: `/usr/lib/postgresql/18/bin` (on `PATH` after `start`)
+- Data dir: `$HOME/pgdata`, unix socket dir: `$HOME/pgrun`
+- Connection (matches `compose.yaml` / `.env.example`): `postgresql://root:mysecretpassword@localhost:5432/local`
+- Admin seed (same as e2e): `admin` / `adminpass`
+
+**Boot:** the environment `start` script starts Postgres if needed, ensures the `root` role + `local` database exist, writes `.env` when missing, then runs `bun run db:migrate` and `bun run db:seed` (both idempotent) and returns. **Dev server is not started by `start`.** After boot:
+
+```bash
+export PATH="$HOME/.bun/bin:$PATH"
+set -a; . ./.env; set +a
+bun run dev --host 127.0.0.1 --port 5173
+```
+
+Bun is pinned **1.3.14** at `~/.bun/bin` (also `/usr/local/bin/bun`). `install` is `bun install --frozen-lockfile` then `bun run prepare`. Unit / component / integration tests do **not** need the live Postgres (PGlite); e2e does. Health check: `curl -s http://127.0.0.1:5173/api/health`.
 
 ## Agent skills
 
@@ -464,6 +484,17 @@ Single-context layout: one `CONTEXT.md` at the repo root, plus `docs/adr/` for a
 This project is using Vite+, a unified toolchain built on top of Vite, Rolldown, Vitest, tsdown, Oxlint, Oxfmt, and Vite Task. Vite+ wraps runtime management, package management, and frontend tooling in a single global CLI called `vp`. Vite+ is distinct from Vite, and it invokes Vite through `vp dev` and `vp build`. Run `vp help` to print a list of commands and `vp <command> --help` for information about a specific command.
 
 Docs are local at `node_modules/vite-plus/docs` or online at https://viteplus.dev/guide/.
+
+## Built-in Commands vs Scripts
+
+`vp <name>` runs a built-in command. `vp run <name>` runs a `package.json` script or a `vite.config.ts` task. Scripts cannot overwrite built-ins, so `vp dev` and `vp run dev` may do different things. Check `package.json` and `vite.config.ts` first, and run `vp run <name>` when the project defines a script or task with that name.
+
+## Tool Versions
+
+Run `vp toolchain` to show versions and relationships in the active Vite+
+release. Add a tool name to select part of the graph. For example, run
+`vp toolchain vite`. Use `--global` to ignore the local `vite-plus` package. Use
+`vp why <package>` to show the package-manager dependency graph.
 
 ## Review Checklist
 
