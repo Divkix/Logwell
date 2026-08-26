@@ -442,6 +442,7 @@ The `plans/` directory is the durable **decision record** — self-contained han
 18. **API keys are write-only**: there is no read/query API by key (logs read only via the session UI). **Project names are unique per-owner**, not globally.
 19. **Per-log ingest errors are not request failures**: `/v1/ingest` returns **200** `{accepted, rejected, errors[]}` for bad records; only batch-level issues (`invalid_json`, `batch_too_large`, auth, rate-limit) return 4xx.
 20. **Login rate-limit proxy trust**: `event.getClientAddress()` trusts the first `X-Forwarded-For`, so per-IP login limiting is effective only behind a trusted proxy that overwrites XFF; direct deployments should set `RATE_LIMIT_LOGIN_RPM` accordingly or use such a proxy.
+21. **Cloud Agent VMs have no Docker.** Postgres is native 18 (`sudo pg_ctlcluster 18 main start`); `bun run db:start` (`docker compose`) will not work. Create role `root` / database `local` to match `.env.example`. Vite is a Node child of `bun run dev` and **does not inherit bun's automatic `.env` load** — `set -a && source .env && set +a` before starting the server, and pass `--host 0.0.0.0` so IPv4 health checks on `127.0.0.1:5173` succeed. Seeded admin is `admin` / `adminpass` (same as e2e).
 
 ## Agent skills
 
