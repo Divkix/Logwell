@@ -34,10 +34,10 @@
     "sdk:version": "bun run --cwd sdks/typescript npm version"
   },
   "dependencies": {
-    "@lucide/svelte": "^1.31.0",
-    "better-auth": "^1.6.29",
+    "@lucide/svelte": "^1.35.0",
+    "better-auth": "^1.7.2",
     "clsx": "^2.1.1",
-    "layerchart": "^2.2.0",
+    "layerchart": "^2.3.1",
     "nanoid": "^6.0.1",
     "postgres": "^3.4.9",
     "tailwind-merge": "^3.6.0",
@@ -46,7 +46,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "^0.5.5",
+    "@electric-sql/pglite": "^0.5.8",
     "@internationalized/date": "^3.12.3",
     "@playwright/test": "^1.62.1",
     "@sveltejs/kit": "^2.70.2",
@@ -56,16 +56,16 @@
     "@testing-library/svelte": "^5.4.2",
     "@testing-library/user-event": "^14.6.4",
     "@types/d3-scale": "^4.0.9",
-    "@types/node": "^26.2.0",
+    "@types/node": "^26.4.0",
     "@typescript/native": "npm:typescript@^7.0.2",
     "@vitest/coverage-v8": "^4.1.10",
     "@vitest/ui": "^4.1.10",
-    "bits-ui": "^2.18.1",
+    "bits-ui": "^2.19.0",
     "drizzle-kit": "^0.31.10",
     "drizzle-orm": "^0.45.2",
     "husky": "^9.1.7",
     "jsdom": "^30.0.1",
-    "knip": "^6.32.2",
+    "knip": "^6.32.3",
     "mode-watcher": "^1.1.0",
     "svelte": "^5.56.9",
     "svelte-adapter-bun": "^1.0.1",
@@ -74,7 +74,7 @@
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3",
     "vite": "npm:@voidzero-dev/vite-plus-core@0.2.9",
-    "vite-plus": "0.2.9",
+    "vite-plus": "0.3.0",
     "vitest": "4.1.10"
   },
   "overrides": {
