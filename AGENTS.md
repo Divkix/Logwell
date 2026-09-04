@@ -52,7 +52,7 @@ Logwell is a **self-hosted, single-tenant logging + incident-intelligence platfo
 | Validation  | Zod 4 (shared client/server/SDK schemas)                                      |
 | Adapter     | `svelte-adapter-bun` (NOT the Node adapter)                                   |
 | Toolchain   | Vite+ (`vp`): oxlint, oxfmt, Vitest, tsdown                                   |
-| Pkg manager | `bun` (pinned `bun@1.3.14`; engines `>=1.2.0`)                                |
+| Pkg manager | `bun` (pinned `bun@1.4.1`; engines `>=1.2.0`)                                 |
 
 ### Directory Structure
 
@@ -291,7 +291,7 @@ TS from repo root: `bun run sdk:test` / `sdk:build` / `sdk:lint`. Python: `cd sd
 - **knip** (`knip.json`): dead-code/dependency check. Entry points include SvelteKit route files + `db/index.ts`, `auth.ts`, `cleanup-scheduler.ts`. Has explicit ignores (the `simple-ingest.ts` types, deps like `tw-animate-css`/`layerchart`, the `jsr` binary). Run `bun run knip` pre-commit.
 - **husky** (`.husky/`): installed via the `prepare` script (`vp config && husky && svelte-kit sync`). `.husky/pre-commit` runs `vp check && bun run knip`; a separate `.vite-hooks/pre-commit` (from `vp config`) runs the lighter `vp staged`. `husky` runs last in `prepare`, so `.husky/pre-commit` is the effective gate.
 - **seed-admin** (`scripts/seed-admin.ts`): idempotent admin creation through better-auth using `ADMIN_USERNAME`/`ADMIN_PASSWORD`; email auto-derived `<user>@logwell.local` (`.local` because `localhost` fails email validation).
-- **Pinned versions**: Bun `1.3.14` (pkg manager + CI setup-bun) / `1.3.14-alpine` (Docker, with digest). Postgres `18-alpine` everywhere (PG 19 is beta-only as of 2026-07; do not bump to a beta). Pinning is for reproducible builds.
+- **Pinned versions**: Bun `1.4.1` (pkg manager + CI setup-bun) / `1.4.1-alpine` (Docker, with digest). Postgres `18-alpine` everywhere (PG 19 is beta-only as of 2026-07; do not bump to a beta). Pinning is for reproducible builds.
 
 ---
 
@@ -340,7 +340,7 @@ Images: `ghcr.io/divkix/logwell` (`:dev`, `:dev-<sha>`, `:<sha>` from main; rele
 ## Build & Deploy
 
 - **Build**: `vp build` → `svelte-adapter-bun` emits a Bun server in `build/` (entry `build/index.js`). The app listens on **port 3000** in production (preview also 3000); dev is 5173.
-- **Dockerfile** (multi-stage): `oven/bun:1.3.14-alpine` (pinned + digest) base → `deps` (`--production --ignore-scripts`) → `deps-dev` (full deps + `bun run prepare`) → `build` (copies config/static/`drizzle`/`scripts`/`entrypoint.sh`/`src` least-to-most-volatile for cache hits, `NODE_ENV=production`, builds) → runtime. Browser binary downloads are skipped (`PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` etc.). `curl` installed for healthcheck.
+- **Dockerfile** (multi-stage): `oven/bun:1.4.1-alpine` (pinned + digest) base → `deps` (`--production --ignore-scripts`) → `deps-dev` (full deps + `bun run prepare`) → `build` (copies config/static/`drizzle`/`scripts`/`entrypoint.sh`/`src` least-to-most-volatile for cache hits, `NODE_ENV=production`, builds) → runtime. Browser binary downloads are skipped (`PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` etc.). `curl` installed for healthcheck.
 - **`entrypoint.sh`**: runs `drizzle-kit migrate` (aborts startup on failure) → seeds admin **only if `ADMIN_PASSWORD` is set** (and fails fast if the seed errors when it _is_ set) → `exec bun run ./build/index.js`.
 - **`compose.yaml`**: local Postgres 18-alpine (`root`/`mysecretpassword`/`local` on 5432, named volume `pgdata`, `pg_isready` healthcheck).
 - **PaaS targets**: any platform that runs the OCI image with `DATABASE_URL` + `BETTER_AUTH_SECRET` (+ `ORIGIN` behind a proxy/tunnel). Migrations run automatically on boot.
@@ -435,7 +435,7 @@ The `plans/` directory is the durable **decision record** — self-contained han
 11. **`test-db.ts` approximations**: schema comes from reflection (not `drizzle/*.sql`); `VARCHAR` is forced to 255; unique indexes become UNIQUE constraints. New schema column types may need the generator's type map / FK `tableOrder` updated or the table is silently skipped.
 12. **Don't copy `tests/integration/api/health/health.integration.test.ts`'s inline CREATE TABLE** — it's a bespoke legacy setup (references an `api_key` column), not the shared `setupTestDatabase()` path.
 13. **Test-doc sources of truth**: trust this file, `vitest.config.ts`, `test-db.ts`, and `tests/fixtures/db.ts` for the testing setup. `tests/README.md` and `src/lib/server/db/README.md` were corrected (the phantom `.browser.test.ts` tier and the old `test-utils.ts`/`createUserFactory`/age-field examples are gone); the fictional `tests/fixtures/README.md` was deleted. Keep these docs aligned with `db.ts` factories when you touch that area.
-14. **Pinned Vite+/Bun/Postgres versions** are intentional for reproducibility; don't bump without reason. (CI's `setup-bun` and the Docker image both pin **Bun 1.3.14**; Postgres stays on **18-alpine** because PG 19 is beta-only.)
+14. **Pinned Vite+/Bun/Postgres versions** are intentional for reproducibility; don't bump without reason. (CI's `setup-bun` and the Docker image both pin **Bun 1.4.1**; Postgres stays on **18-alpine** because PG 19 is beta-only.)
 15. **`src/lib/server/session.ts` is TEST-ONLY** — `getSession()` skips HMAC signature verification. Never call it from a route; production uses `auth.api.getSession()`.
 16. **Incident auto-resolve threshold is duplicated**: the server reads `INCIDENT_AUTO_RESOLVE_MINUTES`, but `incidents/+page.svelte` hardcodes `30 * 60 * 1000`. Keep the env at **30** or server/UI status disagree.
 17. **Never make the SSE stream hooks' `_isConnected`/`_isConnecting` `$state`** — it triggers an `effect_update_depth_exceeded` hydration-breaking loop; surface connection state via the `onConnectionChange` callback instead.
