@@ -277,7 +277,7 @@ Python: `cd sdks/python && uv venv && uv pip install -e ".[dev]"`. Go: `cd sdks/
 
 ## Tooling
 
-- **Vite+ / `vp`** (`vite.config.ts`): `vp check` = format+lint+typecheck (`--fix` to fix). Inline disable: `// oxlint-disable-next-line <rule>`. Pinned exact: **Vite+ 0.2.9**, **vitest 4.1.10** (via `overrides`). Root keeps `typescript` 6 + `@typescript/native` 7 for `svelte-check --tsgo` (svelte-check 4.x hard-fails on TS 7 as the main compiler). Don't bump casually.
+- **Vite+ / `vp`** (`vite.config.ts`): `vp check` = format+lint+typecheck (`--fix` to fix). Inline disable: `// oxlint-disable-next-line <rule>`. Pinned exact: **Vite+ 0.2.9**, **vitest 4.1.10** (via `overrides`), **@vitest/coverage-v8 4.1.10** (Vite+ hard-fails coverage when the provider differs from the bundled runner — never let the `^` range float it). Root keeps `typescript` 6 + `@typescript/native` 7 for `svelte-check --tsgo` (svelte-check 4.x hard-fails on TS 7 as the main compiler). Don't bump casually.
 - **knip** (`knip.json`): entries cover SvelteKit route files + `db/index.ts`, `auth.ts`, `cleanup-scheduler.ts`; ignores for `simple-ingest.ts` types and vendor deps. Run pre-commit.
 - **husky** (`.husky/`): installed via `prepare` (`vp config && husky && svelte-kit sync`). `.husky/pre-commit` runs `vp check && bun run knip` (plus a conditional TS-SDK check); `.vite-hooks/pre-commit` runs the lighter `vp staged`.
 - **seed-admin** (`scripts/seed-admin.ts`): idempotent admin creation via better-auth; email auto-derived `<user>@logwell.local` (`.local` because `localhost` fails email validation).
