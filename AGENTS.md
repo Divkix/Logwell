@@ -2,39 +2,33 @@
 
 ## What is Logwell
 
-Logwell is a **self-hosted, single-tenant logging + incident-intelligence platform**. Services ship logs to it (OTLP/HTTP JSON or a simple JSON API) using a per-project API key; Logwell stores them in PostgreSQL with full-text search, automatically groups error/fatal logs into **fingerprinted incidents**, and streams new logs and incidents to a live web dashboard over Server-Sent Events. Stack: **SvelteKit (Svelte 5 runes) on the Bun runtime**, **PostgreSQL 18** via **Drizzle ORM**, **better-auth** (username/password, single admin user), **shadcn-svelte + Tailwind CSS v4** UI, packaged as a **multi-arch Docker image** via `svelte-adapter-bun`. Three first-party SDKs (TypeScript, Python, Go) live in `sdks/`. Tooling is **Vite+** (the `vp` CLI: oxlint/oxfmt/vitest/build) with `bun` as the package manager.
+Logwell is a **self-hosted, single-tenant logging + incident-intelligence platform**. Services ship logs to it (OTLP/HTTP JSON or a simple JSON API) using a per-project API key; Logwell stores them in PostgreSQL with full-text search, automatically groups error/fatal logs into **fingerprinted incidents**, and streams new logs and incidents to a live web dashboard over Server-Sent Events. Stack: see table below. Three first-party SDKs (TypeScript, Python, Go) live in `sdks/`.
 
 ## How to maintain this document
 
-**AGENTS.md is the single source of truth.** Whenever you discover something new, non-obvious, or surprising about this codebase — a design decision, a gotcha, a workflow, a convention, an env var, a CI quirk — **add it to the relevant section in the same change that surfaced it**. Then **consolidate**: merge the note into the existing structure, dedupe against what's already there, and keep each section tight. Do not append stray notes at the bottom or create parallel docs; fold knowledge into the right home so this file stays accurate and scannable as the code evolves. (Several stale companion docs already exist — see Gotchas — which is exactly the failure mode to avoid.)
+**AGENTS.md is the single source of truth.** When you surface something non-obvious — a design decision, gotcha, workflow, env var, CI quirk — fold it into the relevant section in the same change: merge, dedupe, keep it tight. Don't append stray notes or create parallel docs.
 
 ---
 
 ## Critical Commands
 
-| Task                      | Command                                             | Notes                                          |
-| ------------------------- | --------------------------------------------------- | ---------------------------------------------- |
-| Dev server                | `bun run dev`                                       | port **5173**                                  |
-| Production preview        | `bun run preview`                                   | port **3000**                                  |
-| Build                     | `bun run build`                                     | `vp build` → `svelte-adapter-bun` → `build/`   |
-| Start Postgres            | `bun run db:start`                                  | `docker compose up -d` (postgres:18-alpine)    |
-| Stop Postgres + wipe data | `bun run db:stop`                                   | `docker compose down -v`                       |
-| Apply migrations (prod)   | `bun run db:migrate`                                | `drizzle-kit migrate` — committed SQL          |
-| Push schema (dev/CI only) | `bun run db:push`                                   | `drizzle-kit push` — diff schema → DB          |
-| Generate migration        | `bun run db:generate`                               | `drizzle-kit generate` after schema edit       |
-| Drizzle Studio            | `bun run db:studio`                                 |                                                |
-| Seed admin user           | `bun run db:seed`                                   | needs `ADMIN_PASSWORD` (≥8 chars)              |
-| Backfill incidents        | `bun run incidents:backfill`                        | retro-fingerprint existing logs                |
-| Lint + format + types     | `vp check` (`bun run lint`)                         | `--fix` to auto-fix                            |
-| svelte-check (Svelte+TS)  | `bun run check`                                     | runs `svelte-kit sync` first                   |
-| Dead-code check           | `bun run knip`                                      |                                                |
-| All tests (watch)         | `bun run test`                                      | `vp test` — unit + component + integration     |
-| Unit / Component / Integ. | `bun run test:unit` / `:component` / `:integration` | per-project Vitest                             |
-| Coverage                  | `bun run test:coverage`                             | v8, thresholds enforced                        |
-| E2E                       | `bun run test:e2e`                                  | Playwright; needs real Postgres + seeded admin |
-| SDK tests (TS)            | `bun run sdk:test`                                  | delegates to `sdks/typescript`                 |
+Ports: dev **5173**, preview **4173**, prod **3000**. Always `bun run …` (`bun.lock`; engines `bun >=1.2.0`).
 
-**Pre-commit checklist:** `vp check && bun run knip` (and `bun run check` for Svelte/TS types). Run the nearest test tier for code you touched.
+| Task                      | Command                                             | Notes                                                   |
+| ------------------------- | --------------------------------------------------- | ------------------------------------------------------- |
+| Lint + format + types     | `vp check` (`bun run lint`)                         | `--fix` to auto-fix                                     |
+| Svelte/TS types           | `bun run check`                                     | `svelte-kit sync` + `svelte-check --tsgo`               |
+| Dead code                 | `bun run knip`                                      |                                                         |
+| Unit / Component / Integ. | `bun run test:unit` / `:component` / `:integration` | per-project Vitest                                      |
+| Coverage                  | `bun run test:coverage`                             | v8, thresholds enforced                                 |
+| E2E                       | `bun run test:e2e`                                  | Playwright; needs real Postgres + seeded admin          |
+| DB start / stop+wipe      | `bun run db:start` / `db:stop`                      | `docker compose up -d` / `down -v` (postgres:18-alpine) |
+| Migrations (prod)         | `bun run db:migrate`                                | committed SQL; `db:push` is dev/ephemeral only          |
+| New migration             | `bun run db:generate`                               | after schema edit; commit the SQL (see Gotchas)         |
+| Seed admin / backfill     | `bun run db:seed` / `incidents:backfill`            | seed needs `ADMIN_PASSWORD` (≥8 chars)                  |
+| TS SDK                    | `bun run sdk:test` / `sdk:build` / `sdk:lint`       | delegates to `sdks/typescript`                          |
+
+**Pre-commit:** `vp check && bun run knip` (+ `bun run check` for Svelte/TS). Run the nearest test tier for code you touched.
 
 ---
 
@@ -58,24 +52,24 @@ Logwell is a **self-hosted, single-tenant logging + incident-intelligence platfo
 
 ```
 src/
-  hooks.server.ts          # request lifecycle: auth, DB injection, rate-limit, CSRF gate point, error handler
+  hooks.server.ts          # request lifecycle: auth, DB injection, rate-limit, CSRF, error handler
   lib/
-    components/ui/          # shadcn-svelte primitives (not our code to test)
+    components/ui/          # shadcn-svelte primitives (vendor — don't test)
     server/
-      auth.ts               # createAuth() — lazy-initialized better-auth, test-injectable DB
+      auth.ts               # createAuth() — lazy better-auth, test-injectable DB
       db/
         schema.ts           # Drizzle schema — SINGLE SOURCE OF TRUTH for tables/types
         db.ts               # DatabaseClient type + getDbClient(locals) injection seam
         index.ts            # production postgres-js singleton
         test-db.ts          # PGlite schema-reflection engine for integration tests
-      config/               # env.ts (validated env), performance.ts (tunables), index.ts
+      config/               # env.ts (validated env), performance.ts (tunables)
       jobs/                 # log-cleanup.ts, cleanup-scheduler.ts (retention sweeps)
       utils/                # api-key, csrf, rate-limit, cursor, search, incidents, otlp, simple-ingest, ...
       events.ts             # logEventBus singleton (SSE pub/sub)
       error-handler.ts      # handleError() — sanitized errors + error IDs
     shared/schemas/         # Zod schemas shared by client/server/SDKs (project, log, incident)
-    stores/                 # logs.svelte.ts (runes store)
-    hooks/                  # use-log-stream / use-incident-stream (runes; SSE consumers)
+    stores/                 # logs.svelte.ts (ClientLog type)
+    hooks/                  # use-log-stream / use-incident-stream (POST SSE consumers)
   routes/
     (app)/                  # authenticated dashboard pages (session-guarded)
     api/                    # session+CSRF JSON API (dashboard backend)
@@ -86,7 +80,7 @@ tests/
   e2e/                      # Playwright specs + helpers/ (EXCLUDED from Vitest)
   fixtures/db.ts            # seedProject / seedLog / seedProjectWithApiKey factories
   setup.ts                 # shared Vitest setup (jest-dom + fallback env)
-  setup-component.ts       # component-only Svelte Testing Library cleanup
+  setup-component.ts       # component-only Testing Library cleanup
 scripts/                   # seed-admin.ts, backfill-incidents.ts (+ *.test.ts run as integration)
 sdks/                      # typescript/ python/ go/ — independent packages
 drizzle/                   # committed migration SQL + journal
@@ -100,147 +94,144 @@ Dockerfile, entrypoint.sh, compose.yaml
 Every request flows through the combined `handle` hook:
 
 1. **Build guard** — during `vite build` (`building`), short-circuit `resolve(event)`.
-2. **One-time init** (`ensureInitialized`) — `initAuth()` (lazy better-auth) then `startCleanupScheduler()`. Also registers `SIGTERM`/`SIGINT` handlers that stop the scheduler and exit after a ~5s grace window.
-3. **DB injection seam** — `event.locals.db = db` on **every** route. This is the prod/test seam: integration tests overwrite `locals.db` with a PGlite client, so handlers never import a DB directly — they call `getDbClient(event.locals)` (`src/lib/server/db/db.ts`), which returns `locals.db` if present else the prod singleton.
-4. **Login brute-force guard** — `POST /api/auth/sign-in*` is rate-limited per client IP via `checkRateLimit('login:'+ip, LOGIN_RPM)`; over the limit returns **429** with `Retry-After: 60`.
-5. **Auth fast-path skip** — `/v1/*`, `/api/health`, `/static/*` skip session lookup entirely (ingest is API-key/bearer; health is public).
-6. **Session resolution** — `auth.api.getSession()` populates `event.locals.session` / `event.locals.user`, then defers to better-auth's `svelteKitHandler` (which routes `/api/auth/*`).
+2. **One-time init** — `initAuth()` (lazy better-auth) then `startCleanupScheduler()`; `SIGTERM`/`SIGINT` handlers stop the scheduler and exit after a ~5s grace window.
+3. **DB injection seam** — `event.locals.db = db` on **every** route. Handlers never import a DB directly; they call `getDbClient(event.locals)` (`db.ts`), which returns `locals.db` if present else the prod singleton. Integration tests overwrite `locals.db` with PGlite.
+4. **Login brute-force guard** — `POST /api/auth/sign-in*` is rate-limited per client IP (`LOGIN_RPM`); over the limit → **429** + `Retry-After: 60`. CSRF on the login path is checked before rate-limiting.
+5. **Sign-up kill-switch** — `POST /api/auth/sign-up*` → **403** (`sign_up_disabled`).
+6. **Auth fast-path skip** — `/v1/*`, `/api/health`, `/static/*` skip session lookup entirely.
+7. **Session resolution** — `auth.api.getSession()` populates `locals.session` / `locals.user`, then defers to better-auth's `svelteKitHandler` (routes `/api/auth/*`; non-GET there is CSRF-gated).
 
-**Auth** (`src/lib/server/auth.ts`): `createAuth(db)` builds a better-auth instance using the Drizzle adapter, `username()` plugin, email/password with `autoSignIn`, 7-day sessions (refreshed every 24h), `trustedOrigins` from `ORIGIN`. The default `auth` export is a lazy Proxy that **throws** `"Auth not initialized…"` if accessed before `initAuth()` — `initAuth()` (idempotent, lazily imports `./db`) must run first; the hooks guarantee this. The laziness exists so tests don't import `$env/dynamic/private`; taking `db` as a parameter is what lets tests run auth against PGlite.
+**Auth** (`auth.ts`): `createAuth(db)` with `username()` plugin, email/password `autoSignIn`, 7-day sessions (24h refresh), `trustedOrigins` from `ORIGIN` — see `auth.ts:12-28` for options. The default `auth` export is a lazy Proxy that **throws** if touched before `initAuth()` (idempotent, dynamically imports `./db` so tests don't pull in `$env/dynamic/private`). Taking `db` as a parameter is what lets tests run auth against PGlite.
 
-> **Security footgun — `src/lib/server/session.ts` is TEST-ONLY.** Its `getSession()` parses the `better-auth.session_token` cookie and does a **raw DB lookup with NO HMAC signature verification** (manual `expiresAt < now` check). It is for integration-test setup only — production/route code MUST use `auth.api.getSession()`. Using `session.ts` in a route is a forgeable-session hole.
+> **Security footgun — `src/lib/server/session.ts` is TEST-ONLY.** Raw cookie lookup with NO signature verification. Production/route code MUST use `auth.api.getSession()`; using `session.ts` in a route is a forgeable-session hole.
 
-**SSE event bus** (`src/lib/server/events.ts`): `logEventBus` is an in-process singleton with **project-scoped** listener sets for logs and incidents. Ingest handlers call `emitLog(log)` / `emitIncident(incident)`; SSE routes `onLog/onIncident(projectId, cb)` and get an unsubscribe fn. Emitted log shape is `StreamLog = Omit<Log,'search'>` (the tsvector is never serialized). **This is in-memory and single-process** — it does not fan out across multiple app instances; horizontal scaling of live streaming would need an external bus.
+**SSE event bus** (`events.ts`): in-process singleton with **project-scoped** listener sets. Ingest handlers `emitLog`/`emitIncident`; SSE routes `onLog`/`onIncident(projectId, cb)`. Emitted log shape is `StreamLog = Omit<Log,'search'>`. **Single-process** — no fan-out across replicas (same for the in-memory rate limiter); horizontal live-streaming needs an external bus.
 
-**Error handling** (`error-handler.ts` + `handleError`): logs full context server-side, returns a **sanitized** message + a generated **error ID** to the client.
+**Error handling**: full context logged server-side; client gets a sanitized message + generated error ID.
 
 ---
 
 ## HTTP Surface
 
-Two distinct API families with different auth + protections — **do not conflate them**:
+Two API families — **do not conflate them**:
 
-| Family    | Auth                                                     | Protections                                          | Purpose                            |
-| --------- | -------------------------------------------------------- | ---------------------------------------------------- | ---------------------------------- |
-| `/api/**` | **session cookie** (better-auth) + **project ownership** | **CSRF** (Origin/Referer) on state-changing requests | dashboard backend                  |
-| `/v1/**`  | **API key** `Authorization: Bearer lw_…`                 | **per-project rate limit** (`INGEST_RPM`)            | log ingestion by external services |
+| Family    | Auth                                       | Protections                                    | Purpose           |
+| --------- | ------------------------------------------ | ---------------------------------------------- | ----------------- |
+| `/api/**` | **session cookie** + **project ownership** | **CSRF** on everything except GET/HEAD/OPTIONS | dashboard backend |
+| `/v1/**`  | **API key** `Authorization: Bearer lw_…`   | **per-project rate limit** (`INGEST_RPM`)      | log ingestion     |
 
-`/v1` deliberately does **not** run the CSRF check (`checkCsrfOrigin`) — SDKs/curl legitimately omit Origin/Referer. Conversely every `/api` state-changing handler is cookie-authenticated and runs `checkCsrfOrigin` (in `src/lib/server/utils/csrf.ts`): GET/HEAD/OPTIONS pass; an `Origin` mismatch or bad `Referer` → 403; **and a request with neither Origin nor Referer → 403** (tightened to close the ambient-cookie CSRF hole).
+`/v1` is exempt from CSRF (SDKs/curl omit Origin/Referer). `/api` state-changing requests run `checkCsrfOrigin`: Origin mismatch / bad Referer / **neither header present** → 403.
 
-**Auth/ownership guards** (`auth-guard.ts`, `project-guard.ts`) branch by surface and intentionally **return 404 (not 403) for not-owned/missing projects to hide existence**:
+**Guards** (`auth-guard.ts`, `project-guard.ts`): `requireAuth` throws **401** for `/api/*`, **303** redirect to `/login` for pages; partial sessions rejected. Ownership failures return **404 (not 403)** to hide existence. `requireProjectOwnership` returns a JSON 404 `Response` (check `instanceof Response`); the page twin `requireProjectOwnershipPage` throws SvelteKit `error(404)`. Both share `findOwnedProject` (`ownerId === user.id`) — use the right twin for API vs page.
 
-- `requireAuth` — `/api/*` routes throw a SvelteKit **401** `HttpError` (`{message:'Unauthorized'}`); page routes throw a **303** redirect to `/login`. Partial sessions (user without session, or vice-versa) are rejected.
-- `requireProjectOwnership(event, id)` returns a JSON **404** `Response` (caller must check `instanceof Response`); the page-loader twin `requireProjectOwnershipPage` **throws** SvelteKit `error(404)` (renders the error PAGE). Both delegate to a shared `findOwnedProject` (ownership = `ownerId === user.id`) so the SQL can't drift — **they are not interchangeable; use the right one for API vs page.**
-
-**There is no programmatic read API.** API keys (`lw_*`) grant **write/ingest only**; logs and incidents are readable solely through the session-authenticated `/api` surface (the UI). A read/query API is the unbuilt spike `plans/018`.
+**No programmatic read API.** API keys grant **write/ingest only**; logs/incidents read only via the session `/api` surface. Read/query API is unbuilt spike `plans/018`.
 
 ### Route map
 
-| Method           | Route                                                | Auth         | Notes                                                |
-| ---------------- | ---------------------------------------------------- | ------------ | ---------------------------------------------------- |
-| POST             | `/v1/logs`                                           | API key      | OTLP/HTTP JSON log export                            |
-| POST             | `/v1/ingest`                                         | API key      | Simple JSON (single object or array)                 |
-| GET              | `/api/health`                                        | none         | liveness                                             |
-| GET/POST         | `/api/projects`                                      | session      | list / create project                                |
-| GET/PATCH/DELETE | `/api/projects/[id]`                                 | session+CSRF | project CRUD                                         |
-| POST             | `/api/projects/[id]/regenerate`                      | session+CSRF | rotate API key (returns new plaintext once)          |
-| GET              | `/api/projects/[id]/logs`                            | session      | paginated/filtered/searchable log query              |
-| POST             | `/api/projects/[id]/logs/stream`                     | session+CSRF | **SSE** live log stream                              |
-| GET              | `/api/projects/[id]/logs/export`                     | session      | CSV/JSON export (≤ `EXPORT_CONFIG.MAX_LOGS` = 10000) |
-| GET              | `/api/projects/[id]/stats`                           | session      | aggregate stats                                      |
-| GET              | `/api/projects/[id]/stats/timeseries`                | session      | bucketed counts                                      |
-| GET              | `/api/projects/[id]/incidents`                       | session      | incident list                                        |
-| POST             | `/api/projects/[id]/incidents/stream`                | session+CSRF | **SSE** live incident stream                         |
-| GET/PATCH        | `/api/projects/[id]/incidents/[incidentId]`          | session      | incident detail / status                             |
-| GET              | `/api/projects/[id]/incidents/[incidentId]/timeline` | session      | event timeline                                       |
+| Method           | Route                                                | Auth         | Notes                                                            |
+| ---------------- | ---------------------------------------------------- | ------------ | ---------------------------------------------------------------- |
+| POST             | `/v1/logs`                                           | API key      | OTLP/HTTP JSON log export                                        |
+| POST             | `/v1/ingest`                                         | API key      | Simple JSON (single object or array)                             |
+| GET              | `/api/health`                                        | none         | liveness                                                         |
+| GET/POST         | `/api/projects`                                      | session      | list / create project                                            |
+| GET/PATCH/DELETE | `/api/projects/[id]`                                 | session+CSRF | project CRUD                                                     |
+| POST             | `/api/projects/[id]/regenerate`                      | session+CSRF | rotate API key (plaintext shown once)                            |
+| GET              | `/api/projects/[id]/logs`                            | session      | paginated/filtered/searchable query                              |
+| POST             | `/api/projects/[id]/logs/stream`                     | session+CSRF | **SSE** live log stream                                          |
+| GET              | `/api/projects/[id]/logs/export`                     | session      | CSV/JSON export (≤ `EXPORT_CONFIG.MAX_LOGS` = 10000)             |
+| GET              | `/api/projects/[id]/stats`                           | session      | aggregate stats                                                  |
+| GET              | `/api/projects/[id]/stats/timeseries`                | session      | bucketed counts                                                  |
+| GET              | `/api/projects/[id]/incidents`                       | session      | incident list                                                    |
+| POST             | `/api/projects/[id]/incidents/stream`                | session+CSRF | **SSE** live incident stream                                     |
+| GET              | `/api/projects/[id]/incidents/[incidentId]`          | session      | incident detail (status changes are a future spike, `plans/019`) |
+| GET              | `/api/projects/[id]/incidents/[incidentId]/timeline` | session      | event timeline                                                   |
 
 ### SSE streams
 
-`/api/projects/[id]/logs/stream` (and the incident equivalent) are **POST** SSE endpoints (CSRF-checked). They subscribe to `logEventBus` and emit batched `event: logs` / `event: incidents` plus `event: heartbeat`. Batching: buffer up to `SSE_CONFIG.BATCH_WINDOW_MS` (1500ms) or `MAX_BATCH_SIZE` (50) then flush; heartbeat every `HEARTBEAT_INTERVAL_MS` (30s). Backpressure (slow consumer, `desiredSize < 0`) **drops the batch but keeps the connection open**; a `CountQueuingStrategy({ highWaterMark: 256 })` absorbs bursts. The `cancel()`/cleanup path unsubscribes + clears timers on disconnect.
+Both stream endpoints are **POST** (CSRF-checked). They subscribe to `logEventBus`, emit batched `event: logs` / `event: incidents` plus heartbeats (windows/sizes in the Config table). Slow consumers **drop the batch but keep the connection open**; disconnect unsubscribes + clears timers.
 
 ### Pagination & query (`/api/projects/[id]/logs`)
 
-- **Cursor-based** (preferred): keyset on `(timestamp DESC, id DESC)`, opaque cursor via `cursor.ts` (`encodeCursor`/`decodeCursor`); malformed → 400 `invalid_cursor`. `offset` still accepted for back-compat but deprecated.
-- `limit` clamped 1–500 (default 100). Fetches `limit+1` to compute `has_more` and `nextCursor`.
-- Filters: `level` (comma-separated, e.g. `error,fatal`), `from`/`to` (ISO 8601), `search` (full-text via `buildSearchQuery` → `to_tsquery('english', …)` against the `search` tsvector / GIN index).
-- `total` uses `cappedLogCount` (bounded count, `total_is_capped` flag) on the first page only; **skipped entirely when a cursor is present** to save a round-trip.
+- **Cursor-based** (preferred): keyset on `(timestamp DESC, id DESC)`, opaque base64url cursor; malformed → 400 `invalid_cursor`. `offset` accepted for back-compat but deprecated.
+- `limit` clamped 1–500 (default 100); fetches `limit+1` for `has_more`/`nextCursor`.
+- Filters: `level` (comma-separated), `from`/`to` (ISO 8601), `search` (full-text `to_tsquery('english', …)` against the `search` tsvector / GIN index).
+- `total` uses bounded `cappedLogCount` (`total_is_capped`) on the first page only; skipped when a cursor is present.
 
 ---
 
 ## Log Ingestion + Incident Intelligence Data Path
 
-Both ingest routes (`/v1/logs` OTLP, `/v1/ingest` simple) follow the same pipeline:
+Both ingest routes follow the same pipeline:
 
-1. **Content-Type guard** (`requireJsonContentType`) → **API-key validation** (`validateApiKey` resolves the project from the SHA-256 hash) → **re-verify the project row exists** (one extra read; guards against stale per-process caches causing FK violations) → **per-project rate limit** (`ingest:{projectId}`, `INGEST_RPM` = 600/min).
-2. **Parse/normalize**: OTLP via `normalizeOtlpLogsRequest` + `mapOtlpAttributesToLogColumns`; simple via `parseSimpleIngestRequest`. Batch capped at `API_CONFIG.BATCH_INSERT_LIMIT` = **100** records → 400 `batch_too_large`. Invalid records are counted as `rejected` with per-record `errors` (the rest still ingest).
-3. **Fingerprint + incident upsert** (in a single DB transaction): `prepareLogsForIncidents` → `upsertIncidentsForPreparedLogs` → `assignIncidentIds`. Fingerprinting (`incident-fingerprint.ts`): normalize the message (lowercase/trim, then replace UUIDs→`{uuid}`, hex IDs→`{hex}`, IPv4→`{ip}`, numbers→`{num}`, collapse whitespace; order is fixed and load-bearing), build seed `service|sourceFile|lineNumber|normalizedMessage`, SHA-256 → 32-char hex. Incidents are uniquely keyed `(projectId, fingerprint)`; an upsert bumps `lastSeen`/`totalEvents`/`highestLevel`. Auto-resolve after `INCIDENT_AUTO_RESOLVE_MINUTES` (30) of silence.
-4. **Insert logs** with the assigned `incidentId`/`fingerprint`. The insert `.returning(...)` **explicitly lists every column except `search`** (the generated tsvector) — there's a deliberate `as any` cast because the `DatabaseClient` union breaks the `.returning()` overload; the explicit column map is the source of truth.
-5. **Broadcast**: for each inserted log `logEventBus.emitLog(log)`, for each touched incident `emitIncident(incident)` → SSE consumers → live UI.
+1. **Content-Type guard** → **API-key validation** (SHA-256 hash → project) → **re-verify the project row exists** (one extra read; a deleted project with a still-cached key must yield 401, not a 500 FK violation) → **per-project rate limit** (`INGEST_RPM` = 600/min; 429 carries `Retry-After: 60`, zero logs written).
+2. **Parse/normalize** (OTLP via `normalizeOtlpLogsRequest` + attribute mapping; simple via `parseSimpleIngestRequest`). Batch capped at `BATCH_INSERT_LIMIT` = **100** → 400 `batch_too_large`. Invalid records are counted as `rejected` with per-record `errors`; the rest still ingest.
+3. **Fingerprint + incident upsert** in one transaction (`prepareLogsForIncidents` → `upsertIncidentsForPreparedLogs` → `assignIncidentIds`). Fingerprint: normalize the message (lowercase/trim, mask UUIDs/hex/IPs/numbers, collapse whitespace — order is load-bearing), seed `service|sourceFile|lineNumber|normalizedMessage`, SHA-256 → 32-char hex. Incidents keyed `(projectId, fingerprint)`; upsert bumps `lastSeen`/`totalEvents`/`highestLevel`.
+4. **Insert logs** with assigned `incidentId`/`fingerprint`. The `.returning(...)` explicitly lists every column except `search` (generated tsvector), with a deliberate `as any` (the `DatabaseClient` union breaks the overload).
+5. **Broadcast** to the SSE bus → live UI.
 
-**API keys** (`api-key.ts`): format `lw_` + 32 url-safe chars (`/^lw_[A-Za-z0-9_-]{32}$/`, `lw_${nanoid(32)}`); stored as **SHA-256 hex** only. `validateApiKey` keeps an in-process cache (positive 5 min, negative 30 s) — which is exactly why the ingest pipeline does the extra "re-verify project row exists" read: a deleted project whose key is still cached must yield **401 `unauthorized`, not a 500 FK violation**.
+**API keys** (`api-key.ts`): `lw_` + 32 url-safe chars, stored as **SHA-256 hex only** (plaintext shown once). In-process cache: positive 5 min, negative 30 s.
 
-**Simple-ingest contract** (`/v1/ingest`): per-log validation failures do **not** fail the request — it returns **200** with `{ accepted }`, adding `{ rejected, errors[] }` (array of strings) when any record is rejected. Only batch-level problems return 4xx. Error codes (JSON `{error,message}`): `415 unsupported_media_type`, `400 invalid_json`, `400 validation_error` (e.g. empty array), `400 batch_too_large` (> `BATCH_INSERT_LIMIT` 100), `401 unauthorized`, `429 rate_limited` (+ `Retry-After: 60`, **zero** logs written). Metadata keys are mapped to dedicated columns: `request.id`→`requestId`, `enduser.id`→`userId`, `client.address`→`ipAddress`; a top-level `service` becomes `serviceName` + `resourceAttributes."service.name"`; an empty `{}` metadata stores as `NULL`.
+**Simple-ingest contract** (`/v1/ingest`): per-log failures do **not** fail the request — **200** `{accepted}`, plus `{rejected, errors[]}` when any record is rejected. Only batch-level problems return 4xx (`unsupported_media_type`, `invalid_json`, `validation_error`, `batch_too_large`, `unauthorized`, `rate_limited`). Known wart: the 429 body is `{error}` on `/v1/logs` vs `{error,message}` on `/v1/ingest` (see `plans/README.md` rejected ledger). Metadata mapping: `request.id`→`requestId`, `enduser.id`→`userId`, `client.address`→`ipAddress`; top-level `service` → `serviceName` + `resourceAttributes."service.name"`; empty `{}` metadata stores as `NULL`.
 
-**Incident grouping** is **error/fatal only** (`INCIDENT_GROUPED_LEVELS`); other levels get `null` fingerprint/incidentId (but still get `serviceName` extracted). `highestLevel` collapses to the more severe of the two (`fatal` > `error`) via `LEVEL_RANK` (debug 10 … fatal 50). **Incident open/resolved status is purely time-derived, never stored**: `getIncidentStatus(lastSeen)` returns `open` when `now - lastSeen ≤ AUTO_RESOLVE_MINUTES`, else `resolved`, recomputed per row at serialization. ⚠ The client (`incidents/+page.svelte` `computeStatus`) **hardcodes `30 * 60 * 1000`**, so `INCIDENT_AUTO_RESOLVE_MINUTES` must stay **30** or server and UI status will disagree.
+**Incident grouping** is **error/fatal only**; other levels get `null` fingerprint/incidentId (but still get `serviceName`). `highestLevel` collapses via `LEVEL_RANK` (debug 10 … fatal 50). Status is **time-derived, never stored** (`getIncidentStatus(lastSeen)` vs `INCIDENT_AUTO_RESOLVE_MINUTES`); the client renders `data.autoResolveMinutes` from the server, so the two can't disagree.
 
-The `search` tsvector is a Postgres **STORED generated column**: `to_tsvector('english', COALESCE(message,'') || ' ' || COALESCE(body::text,'') || ' ' || COALESCE(metadata::text,'') || ' ' || COALESCE(resource_attributes::text,'') || ' ' || COALESCE(scope_attributes::text,''))`. It uses `||` + `COALESCE` and **not** `concat_ws` on purpose: a STORED generated column requires an **IMMUTABLE** expression, and `concat_ws` is only `STABLE` (Postgres rejects it). **Keep this expression in sync across three places**: `schema.ts` (`log.search` `generatedAlwaysAs`), the latest recreating migration (`drizzle/0010_*.sql`), and the `log_search_trigger` PL/pgSQL function in `test-db.ts` (PGlite can't do STORED generated columns, so it emulates via a `BEFORE INSERT/UPDATE` trigger).
+The `search` tsvector is a Postgres **STORED generated column** using `||` + `COALESCE`, **not** `concat_ws` — a STORED column requires an IMMUTABLE expression and `concat_ws` is only STABLE. **Keep the expression in sync across three places**: `schema.ts` (`log.search`), the recreating migration (`drizzle/0010_*.sql`), and the `log_search_trigger` in `test-db.ts` (PGlite can't do STORED columns, so tests emulate via trigger).
 
 ---
 
 ## Database
 
-- **Schema** (`src/lib/server/db/schema.ts`) — the single source of truth. Tables: `project`, `incident`, `log`, plus better-auth `user`/`session`/`account`/`verification`. `log_level` enum = `debug|info|warn|error|fatal`.
-  - `project.apiKeyHash` is **SHA-256 only** — plaintext key is shown once at create/regenerate, never stored. `retentionDays`: `null` = system default, `0` = never delete, `>0` = days. **Project names are unique PER OWNER, not globally** — `uniqueIndex("uq_project_name_owner").on(name, ownerId)` (migration `0007` dropped the old global `project_name_unique`); this is an intentional fix so users can't enumerate/squat others' project names.
-  - `log` carries full OTLP fields (trace/span, severity, resource/scope attributes) plus app fields, the generated `search` tsvector (GIN index `idx_log_search`), and FK to `incident` (`ON DELETE set null`).
-  - `incident` is upserted on `uniqueIndex("uq_incident_project_fingerprint").on(projectId, fingerprint)` (the `ON CONFLICT` target); `highestLevel` reuses the `log_level` enum. Heavy indexing on `log` for project+timestamp, project+incident+timestamp, project+fingerprint, level, etc.
-- **Config** (`drizzle.config.ts`): `postgresql` dialect, `strict`, requires `DATABASE_URL`.
-- **Migrations** live in `drizzle/`. Edit `schema.ts` → `bun run db:generate` → commit the SQL. **Prod/CI apply with `db:migrate` (idempotent, ordered) — never `db:push` in prod** (`push` diffs live and is for dev/CI ephemeral DBs only). `entrypoint.sh` runs `drizzle-kit migrate` at container start; CI `test-migrations` job applies the committed SQL against a real Postgres to catch broken migrations.
-- **Driver seam** (`db.ts`): single `DatabaseClient = PostgresJsDatabase | PgliteDatabase`. All handlers use `getDbClient(locals)`; `getQueryRows` normalizes the two drivers' raw-result shapes (`T[]` vs `{rows: T[]}`).
+- **Schema** (`schema.ts`) is the single source of truth. Tables: `project`, `incident`, `log`, plus better-auth `user`/`session`/`account`/`verification`. `log_level` = `debug|info|warn|error|fatal`.
+  - `project.apiKeyHash` is SHA-256 only. `retentionDays`: `null` = system default, `0` = never delete, `>0` = days. **Names are unique PER OWNER, not globally** (intentional — prevents enumerating/squatting others' names).
+  - `log` carries full OTLP fields plus app fields, the generated `search` tsvector (GIN), and FK to `incident` (`ON DELETE set null`).
+  - `incident` upserts on `(projectId, fingerprint)`; `highestLevel` reuses the `log_level` enum. Heavy `log` indexing on project+timestamp, project+incident+timestamp, fingerprint, level.
+- **Migrations** (`drizzle/`): edit `schema.ts` → `db:generate` → commit the SQL. **Prod/CI use `db:migrate` (idempotent, ordered) — never `db:push` in prod.** `entrypoint.sh` migrates at boot; CI `test-migrations` applies committed SQL against real Postgres. (Note: `drizzle/meta/` snapshots currently cover 0000–0005+0011 only — if `db:generate` proposes replaying old migrations, hand-write the SQL and keep the generated snapshot.)
+- **Driver seam** (`db.ts`): `DatabaseClient = PostgresJsDatabase | PgliteDatabase`. Handlers use `getDbClient(locals)`; `getQueryRows` normalizes the drivers' raw-result shapes.
 
 ---
 
 ## Frontend (Svelte 5 runes)
 
-- Pages live under `src/routes/(app)/**` (authenticated; guarded in `+layout.server.ts`). Login is `src/routes/login/`.
-- **Runes-based state**: `src/lib/stores/logs.svelte.ts` is a `.svelte.ts` store using `$state`. Live streaming consumers are hooks: `src/lib/hooks/use-log-stream.svelte.ts` and `use-incident-stream.svelte.ts` — they open the POST SSE endpoints, parse `logs`/`incidents`/`heartbeat` events, and push into the runes store, bounded by `LOG_STREAM_CONFIG.DEFAULT_MAX_LOGS` (1000, hard cap 10000).
-  - ⚠ **Do not convert the stream hooks' internal `_isConnected`/`_isConnecting` to `$state`.** They are deliberately plain (non-reactive) vars: a component `$effect` both reads them (via `connect()`'s guards) and writes them, so making them `$state` creates a self-referential dependency → `effect_update_depth_exceeded` infinite loop that breaks page hydration. Connection state reaches the UI **only** through the `onConnectionChange` callback, not via reactive getters.
-- UI = shadcn-svelte primitives in `src/lib/components/ui/` (treated as vendor — excluded from coverage and knip ownership). Tailwind CSS v4 via `@tailwindcss/vite`.
+- Pages under `src/routes/(app)/**` (guarded in `+layout.server.ts`); login is `src/routes/login/`.
+- Stream hooks (`use-log-stream` / `use-incident-stream`) open the POST SSE endpoints and deliver batches via `onLogs`/`onIncidents` callbacks; pages push into local `$state`. Live list is capped client-side (`MAX_STREAMED_LOGS` = 10000 in `+page.svelte`).
+  - ⚠ **Do not make the hooks' `_isConnected`/`_isConnecting` `$state`.** A component `$effect` both reads them (via `connect()` guards) and writes them — reactive state here self-triggers an `effect_update_depth_exceeded` loop that breaks hydration. Connection state reaches the UI **only** via `onConnectionChange`.
+- UI = shadcn-svelte primitives in `src/lib/components/ui/` (vendor — excluded from coverage and knip).
 
 ---
 
 ## Shared Zod Schemas (the contract)
 
-`src/lib/shared/schemas/` holds Zod schemas that are the **single contract across client, server, and SDKs** — e.g. `project.ts` (`projectCreatePayloadSchema`, `projectUpdatePayloadSchema`: name 1–50 chars, `^[a-zA-Z0-9_-]+$`; `retentionDays` null/0/1–3650), `log.ts` (`parseLevelFilter`, log-level enum), `incident.ts`. The same level enum is mirrored in `schema.ts`'s `pgEnum` and the SDKs. Change a payload shape here and the corresponding SDK types and DB enum must move together.
+`src/lib/shared/schemas/` is the **single contract across client, server, and SDKs** — `project.ts` (name 1–50 chars, `^[a-zA-Z0-9_-]+$`; `retentionDays` null/0/1–3650), `log.ts` (`parseLevelFilter`, level enum), `incident.ts`. The level enum is mirrored in `schema.ts`'s `pgEnum` and the SDKs — change payload shapes here and the SDK types + DB enum move together.
 
 ---
 
 ## Config & Env Vars
 
-`src/lib/server/config/env.ts` validates at module load (throws aggregated `EnvValidationError`). `performance.ts` parses numeric tunables (clamped to bounds). `rate-limit.ts` reads RPM env vars.
+`env.ts` validates at module load (throws aggregated `EnvValidationError`). `performance.ts` parses numeric tunables (clamped). `rate-limit.ts` reads RPM vars (fail-closed).
 
-| Var                                                                        | Required    | Default           | Purpose                                                   |
-| -------------------------------------------------------------------------- | ----------- | ----------------- | --------------------------------------------------------- |
-| `DATABASE_URL`                                                             | **yes**     | —                 | Postgres conn string (must start with `postgres`)         |
-| `BETTER_AUTH_SECRET`                                                       | yes (prod)  | dev-only fallback | ≥32 chars; required unless `NODE_ENV=development`         |
-| `ADMIN_PASSWORD`                                                           | for seeding | —                 | ≥8 chars; `bun run db:seed` / entrypoint admin seed       |
-| `ADMIN_USERNAME`                                                           | no          | `admin`           | seed admin username; email derived `<user>@logwell.local` |
-| `ORIGIN`                                                                   | prod        | —                 | trusted origin for reverse proxies/tunnels (better-auth)  |
-| `NODE_ENV`                                                                 | no          | `development`     | gates auth-secret strictness                              |
-| `RATE_LIMIT_INGEST_RPM`                                                    | no          | 600               | per-project ingest cap                                    |
-| `RATE_LIMIT_LOGIN_RPM`                                                     | no          | 10                | per-IP login cap (**CI/e2e set 10000**)                   |
-| `SSE_BATCH_WINDOW_MS` / `SSE_MAX_BATCH_SIZE` / `SSE_HEARTBEAT_INTERVAL_MS` | no          | 1500 / 50 / 30000 | SSE batching/heartbeat                                    |
-| `LOG_STREAM_MAX_LOGS`                                                      | no          | 1000              | in-memory logs per client (cap 10000)                     |
-| `LOG_RETENTION_DAYS`                                                       | no          | 30                | system default retention (0 = disabled)                   |
-| `LOG_CLEANUP_INTERVAL_MS`                                                  | no          | 3600000           | retention sweep interval                                  |
-| `INCIDENT_AUTO_RESOLVE_MINUTES`                                            | no          | 30                | silence before an incident auto-resolves                  |
+| Var                                                                        | Required    | Default           | Purpose                                                       |
+| -------------------------------------------------------------------------- | ----------- | ----------------- | ------------------------------------------------------------- |
+| `DATABASE_URL`                                                             | **yes**     | —                 | Postgres conn string (must start with `postgres`)             |
+| `BETTER_AUTH_SECRET`                                                       | yes (prod)  | dev-only fallback | ≥32 chars; required unless `NODE_ENV=development` or `test`   |
+| `ADMIN_PASSWORD`                                                           | for seeding | —                 | ≥8 chars; read by the seed script, not env-validated          |
+| `ADMIN_USERNAME`                                                           | no          | `admin`           | seed username; email derived `<user>@logwell.local`           |
+| `ORIGIN`                                                                   | no          | —                 | trusted origin for proxies/tunnels (better-auth); set in prod |
+| `NODE_ENV`                                                                 | no          | `production`      | gates auth-secret strictness                                  |
+| `RATE_LIMIT_INGEST_RPM`                                                    | no          | 600               | per-project ingest cap                                        |
+| `RATE_LIMIT_LOGIN_RPM`                                                     | no          | 10                | per-IP login cap (**CI/e2e set 10000**)                       |
+| `SSE_BATCH_WINDOW_MS` / `SSE_MAX_BATCH_SIZE` / `SSE_HEARTBEAT_INTERVAL_MS` | no          | 1500 / 50 / 30000 | SSE batching/heartbeat                                        |
+| `LOG_STREAM_MAX_LOGS`                                                      | no          | 1000              | server-side stream bound (cap 10000)                          |
+| `LOG_RETENTION_DAYS`                                                       | no          | 30                | system default retention (0 = disabled)                       |
+| `LOG_CLEANUP_INTERVAL_MS`                                                  | no          | 3600000           | retention sweep interval                                      |
+| `INCIDENT_AUTO_RESOLVE_MINUTES`                                            | no          | 30                | silence before auto-resolve                                   |
 
-**Background jobs**: `cleanup-scheduler.ts` (started in `hooks.server.ts` init) runs `log-cleanup.ts` every `LOG_CLEANUP_INTERVAL_MS`, deleting logs past each project's effective retention (`retentionDays` override else `LOG_RETENTION_DAYS`; `0` disables). Scheduler is stopped on graceful shutdown. A separate stale-bucket sweep in `rate-limit.ts` evicts idle token buckets every 5 min.
+**Background jobs**: `cleanup-scheduler.ts` (started in hook init, stopped on graceful shutdown) runs `log-cleanup.ts` every `LOG_CLEANUP_INTERVAL_MS`, deleting logs past each project's effective retention (override else system default; `0` disables). `rate-limit.ts` evicts idle token buckets every 5 min.
 
 ---
 
 ## Testing Strategy (Testing Trophy — 4 tiers)
 
-Tier is chosen by **filename suffix**, not directory. Vitest runs three projects (config: `vitest.config.ts`) via `vp`; Playwright is the fourth tier and is **excluded from Vitest** (`tests/e2e/**`).
+Tier by **filename suffix**, not directory. Playwright is excluded from Vitest.
 
 | Tier        | Glob                                                                  | Env                                                     | DB                     | Command                    |
 | ----------- | --------------------------------------------------------------------- | ------------------------------------------------------- | ---------------------- | -------------------------- |
@@ -249,165 +240,89 @@ Tier is chosen by **filename suffix**, not directory. Vitest runs three projects
 | Integration | `tests/integration/**/*.integration.test.ts` + `scripts/**/*.test.ts` | node                                                    | **PGlite (in-memory)** | `bun run test:integration` |
 | E2E         | `tests/e2e/**` (Playwright)                                           | real browser                                            | **real Postgres**      | `bun run test:e2e`         |
 
-**Global setup** `tests/setup.ts`: jest-dom matchers and fallback `DATABASE_URL` + `BETTER_AUTH_SECRET` (dummy — PGlite needs no real connection). `tests/setup-component.ts` registers `@testing-library/svelte` `cleanup()` afterEach only for the jsdom component project: its source package imports `.svelte` files, which node-env unit/integration projects cannot transform. Import test primitives from **`vite-plus/test`**, not `vitest`.
+Shared setup: jest-dom + fallback `DATABASE_URL`/`BETTER_AUTH_SECRET` (`tests/setup.ts`); component-only `cleanup()` (`setup-component.ts` — its `.svelte` imports can't transform under node). Import test primitives from **`vite-plus/test`**, not `vitest`.
 
-**Integration DB engine** (`src/lib/server/db/test-db.ts`): `setupTestDatabase()` → `createTestDatabase()` boots a fresh in-memory PGlite and **reflects `schema.ts` into hand-generated CREATE ENUM/TABLE/INDEX/TRIGGER SQL** in FK-dependency order (`user, project, incident, session, account, verification, log`) — it does **not** run `drizzle/*.sql`. PGlite workarounds, all deliberate: the `search` tsvector is reproduced via a `BEFORE INSERT/UPDATE` trigger (`log_search_trigger`) instead of a STORED generated column; unique indexes are emitted as table-level `UNIQUE` constraints (so `ON CONFLICT` upserts resolve); `VARCHAR` is hardcoded to `VARCHAR(255)`. `cleanup()` TRUNCATEs all tables CASCADE in reverse order. (Why PGlite over Docker: zero startup, fresh isolated DB per test. Why reflection over migrations: keeps `schema.ts` the single source and sidesteps PGlite's incompatibility with STORED/`IMMUTABLE` tsvector SQL. Tradeoff: not 100% Postgres parity — hence e2e runs real Postgres.)
+**Integration DB** (`test-db.ts`): boots fresh PGlite per test by **reflecting `schema.ts` into generated SQL** in FK order — it does **not** run `drizzle/*.sql` (sidesteps PGlite's STORED/`IMMUTABLE` incompatibility; tradeoff: not 100% Postgres parity, hence e2e on real Postgres). Workarounds: `search` via trigger, unique indexes as table constraints (for `ON CONFLICT`), `VARCHAR(255)`. If you add a column/table/enum, the type map / FK `tableOrder` may need updating or the table is silently skipped.
 
-**Route testing pattern**: import the route's `+server.ts` handlers directly, build a mock `RequestEvent` with `locals.db = <pglite>` (mirrors the prod injection seam), and for non-GET requests **set a same-origin `Origin` header** (the `createRequestEvent` helper auto-adds it) or `checkCsrfOrigin` returns 403. Seed via `tests/fixtures/db.ts` factories (`seedProject`, `seedLog`, `seedProjectWithApiKey` — returns the plaintext key since only the hash is stored, `getOrCreateDefaultUser`); don't hand-roll inserts. If you add a column/table/enum to `schema.ts`, `test-db.ts`'s type map and FK `tableOrder` may need updating or the table is silently skipped. **API-key tests must call `clearApiKeyCache()` in `beforeEach`** (the in-process key cache otherwise bleeds across tests).
+**Route testing pattern**: import `+server.ts` handlers, mock `RequestEvent` with `locals.db = <pglite>`, seed via `tests/fixtures/db.ts` factories (don't hand-roll inserts). Non-GET requests need a same-origin `Origin` header (most `createRequestEvent` helpers auto-add it) or CSRF 403s. **API-key tests must call `clearApiKeyCache()` in `beforeEach`** (in-process cache bleeds across tests).
 
-**Two test conventions worth knowing before you refactor**: (1) Several integration tests **spy on `db.select` and throw if a handler pulls full rows into memory** — timeseries, incident-detail, and incident-timeline **must aggregate counts in SQL, not in JS**; don't "simplify" them into in-memory reductions. (2) `src/hooks.server.test.ts` does **not** invoke the real `handle` chain — it re-implements the session-population logic against PGlite, so the rate-limit guard, `/v1`/`/api/health` fast-paths, and `svelteKitHandler` are **not** covered there.
+**Two conventions before you refactor**: (1) timeseries, incident-detail, and incident-timeline tests **spy on `db.select` and throw on full-row pulls** — counts must aggregate in SQL, not JS. (2) `src/hooks.server.test.ts` re-implements session population against PGlite — it does **not** cover the rate-limit guard, fast-paths, or `svelteKitHandler`.
 
-**E2E** (`playwright.config.ts`): `testDir tests/e2e`. **CI uses preview (built) mode on :4173** (avoids Vite dev HMR flakiness), **locally dev mode on :5173**; `workers:1`, `retries:2`, `github` reporter in CI. Every request gets a same-origin `Origin` header via `extraHTTPHeaders` so Playwright's request client passes CSRF. Projects: `chromium` + `firefox` (CI `ci.yml` runs chromium only; `release.yml` runs both). Helpers: `tests/e2e/helpers/otlp.ts` (POST OTLP to `/v1/logs` with bearer key), `helpers/log-selectors.ts` (viewport-aware locators). E2E admin is `admin`/`adminpass` matching `scripts/seed-admin.ts`.
-
-**E2E login flake mitigation** (commits #153–#155): a hydration race where a click fires before SvelteKit hydrates the form handler caused a pre-hydration no-op. Fix: wrap fill+submit+assert in `await expect(async () => {…}).toPass({ timeout: 45000 })` to retry the whole interaction, **plus** CI sets `RATE_LIMIT_LOGIN_RPM: 10000` so repeated sign-ins (toPass retries × sharding) aren't 429'd. Preserve this pattern for any login-dependent spec. (One "redirect authenticated users away from login" test is `test.skip`'d pending a session-cookie persistence issue.)
+**E2E** (`playwright.config.ts`): CI runs built preview on **:4173**, local runs dev on **:5173**; `workers:1`, `retries:2`. Same-origin `Origin` via `extraHTTPHeaders` (CSRF). `chromium` + `firefox` locally, chromium-only in CI (`release.yml` runs both). Helpers: `helpers/otlp.ts` (bearer POST to `/v1/logs`), `helpers/log-selectors.ts` (viewport-aware locators). Admin `admin`/`adminpass` matches the seed script. Login specs must wrap fill+submit+assert in `expect(…).toPass({ timeout: 45000 })` (hydration race) with `RATE_LIMIT_LOGIN_RPM=10000` so retries aren't 429'd. (One "redirect authenticated users away from login" test is `test.skip`'d pending a session-cookie issue.)
 
 ---
 
 ## SDKs (`sdks/`)
 
-Each SDK is an **independent package** with its own tooling and release workflow. All three share the same **Client → Queue → Transport** architecture (TypeScript is the reference; Python and Go mirror it file-for-file): a `Logwell` **client** (level methods, child loggers, source-location capture) hands entries to a **BatchQueue** (buffering + flush triggers) which a **Transport** ships to `/v1/ingest` (or OTLP) with retry. Files map 1:1: `client` / `queue` / `transport` / `config` / `types` / `errors` / `source(-location)`.
+Independent packages, same **Client → Queue → Transport** architecture (TS is the reference; Python/Go mirror it file-for-file: `client` / `queue` / `transport` / `config` / `types` / `errors` / `source(-location)`).
 
 | SDK        | Dir                | Build                               | Test                                         | Lint                         | Types                                  | Publishes to                                  |
 | ---------- | ------------------ | ----------------------------------- | -------------------------------------------- | ---------------------------- | -------------------------------------- | --------------------------------------------- |
-| TypeScript | `sdks/typescript/` | `vp pack` (tsdown; CJS+ESM+`.d.ts`) | Vitest (`test:unit`, `test:integration`)     | `vp check`                   | `tsc --noEmit`, `attw`, `size` (<10KB) | **npm** `logwell` + **JSR** `@divkix/logwell` |
+| TypeScript | `sdks/typescript/` | `vp pack` (tsdown; CJS+ESM+`.d.ts`) | Vitest (`test:unit`, `test:integration`)     | `vp check`                   | via `vp check`; `attw`, `size` (<10KB) | **npm** `logwell` + **JSR** `@divkix/logwell` |
 | Python     | `sdks/python/`     | `hatchling` / `python -m build`     | `pytest` (`tests/unit`, `tests/integration`) | `ruff check` / `ruff format` | `mypy --strict`                        | **PyPI** `logwell`                            |
 | Go         | `sdks/go/`         | `go build` (stdlib only, zero deps) | `go test -race ./...`                        | `golangci-lint`              | `go vet`                               | `go get github.com/Divkix/Logwell/sdks/go@…`  |
 
-TS from repo root: `bun run sdk:test` / `sdk:build` / `sdk:lint`. Python: `cd sdks/python && uv venv && uv pip install -e ".[dev]"` then `pytest` / `ruff` / `mypy`. Go: `cd sdks/go && go test ./...`. Integration tests for SDKs need a running Logwell server.
+Python: `cd sdks/python && uv venv && uv pip install -e ".[dev]"`. Go: `cd sdks/go && go test ./...`. SDK integration tests need a running server.
 
-**Shared SDK contract** (identical across all three — keep them aligned):
+**Shared contract** (keep aligned across all three):
 
-- **Wire format**: `POST {endpoint}/v1/ingest`, headers `Authorization: Bearer <apiKey>` + `Content-Type: application/json`, body is a **raw JSON array** of entries (no envelope), camelCase fields (`sourceFile`, `lineNumber`).
-- **Config + validation**: defaults `batchSize 50`, `flushInterval 5000ms`, `maxQueueSize 1000`. Upper bounds are enforced (throw `INVALID_CONFIG`): `batchSize ≤ 100` (the server's `BATCH_INSERT_LIMIT`), `maxQueueSize ≤ 100000`, `flushInterval ∈ [100, 60000]ms`. The TS validator also masks the `apiKey` in error messages.
-- **BatchQueue**: bounded; on overflow it drops the **oldest** entry and fires `onError` (`QUEUE_OVERFLOW`); on send failure it **re-queues the undelivered remainder** (preserving order) and retries. `shutdown()` does a final flush and **throws `NETWORK_ERROR`** if logs remain undelivered (the timer path only reports via `onError`).
-- **Error taxonomy** (`LogwellError(message, code, statusCode?, retryable=false)`), 7 codes: `NETWORK_ERROR`(retry), `SERVER_ERROR`/5xx(retry), `RATE_LIMITED`/429(retry); `UNAUTHORIZED`/401, `VALIDATION_ERROR`/400, `QUEUE_OVERFLOW`, `INVALID_CONFIG` (all **non-retryable**). Only 5xx/429/network are retried with backoff.
-- Per-language concurrency models differ: Python's `BatchQueue` runs a daemon asyncio loop on its own thread; Go's `Child()` loggers share the root's queue/transport and `Child.Shutdown()` does **not** flush (shut down the root). The `jsr.json` package (`@divkix/logwell`) exports raw `./src/index.ts`; the npm package (`logwell`) ships the `vp pack`-built `./dist` — two names, two entry points. Build config lives in the `pack` block of `vite.config.ts` (no `tsdown.config.ts`); `fixedExtension: false` keeps the dist filenames (`index.js`/`.cjs`/`.d.ts`/`.d.cts`) aligned with the `exports` map.
+- **Wire**: `POST {endpoint}/v1/ingest`, `Authorization: Bearer <apiKey>` + JSON, **raw JSON array** body (no envelope), camelCase (`sourceFile`, `lineNumber`).
+- **Config**: defaults `batchSize 50`, `flushInterval 5000ms`, `maxQueueSize 1000`; bounds `batchSize ≤ 100` (server limit), `maxQueueSize ≤ 100000`. Flush floor 100ms is enforced by TS+Go; Python currently only rejects `≤0`.
+- **Queue**: bounded; overflow drops the **oldest** + `onError(QUEUE_OVERFLOW)`; send failure **re-queues the undelivered remainder in order** and retries.
+- **Shutdown**: TS throws `NETWORK_ERROR` if logs remain undelivered; Go returns the flush error; Python reports via `on_error` only.
+- **Errors** (`LogwellError(message, code, statusCode?, retryable)`), 7 codes: retryable = `NETWORK_ERROR`, `SERVER_ERROR`-from-5xx, `RATE_LIMITED`/429; non-retryable = `UNAUTHORIZED`/401, `VALIDATION_ERROR`/400, `QUEUE_OVERFLOW`, `INVALID_CONFIG`. (`SERVER_ERROR` is also reused for unexpected 4xx as non-retryable.)
+- **Per-language notes**: Python's queue runs a daemon asyncio loop on its own thread; Go `Child()` shares the root's queue/transport and `Child.Shutdown()` is a no-op (shut down the root). TS never echoes the `apiKey` in errors; Python includes a truncated prefix. npm `logwell` ships built `./dist`, JSR `@divkix/logwell` exports raw `./src/index.ts`; pack config lives in the SDK `vite.config.ts` (`fixedExtension: false` matches the `exports` map).
 
 ---
 
 ## Tooling
 
-- **Vite+ / `vp`** (`vite.config.ts`): unified toolchain (oxlint + oxfmt + Vitest + build). `vp check` = format+lint+typecheck (`--fix` to fix). 2-space indent, single quotes, trailing commas; Svelte files have relaxed rules (unused vars allowed). Inline disable: `// oxlint-disable-next-line <rule>`. **Pinned exact** via `package.json` `overrides`: `vite` → `@voidzero-dev/vite-plus-core@0.2.6`, `vitest` → `4.1.10`, and the `vite-plus` CLI at `0.2.7`. Vite+ 0.2 removed its `@voidzero-dev/vite-plus-test` wrapper; use real Vitest at the version Vite+ bundles. The root keeps `typescript` 6 plus `@typescript/native` 7 for `svelte-check --tsgo` — svelte-check 4.x hard-fails at startup when the main `typescript` package is v7, so TS 7 reaches the root only through the `@typescript/native` alias. The TS SDK runs TypeScript 7 directly: `vp pack` (tsdown) emits declarations with the native compiler, which is why tsup was dropped (its rollup-plugin-dts needs the classic TS JS API that TS 7 no longer ships). Don't bump these casually.
-- **knip** (`knip.json`): dead-code/dependency check. Entry points include SvelteKit route files + `db/index.ts`, `auth.ts`, `cleanup-scheduler.ts`. Has explicit ignores (the `simple-ingest.ts` types, deps like `tw-animate-css`/`layerchart`, the `jsr` binary). Run `bun run knip` pre-commit.
-- **husky** (`.husky/`): installed via the `prepare` script (`vp config && husky && svelte-kit sync`). `.husky/pre-commit` runs `vp check && bun run knip`; a separate `.vite-hooks/pre-commit` (from `vp config`) runs the lighter `vp staged`. `husky` runs last in `prepare`, so `.husky/pre-commit` is the effective gate.
-- **seed-admin** (`scripts/seed-admin.ts`): idempotent admin creation through better-auth using `ADMIN_USERNAME`/`ADMIN_PASSWORD`; email auto-derived `<user>@logwell.local` (`.local` because `localhost` fails email validation).
-- **Pinned versions**: Bun `1.4.1` (pkg manager + CI setup-bun) / `1.4.1-alpine` (Docker, with digest). Postgres `18-alpine` everywhere (PG 19 is beta-only as of 2026-07; do not bump to a beta). Pinning is for reproducible builds.
+- **Vite+ / `vp`** (`vite.config.ts`): `vp check` = format+lint+typecheck (`--fix` to fix). Inline disable: `// oxlint-disable-next-line <rule>`. Pinned exact: **Vite+ 0.2.9**, **vitest 4.1.10** (via `overrides`). Root keeps `typescript` 6 + `@typescript/native` 7 for `svelte-check --tsgo` (svelte-check 4.x hard-fails on TS 7 as the main compiler). Don't bump casually.
+- **knip** (`knip.json`): entries cover SvelteKit route files + `db/index.ts`, `auth.ts`, `cleanup-scheduler.ts`; ignores for `simple-ingest.ts` types and vendor deps. Run pre-commit.
+- **husky** (`.husky/`): installed via `prepare` (`vp config && husky && svelte-kit sync`). `.husky/pre-commit` runs `vp check && bun run knip` (plus a conditional TS-SDK check); `.vite-hooks/pre-commit` runs the lighter `vp staged`.
+- **seed-admin** (`scripts/seed-admin.ts`): idempotent admin creation via better-auth; email auto-derived `<user>@logwell.local` (`.local` because `localhost` fails email validation).
+- **Pinned versions**: Bun `1.4.1` (CI `setup-bun` + Docker `oven/bun:1.4.1-alpine` with digest). Postgres `18-alpine` everywhere (PG 19 is beta-only; don't bump to a beta). Pinning is for reproducible builds.
 
 ---
 
 ## CI/CD (`.github/workflows/`)
 
-All workflows checkout with `persist-credentials: false`, cache the Bun store, and use `bun install --frozen-lockfile`. CI env: `DATABASE_URL=postgresql://postgres:postgres@localhost:5432/test_db`, placeholder `BETTER_AUTH_SECRET`, `CI=true`.
+Bun-based workflows (`ci`, `release`, `sdk-typescript`) checkout with `persist-credentials: false` and `bun install --frozen-lockfile` (Go/Python workflows use their own toolchains). CI env: real-Postgres `DATABASE_URL`, placeholder `BETTER_AUTH_SECRET`, `CI=true`.
 
-### `ci.yml` (push to `main` non-tags, PRs to `main`)
+- **`ci.yml`** (push to `main` non-tags, PRs): `lint` (lint + `prepare` + `check`); unit/component/integration (**3 shards** each); v8 coverage; e2e **chromium-only**, 3 shards — real Postgres service, `drizzle-kit push --force`, seeded admin (`adminpass`), `RATE_LIMIT_LOGIN_RPM=10000`; `test-migrations` (committed SQL vs real Postgres); `build` (`bun --bun run build`); `docker-build` (no push). `docker-publish`/`docker-merge` run on **main push only** (amd64 + arm64 by digest → GHCR tags `dev`, `dev-<sha>`, `<sha>`). `ci-success` gates.
+- **`release.yml`** (push tag `v*`, or manual; `cancel-in-progress: false`): re-runs lint + unit + integration + e2e on **chromium AND firefox** × 3 shards, then multi-arch image + GitHub Release (tags `version` + `latest`).
+- **SDK workflows** (path-filtered to `sdks/<lang>/**`, push/PR to `main`): TS — lint (stubs `.svelte-kit/tsconfig.json` for the root tsconfig), unit+integration, build + `attw` + `size`; Python — ruff, `mypy --strict`, pytest matrix (3.10–3.13), coverage `--cov-fail-under=90`, `twine check`; Go — golangci-lint (v2.10.1), `go test -race` on **1.26.x**, no publish job. Publish jobs (main push, OIDC) check the registry and skip if the version exists — idempotent re-runs.
+- **`dependabot.yml`**: weekly updates across 6 ecosystems (grouped minors/patches, svelte + testing groups, majors separate), prefix `deps`.
 
-| Job                | Does                                                                                                                                                                                   | Local equivalent                      |
-| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
-| `lint`             | `bun run lint` + `prepare` + `bun run check`                                                                                                                                           | `vp check && bun run check`           |
-| `test-unit`        | unit tests, **3 shards**                                                                                                                                                               | `bun run test:unit`                   |
-| `test-component`   | component tests, **3 shards**                                                                                                                                                          | `bun run test:component`              |
-| `test-coverage`    | v8 coverage (needs unit+component)                                                                                                                                                     | `bun run test:coverage`               |
-| `test-integration` | PGlite integration, **3 shards**                                                                                                                                                       | `bun run test:integration`            |
-| `test-e2e`         | Playwright **chromium**, 3 shards; real Postgres service, `drizzle-kit push --force`, seed admin (`ADMIN_PASSWORD=adminpass`), `RATE_LIMIT_LOGIN_RPM=10000`; uploads report on failure | `bun run test:e2e --project=chromium` |
-| `test-migrations`  | applies committed `drizzle-kit migrate` against real Postgres                                                                                                                          | `bun run db:migrate`                  |
-| `build`            | `bun --bun run build`, uploads `build/`                                                                                                                                                | `bun run build`                       |
-| `docker-build`     | builds Docker image (no push), gha cache                                                                                                                                               | `docker build .`                      |
-| `docker-publish`   | **main push only**: build `linux/amd64` (ubuntu) + `linux/arm64` (ubuntu-24.04-arm) by digest → GHCR                                                                                   | —                                     |
-| `docker-merge`     | **main push only**: merge digests into multi-arch manifest, tags `dev`, `dev-<sha>`, `<sha>`                                                                                           | —                                     |
-| `ci-success`       | gate: all required jobs must pass (docker jobs required only on main push)                                                                                                             | —                                     |
-
-Coverage thresholds (`vitest.config.ts`): lines/statements/functions **75%**, branches **65%**; e2e-tested routes (`(app)/**`, `login/**`, `hooks.server.ts`) and shadcn primitives are excluded.
-
-### `release.yml` (push tag `v*`, or manual)
-
-Re-runs lint + unit + integration + **e2e across `chromium` AND `firefox` × 3 shards** (with `RATE_LIMIT_LOGIN_RPM=10000`), then builds + pushes the multi-arch Docker image and a GitHub Release. `cancel-in-progress: false` (partial releases must not be interrupted).
-
-### SDK workflows (path-filtered to `sdks/<lang>/**`, push/PR to `main`)
-
-- `sdk-typescript.yml` — lint (`vp check`; **stubs `.svelte-kit/tsconfig.json`** so the root tsconfig resolves in this SDK-only job), unit + integration tests, build + `attw` + `size`. `publish` job (main push, `id-token: write`): checks npm for `package.json`'s version → `npm publish` (OIDC) if new; checks JSR for `jsr.json`'s version → `npx jsr publish` (OIDC) if new. Both checks are independent and idempotent.
-- `sdk-python.yml` — ruff lint+format, mypy `--strict`, pytest matrix (Py 3.10–3.13), coverage (`--cov-fail-under=90`), build + `twine check` + wheel install smoke. `publish` (main push, PyPI Trusted Publisher / OIDC): checks PyPI for `pyproject.toml` version → publishes if new.
-- `sdk-go.yml` — golangci-lint (v2.10.1), `go test -race` matrix (Go 1.25/1.26), coverage. **No publish job** — Go modules resolve from git tags.
-
-### Other
-
-- `opencode.yml` — on `/oc` or `/opencode` issue/PR comments by OWNER/MEMBER/COLLABORATOR, runs the OpenCode agent.
-- `dependabot.yml` — weekly Bun/npm updates (grouped: minor-and-patch together, svelte-ecosystem and testing grouped, majors separate), commit prefix `deps`.
-
-Images: `ghcr.io/divkix/logwell` (`:dev`, `:dev-<sha>`, `:<sha>` from main; release tags from `release.yml`).
+Coverage thresholds: lines/statements/functions **75%**, branches **65%**; e2e-tested routes and shadcn primitives excluded.
 
 ---
 
 ## Build & Deploy
 
-- **Build**: `vp build` → `svelte-adapter-bun` emits a Bun server in `build/` (entry `build/index.js`). The app listens on **port 3000** in production (preview also 3000); dev is 5173.
-- **Dockerfile** (multi-stage): `oven/bun:1.4.1-alpine` (pinned + digest) base → `deps` (`--production --ignore-scripts`) → `deps-dev` (full deps + `bun run prepare`) → `build` (copies config/static/`drizzle`/`scripts`/`entrypoint.sh`/`src` least-to-most-volatile for cache hits, `NODE_ENV=production`, builds) → runtime. Browser binary downloads are skipped (`PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` etc.). `curl` installed for healthcheck.
-- **`entrypoint.sh`**: runs `drizzle-kit migrate` (aborts startup on failure) → seeds admin **only if `ADMIN_PASSWORD` is set** (and fails fast if the seed errors when it _is_ set) → `exec bun run ./build/index.js`.
-- **`compose.yaml`**: local Postgres 18-alpine (`root`/`mysecretpassword`/`local` on 5432, named volume `pgdata`, `pg_isready` healthcheck).
-- **PaaS targets**: any platform that runs the OCI image with `DATABASE_URL` + `BETTER_AUTH_SECRET` (+ `ORIGIN` behind a proxy/tunnel). Migrations run automatically on boot.
+- **Build**: `vp build` → `svelte-adapter-bun` emits a Bun server in `build/` (entry `build/index.js`). Prod listens on **3000** (preview is 4173; dev 5173).
+- **Dockerfile** (multi-stage, pinned `oven/bun:1.4.1-alpine` + digest): prod-deps → full-deps+`prepare` → build (least-to-most-volatile copies, `NODE_ENV=production`) → release. Browser downloads skipped; `curl` for healthcheck.
+- **`entrypoint.sh`**: `drizzle-kit migrate` (aborts on failure) → seed admin **only if `ADMIN_PASSWORD` is set** (fails fast on seed error) → `exec bun run ./build/index.js`.
+- **`compose.yaml`**: local Postgres 18-alpine (`root`/`mysecretpassword`/`local` on 5432, `pgdata` volume, `pg_isready` healthcheck).
+- **PaaS**: any OCI host with `DATABASE_URL` + `BETTER_AUTH_SECRET` (+ `ORIGIN` behind a proxy/tunnel). Migrations run on boot.
 
 ---
 
 ## Release Process
 
-The **main app** and each **SDK** are versioned and released **independently** — each has its own version line (the app is not in lockstep with the SDKs). Commits and tags are GPG-signed (`commit.gpgsign` / `tag.gpgsign` are enabled), so signing must be available locally.
+App and SDKs version **independently**. Commits/tags are GPG-signed — signing must work locally. Two trigger models:
 
-Two distinct trigger models, do not mix them up:
-
-- **App** → **tag-triggered**: merging to `main` does NOT release; pushing a `v*` tag does.
-- **SDKs (TS/Python)** → **merge-triggered**: pushing a version bump under `sdks/<lang>/**` to `main` runs the SDK workflow, which publishes whatever version is new. The `sdks/...@vX.Y.Z` tags are only git release **markers** — they do NOT trigger publishing. Publish jobs are idempotent: they check the registry and skip if the version already exists, so re-runs are safe.
-
-### Main app — Docker image + GitHub Release (`release.yml`)
-
-1. Bump `version` in the root `package.json` and merge to `main`. (The root `bun.lock` does not record the app version, so `--frozen-lockfile` is unaffected — no lockfile change needed.)
-2. Tag the merge commit and push the tag:
-   ```bash
-   git tag -a v1.1.0 -m "Release v1.1.0"
-   git push origin v1.1.0
-   ```
-   The `v*` tag triggers `release.yml` → multi-platform Docker images (`linux/amd64`, `linux/arm64`) to GHCR + a GitHub Release with auto-generated notes.
-
-### TypeScript SDK — npm + JSR (`sdk-typescript.yml`, on push to `main` under `sdks/typescript/**`)
-
-1. **Bump BOTH version fields** — they are separate and easy to desync:
-   - `sdks/typescript/package.json` → `version` (read by the **npm** publish)
-   - `sdks/typescript/jsr.json` → `version` (read by the **JSR** publish)
-
-   If you bump only `package.json`, npm gets the new version while JSR silently stays on the old one (the JSR step finds the old version already published and skips).
-
-2. Merge to `main`. The workflow publishes to npm (OIDC) if `package.json`'s version is new, and to JSR (`npx jsr publish`, OIDC) if `jsr.json`'s version is new.
-3. (Optional) push the marker tag:
-   ```bash
-   git tag -a "sdks/typescript@v1.1.0" -m "Release sdks/typescript v1.1.0"
-   git push origin "sdks/typescript@v1.1.0"
-   ```
-
-### Python SDK — PyPI (`sdk-python.yml`, on push to `main` under `sdks/python/**`)
-
-1. Bump `version` in `sdks/python/pyproject.toml`, then sync the lockfile (it records the project version, and CI runs `uv lock --check`):
-   ```bash
-   cd sdks/python && uv lock
-   ```
-2. Merge to `main` → publishes to PyPI (OIDC) if the version is new.
-3. (Optional) marker tag:
-   ```bash
-   git tag -a "sdks/python@v1.1.0" -m "Release sdks/python v1.1.0"
-   git push origin "sdks/python@v1.1.0"
-   ```
-
-### Go SDK — tag-resolved by `go get` (no publish workflow)
-
-Use the **slash** tag format so the Go toolchain can resolve the subdirectory module via `go get github.com/Divkix/Logwell/sdks/go@vX.Y.Z`:
-
-```bash
-git tag -a "sdks/go/v1.1.0" -m "Release sdks/go v1.1.0"
-git push origin "sdks/go/v1.1.0"
-```
+- **App → tag-triggered**: merging to `main` does NOT release; pushing `v*` does (`release.yml` → images + GitHub Release). Bump root `package.json` `version`, merge, then `git tag -a vX.Y.Z -m "Release vX.Y.Z" && git push origin vX.Y.Z`. (`bun.lock` doesn't record the app version — no lockfile churn.)
+- **SDKs (TS/Python) → merge-triggered**: pushing a version bump under `sdks/<lang>/**` to `main` publishes whatever version is new; `sdks/…@vX.Y.Z` tags are git markers only. Publish jobs are idempotent (skip if the version exists).
+  - **TS**: bump **BOTH** `sdks/typescript/package.json` (`version`, npm) and `sdks/typescript/jsr.json` (`version`, JSR) — they desync silently otherwise.
+  - **Python**: bump `pyproject.toml` `version`, then `cd sdks/python && uv lock` (lockfile records it; CI-adjacent check).
+  - **Go**: no publish job — tag `sdks/go/vX.Y.Z` (slash format) so `go get github.com/Divkix/Logwell/sdks/go@vX.Y.Z` resolves.
 
 ---
 
 ## Decision Log & Roadmap (`plans/`)
 
-The `plans/` directory is the durable **decision record** — self-contained handoff plans from the `improve` audit (planned at commit `8ec01b0`, 2026-06-17), each tied to a finding ID (F1–F18 / D1–D4). Most recent shipped work traces directly to a plan: **006** SSE backpressure → #142, **007** OTLP zero-timestamp → #144, **009** CSRF tightening, **012** batched incident upsert + narrowed `returning` → #145, **013** capped log count → #146, **014** tsvector single-parse → #147, **015** dedup time-range/level-filter helpers → #148, **016** unify `(app)` loader ownership + DB seam → #149. Plans **001–016 are done**; **017–020 are open SPIKEs** — design a vertical slice behind a flag, then STOP at a go/no-go gate; do **not** full-build:
+`plans/` is the durable decision record from the `improve` audit — self-contained handoff plans, each tied to a finding ID. Plans **001–016 are done**; **017–020 are open SPIKEs** (design a vertical slice behind a flag, then STOP at a go/no-go gate; do **not** full-build):
 
 | Spike | Direction                                                                           |
 | ----- | ----------------------------------------------------------------------------------- |
@@ -416,49 +331,31 @@ The `plans/` directory is the durable **decision record** — self-contained han
 | 019   | Incident lifecycle — acknowledge / mute / manual resolve (core-table schema change) |
 | 020   | Backup-grade export (full-fidelity, uncapped, restorable)                           |
 
-`plans/README.md` holds the status table, dependency graph (only hard blocker: **005 → 014**), shared-design notes (e.g. build incident `isNew`/reopen detection **once** in the upsert; compute status in one `computeIncidentStatus`), and a **"Considered and rejected"** ledger so settled questions aren't re-litigated — IDOR verified safe (`requireProjectOwnership` returns **404**, not 403, to hide existence), XSS/SQLi/mass-assignment audited clean, plus deferred minors (timeline/timeseries final-bucket off-by-one; the `/v1/ingest` `{error,message}` vs `/v1/logs` `{error}` 429 body-shape mismatch; login `X-Forwarded-For` trust is deployment-specific). Before roadmap work, read the relevant plan and **re-run its drift check** — the repo has moved past `8ec01b0`.
+Details live in `plans/README.md` (status table, 005→014 dep graph, shared-design notes, "Considered and rejected" ledger). Before roadmap work, read the relevant plan and **re-run its drift check**.
 
 ---
 
 ## Common Gotchas
 
-1. **Ports**: dev = 5173, preview/production = 3000.
-2. **Bun, not npm**: always `bun run …`; lockfile is `bun.lock`. Engines require Bun ≥1.2.0.
-3. **Adapter**: `svelte-adapter-bun`, not the Node adapter. The prod entry is `build/index.js` run by Bun.
-4. **`db:migrate` vs `db:push`**: prod/CI-real-Postgres apply committed migrations (`migrate`); `push` is for dev/ephemeral DBs only. After editing `schema.ts`, run `db:generate` and commit the SQL.
-5. **tsvector triple-sync**: the `search` generated-column expression lives in `schema.ts`, the recreating migration (`drizzle/0010_*.sql`), and the PGlite `log_search_trigger` in `test-db.ts` — change all three together. It must stay `||`+`COALESCE` (IMMUTABLE), never `concat_ws`.
-6. **CSRF on `/api`**: any non-GET request **without** an `Origin` or `Referer` is 403. Integration tests auto-inject `Origin` via `createRequestEvent`; hand-built `Request`s must add it. `/v1` ingest is exempt.
-7. **API keys are hash-only**: plaintext is shown once at create/regenerate. Use `seedProjectWithApiKey` in tests to get the plaintext.
-8. **SSE event bus is in-memory / single-process**: live streaming does not fan out across replicas; the in-memory token-bucket rate limiter is likewise per-process.
-9. **e2e is Playwright-only**: Vitest excludes `tests/e2e/**`; it never picks them up. Local `test:e2e` runs chromium **and** firefox unless you pass `--project=chromium`.
-10. **e2e prerequisites**: needs a real Postgres + a seeded admin (`ADMIN_PASSWORD`). Login specs must use the `expect().toPass()` retry pattern and benefit from `RATE_LIMIT_LOGIN_RPM=10000`.
-11. **`test-db.ts` approximations**: schema comes from reflection (not `drizzle/*.sql`); `VARCHAR` is forced to 255; unique indexes become UNIQUE constraints. New schema column types may need the generator's type map / FK `tableOrder` updated or the table is silently skipped.
-12. **Don't copy `tests/integration/api/health/health.integration.test.ts`'s inline CREATE TABLE** — it's a bespoke legacy setup (references an `api_key` column), not the shared `setupTestDatabase()` path.
-13. **Test-doc sources of truth**: trust this file, `vitest.config.ts`, `test-db.ts`, and `tests/fixtures/db.ts` for the testing setup. `tests/README.md` and `src/lib/server/db/README.md` were corrected (the phantom `.browser.test.ts` tier and the old `test-utils.ts`/`createUserFactory`/age-field examples are gone); the fictional `tests/fixtures/README.md` was deleted. Keep these docs aligned with `db.ts` factories when you touch that area.
-14. **Pinned Vite+/Bun/Postgres versions** are intentional for reproducibility; don't bump without reason. (CI's `setup-bun` and the Docker image both pin **Bun 1.4.1**; Postgres stays on **18-alpine** because PG 19 is beta-only.)
-15. **`src/lib/server/session.ts` is TEST-ONLY** — `getSession()` skips HMAC signature verification. Never call it from a route; production uses `auth.api.getSession()`.
-16. **Incident auto-resolve threshold is duplicated**: the server reads `INCIDENT_AUTO_RESOLVE_MINUTES`, but `incidents/+page.svelte` hardcodes `30 * 60 * 1000`. Keep the env at **30** or server/UI status disagree.
-17. **Never make the SSE stream hooks' `_isConnected`/`_isConnecting` `$state`** — it triggers an `effect_update_depth_exceeded` hydration-breaking loop; surface connection state via the `onConnectionChange` callback instead.
-18. **API keys are write-only**: there is no read/query API by key (logs read only via the session UI). **Project names are unique per-owner**, not globally.
-19. **Per-log ingest errors are not request failures**: `/v1/ingest` returns **200** `{accepted, rejected, errors[]}` for bad records; only batch-level issues (`invalid_json`, `batch_too_large`, auth, rate-limit) return 4xx.
-20. **Login rate-limit proxy trust**: `event.getClientAddress()` trusts the first `X-Forwarded-For`, so per-IP login limiting is effective only behind a trusted proxy that overwrites XFF; direct deployments should set `RATE_LIMIT_LOGIN_RPM` accordingly or use such a proxy.
-21. **better-auth minors can add required schema columns**: 1.7 added `account.issuer` (NOT NULL + unique `(issuer, account_id)`). Symptom is integration `BetterAuthError: The field "…" does not exist…` → add the column to `schema.ts` plus a migration that backfills (`'local:' || provider_id` matches better-auth's synthetic issuer) before `SET NOT NULL`.
-22. **`db:generate` needs a TTY and diffs against the latest `drizzle/meta/*_snapshot.json`**: if it prompts about unrelated columns or proposes replaying old migrations, don't accept blindly — hand-write the migration SQL and keep the generated snapshot (it always reflects current `schema.ts`, which is what the next diff uses as baseline).
-23. **Local `bun run build` needs env**: set dummy `DATABASE_URL` + `BETTER_AUTH_SECRET` or env validation fails the build (CI provides real `DATABASE_URL` plus a placeholder secret).
+1. **`db:migrate` vs `db:push`**: prod/CI-real-Postgres apply committed migrations; `push` is dev/ephemeral only. After `schema.ts` edits, `db:generate` + commit the SQL.
+2. **`db:generate` needs a TTY and diffs the latest `drizzle/meta/*_snapshot.json`**: if it prompts about unrelated columns or replays old migrations, hand-write the SQL and keep the generated snapshot.
+3. **Local `bun run build` needs env**: dummy `DATABASE_URL` + `BETTER_AUTH_SECRET` or env validation fails the build.
+4. **API keys are hash-only + write-only**: plaintext shown once at create/regenerate (`seedProjectWithApiKey` in tests); keys can't read anything (no read API by design).
+5. **Per-log ingest errors aren't request failures**: `/v1/ingest` returns **200** `{accepted, rejected, errors[]}`; only batch-level issues (auth, rate-limit, `invalid_json`, `batch_too_large`) return 4xx.
+6. **CSRF on `/api`**: any request other than GET/HEAD/OPTIONS **without** `Origin`/`Referer` is 403 (`/v1` exempt). Hand-built test `Request`s must add `Origin`.
+7. **SSE bus + rate limiter are in-memory / single-process**: no fan-out across replicas.
+8. **e2e prerequisites**: real Postgres + seeded admin; login specs need the `toPass()` retry pattern and `RATE_LIMIT_LOGIN_RPM=10000`; local runs chromium+firefox unless `--project` is passed.
+9. **`test-db.ts` approximations**: reflection (not `drizzle/*.sql`), `VARCHAR(255)`, unique indexes as constraints. New column types may need the type map / FK `tableOrder` updated or the table is silently skipped.
+10. **Don't copy `tests/integration/api/health/health.integration.test.ts`'s inline `CREATE TABLE`** — bespoke legacy setup (`api_key` column), not the shared `setupTestDatabase()` path.
+11. **better-auth minors can add required columns**: 1.7 added `account.issuer` (NOT NULL + unique). Symptom: `BetterAuthError: The field "…" does not exist…` → add the column + a backfilling migration (`'local:' || provider_id`) before `SET NOT NULL`.
+12. **Login rate-limit is socket-IP by default**: `getClientAddress()` ignores `X-Forwarded-For` unless `ADDRESS_HEADER` is configured (depth-indexed from the right via `XFF_DEPTH`). Behind a proxy, set both or per-IP limiting won't see real client IPs.
+13. **Pinned Vite+/Bun/Postgres versions** are intentional; don't bump without reason.
 
 ## Agent skills
 
-### Issue tracker
-
-Issues are tracked in GitHub Issues (`Divkix/Logwell`). External PRs are not treated as a triage surface. See `docs/agents/issue-tracker.md`.
-
-### Triage labels
-
-Default canonical labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
-
-### Domain docs
-
-Single-context layout: one `CONTEXT.md` at the repo root, plus `docs/adr/` for architectural decisions. See `docs/agents/domain.md`.
+- Issues: GitHub Issues (`Divkix/Logwell`); external PRs are not a triage surface. See `docs/agents/issue-tracker.md`.
+- Triage labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+- Domain docs: planned layout is one root `CONTEXT.md` plus `docs/adr/` (not yet present). See `docs/agents/domain.md`.
 
 <!--VITE PLUS START-->
 
