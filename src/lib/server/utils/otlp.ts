@@ -1,5 +1,6 @@
 import type { LogLevel } from "$lib/shared/types";
 import { API_CONFIG } from "../config/performance";
+import type { ParsedIngest } from "./ingest";
 
 export class OtlpValidationError extends Error {
   constructor(message: string) {
@@ -445,4 +446,40 @@ export function normalizeOtlpLogsRequest(body: unknown): NormalizedOtlpLogsResul
   }
 
   return { records, rejectedLogRecords, errors };
+}
+
+export function parseOtlpIngestBody(body: unknown): ParsedIngest {
+  const normalized = normalizeOtlpLogsRequest(body);
+  return {
+    inputs: normalized.records.map((record) => {
+      const mapped = mapOtlpAttributesToLogColumns(record.attributes);
+      return {
+        ...mapped,
+        level: record.level,
+        message: record.message,
+        timestamp: record.timestamp,
+        metadata: record.attributes,
+        resourceAttributes: record.resourceAttributes,
+        timeUnixNano: record.timeUnixNano,
+        observedTimeUnixNano: record.observedTimeUnixNano,
+        severityNumber: record.severityNumber,
+        severityText: record.severityText,
+        body: record.body,
+        droppedAttributesCount: record.droppedAttributesCount,
+        flags: record.flags,
+        traceId: record.traceId,
+        spanId: record.spanId,
+        resourceDroppedAttributesCount: record.resourceDroppedAttributesCount,
+        resourceSchemaUrl: record.resourceSchemaUrl,
+        scopeName: record.scopeName,
+        scopeVersion: record.scopeVersion,
+        scopeAttributes: record.scopeAttributes,
+        scopeDroppedAttributesCount: record.scopeDroppedAttributesCount,
+        scopeSchemaUrl: record.scopeSchemaUrl,
+      };
+    }),
+    accepted: normalized.records.length,
+    rejected: normalized.rejectedLogRecords,
+    errors: normalized.errors,
+  };
 }

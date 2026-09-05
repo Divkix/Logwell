@@ -1,4 +1,5 @@
 import { LOG_LEVELS, type LogLevel } from "../../shared/schemas/log";
+import type { ParsedIngest } from "./ingest";
 import { mapOtlpAttributesToLogColumns } from "./otlp";
 
 export interface SimpleLogInput {
@@ -148,5 +149,42 @@ export function parseSimpleIngestRequest(body: unknown): SimpleIngestResult {
     accepted: records.length,
     rejected: errors.length,
     errors,
+  };
+}
+
+export function parseSimpleIngestBody(body: unknown): ParsedIngest {
+  const result = parseSimpleIngestRequest(body);
+  return {
+    inputs: result.records.map((record) => ({
+      level: record.level,
+      message: record.message,
+      timestamp: record.timestamp,
+      metadata: record.metadata,
+      resourceAttributes: record.resourceAttributes,
+      sourceFile: record.sourceFile,
+      lineNumber: record.lineNumber,
+      requestId: record.requestId,
+      userId: record.userId,
+      ipAddress: record.ipAddress,
+      timeUnixNano: null,
+      observedTimeUnixNano: null,
+      severityNumber: null,
+      severityText: null,
+      body: null,
+      droppedAttributesCount: null,
+      flags: null,
+      traceId: null,
+      spanId: null,
+      resourceDroppedAttributesCount: null,
+      resourceSchemaUrl: null,
+      scopeName: null,
+      scopeVersion: null,
+      scopeAttributes: null,
+      scopeDroppedAttributesCount: null,
+      scopeSchemaUrl: null,
+    })),
+    accepted: result.accepted,
+    rejected: result.rejected,
+    errors: result.errors,
   };
 }
