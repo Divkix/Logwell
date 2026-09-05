@@ -64,7 +64,7 @@ src/
         test-db.ts          # PGlite schema-reflection engine for integration tests
       config/               # env.ts (validated env), performance.ts (tunables)
       jobs/                 # log-cleanup.ts, cleanup-scheduler.ts (retention sweeps)
-      utils/                # api-key, csrf, rate-limit, cursor, search, incidents, otlp, simple-ingest, ...
+      utils/                # ingest (pipeline), log-query, api-key, csrf, rate-limit, cursor, search, incidents, otlp, simple-ingest, ...
       events.ts             # logEventBus singleton (SSE pub/sub)
       error-handler.ts      # handleError() — sanitized errors + error IDs
     shared/schemas/         # Zod schemas shared by client/server/SDKs (project, log, incident)
@@ -171,7 +171,7 @@ Both ingest routes follow the same pipeline:
 
 **API keys** (`api-key.ts`): `lw_` + 32 url-safe chars, stored as **SHA-256 hex only** (plaintext shown once). In-process cache: positive 5 min, negative 30 s.
 
-**Simple-ingest contract** (`/v1/ingest`): per-log failures do **not** fail the request — **200** `{accepted}`, plus `{rejected, errors[]}` when any record is rejected. Only batch-level problems return 4xx (`unsupported_media_type`, `invalid_json`, `validation_error`, `batch_too_large`, `unauthorized`, `rate_limited`). Known wart: the 429 body is `{error}` on `/v1/logs` vs `{error,message}` on `/v1/ingest` (see `plans/README.md` rejected ledger). Metadata mapping: `request.id`→`requestId`, `enduser.id`→`userId`, `client.address`→`ipAddress`; top-level `service` → `serviceName` + `resourceAttributes."service.name"`; empty `{}` metadata stores as `NULL`.
+**Ingest pipeline** (`utils/ingest.ts:ingestLogs`): both `/v1` routes are thin adapters over one pipeline — shared guard → rate-limit → parse → transaction → broadcast. Adapters differ only in parsing (`parseOtlpIngestBody` / `parseSimpleIngestBody` → wide rows minus id/project/incident stamps). Both 429s return `{error,message}` + `Retry-After: 60` (SDKs key off status, not body). **Log-query module** (`utils/log-query.ts:queryLogs`): owns filter → where-clause → paged select for the logs route, export, and page loader (params-in/rows-out; throws `InvalidCursorError`, route maps to 400, loader falls back to first page). `cursor.ts`/`search.ts`/`capped-count.ts` stay until the incidents route migrates onto it. **Simple-ingest contract** (`/v1/ingest`): per-log failures do **not** fail the request — **200** `{accepted}`, plus `{rejected, errors[]}` when any record is rejected. Only batch-level problems return 4xx (`unsupported_media_type`, `invalid_json`, `validation_error`, `batch_too_large`, `unauthorized`, `rate_limited`). Metadata mapping: `request.id`→`requestId`, `enduser.id`→`userId`, `client.address`→`ipAddress`; top-level `service` → `serviceName` + `resourceAttributes."service.name"`; empty `{}` metadata stores as `NULL`.
 
 **Incident grouping** is **error/fatal only**; other levels get `null` fingerprint/incidentId (but still get `serviceName`). `highestLevel` collapses via `LEVEL_RANK` (debug 10 … fatal 50). Status is **time-derived, never stored** (`getIncidentStatus(lastSeen)` vs `INCIDENT_AUTO_RESOLVE_MINUTES`); the client renders `data.autoResolveMinutes` from the server, so the two can't disagree.
 

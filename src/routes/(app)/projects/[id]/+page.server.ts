@@ -1,12 +1,8 @@
-import { and, desc, eq, gte, inArray, lt, or, type SQL, sql } from "drizzle-orm";
-import { env } from "$lib/server/config/env";
 import { getDbClient } from "$lib/server/db/db";
-import { log } from "$lib/server/db/schema";
-import { cappedLogCount } from "$lib/server/utils/capped-count";
-import { decodeCursor, encodeCursor } from "$lib/server/utils/cursor";
+import { InvalidCursorError, queryLogs } from "$lib/server/utils/log-query";
 import { requireProjectOwnershipPage } from "$lib/server/utils/project-guard";
-import { buildSearchQuery } from "$lib/server/utils/search";
 import { parseLevelFilter } from "$lib/shared/schemas/log";
+import { env } from "$lib/server/config/env";
 import { getTimeRangeStart } from "$lib/utils/format";
 import { parseTimeRange } from "$lib/utils/time-range";
 import type { PageServerLoad } from "./$types";
@@ -43,75 +39,27 @@ export const load: PageServerLoad = async (event) => {
   const range = parseTimeRange(rangeParam);
   const fromDate = range ? getTimeRangeStart(range) : null;
 
-  const conditions: SQL[] = [eq(log.projectId, projectId)];
+  const filter = {
+    projectId,
+    levels,
+    from: fromDate,
+    to: null,
+    search: searchParam,
+    cursor: cursorParam,
+    limit,
+    offset,
+  };
 
-  if (cursorParam) {
-    try {
-      const { timestamp: cursorTimestamp, id: cursorId } = decodeCursor(cursorParam);
-
-      conditions.push(
-        or(
-          lt(log.timestamp, cursorTimestamp),
-          and(eq(log.timestamp, cursorTimestamp), lt(log.id, cursorId)),
-        ) as SQL,
-      );
-    } catch (err) {
-      console.error("[page/logs] invalid cursor, falling back to first page:", err);
-    }
+  let result: Awaited<ReturnType<typeof queryLogs>>;
+  try {
+    result = await queryLogs(db, filter);
+  } catch (err) {
+    if (!(err instanceof InvalidCursorError)) throw err;
+    console.error("[page/logs] invalid cursor, falling back to first page:", err);
+    result = await queryLogs(db, { ...filter, cursor: null });
   }
 
-  if (levels && levels.length > 0) {
-    conditions.push(inArray(log.level, levels));
-  }
-
-  if (fromDate) {
-    conditions.push(gte(log.timestamp, fromDate));
-  }
-
-  if (searchParam?.trim()) {
-    const tsquery = buildSearchQuery(searchParam);
-    if (tsquery) {
-      conditions.push(sql`${log.search} @@ to_tsquery('english', ${tsquery})`);
-    }
-  }
-
-  const whereClause = and(...conditions);
-
-  const pageCountResult = cursorParam ? undefined : await cappedLogCount(db, whereClause);
-  const total = pageCountResult?.total ?? 0;
-  const totalIsCapped = pageCountResult?.capped ?? false;
-
-  const logs = await db
-    .select({
-      id: log.id,
-      projectId: log.projectId,
-      incidentId: log.incidentId,
-      fingerprint: log.fingerprint,
-      serviceName: log.serviceName,
-      level: log.level,
-      message: log.message,
-      metadata: log.metadata,
-      sourceFile: log.sourceFile,
-      lineNumber: log.lineNumber,
-      requestId: log.requestId,
-      userId: log.userId,
-      ipAddress: log.ipAddress,
-      timestamp: log.timestamp,
-    })
-    .from(log)
-    .where(whereClause)
-    .orderBy(desc(log.timestamp), desc(log.id))
-    .limit(limit + 1)
-    .offset(cursorParam ? 0 : offset);
-
-  const hasMore = logs.length > limit;
-
-  const logsToReturn = hasMore ? logs.slice(0, limit) : logs;
-
-  const nextCursor =
-    hasMore && logsToReturn.length > 0
-      ? encodeCursor(logsToReturn.at(-1)!.timestamp as Date, logsToReturn.at(-1)!.id)
-      : null;
+  const total = result.total ?? 0;
 
   return {
     project: {
@@ -122,17 +70,17 @@ export const load: PageServerLoad = async (event) => {
       createdAt: projectData.createdAt?.toISOString() ?? null,
       updatedAt: projectData.updatedAt?.toISOString() ?? null,
     },
-    logs: logsToReturn.map((l) => ({
+    logs: result.logs.map((l) => ({
       ...l,
       timestamp: l.timestamp?.toISOString() ?? null,
     })),
     pagination: {
       total,
-      totalIsCapped,
-      hasMore,
+      totalIsCapped: result.totalIsCapped,
+      hasMore: result.hasMore,
       limit,
       offset,
-      nextCursor,
+      nextCursor: result.nextCursor,
     },
     filters: {
       levels: levels ?? [],

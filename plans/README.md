@@ -127,7 +127,7 @@ These surfaced during the audit but were NOT turned into plans, with the reason.
 
 ### Minor items, not separately planned
 
-- **429 body-shape inconsistency**: `/v1/ingest` returns `{error, message}` while `/v1/logs` returns `{error}` for rate-limit responses. Cosmetic; plan 010 asserts both current shapes rather than normalizing. Fix opportunistically if touching both endpoints.
+- **429 body-shape inconsistency**: ~~`/v1/ingest` returns `{error, message}` while `/v1/logs` returns `{error}`~~ — fixed: the shared ingest pipeline (`utils/ingest.ts:ingestLogs`) normalizes both to `{error, message}` + `Retry-After: 60`; pipeline suite asserts both parsers.
 - **Timeline/timeseries final-bucket off-by-one** (BUG-03/BUG-04): the last time bucket can be computed slightly narrow. Minor visual effect on charts; not worth a dedicated migration-free change now. Revisit if charts show edge artifacts.
 - **Health-endpoint version disclosure**: the health endpoint exposes a version string. Low value to hide for a self-hosted tool; not worth the change.
 
