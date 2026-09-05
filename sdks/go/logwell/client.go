@@ -131,22 +131,27 @@ func (c *Client) Child(opts ...ChildOption) *Client {
 	}
 }
 
+// Debug logs a message at DEBUG level.
 func (c *Client) Debug(message string, metadata ...map[string]any) {
 	c.log(LevelDebug, message, metadata...)
 }
 
+// Info logs a message at INFO level.
 func (c *Client) Info(message string, metadata ...map[string]any) {
 	c.log(LevelInfo, message, metadata...)
 }
 
+// Warn logs a message at WARN level.
 func (c *Client) Warn(message string, metadata ...map[string]any) {
 	c.log(LevelWarn, message, metadata...)
 }
 
+// Error logs a message at ERROR level.
 func (c *Client) Error(message string, metadata ...map[string]any) {
 	c.log(LevelError, message, metadata...)
 }
 
+// Fatal logs a message at FATAL level.
 func (c *Client) Fatal(message string, metadata ...map[string]any) {
 	c.log(LevelFatal, message, metadata...)
 }

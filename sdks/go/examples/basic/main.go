@@ -1,3 +1,4 @@
+// Command basic demonstrates minimal Logwell usage: create a client, log, flush, shut down.
 package main
 
 import (
