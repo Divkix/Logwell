@@ -7,9 +7,6 @@ import Button from './ui/button/button.svelte';
 import * as Select from './ui/select';
 
 interface Props {
-  // Plaintext keys are no longer persisted, so the live key is usually
-  // unavailable here — fall back to a placeholder the user replaces with the
-  // key they saved at creation.
   apiKey?: string;
   baseUrl: string;
   class?: string;

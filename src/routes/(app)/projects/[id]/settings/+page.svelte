@@ -32,33 +32,24 @@ interface Props {
 
 const { data }: Props = $props();
 
-// Project data state (for updates after API calls)
-// These intentionally capture initial values - we update them locally after API calls
 // svelte-ignore state_referenced_locally
 let projectName = $state(data.project.name);
-// API keys are stored hashed and never returned on load. This holds the
-// plaintext key only transiently, right after a regenerate, so it can be shown
-// once and copied.
 let projectApiKey = $state('');
 // svelte-ignore state_referenced_locally
 let projectRetentionDays = $state(data.project.retentionDays);
 
-// UI state
 let showRegenerateConfirm = $state(false);
 let showDeleteConfirm = $state(false);
 let deleteConfirmInput = $state('');
 let selectedExample = $state<string>('curl');
 
-// Project name editing state
 let isEditingName = $state(false);
 let editedName = $state('');
 let nameError = $state('');
 let isSaving = $state(false);
 
-// Retention editing state
 let isUpdatingRetention = $state(false);
 
-// Retention options (derived to properly reference data.systemDefault)
 const retentionOptions = $derived([
   { value: 'system', label: `System Default (${data.systemDefault.retentionDays} days)` },
   { value: '0', label: 'Never delete' },
@@ -71,25 +62,20 @@ const retentionOptions = $derived([
   { value: '365', label: '365 days' },
 ]);
 
-// Current retention value for select
 const currentRetentionValue = $derived(
   projectRetentionDays === null ? 'system' : String(projectRetentionDays),
 );
 
-// Effective retention for display
 const effectiveRetention = $derived(
   projectRetentionDays === null ? data.systemDefault.retentionDays : projectRetentionDays,
 );
 
 const isDeleteConfirmValid = $derived(deleteConfirmInput === projectName);
 
-// Dynamic base URL
 const baseUrl = $derived(
   typeof window !== 'undefined' ? window.location.origin : 'https://your-domain.com',
 );
 
-// Code examples. The live key is only available transiently after a regenerate;
-// otherwise show a placeholder the user replaces with the key they saved.
 const exampleApiKey = $derived(projectApiKey || 'YOUR_API_KEY');
 
 const simpleCurlCommand = $derived(
@@ -141,8 +127,6 @@ async function handleSaveName() {
   nameError = '';
   const trimmedName = editedName.trim();
 
-  // Validate against the shared project update schema (single source of truth
-  // with PATCH /api/projects/[id]).
   const validation = projectUpdatePayloadSchema.safeParse({ name: trimmedName });
   if (!validation.success) {
     nameError = validation.error.issues?.[0]?.message ?? 'Project name cannot be empty';
@@ -264,7 +248,6 @@ function formatDate(isoDate: string | null): string {
 </svelte:head>
 
 <div class="container mx-auto max-w-5xl px-4 py-8">
-  <!-- Header with back button -->
   <div class="mb-8">
     <a
       href="/projects/{data.project.id}"
@@ -278,10 +261,7 @@ function formatDate(isoDate: string | null): string {
   </div>
 
   <div class="space-y-8">
-    <!-- Settings Grid: 2x2 on desktop, 1-column on mobile -->
     <div data-testid="settings-grid" class="grid gap-6 sm:grid-cols-2">
-      <!-- Row 1: General + API Key -->
-      <!-- General Section -->
       <section class="bg-card rounded-lg border p-6">
       <h2 class="text-lg font-semibold">General</h2>
 
@@ -332,7 +312,6 @@ function formatDate(isoDate: string | null): string {
       </div>
     </section>
 
-    <!-- API Key Section -->
     <section class="bg-card rounded-lg border p-6">
       <h2 class="text-lg font-semibold">API Key</h2>
       <p class="text-muted-foreground mt-1 text-sm">
@@ -389,8 +368,6 @@ function formatDate(isoDate: string | null): string {
       {/if}
     </section>
 
-      <!-- Row 2: Quick Start + Log Retention -->
-      <!-- Quick Start Section -->
       <section class="bg-card rounded-lg border p-6">
         <div class="flex items-center justify-between">
           <div>
@@ -436,7 +413,6 @@ function formatDate(isoDate: string | null): string {
       </div>
     </section>
 
-    <!-- Log Retention Section -->
     <section class="bg-card rounded-lg border p-6">
       <h2 class="text-lg font-semibold">Log Retention</h2>
       <p class="text-muted-foreground mt-1 text-sm">
@@ -500,7 +476,6 @@ function formatDate(isoDate: string | null): string {
       </section>
     </div>
 
-    <!-- Danger Zone: Full-width, outside grid -->
     <section data-testid="danger-zone" class="rounded-lg border border-destructive/50 p-6">
       <h2 class="text-destructive text-lg font-semibold">Danger Zone</h2>
       <p class="text-muted-foreground mt-1 text-sm">
@@ -521,7 +496,6 @@ function formatDate(isoDate: string | null): string {
   </div>
 </div>
 
-<!-- Regenerate Confirmation Dialog -->
 {#if showRegenerateConfirm}
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
     <div
@@ -559,7 +533,6 @@ function formatDate(isoDate: string | null): string {
   </div>
 {/if}
 
-<!-- Delete Confirmation Dialog -->
 {#if showDeleteConfirm}
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
     <div

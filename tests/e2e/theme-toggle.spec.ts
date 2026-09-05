@@ -20,9 +20,7 @@ async function login(page: Page) {
 test.describe("Theme Toggle", () => {
   test.beforeEach(async ({ page }) => {
     await login(page);
-    // Clear theme storage after login to ensure consistent initial state
     await page.evaluate(() => localStorage.removeItem("mode-watcher-mode"));
-    // Reload to apply the cleared state
     await page.reload();
   });
 
@@ -30,23 +28,18 @@ test.describe("Theme Toggle", () => {
     const html = page.locator("html");
     const toggleButton = page.getByRole("button", { name: /toggle theme/i });
 
-    // Initial state: light mode (sun icon visible)
     await expect(page.locator('[data-testid="sun-icon"]')).toBeVisible();
     await expect(page.locator('[data-testid="moon-icon"]')).not.toBeVisible();
     await expect(html).not.toHaveClass(/dark/);
 
-    // Click to switch to dark mode
     await toggleButton.click();
 
-    // Dark mode: moon icon, .dark class present
     await expect(page.locator('[data-testid="moon-icon"]')).toBeVisible();
     await expect(page.locator('[data-testid="sun-icon"]')).not.toBeVisible();
     await expect(html).toHaveClass(/dark/);
 
-    // Click to switch back to light mode
     await toggleButton.click();
 
-    // Light mode again
     await expect(page.locator('[data-testid="sun-icon"]')).toBeVisible();
     await expect(html).not.toHaveClass(/dark/);
   });
@@ -55,18 +48,14 @@ test.describe("Theme Toggle", () => {
     const html = page.locator("html");
     const toggleButton = page.getByRole("button", { name: /toggle theme/i });
 
-    // Switch to dark mode
     await toggleButton.click();
     await expect(html).toHaveClass(/dark/);
 
-    // Verify localStorage
     const storedMode = await page.evaluate(() => localStorage.getItem("mode-watcher-mode"));
     expect(storedMode).toBe("dark");
 
-    // Reload page
     await page.reload();
 
-    // Theme should persist
     await expect(html).toHaveClass(/dark/);
     await expect(page.locator('[data-testid="moon-icon"]')).toBeVisible();
   });
@@ -75,13 +64,10 @@ test.describe("Theme Toggle", () => {
     const html = page.locator("html");
     const toggleButton = page.getByRole("button", { name: /toggle theme/i });
 
-    // Switch to dark mode
     await toggleButton.click();
 
-    // Wait for dark class to be applied
     await expect(html).toHaveClass(/dark/);
 
-    // Check color-scheme style attribute contains dark
     await expect(html).toHaveAttribute("style", /color-scheme:.*dark/);
   });
 });

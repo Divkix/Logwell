@@ -8,12 +8,6 @@ export class OtlpValidationError extends Error {
   }
 }
 
-/**
- * Specialized validation error for batches that exceed the server's
- * BATCH_INSERT_LIMIT. Routes map this to a `batch_too_large` response
- * (distinct from a generic `validation_error`) so clients can distinguish
- * the two.
- */
 export class OtlpBatchTooLargeError extends OtlpValidationError {
   constructor(limit: number) {
     super(`Batch exceeds maximum limit of ${limit} logs.`);
@@ -151,7 +145,6 @@ function parseIntValue(value: unknown): number | string | null {
 }
 
 function nonZeroNano(value: string | null): string | null {
-  // Treat an explicit zero ("0", "00", ...) as unset so observedTime / now() win.
   if (value === null) return null;
   return /^0+$/.test(value) ? null : value;
 }
@@ -413,9 +406,6 @@ export function normalizeOtlpLogsRequest(body: unknown): NormalizedOtlpLogsResul
         const level = deriveLevel(severityNumber, severityText);
         const message = deriveMessage(bodyValue, attributes);
 
-        // Records whose derived message is empty or whitespace-only carry no
-        // signal; reject them per-record (mirrors simple-ingest's handling)
-        // so the request still succeeds with an `accepted/rejected` response.
         if (!message.trim()) {
           rejectedLogRecords += 1;
           errors.push(`Log record rejected: message cannot be empty`);

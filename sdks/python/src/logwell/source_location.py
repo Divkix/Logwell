@@ -41,7 +41,6 @@ def capture_source_location(skip_frames: int = 0) -> SourceLocation | None:
             # location.source_file = file where log() was called
     """
     try:
-        # skip_frames=0 → caller of this function (1 frame above us)
         frame = sys._getframe(skip_frames + 1)
         return SourceLocation(
             source_file=frame.f_code.co_filename,

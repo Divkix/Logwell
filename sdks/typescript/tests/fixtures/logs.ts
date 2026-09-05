@@ -1,8 +1,5 @@
 import type { LogEntry, LogLevel } from "../../src/types";
 
-/**
- * Creates a log entry fixture with optional overrides
- */
 export function createLogFixture(overrides: Partial<LogEntry> = {}): LogEntry {
   return {
     level: "info",
@@ -11,9 +8,6 @@ export function createLogFixture(overrides: Partial<LogEntry> = {}): LogEntry {
   };
 }
 
-/**
- * Creates an array of log entry fixtures
- */
 export function createLogBatch(count: number, overrides: Partial<LogEntry> = {}): LogEntry[] {
   return Array.from({ length: count }, (_, i) =>
     createLogFixture({
@@ -23,9 +17,6 @@ export function createLogBatch(count: number, overrides: Partial<LogEntry> = {})
   );
 }
 
-/**
- * Pre-defined log fixtures for specific test scenarios
- */
 export const logFixtures = {
   minimal: {
     level: "info" as LogLevel,
@@ -93,7 +84,4 @@ export const logFixtures = {
   },
 };
 
-/**
- * All log levels for parametrized testing
- */
 export const allLogLevels: LogLevel[] = ["debug", "info", "warn", "error", "fatal"];

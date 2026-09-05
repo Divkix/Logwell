@@ -11,10 +11,6 @@ import { clearApiKeyCache } from "$lib/server/utils/api-key";
 import { PATCH } from "../../../../src/routes/api/projects/[id]/+server";
 import { seedProject } from "../../../fixtures/db";
 
-/**
- * Helper to create a mock SvelteKit RequestEvent for [id] routes.
- * Adds a same-origin Origin header to state-changing requests so they pass CSRF checks.
- */
 function createRequestEvent(
   request: Request,
   db: PgliteDatabase<typeof schema>,
@@ -53,9 +49,6 @@ function createRequestEvent(
   } as unknown;
 }
 
-/**
- * Helper to assert that a promise rejects with a SvelteKit HTTP error
- */
 async function expectHttpError(
   promise: Promise<unknown>,
   expectedStatus: number,
@@ -87,7 +80,6 @@ describe("PATCH /api/projects/[id]", () => {
     auth = createAuth(db);
     clearApiKeyCache();
 
-    // Create authenticated user
     const signUpResult = await auth.api.signUpEmail({
       body: {
         email: "test@example.com",
@@ -155,7 +147,6 @@ describe("PATCH /api/projects/[id]", () => {
       expect(body).not.toHaveProperty("apiKey");
       expect(body).toHaveProperty("updatedAt");
 
-      // Verify in database
       const [updatedProject] = await db
         .select()
         .from(project)
@@ -183,7 +174,6 @@ describe("PATCH /api/projects/[id]", () => {
       expect(body).toHaveProperty("code", "duplicate_name");
       expect(body).toHaveProperty("message", "A project with this name already exists");
 
-      // Verify project name unchanged
       const [unchangedProject] = await db
         .select()
         .from(project)
@@ -192,10 +182,8 @@ describe("PATCH /api/projects/[id]", () => {
     });
 
     it("allows renaming to a name used by another user", async () => {
-      // Create a project for the first user
       await seedProject(db, { name: "shared-project-name", ownerId: userId });
 
-      // Create a second user with a project using the same name
       const signUpResult2 = await auth.api.signUpEmail({
         body: {
           email: "other@example.com",
@@ -224,7 +212,6 @@ describe("PATCH /api/projects/[id]", () => {
         session: sessionData2.session,
       };
 
-      // Second user renames their project to the same name as first user's project
       const request = new Request(`http://localhost/api/projects/${otherProject.id}`, {
         method: "PATCH",
         headers: {
@@ -323,7 +310,6 @@ describe("PATCH /api/projects/[id]", () => {
       const testProject = await seedProject(db, { name: "old-name", ownerId: userId });
       const originalUpdatedAt = testProject.updatedAt;
 
-      // Wait a bit to ensure timestamp difference
       await new Promise((resolve) => setTimeout(resolve, 10));
 
       const request = new Request(`http://localhost/api/projects/${testProject.id}`, {

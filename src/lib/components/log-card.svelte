@@ -53,7 +53,6 @@ function handleKeyDown(event: KeyboardEvent) {
   onclick={handleClick}
   onkeydown={handleKeyDown}
 >
-  <!-- Header row: Level badge + Timestamp -->
   <div class="flex items-center justify-between gap-2 mb-2">
     <span data-testid="log-level-badge-mobile">
       <LevelBadge level={log.level} />
@@ -66,7 +65,6 @@ function handleKeyDown(event: KeyboardEvent) {
     </span>
   </div>
 
-  <!-- Message -->
   <p
     data-testid="log-message-mobile"
     class="text-sm wrap-break-word line-clamp-3"
@@ -75,7 +73,6 @@ function handleKeyDown(event: KeyboardEvent) {
     {log.message}
   </p>
 
-  <!-- Source info (if available) -->
   {#if sourceInfo}
     <p class="text-xs text-muted-foreground font-mono mt-1 truncate">
       {sourceInfo}

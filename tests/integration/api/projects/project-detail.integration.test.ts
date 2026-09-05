@@ -13,10 +13,6 @@ import { POST as POST_REGENERATE } from "../../../../src/routes/api/projects/[id
 import { POST as POST_INGEST } from "../../../../src/routes/v1/ingest/+server";
 import { seedLogs, seedProject, seedProjectWithApiKey } from "../../../fixtures/db";
 
-/**
- * Helper to create a mock SvelteKit RequestEvent for [id] routes.
- * Adds a same-origin Origin header to state-changing requests so they pass CSRF checks.
- */
 function createRequestEvent(
   request: Request,
   db: PgliteDatabase<typeof schema>,
@@ -111,7 +107,6 @@ describe("GET /api/projects/[id]", () => {
     auth = createAuth(db);
     clearApiKeyCache();
 
-    // Create authenticated user
     const signUpResult = await auth.api.signUpEmail({
       body: {
         email: "test@example.com",
@@ -155,7 +150,6 @@ describe("GET /api/projects/[id]", () => {
   describe("Project Detail", () => {
     it("returns project with stats", async () => {
       const testProject = await seedProject(db, { name: "my-test-project", ownerId: userId });
-      // Add 10 logs with various levels
       await seedLogs(db, testProject.id, 3, { level: "info" });
       await seedLogs(db, testProject.id, 2, { level: "error" });
       await seedLogs(db, testProject.id, 5, { level: "debug" });
@@ -170,14 +164,12 @@ describe("GET /api/projects/[id]", () => {
       expect(response.status).toBe(200);
       const body = await response.json();
 
-      // Basic project fields
       expect(body).toHaveProperty("id", testProject.id);
       expect(body).toHaveProperty("name", "my-test-project");
       expect(body).not.toHaveProperty("apiKey");
       expect(body).toHaveProperty("createdAt");
       expect(body).toHaveProperty("updatedAt");
 
-      // Stats
       expect(body).toHaveProperty("stats");
       expect(body.stats).toHaveProperty("totalLogs", 10);
       expect(body.stats).toHaveProperty("levelCounts");
@@ -230,7 +222,6 @@ describe("DELETE /api/projects/[id]", () => {
     auth = createAuth(db);
     clearApiKeyCache();
 
-    // Create authenticated user
     const signUpResult = await auth.api.signUpEmail({
       body: {
         email: "test@example.com",
@@ -276,7 +267,6 @@ describe("DELETE /api/projects/[id]", () => {
       const testProject = await seedProject(db, { ownerId: userId });
       await seedLogs(db, testProject.id, 5);
 
-      // Verify logs exist before deletion
       const logsBefore = await db.select().from(log).where(eq(log.projectId, testProject.id));
       expect(logsBefore).toHaveLength(5);
 
@@ -292,11 +282,9 @@ describe("DELETE /api/projects/[id]", () => {
       expect(body).toHaveProperty("success", true);
       expect(body).toHaveProperty("id", testProject.id);
 
-      // Verify project was deleted
       const projectsAfter = await db.select().from(project).where(eq(project.id, testProject.id));
       expect(projectsAfter).toHaveLength(0);
 
-      // Verify logs were cascade deleted
       const logsAfter = await db.select().from(log).where(eq(log.projectId, testProject.id));
       expect(logsAfter).toHaveLength(0);
     });
@@ -317,7 +305,6 @@ describe("DELETE /api/projects/[id]", () => {
     it("invalidates API key cache on deletion", async () => {
       const testProject = await seedProjectWithApiKey(db, { ownerId: userId });
 
-      // Validate API key to add to cache
       const apiKeyRequest = new Request("http://localhost", {
         headers: {
           Authorization: `Bearer ${testProject.apiKey}`,
@@ -325,7 +312,6 @@ describe("DELETE /api/projects/[id]", () => {
       });
       await validateApiKey(apiKeyRequest, db);
 
-      // Delete project
       const request = new Request(`http://localhost/api/projects/${testProject.id}`, {
         method: "DELETE",
       });
@@ -333,14 +319,12 @@ describe("DELETE /api/projects/[id]", () => {
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
       await DELETE(event as never);
 
-      // Verify API key is no longer valid (cache should be invalidated)
       await expect(validateApiKey(apiKeyRequest, db)).rejects.toThrow("Invalid API key");
     });
 
     it("prevents ingestion with deleted project API key", async () => {
       const testProject = await seedProjectWithApiKey(db, { ownerId: userId });
 
-      // Populate cache by validating the API key
       const apiKeyRequest = new Request("http://localhost", {
         headers: {
           Authorization: `Bearer ${testProject.apiKey}`,
@@ -348,7 +332,6 @@ describe("DELETE /api/projects/[id]", () => {
       });
       await validateApiKey(apiKeyRequest, db);
 
-      // Delete project
       const deleteRequest = new Request(`http://localhost/api/projects/${testProject.id}`, {
         method: "DELETE",
       });
@@ -361,7 +344,6 @@ describe("DELETE /api/projects/[id]", () => {
       const deleteResponse = await DELETE(deleteEvent as never);
       expect(deleteResponse.status).toBe(200);
 
-      // Attempt to ingest with the now-deleted project's API key
       const ingestRequest = new Request("http://localhost/v1/ingest", {
         method: "POST",
         headers: {
@@ -374,7 +356,6 @@ describe("DELETE /api/projects/[id]", () => {
       const ingestEvent = createIngestRequestEvent(ingestRequest, db);
       const ingestResponse = await POST_INGEST(ingestEvent as never);
 
-      // Should return 401, not 500 from FK violation
       expect(ingestResponse.status).toBe(401);
       const body = await ingestResponse.json();
       expect(body.error).toBe("unauthorized");
@@ -396,7 +377,6 @@ describe("POST /api/projects/[id]/regenerate", () => {
     auth = createAuth(db);
     clearApiKeyCache();
 
-    // Create authenticated user
     const signUpResult = await auth.api.signUpEmail({
       body: {
         email: "test@example.com",
@@ -456,7 +436,6 @@ describe("POST /api/projects/[id]/regenerate", () => {
       expect(body.apiKey).toMatch(/^lw_[A-Za-z0-9_-]{32}$/);
       expect(body.apiKey).not.toBe(oldApiKey);
 
-      // Verify in database
       const [updatedProject] = await db
         .select()
         .from(project)
@@ -468,7 +447,6 @@ describe("POST /api/projects/[id]/regenerate", () => {
       const testProject = await seedProjectWithApiKey(db, { ownerId: userId });
       const oldApiKey = testProject.apiKey;
 
-      // Validate old API key to add to cache
       const oldKeyRequest = new Request("http://localhost", {
         headers: {
           Authorization: `Bearer ${oldApiKey}`,
@@ -476,7 +454,6 @@ describe("POST /api/projects/[id]/regenerate", () => {
       });
       await validateApiKey(oldKeyRequest, db);
 
-      // Regenerate API key
       const request = new Request(`http://localhost/api/projects/${testProject.id}/regenerate`, {
         method: "POST",
       });
@@ -485,10 +462,8 @@ describe("POST /api/projects/[id]/regenerate", () => {
       const response = await POST_REGENERATE(event as never);
       const body = await response.json();
 
-      // Old key should no longer work
       await expect(validateApiKey(oldKeyRequest, db)).rejects.toThrow("Invalid API key");
 
-      // New key should work
       const newKeyRequest = new Request("http://localhost", {
         headers: {
           Authorization: `Bearer ${body.apiKey}`,
@@ -515,7 +490,6 @@ describe("POST /api/projects/[id]/regenerate", () => {
       const testProject = await seedProject(db, { ownerId: userId });
       const originalUpdatedAt = testProject.updatedAt;
 
-      // Wait a bit to ensure timestamp difference
       await new Promise((resolve) => setTimeout(resolve, 10));
 
       const request = new Request(`http://localhost/api/projects/${testProject.id}/regenerate`, {

@@ -1,9 +1,6 @@
 import { LOG_LEVELS, type LogLevel } from "../../shared/schemas/log";
 import { mapOtlpAttributesToLogColumns } from "./otlp";
 
-/**
- * Input format for a single log entry from the simple API
- */
 export interface SimpleLogInput {
   level: string;
   message: string;
@@ -14,9 +11,6 @@ export interface SimpleLogInput {
   lineNumber?: number;
 }
 
-/**
- * Normalized log entry ready for database insertion
- */
 export interface NormalizedSimpleLog {
   level: LogLevel;
   message: string;
@@ -30,9 +24,6 @@ export interface NormalizedSimpleLog {
   ipAddress: string | null;
 }
 
-/**
- * Result of parsing and validating simple log input
- */
 export interface SimpleIngestResult {
   records: NormalizedSimpleLog[];
   accepted: number;
@@ -40,9 +31,6 @@ export interface SimpleIngestResult {
   errors: string[];
 }
 
-/**
- * Custom error class for simple ingest validation errors
- */
 export class SimpleIngestError extends Error {
   constructor(message: string) {
     super(message);
@@ -50,17 +38,10 @@ export class SimpleIngestError extends Error {
   }
 }
 
-/**
- * Validates that a value is a valid log level
- */
 function isValidLevel(level: unknown): level is LogLevel {
   return typeof level === "string" && LOG_LEVELS.includes(level as LogLevel);
 }
 
-/**
- * Parses an ISO8601 timestamp string to a Date object
- * Returns current date if timestamp is invalid or missing
- */
 function parseTimestamp(timestamp: unknown): Date {
   if (!timestamp || typeof timestamp !== "string") {
     return new Date();
@@ -74,10 +55,6 @@ function parseTimestamp(timestamp: unknown): Date {
   return parsed;
 }
 
-/**
- * Validates and normalizes a single log entry
- * Returns the normalized log or null with an error message
- */
 function validateLogEntry(
   input: unknown,
   index: number,
@@ -88,7 +65,6 @@ function validateLogEntry(
 
   const entry = input as Record<string, unknown>;
 
-  // Validate level
   if (!("level" in entry)) {
     return { log: null, error: `Entry at index ${index}: missing required field 'level'` };
   }
@@ -99,7 +75,6 @@ function validateLogEntry(
     };
   }
 
-  // Validate message
   if (!("message" in entry)) {
     return { log: null, error: `Entry at index ${index}: missing required field 'message'` };
   }
@@ -110,7 +85,6 @@ function validateLogEntry(
     return { log: null, error: `Entry at index ${index}: message cannot be empty` };
   }
 
-  // Parse optional fields
   const timestamp = parseTimestamp(entry.timestamp);
   const service = typeof entry.service === "string" ? entry.service : null;
   const rawMetadata =
@@ -146,23 +120,11 @@ function validateLogEntry(
   };
 }
 
-/**
- * Parses and validates the request body for simple log ingestion
- *
- * Accepts either:
- * - A single log object: { level: "info", message: "..." }
- * - An array of log objects: [{ level: "info", message: "..." }, ...]
- *
- * @param body - Parsed JSON body from the request
- * @returns Result with normalized logs and validation errors
- * @throws SimpleIngestError if body is completely invalid (not object or array)
- */
 export function parseSimpleIngestRequest(body: unknown): SimpleIngestResult {
   if (body === null || body === undefined) {
     throw new SimpleIngestError("Request body cannot be empty");
   }
 
-  // Normalize to array
   const entries = Array.isArray(body) ? body : [body];
 
   if (entries.length === 0) {

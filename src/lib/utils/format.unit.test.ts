@@ -18,7 +18,7 @@ describe("formatTimestamp", () => {
   });
 
   it("handles Date object at the start of epoch", () => {
-    const date = new Date(0); // 1970-01-01T00:00:00.000Z
+    const date = new Date(0);
     expect(formatTimestamp(date)).toBe("00:00:00.000");
   });
 });
@@ -78,7 +78,6 @@ describe("formatRelativeTime", () => {
   describe("edge cases", () => {
     it("handles future dates gracefully", () => {
       const futureDate = new Date(now.getTime() + 5 * 60 * 1000);
-      // Should either return "just now" or a negative indication
       const result = formatRelativeTime(futureDate, now);
       expect(result).toBeDefined();
       expect(typeof result).toBe("string");
@@ -113,7 +112,6 @@ describe("getTimeRangeStart", () => {
     const result = getTimeRangeStart("1h");
     const after = Date.now();
 
-    // Result should be approximately 1 hour before now
     expect(result.getTime()).toBeGreaterThanOrEqual(before - 60 * 60 * 1000);
     expect(result.getTime()).toBeLessThanOrEqual(after - 60 * 60 * 1000);
   });
@@ -127,7 +125,6 @@ describe("getTimeRangeStart", () => {
 
   it("preserves millisecond precision", () => {
     const result = getTimeRangeStart("1h", now);
-    // If now has milliseconds, the result should maintain them
     expect(result.getMilliseconds()).toBe(now.getMilliseconds());
   });
 });
@@ -148,7 +145,7 @@ describe("formatFullDate", () => {
   });
 
   it("handles epoch start", () => {
-    const date = new Date(0); // 1970-01-01T00:00:00.000Z
+    const date = new Date(0);
     expect(formatFullDate(date)).toBe("1970-01-01 00:00:00.000 UTC");
   });
 });

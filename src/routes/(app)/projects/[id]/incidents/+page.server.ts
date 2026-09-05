@@ -58,7 +58,6 @@ export const load: PageServerLoad = async (event) => {
         ) as SQL,
       );
     } catch (err) {
-      // Invalid cursor - log and fall back to first page (consistent with API behavior)
       console.error("[page/incidents] invalid cursor, falling back to first page:", err);
     }
   }

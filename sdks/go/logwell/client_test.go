@@ -13,7 +13,6 @@ import (
 	"time"
 )
 
-// testServer is a mock server that captures received logs for verification.
 type testServer struct {
 	*httptest.Server
 	mu       sync.Mutex
@@ -22,7 +21,6 @@ type testServer struct {
 	handler  http.HandlerFunc
 }
 
-// newTestServer creates a new test server that accepts logs.
 func newTestServer() *testServer {
 	ts := &testServer{
 		logs:     make([]LogEntry, 0),
@@ -30,14 +28,11 @@ func newTestServer() *testServer {
 	}
 
 	ts.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Allow custom handler override
 		if ts.handler != nil {
 			ts.handler(w, r)
 			return
 		}
 
-		// Default: accept all logs — validate against real server format using generic
-		// map decode so any JSON tag mismatch in LogEntry is caught.
 		var raw []map[string]any
 		if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
@@ -68,7 +63,6 @@ func newTestServer() *testServer {
 	return ts
 }
 
-// getLogs returns a copy of received logs.
 func (ts *testServer) getLogs() []LogEntry {
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
@@ -77,7 +71,6 @@ func (ts *testServer) getLogs() []LogEntry {
 	return result
 }
 
-// getRequests returns a copy of received requests.
 func (ts *testServer) getRequests() [][]LogEntry {
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
@@ -86,8 +79,6 @@ func (ts *testServer) getRequests() [][]LogEntry {
 	return result
 }
 
-// mapToLogEntry converts a generic JSON-decoded map to a LogEntry,
-// validating that the real server keys (level, message, service, etc.) are present.
 func mapToLogEntry(m map[string]any) (LogEntry, error) {
 	var entry LogEntry
 
@@ -122,14 +113,12 @@ func mapToLogEntry(m map[string]any) (LogEntry, error) {
 	return entry, nil
 }
 
-// setHandler sets a custom handler for the server.
 func (ts *testServer) setHandler(h http.HandlerFunc) {
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
 	ts.handler = h
 }
 
-// TestClientNew tests client creation with valid and invalid configs.
 func TestClientNew(t *testing.T) {
 	t.Run("valid config creates client", func(t *testing.T) {
 		ts := newTestServer()
@@ -210,7 +199,6 @@ func TestClientNew(t *testing.T) {
 	})
 }
 
-// TestClientLogLevels tests logging at all severity levels.
 func TestClientLogLevels(t *testing.T) {
 	ts := newTestServer()
 	defer ts.Close()
@@ -236,14 +224,12 @@ func TestClientLogLevels(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Clear previous logs
 			ts.mu.Lock()
 			ts.logs = ts.logs[:0]
 			ts.mu.Unlock()
 
 			tc.logFn(tc.message)
 
-			// Wait for flush (batch size 1 triggers immediate flush)
 			time.Sleep(50 * time.Millisecond)
 
 			logs := ts.getLogs()
@@ -262,7 +248,6 @@ func TestClientLogLevels(t *testing.T) {
 	}
 }
 
-// TestClientMetadataMerging tests metadata merging from config and call.
 func TestClientMetadataMerging(t *testing.T) {
 	ts := newTestServer()
 	defer ts.Close()
@@ -329,7 +314,6 @@ func TestClientMetadataMerging(t *testing.T) {
 	})
 }
 
-// TestClientBatchAutoFlush tests auto-flush when batch size is reached.
 func TestClientBatchAutoFlush(t *testing.T) {
 	ts := newTestServer()
 	defer ts.Close()
@@ -346,12 +330,10 @@ func TestClientBatchAutoFlush(t *testing.T) {
 	}
 	defer client.Shutdown(context.Background())
 
-	// Log exactly batch size entries
 	for i := 0; i < batchSize; i++ {
 		client.Info("message")
 	}
 
-	// Wait for flush
 	time.Sleep(100 * time.Millisecond)
 
 	logs := ts.getLogs()
@@ -359,14 +341,12 @@ func TestClientBatchAutoFlush(t *testing.T) {
 		t.Errorf("received %d logs, want %d", len(logs), batchSize)
 	}
 
-	// Verify exactly one request was made (all in one batch)
 	requests := ts.getRequests()
 	if len(requests) != 1 {
 		t.Errorf("received %d requests, want 1", len(requests))
 	}
 }
 
-// TestClientManualFlush tests explicit Flush() call.
 func TestClientManualFlush(t *testing.T) {
 	ts := newTestServer()
 	defer ts.Close()
@@ -382,31 +362,26 @@ func TestClientManualFlush(t *testing.T) {
 	}
 	defer client.Shutdown(context.Background())
 
-	// Log some entries (less than batch size)
 	client.Info("message 1")
 	client.Info("message 2")
 	client.Info("message 3")
 
-	// Verify no logs sent yet
 	logs := ts.getLogs()
 	if len(logs) != 0 {
 		t.Errorf("expected 0 logs before flush, got %d", len(logs))
 	}
 
-	// Manual flush
 	err = client.Flush(context.Background())
 	if err != nil {
 		t.Fatalf("Flush() error = %v", err)
 	}
 
-	// Verify logs sent
 	logs = ts.getLogs()
 	if len(logs) != 3 {
 		t.Errorf("expected 3 logs after flush, got %d", len(logs))
 	}
 }
 
-// TestClientShutdown tests graceful shutdown behavior.
 func TestClientShutdown(t *testing.T) {
 	ts := newTestServer()
 	defer ts.Close()
@@ -421,29 +396,24 @@ func TestClientShutdown(t *testing.T) {
 		t.Fatalf("New() error = %v", err)
 	}
 
-	// Log entries
 	client.Info("message 1")
 	client.Info("message 2")
 
-	// Verify no logs sent yet
 	logs := ts.getLogs()
 	if len(logs) != 0 {
 		t.Errorf("expected 0 logs before shutdown, got %d", len(logs))
 	}
 
-	// Shutdown should flush remaining logs
 	err = client.Shutdown(context.Background())
 	if err != nil {
 		t.Fatalf("Shutdown() error = %v", err)
 	}
 
-	// Verify logs were flushed
 	logs = ts.getLogs()
 	if len(logs) != 2 {
 		t.Errorf("expected 2 logs after shutdown, got %d", len(logs))
 	}
 
-	// Verify new logs are not sent after shutdown
 	client.Info("should not be sent")
 
 	time.Sleep(50 * time.Millisecond)
@@ -454,7 +424,6 @@ func TestClientShutdown(t *testing.T) {
 	}
 }
 
-// TestClientShutdownIdempotent tests that multiple shutdowns are safe.
 func TestClientShutdownIdempotent(t *testing.T) {
 	ts := newTestServer()
 	defer ts.Close()
@@ -464,20 +433,17 @@ func TestClientShutdownIdempotent(t *testing.T) {
 		t.Fatalf("New() error = %v", err)
 	}
 
-	// First shutdown
 	err = client.Shutdown(context.Background())
 	if err != nil {
 		t.Fatalf("first Shutdown() error = %v", err)
 	}
 
-	// Second shutdown should not error
 	err = client.Shutdown(context.Background())
 	if err != nil {
 		t.Fatalf("second Shutdown() error = %v", err)
 	}
 }
 
-// TestClientChild tests child logger creation and inheritance.
 func TestClientChild(t *testing.T) {
 	ts := newTestServer()
 	defer ts.Close()
@@ -558,7 +524,6 @@ func TestClientChild(t *testing.T) {
 	})
 }
 
-// TestClientOnErrorCallback tests the OnError callback.
 func TestClientOnErrorCallback(t *testing.T) {
 	var errorReceived *Error
 	var errorMu sync.Mutex
@@ -566,7 +531,6 @@ func TestClientOnErrorCallback(t *testing.T) {
 	ts := newTestServer()
 	defer ts.Close()
 
-	// Set handler to always return 500
 	ts.setHandler(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": "test error"})
@@ -602,7 +566,6 @@ func TestClientOnErrorCallback(t *testing.T) {
 	}
 }
 
-// TestClientOnFlushCallback tests the OnFlush callback.
 func TestClientOnFlushCallback(t *testing.T) {
 	var flushCount int32
 
@@ -622,7 +585,6 @@ func TestClientOnFlushCallback(t *testing.T) {
 	}
 	defer client.Shutdown(context.Background())
 
-	// Log exactly batch size to trigger flush
 	client.Info("message 1")
 	client.Info("message 2")
 	client.Info("message 3")
@@ -635,7 +597,6 @@ func TestClientOnFlushCallback(t *testing.T) {
 	}
 }
 
-// TestClientSourceLocation tests source location capture.
 func TestClientSourceLocation(t *testing.T) {
 	ts := newTestServer()
 	defer ts.Close()
@@ -705,12 +666,10 @@ func TestClientSourceLocation(t *testing.T) {
 	})
 }
 
-// TestClientContextCancellation tests context cancellation during flush.
 func TestClientContextCancellation(t *testing.T) {
 	ts := newTestServer()
 	defer ts.Close()
 
-	// Set handler to delay response
 	ts.setHandler(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(500 * time.Millisecond)
 		w.WriteHeader(http.StatusOK)
@@ -729,7 +688,6 @@ func TestClientContextCancellation(t *testing.T) {
 
 	client.Info("test message")
 
-	// Create context with short timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 
@@ -738,7 +696,6 @@ func TestClientContextCancellation(t *testing.T) {
 		t.Fatal("Flush() expected error for context timeout")
 	}
 
-	// Verify error is context-related
 	logwellErr, ok := err.(*Error)
 	if !ok {
 		t.Fatalf("error type = %T, want *Error", err)
@@ -748,7 +705,6 @@ func TestClientContextCancellation(t *testing.T) {
 	}
 }
 
-// TestClientLogEntry tests the generic Log() method.
 func TestClientLogEntry(t *testing.T) {
 	ts := newTestServer()
 	defer ts.Close()
@@ -854,12 +810,10 @@ func TestClientLogEntry(t *testing.T) {
 	})
 }
 
-// TestClientFullFlow tests the complete lifecycle: create, log, flush, shutdown.
 func TestClientFullFlow(t *testing.T) {
 	ts := newTestServer()
 	defer ts.Close()
 
-	// Step 1: Create client
 	client, err := New(
 		ts.URL,
 		validAPIKey(),
@@ -872,19 +826,16 @@ func TestClientFullFlow(t *testing.T) {
 		t.Fatalf("New() error = %v", err)
 	}
 
-	// Step 2: Log at various levels
 	client.Debug("debug message", M{"level": "debug"})
 	client.Info("info message", M{"level": "info"})
 	client.Warn("warn message", M{"level": "warn"})
 	client.Error("error message", M{"level": "error"})
 
-	// Verify logs are queued (not sent yet, batch size is 5)
 	logs := ts.getLogs()
 	if len(logs) != 0 {
 		t.Errorf("expected 0 logs before batch complete, got %d", len(logs))
 	}
 
-	// Step 3: Log one more to trigger batch flush
 	client.Fatal("fatal message", M{"level": "fatal"})
 
 	time.Sleep(100 * time.Millisecond)
@@ -894,15 +845,12 @@ func TestClientFullFlow(t *testing.T) {
 		t.Errorf("expected 5 logs after batch complete, got %d", len(logs))
 	}
 
-	// Verify all levels present
 	levels := make(map[LogLevel]bool)
 	for _, log := range logs {
 		levels[log.Level] = true
-		// Verify service
 		if log.Service != "integration-test" {
 			t.Errorf("Service = %q, want %q", log.Service, "integration-test")
 		}
-		// Verify base metadata
 		if log.Metadata["test"] != "integration" {
 			t.Errorf("Metadata[test] = %v, want %q", log.Metadata["test"], "integration")
 		}
@@ -915,7 +863,6 @@ func TestClientFullFlow(t *testing.T) {
 		}
 	}
 
-	// Step 4: Log more and manually flush
 	client.Info("post-batch message 1")
 	client.Info("post-batch message 2")
 
@@ -929,7 +876,6 @@ func TestClientFullFlow(t *testing.T) {
 		t.Errorf("expected 7 logs after manual flush, got %d", len(logs))
 	}
 
-	// Step 5: Shutdown gracefully
 	client.Info("pre-shutdown message")
 
 	err = client.Shutdown(context.Background())
@@ -942,7 +888,6 @@ func TestClientFullFlow(t *testing.T) {
 		t.Errorf("expected 8 logs after shutdown, got %d", len(logs))
 	}
 
-	// Verify no more logs accepted after shutdown
 	client.Info("post-shutdown message")
 	time.Sleep(50 * time.Millisecond)
 
@@ -952,14 +897,12 @@ func TestClientFullFlow(t *testing.T) {
 	}
 }
 
-// TestClientRequeueOnFailure tests that entries are re-queued when transport fails.
 func TestClientRequeueOnFailure(t *testing.T) {
 	var errorCount int32
 
 	ts := newTestServer()
 	defer ts.Close()
 
-	// Set handler to always return 500
 	ts.setHandler(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": "test error"})
@@ -980,59 +923,48 @@ func TestClientRequeueOnFailure(t *testing.T) {
 	}
 	defer client.Shutdown(context.Background())
 
-	// Log entries
 	client.Info("message 1")
 	client.Info("message 2")
 	client.Info("message 3")
 
-	// Verify entries are queued
 	if client.queue.size() != 3 {
 		t.Fatalf("expected 3 entries in queue, got %d", client.queue.size())
 	}
 
-	// Flush should fail
 	err = client.Flush(context.Background())
 	if err == nil {
 		t.Fatal("Flush() expected error")
 	}
 
-	// Entries should be re-queued, not lost
 	if client.queue.size() != 3 {
 		t.Fatalf("expected 3 entries re-queued after failure, got %d", client.queue.size())
 	}
 
-	// OnError should have been called
 	if atomic.LoadInt32(&errorCount) != 1 {
 		t.Fatalf("expected OnError to be called once, got %d", atomic.LoadInt32(&errorCount))
 	}
 
-	// Now make server accept logs
 	ts.setHandler(nil)
 
-	// Flush again should succeed and send all re-queued entries
 	err = client.Flush(context.Background())
 	if err != nil {
 		t.Fatalf("second Flush() error = %v", err)
 	}
 
-	// Verify all logs were sent
 	logs := ts.getLogs()
 	if len(logs) != 3 {
 		t.Fatalf("expected 3 logs after recovery, got %d", len(logs))
 	}
 
-	// Queue should be empty
 	if client.queue.size() != 0 {
 		t.Fatalf("expected queue to be empty after successful flush, got %d", client.queue.size())
 	}
 }
 
-// TestClientRequeueOrderOnFailure tests that entries maintain order when re-queued.
 func TestClientRequeueOrderOnFailure(t *testing.T) {
 	ts := newTestServer()
 	defer ts.Close()
 
-	// Set handler to fail first request, then succeed
 	requestCount := 0
 	ts.setHandler(func(w http.ResponseWriter, r *http.Request) {
 		requestCount++
@@ -1041,7 +973,6 @@ func TestClientRequeueOrderOnFailure(t *testing.T) {
 			json.NewEncoder(w).Encode(map[string]string{"error": "first attempt fails"})
 			return
 		}
-		// Default handler for subsequent requests
 		var raw []map[string]any
 		if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
@@ -1076,21 +1007,17 @@ func TestClientRequeueOrderOnFailure(t *testing.T) {
 	}
 	defer client.Shutdown(context.Background())
 
-	// Log entries in specific order
 	client.Info("first")
 	client.Info("second")
 	client.Info("third")
 
-	// First flush fails, entries re-queued
 	_ = client.Flush(context.Background())
 
-	// Second flush succeeds
 	err = client.Flush(context.Background())
 	if err != nil {
 		t.Fatalf("second Flush() error = %v", err)
 	}
 
-	// Verify order is preserved
 	logs := ts.getLogs()
 	if len(logs) != 3 {
 		t.Fatalf("expected 3 logs, got %d", len(logs))
@@ -1127,9 +1054,6 @@ func TestClientFlushChunksLargeBatch(t *testing.T) {
 	}
 	defer client.Shutdown(context.Background())
 
-	// Queue more entries than a single batch can carry (> 100 and > BatchSize)
-	// directly, bypassing enqueue's batch-size auto-flush (the queue can grow
-	// this large in production when producers outpace async flushes).
 	total := 130
 	for i := 0; i < total; i++ {
 		client.queue.add(LogEntry{Level: LevelInfo, Message: fmt.Sprintf("message %d", i)})
@@ -1140,13 +1064,11 @@ func TestClientFlushChunksLargeBatch(t *testing.T) {
 		t.Fatalf("Flush() error = %v", err)
 	}
 
-	// 130 entries / 30 per chunk = 5 requests (30, 30, 30, 30, 10).
 	requests := ts.getRequests()
 	if len(requests) != 5 {
 		t.Fatalf("expected 5 requests, got %d", len(requests))
 	}
 
-	// Every request must carry at most BatchSize entries.
 	sent := 0
 	for i, req := range requests {
 		if len(req) > batchSize {
@@ -1158,7 +1080,6 @@ func TestClientFlushChunksLargeBatch(t *testing.T) {
 		t.Errorf("total entries sent = %d, want %d", sent, total)
 	}
 
-	// Order must be preserved across chunks.
 	logs := ts.getLogs()
 	if len(logs) != total {
 		t.Fatalf("expected %d logs, got %d", len(logs), total)
@@ -1171,14 +1092,10 @@ func TestClientFlushChunksLargeBatch(t *testing.T) {
 	}
 }
 
-// TestClientFlushChunksRequeueOnFailure tests that when a chunk fails, the
-// failed chunk plus all not-yet-sent chunks are re-queued at the front in
-// order, sending stops, and a later flush delivers them all.
 func TestClientFlushChunksRequeueOnFailure(t *testing.T) {
 	ts := newTestServer()
 	defer ts.Close()
 
-	// Fail the second chunk, accept everything else.
 	var requestCount int32
 	ts.setHandler(func(w http.ResponseWriter, r *http.Request) {
 		if atomic.AddInt32(&requestCount, 1) == 2 {
@@ -1229,7 +1146,6 @@ func TestClientFlushChunksRequeueOnFailure(t *testing.T) {
 		client.queue.add(LogEntry{Level: LevelInfo, Message: fmt.Sprintf("message %d", i)})
 	}
 
-	// First chunk succeeds, second fails: only 2 requests may be made.
 	err = client.Flush(context.Background())
 	if err == nil {
 		t.Fatal("Flush() expected error for failed chunk")
@@ -1245,13 +1161,10 @@ func TestClientFlushChunksRequeueOnFailure(t *testing.T) {
 		t.Fatalf("OnError calls = %d, want 1", got)
 	}
 
-	// The failed chunk plus all unsent chunks (2nd..5th, 100 entries) must be
-	// re-queued at the front in order.
 	if got := client.queue.size(); got != total-30 {
 		t.Fatalf("queue size after failed flush = %d, want %d", got, total-30)
 	}
 
-	// Recovery: accept everything and flush again.
 	ts.setHandler(nil)
 	err = client.Flush(context.Background())
 	if err != nil {
@@ -1262,7 +1175,6 @@ func TestClientFlushChunksRequeueOnFailure(t *testing.T) {
 	if len(logs) != total {
 		t.Fatalf("expected %d logs after recovery, got %d", len(logs), total)
 	}
-	// The first 30 (sent pre-failure) plus the re-queued 100 in original order.
 	for i, log := range logs {
 		want := fmt.Sprintf("message %d", i)
 		if log.Message != want {
@@ -1274,7 +1186,6 @@ func TestClientFlushChunksRequeueOnFailure(t *testing.T) {
 	}
 }
 
-// TestClientTimerFlush tests timer-based auto-flush.
 func TestClientTimerFlush(t *testing.T) {
 	ts := newTestServer()
 	defer ts.Close()
@@ -1291,16 +1202,13 @@ func TestClientTimerFlush(t *testing.T) {
 	}
 	defer client.Shutdown(context.Background())
 
-	// Log a message
 	client.Info("timer flush test")
 
-	// Verify no logs sent immediately
 	logs := ts.getLogs()
 	if len(logs) != 0 {
 		t.Errorf("expected 0 logs immediately, got %d", len(logs))
 	}
 
-	// Wait for timer flush
 	time.Sleep(flushInterval + 100*time.Millisecond)
 
 	logs = ts.getLogs()
@@ -1309,7 +1217,6 @@ func TestClientTimerFlush(t *testing.T) {
 	}
 }
 
-// TestClientService tests service name in logs.
 func TestClientService(t *testing.T) {
 	ts := newTestServer()
 	defer ts.Close()
@@ -1338,7 +1245,6 @@ func TestClientService(t *testing.T) {
 	}
 }
 
-// TestClientConcurrency tests thread-safety of client operations.
 func TestClientConcurrency(t *testing.T) {
 	ts := newTestServer()
 	defer ts.Close()
@@ -1357,7 +1263,6 @@ func TestClientConcurrency(t *testing.T) {
 	numGoroutines := 10
 	logsPerGoroutine := 50
 
-	// Concurrent logging
 	for i := 0; i < numGoroutines; i++ {
 		wg.Add(1)
 		go func(id int) {
@@ -1370,7 +1275,6 @@ func TestClientConcurrency(t *testing.T) {
 
 	wg.Wait()
 
-	// Shutdown to flush all remaining logs
 	err = client.Shutdown(context.Background())
 	if err != nil {
 		t.Fatalf("Shutdown() error = %v", err)

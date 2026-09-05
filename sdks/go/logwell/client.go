@@ -17,14 +17,11 @@ type Client struct {
 	queue     *batchQueue
 	transport *httpTransport
 
-	// parent is set for child loggers; nil for root clients.
-	// Child loggers share the parent's queue and transport.
 	parent *Client
 
 	mu       sync.Mutex
 	shutdown bool
 
-	// flushWG tracks in-flight async flush goroutines so Shutdown can wait for them.
 	flushWG sync.WaitGroup
 }
 
@@ -64,28 +61,23 @@ func ChildWithMetadata(metadata map[string]any) ChildOption {
 //	    logwell.WithBatchSize(50),
 //	)
 func New(endpoint, apiKey string, opts ...Option) (*Client, error) {
-	// Create config with defaults
 	cfg := newDefaultConfig(endpoint, apiKey)
 
-	// Apply options
 	for _, opt := range opts {
 		opt(cfg)
 	}
 
-	// Validate config
 	if err := validateConfig(cfg); err != nil {
 		return nil, err
 	}
 
 	transport := newHTTPTransportFromConfig(cfg)
 
-	// Create client first so we can pass flush callback to queue
 	c := &Client{
 		config:    cfg,
 		transport: transport,
 	}
 
-	// Create queue with timer-based auto-flush and overflow protection
 	c.queue = newBatchQueue(cfg.FlushInterval, c.flush, cfg.MaxQueueSize, cfg.OnError)
 
 	return c, nil
@@ -104,19 +96,16 @@ func New(endpoint, apiKey string, opts ...Option) (*Client, error) {
 //	)
 //	child.Info("Processing payment")
 func (c *Client) Child(opts ...ChildOption) *Client {
-	// Apply child options
 	cfg := &childConfig{}
 	for _, opt := range opts {
 		opt(cfg)
 	}
 
-	// Determine the root client (for accessing queue/transport)
 	root := c
 	if c.parent != nil {
 		root = c.parent
 	}
 
-	// Build child config
 	childCfg := &Config{
 		Endpoint:              c.config.Endpoint,
 		APIKey:                c.config.APIKey,
@@ -127,11 +116,9 @@ func (c *Client) Child(opts ...ChildOption) *Client {
 		CaptureSourceLocation: c.config.CaptureSourceLocation,
 		OnError:               c.config.OnError,
 		OnFlush:               c.config.OnFlush,
-		// Merge parent metadata with child metadata (child overrides parent)
-		Metadata: mergeMetadata(c.config.Metadata, cfg.metadata),
+		Metadata:              mergeMetadata(c.config.Metadata, cfg.metadata),
 	}
 
-	// Override service if specified
 	if cfg.service != "" {
 		childCfg.Service = cfg.service
 	}
@@ -144,32 +131,22 @@ func (c *Client) Child(opts ...ChildOption) *Client {
 	}
 }
 
-// Debug logs a message at DEBUG level.
-// Accepts optional metadata maps that will be merged (later maps override earlier).
 func (c *Client) Debug(message string, metadata ...map[string]any) {
 	c.log(LevelDebug, message, metadata...)
 }
 
-// Info logs a message at INFO level.
-// Accepts optional metadata maps that will be merged (later maps override earlier).
 func (c *Client) Info(message string, metadata ...map[string]any) {
 	c.log(LevelInfo, message, metadata...)
 }
 
-// Warn logs a message at WARN level.
-// Accepts optional metadata maps that will be merged (later maps override earlier).
 func (c *Client) Warn(message string, metadata ...map[string]any) {
 	c.log(LevelWarn, message, metadata...)
 }
 
-// Error logs a message at ERROR level.
-// Accepts optional metadata maps that will be merged (later maps override earlier).
 func (c *Client) Error(message string, metadata ...map[string]any) {
 	c.log(LevelError, message, metadata...)
 }
 
-// Fatal logs a message at FATAL level.
-// Accepts optional metadata maps that will be merged (later maps override earlier).
 func (c *Client) Fatal(message string, metadata ...map[string]any) {
 	c.log(LevelFatal, message, metadata...)
 }
@@ -186,7 +163,6 @@ func (c *Client) Log(entry LogEntry) {
 	}
 	c.mu.Unlock()
 
-	// Capture source location if enabled and not already set
 	if c.config.CaptureSourceLocation && entry.SourceFile == "" {
 		if file, line := captureSource(2); file != "" {
 			entry.SourceFile = file
@@ -194,21 +170,17 @@ func (c *Client) Log(entry LogEntry) {
 		}
 	}
 
-	// Set defaults if not provided
 	if entry.Timestamp == "" {
 		entry.Timestamp = now()
 	}
 	if entry.Service == "" {
 		entry.Service = c.config.Service
 	}
-	// Merge config metadata with entry metadata
 	entry.Metadata = mergeMetadata(c.config.Metadata, entry.Metadata)
 
 	c.enqueue(entry)
 }
 
-// log is the internal logging method used by all level methods.
-// Returns without logging if the client has been shut down.
 func (c *Client) log(level LogLevel, message string, metadata ...map[string]any) {
 	c.mu.Lock()
 	if c.shutdown {
@@ -225,8 +197,6 @@ func (c *Client) log(level LogLevel, message string, metadata ...map[string]any)
 		Metadata:  mergeMetadata(c.config.Metadata, mergeMetadata(metadata...)),
 	}
 
-	// Capture source location if enabled
-	// Skip 3 frames: captureSource -> log -> Debug/Info/Warn/Error/Fatal
 	if c.config.CaptureSourceLocation {
 		entry.SourceFile, entry.LineNumber = captureSource(3)
 	}
@@ -234,11 +204,6 @@ func (c *Client) log(level LogLevel, message string, metadata ...map[string]any)
 	c.enqueue(entry)
 }
 
-// enqueue admits an entry into the shared root queue and, if the batch size is
-// reached, spawns an async flush. Admission and flush-goroutine spawning are
-// coordinated under the root's mutex and re-check the root's shutdown flag, so
-// once Shutdown begins no new entries are admitted and no new flush goroutines
-// are started (preventing races with flushWG.Wait()).
 func (c *Client) enqueue(entry LogEntry) {
 	root := c
 	if c.parent != nil {
@@ -246,9 +211,6 @@ func (c *Client) enqueue(entry LogEntry) {
 	}
 
 	root.mu.Lock()
-	// Re-check the root's shutdown flag under the same lock that guards the
-	// enqueue and async-flush spawn. A child may still be active while the
-	// shared root is shutting down; reject admission in that case.
 	if root.shutdown {
 		root.mu.Unlock()
 		return
@@ -256,8 +218,6 @@ func (c *Client) enqueue(entry LogEntry) {
 	c.queue.add(entry)
 	shouldFlush := c.queue.size() >= c.config.BatchSize
 	if shouldFlush {
-		// Register the in-flight flush while still holding root.mu so it is
-		// guaranteed to be observed by Shutdown's flushWG.Wait().
 		root.flushWG.Add(1)
 	}
 	root.mu.Unlock()
@@ -267,27 +227,20 @@ func (c *Client) enqueue(entry LogEntry) {
 			defer root.flushWG.Done()
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
-			// Flush handles OnError callback internally; ignore the returned error here.
 			_ = c.Flush(ctx)
 		}()
 	}
 }
 
-// flush sends all queued log entries to the server.
-// Internal method - does not respect context cancellation.
-// Calls OnFlush callback on success and OnError callback on failure.
 func (c *Client) flush() {
 	entries := c.queue.flush()
 	if len(entries) == 0 {
 		return
 	}
 
-	// Send logs in BatchSize chunks (the server rejects batches over its
-	// ingest limit) with retry per chunk.
 	ctx := context.Background()
 	sent, err := c.flushChunks(ctx, entries)
 
-	// Call callbacks (non-blocking)
 	if err != nil {
 		if c.config.OnError != nil {
 			var logwellErr *Error
@@ -305,11 +258,6 @@ func (c *Client) flush() {
 	}
 }
 
-// flushChunks sends entries to the server in chunks of at most BatchSize
-// entries. On the first chunk failure it re-queues the failed chunk plus all
-// not-yet-sent chunks (preserving order) at the front of the queue and stops
-// sending further chunks. Returns the number of entries successfully sent and
-// the transport error (nil on full success).
 func (c *Client) flushChunks(ctx context.Context, entries []LogEntry) (int, error) {
 	batchSize := c.config.BatchSize
 	if batchSize < 1 {
@@ -325,7 +273,6 @@ func (c *Client) flushChunks(ctx context.Context, entries []LogEntry) (int, erro
 		chunk := entries[i:end]
 
 		if _, err := c.transport.sendWithRetry(ctx, chunk); err != nil {
-			// Re-queue the failed chunk plus all not-yet-sent chunks in order.
 			c.queue.prepend(entries[i:])
 			return sent, err
 		}
@@ -344,11 +291,8 @@ func (c *Client) Flush(ctx context.Context) error {
 		return nil
 	}
 
-	// Send logs in BatchSize chunks (the server rejects batches over its
-	// ingest limit) with retry per chunk.
 	sent, err := c.flushChunks(ctx, entries)
 
-	// Call callbacks (non-blocking)
 	if err != nil {
 		if c.config.OnError != nil {
 			var logwellErr *Error
@@ -382,22 +326,17 @@ func (c *Client) Shutdown(ctx context.Context) error {
 	c.mu.Lock()
 	if c.shutdown {
 		c.mu.Unlock()
-		return nil // Already shut down
+		return nil
 	}
 	c.shutdown = true
 	c.mu.Unlock()
 
-	// Child loggers don't own the queue/transport, so they shouldn't
-	// stop the timer or flush. Only mark themselves as shut down.
 	if c.parent != nil {
 		return nil
 	}
 
-	// Stop the queue timer to prevent further auto-flushes
 	c.queue.stopTimer()
 
-	// Wait for any in-flight async flush goroutines to complete, but respect
-	// context cancellation/timeout so Shutdown does not block uninterruptibly.
 	done := make(chan struct{})
 	go func() {
 		c.flushWG.Wait()
@@ -405,25 +344,18 @@ func (c *Client) Shutdown(ctx context.Context) error {
 	}()
 	select {
 	case <-done:
-		// All in-flight flushes completed.
 	case <-ctx.Done():
 		return ctx.Err()
 	}
 
-	// Flush remaining logs with context
 	return c.Flush(ctx)
 }
 
-// mergeMetadata combines multiple metadata maps into one.
-// Later maps override earlier ones for duplicate keys.
 func mergeMetadata(maps ...map[string]any) map[string]any {
 	if len(maps) == 0 {
 		return nil
 	}
 
-	// Fast-path: single non-empty map. Clone it rather than returning the
-	// caller's reference, to avoid aliasing/concurrent map access when the
-	// entry is later JSON-marshaled.
 	if len(maps) == 1 {
 		if len(maps[0]) == 0 {
 			return nil
@@ -431,7 +363,6 @@ func mergeMetadata(maps ...map[string]any) map[string]any {
 		return cloneMetadata(maps[0])
 	}
 
-	// Fast-path: two maps where the second (extra) is empty.
 	if len(maps) == 2 && len(maps[1]) == 0 {
 		if len(maps[0]) == 0 {
 			return nil
@@ -453,7 +384,6 @@ func mergeMetadata(maps ...map[string]any) map[string]any {
 	return result
 }
 
-// cloneMetadata returns a shallow copy of m. m must be non-empty.
 func cloneMetadata(m map[string]any) map[string]any {
 	clone := make(map[string]any, len(m))
 	for k, v := range m {

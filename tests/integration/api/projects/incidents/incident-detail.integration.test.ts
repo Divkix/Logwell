@@ -137,7 +137,6 @@ describe("GET /api/projects/[id]/incidents/[incidentId]", () => {
   it("returns 404 for incident belonging to a different project", async () => {
     const ownerProject = await seedProject(db, { ownerId: userId });
 
-    // Create a second user and their project
     const otherUser = await auth.api.signUpEmail({
       body: {
         email: "other-detail@example.com",
@@ -170,7 +169,6 @@ describe("GET /api/projects/[id]/incidents/[incidentId]", () => {
       })
       .returning();
 
-    // Query the incident using our user's project ID but incident from other project
     const request = new Request(
       `http://localhost/api/projects/${ownerProject.id}/incidents/${otherIncident!.id}`,
     );
@@ -217,7 +215,6 @@ describe("GET /api/projects/[id]/incidents/[incidentId]", () => {
 
     try {
       const response = await GET_DETAIL(event as never);
-      // Some implementations return 401 response instead of throwing
       expect(response.status).toBe(401);
     } catch (error) {
       const httpError = error as { status: number };

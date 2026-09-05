@@ -36,7 +36,6 @@ describe("LevelChart", () => {
     it("renders a segment for each level with data", () => {
       render(LevelChart, { props: { data: mockData } });
 
-      // Each level should have a path element
       expect(screen.getByTestId("chart-segment-debug")).toBeInTheDocument();
       expect(screen.getByTestId("chart-segment-info")).toBeInTheDocument();
       expect(screen.getByTestId("chart-segment-warn")).toBeInTheDocument();
@@ -86,7 +85,6 @@ describe("LevelChart", () => {
     it("renders center text with total count", () => {
       render(LevelChart, { props: { data: mockData } });
 
-      // Total is 400 (100 + 200 + 50 + 30 + 20)
       expect(screen.getByTestId("chart-total")).toBeInTheDocument();
       expect(screen.getByText("400")).toBeInTheDocument();
     });
@@ -102,31 +100,26 @@ describe("LevelChart", () => {
     it("displays each level with its count and percentage", () => {
       render(LevelChart, { props: { data: mockData } });
 
-      // Check debug entry
       expect(screen.getByTestId("legend-item-debug")).toBeInTheDocument();
       expect(screen.getByText("DEBUG")).toBeInTheDocument();
       expect(screen.getByText("100")).toBeInTheDocument();
       expect(screen.getByText("25%")).toBeInTheDocument();
 
-      // Check info entry
       expect(screen.getByTestId("legend-item-info")).toBeInTheDocument();
       expect(screen.getByText("INFO")).toBeInTheDocument();
       expect(screen.getByText("200")).toBeInTheDocument();
       expect(screen.getByText("50%")).toBeInTheDocument();
 
-      // Check warn entry
       expect(screen.getByTestId("legend-item-warn")).toBeInTheDocument();
       expect(screen.getByText("WARN")).toBeInTheDocument();
       expect(screen.getByText("50")).toBeInTheDocument();
       expect(screen.getByText("12.5%")).toBeInTheDocument();
 
-      // Check error entry
       expect(screen.getByTestId("legend-item-error")).toBeInTheDocument();
       expect(screen.getByText("ERROR")).toBeInTheDocument();
       expect(screen.getByText("30")).toBeInTheDocument();
       expect(screen.getByText("7.5%")).toBeInTheDocument();
 
-      // Check fatal entry
       expect(screen.getByTestId("legend-item-fatal")).toBeInTheDocument();
       expect(screen.getByText("FATAL")).toBeInTheDocument();
       expect(screen.getByText("20")).toBeInTheDocument();
@@ -175,7 +168,6 @@ describe("LevelChart", () => {
     it("displays legend color indicators matching segment colors", () => {
       render(LevelChart, { props: { data: mockData } });
 
-      // Each legend item should have a color indicator
       const debugIndicator = screen.getByTestId("legend-color-debug");
       const infoIndicator = screen.getByTestId("legend-color-info");
       const warnIndicator = screen.getByTestId("legend-color-warn");
@@ -235,7 +227,6 @@ describe("LevelChart", () => {
       const errorIndicator = screen.getByTestId("legend-color-error");
       const fatalIndicator = screen.getByTestId("legend-color-fatal");
 
-      // Verify legend indicators have background-color style set (JSDOM converts HSL to RGB)
       expect(debugIndicator.getAttribute("style")).toContain("background-color");
       expect(infoIndicator.getAttribute("style")).toContain("background-color");
       expect(warnIndicator.getAttribute("style")).toContain("background-color");
@@ -258,7 +249,6 @@ describe("LevelChart", () => {
       render(LevelChart, { props: { data: singleData } });
 
       expect(screen.getByTestId("chart-segment-error")).toBeInTheDocument();
-      // Use testids to avoid ambiguity between total count and legend count
       expect(screen.getByTestId("chart-total")).toHaveTextContent("100");
       expect(screen.getByTestId("legend-item-error")).toHaveTextContent("100%");
     });

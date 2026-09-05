@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import { checkCsrfOrigin } from "$lib/server/utils/csrf";
 
-/**
- * Creates a minimal mock RequestEvent for testing checkCsrfOrigin.
- */
 function makeEvent(method: string, url: string, headers: Record<string, string> = {}) {
   const request = new Request(url, { method, headers });
   return {
@@ -127,9 +124,6 @@ describe("checkCsrfOrigin", () => {
     });
 
     it("rejects Referer that does not start with origin + slash", () => {
-      // e.g. referer starts with http://localhost but not http://localhost/
-      // This case would only apply if Referer were exactly the origin without a slash.
-      // The check is startsWith(`${expectedOrigin}/`) so origin-only Referer is rejected.
       const event = makeEvent("POST", "http://localhost/api/projects", {
         Referer: "http://localhost.evil.com/",
       });

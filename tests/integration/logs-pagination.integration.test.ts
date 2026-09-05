@@ -10,9 +10,6 @@ import { clearApiKeyCache } from "$lib/server/utils/api-key";
 import { GET } from "../../src/routes/api/projects/[id]/logs/+server";
 import { seedLog, seedLogs, seedProject } from "../fixtures/db";
 
-/**
- * Helper to create a mock SvelteKit RequestEvent for [id]/logs routes
- */
 function createRequestEvent(
   request: Request,
   db: PgliteDatabase<typeof schema>,
@@ -57,7 +54,6 @@ describe("Cursor-based Pagination", () => {
     auth = createAuth(db);
     clearApiKeyCache();
 
-    // Create authenticated user
     const signUpResult = await auth.api.signUpEmail({
       body: {
         email: "test@example.com",
@@ -90,7 +86,6 @@ describe("Cursor-based Pagination", () => {
     it("returns nextCursor when more logs exist", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
 
-      // Create 150 logs (more than default limit of 100)
       await seedLogs(db, testProject.id, 150);
 
       const request = new Request(`http://localhost/api/projects/${testProject.id}/logs`, {
@@ -112,7 +107,6 @@ describe("Cursor-based Pagination", () => {
     it("returns null nextCursor when no more logs exist", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
 
-      // Create 50 logs (less than default limit)
       await seedLogs(db, testProject.id, 50);
 
       const request = new Request(`http://localhost/api/projects/${testProject.id}/logs`, {
@@ -133,7 +127,6 @@ describe("Cursor-based Pagination", () => {
     it("fetches next page using cursor", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
 
-      // Create logs with specific timestamps to verify ordering
       const now = new Date();
       const logs = [];
       for (let i = 0; i < 5; i++) {
@@ -144,7 +137,6 @@ describe("Cursor-based Pagination", () => {
         logs.push(log);
       }
 
-      // First request - get first 2 logs
       const request1 = new Request(
         `http://localhost/api/projects/${testProject.id}/logs?limit=100`,
         { method: "GET" },
@@ -157,14 +149,11 @@ describe("Cursor-based Pagination", () => {
       const body1 = await response1.json();
 
       expect(body1.logs).toHaveLength(5);
-      // Logs should be ordered newest first
       expect(body1.logs[0]?.id).toBe(logs[4]?.id); // Newest
       expect(body1.logs[4]?.id).toBe(logs[0]?.id); // Oldest
 
-      // Create 150 more logs to test pagination
       await seedLogs(db, testProject.id, 150);
 
-      // Get first page
       const request2 = new Request(`http://localhost/api/projects/${testProject.id}/logs`, {
         method: "GET",
       });
@@ -175,7 +164,6 @@ describe("Cursor-based Pagination", () => {
 
       expect(body2.nextCursor).toBeTruthy();
 
-      // Use cursor to get next page
       const request3 = new Request(
         `http://localhost/api/projects/${testProject.id}/logs?cursor=${body2.nextCursor}`,
         { method: "GET" },
@@ -187,9 +175,7 @@ describe("Cursor-based Pagination", () => {
       expect(response3.status).toBe(200);
       const body3 = await response3.json();
 
-      // Should get the remaining logs
       expect(body3.logs.length).toBeGreaterThan(0);
-      // No duplicate IDs between pages
       const page1Ids = new Set(body2.logs.map((l: { id: string }) => l.id));
       const page2Ids = new Set(body3.logs.map((l: { id: string }) => l.id));
       const intersection = [...page1Ids].filter((id) => page2Ids.has(id));
@@ -217,11 +203,9 @@ describe("Cursor-based Pagination", () => {
     it("maintains level filter across cursor pagination", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
 
-      // Create mixed logs - 200 error logs and 100 info logs
       await seedLogs(db, testProject.id, 200, { level: "error" });
       await seedLogs(db, testProject.id, 100, { level: "info" });
 
-      // First page with level filter
       const request1 = new Request(
         `http://localhost/api/projects/${testProject.id}/logs?level=error&limit=100`,
         { method: "GET" },
@@ -235,7 +219,6 @@ describe("Cursor-based Pagination", () => {
       expect(body1.logs.every((l: { level: string }) => l.level === "error")).toBe(true);
       expect(body1.nextCursor).toBeTruthy();
 
-      // Second page with cursor and level filter
       const request2 = new Request(
         `http://localhost/api/projects/${testProject.id}/logs?level=error&cursor=${body1.nextCursor}`,
         { method: "GET" },
@@ -252,15 +235,12 @@ describe("Cursor-based Pagination", () => {
     it("maintains search filter across cursor pagination", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
 
-      // Create 200 logs with "database" in message
       for (let i = 0; i < 200; i++) {
         await seedLog(db, testProject.id, { message: `Database query ${i}` });
       }
 
-      // Create 50 other logs
       await seedLogs(db, testProject.id, 50, { message: "Other log message" });
 
-      // First page with search
       const request1 = new Request(
         `http://localhost/api/projects/${testProject.id}/logs?search=database&limit=100`,
         { method: "GET" },
@@ -273,7 +253,6 @@ describe("Cursor-based Pagination", () => {
       expect(body1.logs).toHaveLength(100);
       expect(body1.nextCursor).toBeTruthy();
 
-      // Second page with cursor and search
       const request2 = new Request(
         `http://localhost/api/projects/${testProject.id}/logs?search=database&cursor=${body1.nextCursor}`,
         { method: "GET" },
@@ -293,7 +272,6 @@ describe("Cursor-based Pagination", () => {
       const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
       const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
 
-      // Create 150 logs within the time range
       for (let i = 0; i < 150; i++) {
         await seedLog(db, testProject.id, {
           message: `Log ${i}`,
@@ -301,10 +279,8 @@ describe("Cursor-based Pagination", () => {
         });
       }
 
-      // Create logs outside the range
       await seedLogs(db, testProject.id, 50, { timestamp: twoHoursAgo });
 
-      // First page with time range
       const request1 = new Request(
         `http://localhost/api/projects/${testProject.id}/logs?from=${oneHourAgo.toISOString()}&limit=100`,
         { method: "GET" },
@@ -317,7 +293,6 @@ describe("Cursor-based Pagination", () => {
       expect(body1.logs).toHaveLength(100);
       expect(body1.nextCursor).toBeTruthy();
 
-      // Second page with cursor and time range
       const request2 = new Request(
         `http://localhost/api/projects/${testProject.id}/logs?from=${oneHourAgo.toISOString()}&cursor=${body1.nextCursor}`,
         { method: "GET" },
@@ -344,7 +319,6 @@ describe("Cursor-based Pagination", () => {
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
       const response = await GET(event as never);
 
-      // Empty cursor should be ignored, treated as no cursor
       expect(response.status).toBe(200);
       const body = await response.json();
       expect(body.logs).toHaveLength(50);
@@ -353,10 +327,8 @@ describe("Cursor-based Pagination", () => {
     it("handles cursor pointing to last log", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
 
-      // Create exactly 100 logs
       await seedLogs(db, testProject.id, 100);
 
-      // Get first page
       const request1 = new Request(`http://localhost/api/projects/${testProject.id}/logs`, {
         method: "GET",
       });
@@ -368,7 +340,6 @@ describe("Cursor-based Pagination", () => {
       expect(body1.logs).toHaveLength(100);
       expect(body1.nextCursor).toBeNull(); // No more logs
 
-      // Try to use cursor (shouldn't exist but testing edge case)
       if (body1.nextCursor) {
         const request2 = new Request(
           `http://localhost/api/projects/${testProject.id}/logs?cursor=${body1.nextCursor}`,
@@ -394,11 +365,6 @@ describe("Cursor-based Pagination", () => {
     it("does not skip rows that share the cursor's millisecond", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
 
-      // 25 logs whose timestamps all fall within the same millisecond but at
-      // distinct microsecond offsets. A millisecond-truncated cursor timestamp
-      // breaks the `timestamp = <cursorTs>` equality check for such rows, so
-      // the next page comes back empty — everything past the first page is
-      // silently skipped.
       const baseEpoch = 1767225600.123456; // 2026-01-01T00:00:00.123456Z
       const seededIds: string[] = [];
       for (let i = 0; i < 25; i++) {
@@ -410,7 +376,6 @@ describe("Cursor-based Pagination", () => {
         `);
       }
 
-      // Paginate through 10 at a time, following the cursor.
       const collectedIds: string[] = [];
       let cursor: string | null = null;
       for (let page = 0; page < 10; page++) {
@@ -429,7 +394,6 @@ describe("Cursor-based Pagination", () => {
         cursor = body.nextCursor;
       }
 
-      // Every row returned, exactly once, with nothing skipped or duplicated.
       expect(collectedIds).toHaveLength(25);
       expect(new Set(collectedIds).size).toBe(25);
       for (const id of seededIds) {

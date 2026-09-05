@@ -21,7 +21,6 @@ describe("Logwell Client", () => {
       flushInterval: 1000,
     };
 
-    // Capture all logs sent to the server
     server.use(
       http.post("*/v1/ingest", async ({ request }) => {
         const body = (await request.json()) as LogEntry[];
@@ -102,7 +101,6 @@ describe("Logwell Client", () => {
       await client.flush();
 
       expect(capturedLogs[0].timestamp).toBeDefined();
-      // Should be ISO8601 format
       const timestamp = capturedLogs[0].timestamp as string;
       expect(new Date(timestamp).toISOString()).toBe(timestamp);
     });
@@ -123,7 +121,6 @@ describe("Logwell Client", () => {
     it("auto-flushes when batch size reached", async () => {
       const client = new Logwell(defaultConfig);
 
-      // Add 5 logs (batchSize is 5)
       for (let i = 0; i < 5; i++) {
         client.info(`Log ${i + 1}`);
       }
@@ -212,7 +209,6 @@ describe("Logwell Client", () => {
     });
 
     it("calls onError on send failure", async () => {
-      // Use real timers for this test
       vi.useRealTimers();
 
       const onError = vi.fn();
@@ -289,7 +285,6 @@ describe("Logwell Client", () => {
 
   describe("error handling", () => {
     it("continues working after transient error", async () => {
-      // Use real timers for this test since it involves actual retries
       vi.useRealTimers();
 
       let attempts = 0;
@@ -309,7 +304,6 @@ describe("Logwell Client", () => {
       client.info("Will retry");
       await client.flush();
 
-      // Should succeed on retry
       expect(attempts).toBeGreaterThanOrEqual(2);
     }, 10000);
   });

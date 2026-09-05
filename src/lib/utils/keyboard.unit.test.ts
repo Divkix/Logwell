@@ -1,10 +1,5 @@
 import { FORM_ELEMENTS, SHORTCUTS, shouldBlockShortcut } from "./keyboard";
 
-/**
- * Helper to create a mock KeyboardEvent with customizable properties.
- * Uses plain object instead of document.createElement since unit tests
- * run in Node.js environment without DOM.
- */
 function createMockKeyboardEvent(options: {
   targetTagName?: string;
   isComposing?: boolean;
@@ -20,7 +15,6 @@ function createMockKeyboardEvent(options: {
     metaKey = false,
   } = options;
 
-  // Create a plain object that mimics HTMLElement with tagName property
   const target = { tagName: targetTagName };
 
   return {

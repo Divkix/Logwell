@@ -15,17 +15,15 @@ from logwell.errors import LogwellError, LogwellErrorCode
 if TYPE_CHECKING:
     from logwell.types import LogwellConfig
 
-# Default configuration values
 DEFAULT_CONFIG: dict[str, Any] = {
     "batch_size": 50,
-    "flush_interval": 5.0,  # seconds
+    "flush_interval": 5.0,
     "max_queue_size": 1000,
     "max_retries": 3,
-    "timeout": 30.0,  # seconds
+    "timeout": 30.0,
     "capture_source_location": False,
 }
 
-# API key format regex: lw_[32 alphanumeric chars including - and _]
 API_KEY_REGEX: re.Pattern[str] = re.compile(r"^lw_[A-Za-z0-9_-]{32}$")
 
 
@@ -44,14 +42,6 @@ def validate_api_key_format(api_key: str) -> bool:
 
 
 def _is_valid_url(url: str) -> bool:
-    """Validate a URL string.
-
-    Args:
-        url: URL string to validate
-
-    Returns:
-        True if valid URL with scheme and netloc, False otherwise
-    """
     try:
         result = urlparse(url)
         return bool(result.scheme and result.netloc)
@@ -71,7 +61,6 @@ def validate_config(config: LogwellConfig) -> LogwellConfig:
     Raises:
         LogwellError: If configuration is invalid (INVALID_CONFIG code)
     """
-    # Validate required fields
     if "api_key" not in config or not config["api_key"]:
         raise LogwellError(
             "Configuration missing 'api_key'. "
@@ -88,7 +77,6 @@ def validate_config(config: LogwellConfig) -> LogwellConfig:
             LogwellErrorCode.INVALID_CONFIG,
         )
 
-    # Validate API key format
     if not validate_api_key_format(config["api_key"]):
         masked_key = config["api_key"][:10] + "..." if len(config["api_key"]) > 10 else "***"
         raise LogwellError(
@@ -98,7 +86,6 @@ def validate_config(config: LogwellConfig) -> LogwellConfig:
             LogwellErrorCode.INVALID_CONFIG,
         )
 
-    # Validate endpoint URL and strip trailing slash (PY-11)
     try:
         parsed_endpoint = urlparse(config["endpoint"])
         valid_url = bool(parsed_endpoint.scheme and parsed_endpoint.netloc)
@@ -123,7 +110,6 @@ def validate_config(config: LogwellConfig) -> LogwellConfig:
             LogwellErrorCode.INVALID_CONFIG,
         )
 
-    # Validate numeric options
     if "batch_size" in config and config["batch_size"] <= 0:
         raise LogwellError(
             f"Invalid batch_size: {config['batch_size']}. "
@@ -186,7 +172,6 @@ def validate_config(config: LogwellConfig) -> LogwellConfig:
             LogwellErrorCode.INVALID_CONFIG,
         )
 
-    # Return merged config with defaults
     merged: LogwellConfig = {
         "api_key": config["api_key"],
         "endpoint": config["endpoint"],
@@ -200,7 +185,6 @@ def validate_config(config: LogwellConfig) -> LogwellConfig:
         ),
     }
 
-    # Add optional fields if present
     if "service" in config:
         merged["service"] = config["service"]
 

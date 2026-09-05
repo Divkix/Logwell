@@ -49,12 +49,10 @@ class Logwell:
             _queue: Internal: shared queue for child loggers (do not use directly)
             _parent_metadata: Internal: inherited metadata from parent (do not use directly)
         """
-        # Validate and apply defaults
         self._config = validate_config(config)
         self._parent_metadata = _parent_metadata
         self._stopped = False
 
-        # Use existing queue (for child loggers) or create new one (PY-10)
         if _queue is not None:
             self._transport: HttpTransport | None = None
             self._queue = _queue
@@ -81,7 +79,6 @@ class Logwell:
         await self.shutdown()
 
     def _register_atexit(self) -> None:
-        """Register a best-effort flush on process exit (PY-6)."""
 
         def _flush_on_exit() -> None:
             import asyncio as _asyncio
@@ -96,12 +93,6 @@ class Logwell:
         atexit.register(_flush_on_exit)
 
     def _add_log(self, entry: LogEntry, skip_frames: int) -> None:
-        """Internal log method with source location capture.
-
-        Args:
-            entry: The log entry to add
-            skip_frames: Number of frames to skip for source location
-        """
         if self._stopped:
             return
 
@@ -114,7 +105,6 @@ class Logwell:
                 source_file = location.source_file
                 line_number = location.line_number
 
-        # Build full entry with defaults
         default_timestamp = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
         timestamp = entry.get("timestamp") or default_timestamp
         full_entry: LogEntry = {
@@ -123,17 +113,14 @@ class Logwell:
             "timestamp": timestamp,
         }
 
-        # Add service from entry, config, or omit
         service = entry.get("service") or self._config.get("service")
         if service:
             full_entry["service"] = service
 
-        # Merge metadata
         merged_metadata = self._merge_metadata(entry.get("metadata"))
         if merged_metadata:
             full_entry["metadata"] = merged_metadata
 
-        # Add source location if captured
         if source_file is not None:
             full_entry["sourceFile"] = source_file
         if line_number is not None:
@@ -142,68 +129,33 @@ class Logwell:
         self._queue.add(full_entry)
 
     def log(self, entry: LogEntry) -> None:
-        """Log a message at the specified level.
-
-        Args:
-            entry: Log entry with level, message, and optional metadata
-        """
         self._add_log(entry, skip_frames=2)
 
     def debug(self, message: str, metadata: dict[str, Any] | None = None) -> None:
-        """Log a debug message.
-
-        Args:
-            message: Log message content
-            metadata: Optional key-value metadata
-        """
         entry: LogEntry = {"level": "debug", "message": message}
         if metadata:
             entry["metadata"] = metadata
         self._add_log(entry, skip_frames=2)
 
     def info(self, message: str, metadata: dict[str, Any] | None = None) -> None:
-        """Log an info message.
-
-        Args:
-            message: Log message content
-            metadata: Optional key-value metadata
-        """
         entry: LogEntry = {"level": "info", "message": message}
         if metadata:
             entry["metadata"] = metadata
         self._add_log(entry, skip_frames=2)
 
     def warn(self, message: str, metadata: dict[str, Any] | None = None) -> None:
-        """Log a warning message.
-
-        Args:
-            message: Log message content
-            metadata: Optional key-value metadata
-        """
         entry: LogEntry = {"level": "warn", "message": message}
         if metadata:
             entry["metadata"] = metadata
         self._add_log(entry, skip_frames=2)
 
     def error(self, message: str, metadata: dict[str, Any] | None = None) -> None:
-        """Log an error message.
-
-        Args:
-            message: Log message content
-            metadata: Optional key-value metadata
-        """
         entry: LogEntry = {"level": "error", "message": message}
         if metadata:
             entry["metadata"] = metadata
         self._add_log(entry, skip_frames=2)
 
     def fatal(self, message: str, metadata: dict[str, Any] | None = None) -> None:
-        """Log a fatal error message.
-
-        Args:
-            message: Log message content
-            metadata: Optional key-value metadata
-        """
         entry: LogEntry = {"level": "fatal", "message": message}
         if metadata:
             entry["metadata"] = metadata
@@ -262,19 +214,16 @@ class Logwell:
             "capture_source_location": self._config.get("capture_source_location", False),
         }
 
-        # Set service: override > config > none
         if service is not None:
             child_config["service"] = service
         elif "service" in self._config:
             child_config["service"] = self._config["service"]
 
-        # Preserve callbacks
         if "on_error" in self._config:
             child_config["on_error"] = self._config["on_error"]
         if "on_flush" in self._config:
             child_config["on_flush"] = self._config["on_flush"]
 
-        # Merge metadata: parent -> new
         child_metadata: dict[str, Any] | None = None
         if self._parent_metadata or metadata:
             child_metadata = {
@@ -292,14 +241,6 @@ class Logwell:
         self,
         entry_metadata: dict[str, Any] | None,
     ) -> dict[str, Any] | None:
-        """Merge parent metadata with entry metadata.
-
-        Args:
-            entry_metadata: Metadata from the log entry
-
-        Returns:
-            Merged metadata dict, or None if neither exists
-        """
         if not self._parent_metadata and not entry_metadata:
             return None
         return {

@@ -43,9 +43,6 @@ function createRequestEvent(
   } as unknown;
 }
 
-/**
- * Helper to assert that a promise rejects with a SvelteKit HTTP error
- */
 async function expectHttpError(
   promise: Promise<unknown>,
   expectedStatus: number,
@@ -160,7 +157,6 @@ describe("Incident APIs", () => {
     const project = await seedProject(db, { ownerId: userId });
     const now = Date.now();
 
-    // Create exactly 50 open incidents (default limit)
     const incidents = [];
     for (let i = 0; i < 50; i++) {
       incidents.push({
@@ -503,9 +499,6 @@ describe("Incident APIs", () => {
   it("does not skip incidents that share the cursor's millisecond", async () => {
     const project = await seedProject(db, { ownerId: userId });
 
-    // 25 open incidents whose lastSeen all fall within the same millisecond
-    // but at distinct microsecond offsets — the scenario where a
-    // millisecond-truncated cursor timestamp makes the next page empty.
     const nowSecs = Date.now() / 1000;
     const baseEpoch = Math.floor(nowSecs) + 0.123456;
     const seededIds: string[] = [];
@@ -519,7 +512,6 @@ describe("Incident APIs", () => {
       `);
     }
 
-    // Paginate through 10 at a time, following the cursor.
     const collectedIds: string[] = [];
     let cursor: string | null = null;
     for (let page = 0; page < 10; page++) {
@@ -538,7 +530,6 @@ describe("Incident APIs", () => {
       cursor = body.nextCursor;
     }
 
-    // Every row returned, exactly once, with nothing skipped or duplicated.
     expect(collectedIds).toHaveLength(25);
     expect(new Set(collectedIds).size).toBe(25);
     for (const id of seededIds) {

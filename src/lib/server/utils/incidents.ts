@@ -6,9 +6,6 @@ import { INCIDENT_CONFIG } from "../config/performance";
 import { type Incident, incident, type LogLevel } from "../db/schema";
 import { buildIncidentFingerprint } from "./incident-fingerprint";
 
-/**
- * Log input shape needed for incident grouping.
- */
 export interface IncidentLogInput {
   level: LogLevel;
   message: string;
@@ -19,9 +16,6 @@ export interface IncidentLogInput {
   metadata: unknown;
 }
 
-/**
- * Log input enriched with incident fields.
- */
 export interface PreparedIncidentLog extends IncidentLogInput {
   serviceName: string | null;
   fingerprint: string | null;
@@ -43,9 +37,6 @@ interface IncidentAggregate {
   totalEvents: number;
 }
 
-/**
- * Result of incident upsert batch.
- */
 export interface IncidentUpsertResult {
   incidentByFingerprint: Map<string, Incident>;
   touchedIncidents: Incident[];
@@ -69,9 +60,6 @@ function stringField(record: Record<string, unknown> | null, keys: string[]): st
   return null;
 }
 
-/**
- * Extracts service name from OTLP resource attributes or simple-ingest metadata.
- */
 export function extractServiceName(resourceAttributes: unknown, metadata: unknown): string | null {
   const resource = asRecord(resourceAttributes);
   const meta = asRecord(metadata);
@@ -83,18 +71,12 @@ export function extractServiceName(resourceAttributes: unknown, metadata: unknow
   );
 }
 
-/**
- * Converts a raw message into a concise incident title.
- */
 export function buildIncidentTitle(message: string): string {
   const trimmed = message.trim();
   if (!trimmed) return "Unknown error";
   return trimmed.length > 160 ? `${trimmed.slice(0, 157)}...` : trimmed;
 }
 
-/**
- * Enriches logs with incident fields. Non-error logs keep null incident fields.
- */
 export function prepareLogsForIncidents(logs: IncidentLogInput[]): PreparedIncidentLog[] {
   return logs.map((log) => {
     if (!isIncidentGroupedLevel(log.level)) {
@@ -127,9 +109,6 @@ export function prepareLogsForIncidents(logs: IncidentLogInput[]): PreparedIncid
   });
 }
 
-/**
- * Groups prepared logs by fingerprint for batch incident upsert.
- */
 export function groupPreparedLogsByFingerprint(logs: PreparedIncidentLog[]): IncidentAggregate[] {
   const groups = new Map<string, IncidentAggregate>();
 
@@ -166,9 +145,6 @@ export function groupPreparedLogsByFingerprint(logs: PreparedIncidentLog[]): Inc
   return [...groups.values()];
 }
 
-/**
- * Returns incident status using auto-resolve threshold.
- */
 export function getIncidentStatus(
   lastSeen: Date,
   now: Date = new Date(),
@@ -178,9 +154,6 @@ export function getIncidentStatus(
   return now.getTime() - lastSeen.getTime() <= thresholdMs ? "open" : "resolved";
 }
 
-/**
- * Batch-upserts incidents and returns touched incident rows.
- */
 export async function upsertIncidentsForPreparedLogs(
   db: DatabaseClient,
   projectId: string,
@@ -244,9 +217,6 @@ export async function upsertIncidentsForPreparedLogs(
   return { incidentByFingerprint, touchedIncidents };
 }
 
-/**
- * Assigns incident ids to prepared logs from fingerprint mapping.
- */
 export function assignIncidentIds(
   logs: PreparedIncidentLog[],
   incidentByFingerprint: Map<string, Incident>,

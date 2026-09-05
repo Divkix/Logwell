@@ -5,7 +5,6 @@ const LEGEND_ITEM_COUNT = 5;
 </script>
 
 <div data-testid="stats-skeleton" class="space-y-6">
-  <!-- Header Skeleton -->
   <div data-testid="stats-skeleton-header" class="flex items-center justify-between">
     <div class="flex items-center gap-4">
       <Skeleton class="h-4 w-4" />
@@ -13,7 +12,6 @@ const LEGEND_ITEM_COUNT = 5;
     </div>
   </div>
 
-  <!-- Stats Header Skeleton -->
   <div data-testid="stats-skeleton-subheader" class="flex flex-wrap items-center justify-between gap-4">
     <div>
       <Skeleton class="mb-2 h-6 w-48" />
@@ -22,16 +20,13 @@ const LEGEND_ITEM_COUNT = 5;
     <Skeleton class="h-9 w-24" />
   </div>
 
-  <!-- Chart Section Skeleton -->
   <div data-testid="stats-skeleton-chart" class="flex justify-center py-8">
     <div class="flex flex-col gap-4">
-      <!-- Donut Chart Placeholder -->
       <Skeleton
         data-testid="skeleton-donut"
         class="h-[200px] w-[200px] rounded-full"
       />
 
-      <!-- Legend Skeleton -->
       <div data-testid="stats-skeleton-legend" class="flex flex-col gap-2">
         {#each Array(LEGEND_ITEM_COUNT) as _}
           <div data-testid="skeleton-legend-item" class="flex items-center gap-2">
@@ -43,7 +38,6 @@ const LEGEND_ITEM_COUNT = 5;
     </div>
   </div>
 
-  <!-- Summary Skeleton -->
   <div data-testid="stats-skeleton-summary" class="text-center">
     <Skeleton class="mx-auto h-4 w-48" />
   </div>

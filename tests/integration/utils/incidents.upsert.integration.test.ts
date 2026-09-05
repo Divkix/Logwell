@@ -54,18 +54,14 @@ describe("Incident upsert race condition", () => {
       },
     ];
 
-    // Fire both upserts concurrently — simulates two ingest requests
-    // hitting the same new fingerprint at the same time.
     const [resultA, resultB] = await Promise.all([
       upsertIncidentsForPreparedLogs(db, project.id, logsA),
       upsertIncidentsForPreparedLogs(db, project.id, logsB),
     ]);
 
-    // Both calls should return successfully
     expect(resultA.touchedIncidents).toHaveLength(1);
     expect(resultB.touchedIncidents).toHaveLength(1);
 
-    // The incident should exist in the database
     const allIncidents = await db
       .select()
       .from(schema.incident)
@@ -79,10 +75,8 @@ describe("Incident upsert race condition", () => {
     expect(allIncidents).toHaveLength(1);
     const incidentRow = allIncidents[0]!;
 
-    // totalEvents should reflect the combined count from both batches
     expect(incidentRow.totalEvents).toBe(2);
 
-    // lastSeen should be from the later batch
     expect(incidentRow.lastSeen.getTime()).toBeGreaterThanOrEqual(now.getTime() + 1000);
   });
 
@@ -144,7 +138,6 @@ describe("Incident upsert race condition", () => {
     const project = await seedProject(db);
     const now = new Date();
 
-    // Two distinct fingerprints each appearing twice, plus one appearing once
     const logs: PreparedIncidentLog[] = [
       {
         level: "error",
@@ -188,7 +181,6 @@ describe("Incident upsert race condition", () => {
         incidentTitle: "Auth failure",
         incidentId: null,
       },
-      // repeat fp-cache and fp-db to accumulate totalEvents
       {
         level: "error",
         message: "Cache miss again",
@@ -221,7 +213,6 @@ describe("Incident upsert race condition", () => {
 
     const result = await upsertIncidentsForPreparedLogs(db, project.id, logs);
 
-    // Three distinct fingerprints → three incident rows
     expect(result.touchedIncidents).toHaveLength(3);
     expect(result.incidentByFingerprint.size).toBe(3);
     expect(result.incidentByFingerprint.has("fp-cache")).toBe(true);
@@ -239,19 +230,13 @@ describe("Incident upsert race condition", () => {
     const dbIncident = allIncidents.find((i) => i.fingerprint === "fp-db")!;
     const authIncident = allIncidents.find((i) => i.fingerprint === "fp-auth")!;
 
-    // fp-cache appeared twice → totalEvents = 2
     expect(cacheIncident.totalEvents).toBe(2);
-    // fp-db appeared twice → totalEvents = 2
     expect(dbIncident.totalEvents).toBe(2);
-    // fp-auth appeared once → totalEvents = 1
     expect(authIncident.totalEvents).toBe(1);
 
-    // fatal-level fp-auth must have highestLevel = 'fatal'
     expect(authIncident.highestLevel).toBe("fatal");
-    // error-level fp-cache must have highestLevel = 'error'
     expect(cacheIncident.highestLevel).toBe("error");
 
-    // lastSeen for fp-cache should equal the second occurrence timestamp
     expect(cacheIncident.lastSeen.getTime()).toBe(now.getTime() + 1500);
   });
 });

@@ -1,8 +1,5 @@
 import type { LogwellConfig } from "../../src/types";
 
-/**
- * Valid configuration fixtures for testing
- */
 export const validConfigs = {
   minimal: {
     apiKey: "lw_aBcDeFgHiJkLmNoPqRsTuVwXyZ123456",
@@ -34,9 +31,6 @@ export const validConfigs = {
   } satisfies LogwellConfig,
 };
 
-/**
- * Invalid configuration fixtures for testing validation
- */
 export const invalidConfigs = {
   missingApiKey: {
     endpoint: "https://test.logwell.io",

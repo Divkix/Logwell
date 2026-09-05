@@ -1,21 +1,10 @@
 import { expect, type Page, test } from "@playwright/test";
 
-/**
- * E2E tests for Project Settings Page
- *
- * Phase 10 from the auto-delete implementation plan
- * Tests follow Trophy testing methodology - focus on user behavior
- */
-
-// Test user credentials (matches seeded admin from scripts/seed-admin.ts)
 const TEST_USER = {
   username: "admin",
   password: "adminpass",
 };
 
-/**
- * Helper to perform login
- */
 async function login(page: Page) {
   await page.goto("/login");
   await page.waitForSelector("form");
@@ -28,10 +17,6 @@ async function login(page: Page) {
   }).toPass({ timeout: 45000 });
 }
 
-/**
- * Helper to create a project via API
- * Returns the created project data including apiKey
- */
 async function createProject(page: Page, name: string) {
   const response = await page.request.post("/api/projects", {
     data: { name },
@@ -40,17 +25,11 @@ async function createProject(page: Page, name: string) {
   return response.json();
 }
 
-/**
- * Helper to delete a project via API
- */
 async function deleteProject(page: Page, projectId: string) {
   const response = await page.request.delete(`/api/projects/${projectId}`);
   return response.ok();
 }
 
-/**
- * Helper to get all projects and delete them
- */
 async function cleanupProjects(page: Page) {
   const response = await page.request.get("/api/projects");
   if (response.ok()) {
@@ -77,16 +56,13 @@ test.describe("Project Settings - Navigation", () => {
   });
 
   test("should navigate to settings page from bottom nav", async ({ page }) => {
-    // Navigate to project page first
     await page.goto(`/projects/${testProject.id}`);
 
-    // Click settings in bottom nav (visible on mobile)
     await page.setViewportSize({ width: 375, height: 667 });
     const settingsLink = page.getByTestId("nav-settings");
     await expect(settingsLink).toBeVisible();
     await settingsLink.click();
 
-    // Should be on settings page
     await expect(page).toHaveURL(`/projects/${testProject.id}/settings`);
     await expect(page.getByRole("heading", { name: /project settings/i })).toBeVisible();
   });
@@ -94,12 +70,10 @@ test.describe("Project Settings - Navigation", () => {
   test("should navigate back to project from settings", async ({ page }) => {
     await page.goto(`/projects/${testProject.id}/settings`);
 
-    // Click back link
     const backLink = page.getByRole("link", { name: /back to project/i });
     await expect(backLink).toBeVisible();
     await backLink.click();
 
-    // Should be on project page
     await expect(page).toHaveURL(`/projects/${testProject.id}`);
   });
 });
@@ -125,25 +99,19 @@ test.describe("Project Settings - General Section", () => {
   });
 
   test("should edit project name", async ({ page }) => {
-    // Click edit button
     await page.getByTestId("edit-name-button").click();
 
-    // Input should appear with current name
     const input = page.getByTestId("project-name-input");
     await expect(input).toBeVisible();
     await expect(input).toHaveValue(testProject.name);
 
-    // Clear and type new name
     await input.clear();
     await input.fill("renamed-project");
 
-    // Save
     await page.getByTestId("save-name-button").click();
 
-    // Should update display
     await expect(page.getByTestId("project-name-display")).toHaveText("renamed-project");
 
-    // Update for cleanup
     testProject.name = "renamed-project";
   });
 
@@ -154,10 +122,8 @@ test.describe("Project Settings - General Section", () => {
     await input.clear();
     await input.fill("should-not-save");
 
-    // Click cancel
     await page.getByTestId("cancel-edit-button").click();
 
-    // Should show original name
     await expect(page.getByTestId("project-name-display")).toHaveText(testProject.name);
   });
 
@@ -167,10 +133,8 @@ test.describe("Project Settings - General Section", () => {
     const input = page.getByTestId("project-name-input");
     await input.clear();
 
-    // Save with empty name
     await page.getByTestId("save-name-button").click();
 
-    // Should show error
     await expect(page.getByTestId("name-error")).toBeVisible();
     await expect(page.getByTestId("name-error")).toContainText(/cannot be empty/i);
   });
@@ -206,15 +170,12 @@ test.describe("Project Settings - API Key Section", () => {
   });
 
   test("should not display API key on load, only a regenerate button", async ({ page }) => {
-    // Keys are hashed and shown only once at creation; the settings page no
-    // longer surfaces the live key on load.
     await expect(page.getByTestId("api-key-display")).toHaveCount(0);
     await expect(page.getByTestId("api-key-once-warning")).toHaveCount(0);
     await expect(page.getByTestId("regenerate-button")).toBeVisible();
   });
 
   test("should reveal the new API key after regenerating", async ({ page }) => {
-    // The key only appears transiently after a regenerate.
     await page.getByTestId("regenerate-button").click();
     await page.getByTestId("confirm-regenerate-button").click();
 
@@ -222,7 +183,6 @@ test.describe("Project Settings - API Key Section", () => {
     await expect(apiKeyDisplay).toBeVisible();
     await expect(apiKeyDisplay).toContainText(/^lw_[A-Za-z0-9_-]{32}$/);
 
-    // The original key is never re-displayed.
     await expect(apiKeyDisplay).not.toContainText(testProject.apiKey);
     await expect(page.getByTestId("api-key-once-warning")).toBeVisible();
   });
@@ -233,10 +193,8 @@ test.describe("Project Settings - API Key Section", () => {
     browserName,
   }) => {
     test.skip(browserName !== "chromium", "Clipboard permissions only supported in Chromium");
-    // Grant clipboard permissions
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
 
-    // The key (and its copy button) only exist after a regenerate.
     await page.getByTestId("regenerate-button").click();
     await page.getByTestId("confirm-regenerate-button").click();
 
@@ -245,7 +203,6 @@ test.describe("Project Settings - API Key Section", () => {
 
     await page.getByTestId("copy-api-key-button").click();
 
-    // Verify clipboard content matches the freshly regenerated key
     const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
     expect(clipboardText).toBe(newKey);
   });
@@ -253,7 +210,6 @@ test.describe("Project Settings - API Key Section", () => {
   test("should show regenerate confirmation dialog", async ({ page }) => {
     await page.getByTestId("regenerate-button").click();
 
-    // Dialog should appear
     const dialog = page.getByTestId("regenerate-confirm-dialog");
     await expect(dialog).toBeVisible();
     await expect(dialog.getByText(/regenerate api key/i)).toBeVisible();
@@ -264,10 +220,8 @@ test.describe("Project Settings - API Key Section", () => {
     await page.getByTestId("regenerate-button").click();
     await page.getByTestId("cancel-regenerate-button").click();
 
-    // Dialog should close
     await expect(page.getByTestId("regenerate-confirm-dialog")).not.toBeVisible();
 
-    // No new key was issued, so nothing is displayed.
     await expect(page.getByTestId("api-key-display")).toHaveCount(0);
   });
 
@@ -277,10 +231,8 @@ test.describe("Project Settings - API Key Section", () => {
     await page.getByTestId("regenerate-button").click();
     await page.getByTestId("confirm-regenerate-button").click();
 
-    // Dialog should close
     await expect(page.getByTestId("regenerate-confirm-dialog")).not.toBeVisible();
 
-    // API key should be different
     const apiKeyDisplay = page.getByTestId("api-key-display");
     await expect(apiKeyDisplay).not.toContainText(originalApiKey);
   });
@@ -306,28 +258,22 @@ test.describe("Project Settings - Log Retention Section", () => {
     const selector = page.getByTestId("retention-selector");
     await expect(selector).toBeVisible();
 
-    // Default should be system default
     await expect(selector).toContainText(/system default/i);
   });
 
   test("should display log statistics", async ({ page }) => {
-    // Stats section should show total logs and oldest log
     await expect(page.getByText(/total logs/i)).toBeVisible();
     await expect(page.getByText(/oldest log/i)).toBeVisible();
     await expect(page.getByText(/effective retention/i)).toBeVisible();
   });
 
   test("should change retention to 30 days", async ({ page }) => {
-    // Open selector
     await page.getByTestId("retention-selector").click();
 
-    // Select 30 days option
     await page.getByTestId("retention-option-30").click();
 
-    // Wait for update
     await page.waitForTimeout(500);
 
-    // Selector should show 30 days
     await expect(page.getByTestId("retention-selector")).toContainText("30 days");
   });
 
@@ -341,15 +287,12 @@ test.describe("Project Settings - Log Retention Section", () => {
   });
 
   test("should persist retention changes after page reload", async ({ page }) => {
-    // Change retention
     await page.getByTestId("retention-selector").click();
     await page.getByTestId("retention-option-90").click();
     await page.waitForTimeout(500);
 
-    // Reload page
     await page.reload();
 
-    // Should still show 90 days
     await expect(page.getByTestId("retention-selector")).toContainText("90 days");
   });
 });
@@ -363,8 +306,6 @@ test.describe("Project Settings - Danger Zone", () => {
     testProject = await createProject(page, "delete-test-project");
     await page.goto(`/projects/${testProject.id}/settings`);
   });
-
-  // No afterEach cleanup needed - project should be deleted
 
   test("should show delete button in danger zone", async ({ page }) => {
     await expect(page.getByTestId("delete-project-button")).toBeVisible();
@@ -383,15 +324,12 @@ test.describe("Project Settings - Danger Zone", () => {
   test("should require type-to-confirm before delete", async ({ page }) => {
     await page.getByTestId("delete-project-button").click();
 
-    // Delete button should be disabled initially
     const confirmButton = page.getByTestId("confirm-delete-button");
     await expect(confirmButton).toBeDisabled();
 
-    // Type wrong name
     await page.getByTestId("delete-confirm-input").fill("wrong-name");
     await expect(confirmButton).toBeDisabled();
 
-    // Type correct name
     await page.getByTestId("delete-confirm-input").fill(testProject.name);
     await expect(confirmButton).toBeEnabled();
   });
@@ -400,7 +338,6 @@ test.describe("Project Settings - Danger Zone", () => {
     await page.getByTestId("delete-project-button").click();
     await page.getByTestId("cancel-delete-button").click();
 
-    // Dialog should close
     await expect(page.getByTestId("delete-confirm-dialog")).not.toBeVisible();
   });
 
@@ -409,10 +346,8 @@ test.describe("Project Settings - Danger Zone", () => {
     await page.getByTestId("delete-confirm-input").fill(testProject.name);
     await page.getByTestId("confirm-delete-button").click();
 
-    // Should redirect to home
     await expect(page).toHaveURL("/", { timeout: 10000 });
 
-    // Project should not exist anymore (mark as deleted)
     testProject.id = "";
   });
 
@@ -448,7 +383,6 @@ test.describe("Project Settings - Quick Start Section", () => {
     const codeBlock = page.getByTestId("example-code");
     await expect(codeBlock).toBeVisible();
     await expect(codeBlock).toContainText("curl");
-    // On load the live key is not shown; the example uses a placeholder.
     await expect(codeBlock).toContainText("YOUR_API_KEY");
   });
 
@@ -472,7 +406,6 @@ test.describe("Project Settings - Quick Start Section", () => {
   });
 
   test("should inline the live key into examples after regenerating", async ({ page }) => {
-    // After regenerating, the freshly issued key is woven into the examples.
     await page.getByTestId("regenerate-button").click();
     await page.getByTestId("confirm-regenerate-button").click();
 
@@ -518,13 +451,11 @@ test.describe("Project Settings - Layout", () => {
     const grid = page.getByTestId("settings-grid");
     await expect(grid).toBeVisible();
 
-    // Verify grid has 2 columns by checking CSS
     const gridStyle = await grid.evaluate((el) => {
       const computed = window.getComputedStyle(el);
       return computed.gridTemplateColumns;
     });
 
-    // Should have 2 equal columns (e.g., "400px 400px" or similar)
     const columns = gridStyle.split(" ").filter((c) => c !== "");
     expect(columns.length).toBe(2);
   });
@@ -535,7 +466,6 @@ test.describe("Project Settings - Layout", () => {
     const grid = page.getByTestId("settings-grid");
     await expect(grid).toBeVisible();
 
-    // Verify grid has 1 column on mobile
     const gridStyle = await grid.evaluate((el) => {
       const computed = window.getComputedStyle(el);
       return computed.gridTemplateColumns;
@@ -551,7 +481,6 @@ test.describe("Project Settings - Layout", () => {
     const dangerZone = page.getByTestId("danger-zone");
     await expect(dangerZone).toBeVisible();
 
-    // Danger zone should NOT be inside the grid
     const isInsideGrid = await dangerZone.evaluate((el) => {
       return el.closest('[data-testid="settings-grid"]') !== null;
     });
@@ -562,10 +491,8 @@ test.describe("Project Settings - Layout", () => {
     const grid = page.getByTestId("settings-grid");
     const sections = grid.locator("section");
 
-    // 4 sections in grid (General, API Key, Quick Start, Log Retention)
     await expect(sections).toHaveCount(4);
 
-    // Verify order by checking headings
     const headings = await sections.locator("h2").allTextContents();
     expect(headings[0]).toContain("General");
     expect(headings[1]).toContain("API Key");

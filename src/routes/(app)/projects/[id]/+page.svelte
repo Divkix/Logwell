@@ -32,10 +32,8 @@ import type { PageData } from './$types';
 
 const { data }: { data: PageData } = $props();
 
-// Hard cap on in-memory streamed logs per client (matches LOG_STREAM_CONFIG.MAX_LOGS_UPPER_LIMIT)
 const MAX_STREAMED_LOGS = 10000;
 
-// Show skeleton when navigating TO this page (project logs page, not stats)
 const navTo = $navigating?.to?.url.pathname;
 const isNavigating = $derived(
   !!navTo &&
@@ -45,7 +43,6 @@ const isNavigating = $derived(
     !navTo.endsWith('/settings'),
 );
 
-// Convert server data logs (with string timestamps) to Log type (with Date timestamps)
 function parseLogTimestamp(log: PageData['logs'][number]): Log {
   return {
     ...log,
@@ -53,7 +50,6 @@ function parseLogTimestamp(log: PageData['logs'][number]): Log {
   } as Log;
 }
 
-// Convert ClientLog (from SSE) to Log type (with Date timestamps)
 function parseClientLog(log: ClientLog): Log {
   return {
     ...log,
@@ -61,8 +57,6 @@ function parseClientLog(log: ClientLog): Log {
   } as Log;
 }
 
-// Convert server project data to Project type (reactive to handle invalidateAll)
-// Note: ownerId is intentionally not exposed to client
 const projectData = $derived<Omit<Project, 'ownerId'>>({
   id: data.project.id,
   name: data.project.name,
@@ -72,7 +66,6 @@ const projectData = $derived<Omit<Project, 'ownerId'>>({
   updatedAt: data.project.updatedAt ? new Date(data.project.updatedAt) : null,
 });
 
-// Local state (intentionally capture initial values - managed via URL navigation)
 let liveEnabled = $state(true);
 // svelte-ignore state_referenced_locally
 let searchValue = $state(data.filters.search);
@@ -87,44 +80,34 @@ let selectedLogId = $state<string | null>(null);
 let loading = $state(false);
 let searchInputRef = $state<HTMLInputElement | null>(null);
 
-// Track new log IDs for highlighting
 let newLogIds = $state<Set<string>>(new Set());
 const highlightTimers: ReturnType<typeof setTimeout>[] = [];
 
-// Pagination state for Load More
 let loadedMoreLogs = $state<Log[]>([]);
 // svelte-ignore state_referenced_locally
 let nextCursor = $state<string | null>(data.pagination.nextCursor ?? null);
 let isLoadingMore = $state(false);
 
-// Sort state owned by the page so j/k navigation walks the same order the
-// table renders. Bound into LogTable, which drives the header-click UI.
 let sortKey = $state<SortField | null>(null);
 let sortDirection = $state<SortDirection>(null);
 
-// Count active filters for badge
 const activeFilterCount = $derived(
   (selectedLevels.length > 0 ? 1 : 0) + (searchValue ? 1 : 0) + (selectedRange !== '1h' ? 1 : 0),
 );
 
-// Derive hasFilters for empty state distinction
 const hasFilters = $derived(
   Boolean(searchValue) || selectedLevels.length > 0 || selectedRange !== '1h',
 );
 
-// Live streaming is paused when search is active
 const isLivePaused = $derived(Boolean(data.filters.search));
 
-// Streamed logs from SSE
 let streamedLogs = $state<Log[]>([]);
 
-// Handle incoming logs from SSE stream
 function handleIncomingLogs(logs: ClientLog[]) {
   const parsedLogs = logs.map(parseClientLog);
   const ids = parsedLogs.map((l) => l.id);
   newLogIds = new Set([...ids, ...newLogIds]);
 
-  // Remove highlight after 3s; track timer for cleanup
   const timer = setTimeout(() => {
     newLogIds = new Set([...newLogIds].filter((id) => !ids.includes(id)));
     highlightTimers.splice(highlightTimers.indexOf(timer), 1);
@@ -134,15 +117,13 @@ function handleIncomingLogs(logs: ClientLog[]) {
   streamedLogs = [...parsedLogs, ...streamedLogs].slice(0, MAX_STREAMED_LOGS);
 }
 
-// Track SSE connection state reactively for UI
 let sseConnected = $state(false);
 let streamError = $state<Error | null>(null);
 
-// Use the SSE hook for log streaming (connection managed reactively via $effect below)
 // svelte-ignore state_referenced_locally
 const logStream = useLogStream({
   projectId: data.project.id,
-  enabled: false, // Initial state; $effect manages actual connection
+  enabled: false,
   onLogs: handleIncomingLogs,
   onConnectionChange: (connected) => {
     sseConnected = connected;
@@ -153,7 +134,6 @@ const logStream = useLogStream({
   },
 });
 
-// Manage stream connection based on liveEnabled and pause state
 $effect(() => {
   logStream.setProjectId(data.project.id);
   if (liveEnabled && !isLivePaused) {
@@ -167,8 +147,6 @@ $effect(() => {
   };
 });
 
-// Clear highlight-removal timers only on component unmount — not on every
-// live-mode toggle, which would otherwise strand the "new log" highlight.
 $effect(() => {
   return () => {
     for (const t of highlightTimers) clearTimeout(t);
@@ -176,15 +154,11 @@ $effect(() => {
   };
 });
 
-// Reset pagination state when data changes (filters applied)
 $effect(() => {
-  // This runs when data.logs changes (after navigation with new filters)
   loadedMoreLogs = [];
   nextCursor = data.pagination.nextCursor ?? null;
 });
 
-// Combined logs: streamed + server-loaded + loaded more (with proper Date conversion)
-// Deduplicate by ID so the same log never appears twice; streamed logs win on collisions
 const allLogs = $derived.by(() => {
   const seen = new Set<string>();
   const result: Log[] = [];
@@ -213,8 +187,6 @@ const allLogs = $derived.by(() => {
   return result;
 });
 
-// Sorted view used by j/k keyboard navigation — must match what LogTable
-// renders (it sorts the same `allLogs` with the same bound sort state).
 const sortedAllLogs = $derived(sortLogs(allLogs, sortKey, sortDirection));
 
 function handleSearch(value: string) {
@@ -238,8 +210,7 @@ function handleTimeRangeChange(range: TimeRange) {
 async function updateFilters() {
   loading = true;
   try {
-    streamedLogs = []; // Clear streamed logs on filter change
-
+    streamedLogs = [];
     const params = new URLSearchParams();
     if (searchValue) params.set('search', searchValue);
     if (selectedLevels.length > 0) params.set('level', selectedLevels.join(','));
@@ -321,7 +292,6 @@ function handleRemoveRange() {
 }
 
 function scrollSelectedIntoView() {
-  // Prefer table row (desktop) to avoid matching hidden mobile card first
   const element =
     document.querySelector('table [data-selected="true"]') ??
     document.querySelector('[data-selected="true"]');
@@ -329,24 +299,18 @@ function scrollSelectedIntoView() {
 }
 
 function handleKeyboardShortcut(event: KeyboardEvent) {
-  // Block shortcuts in form elements, during IME composition, or with modifiers
   if (shouldBlockShortcut(event)) {
     return;
   }
 
-  // Block shortcuts when modal is open
   if (showDetailModal || showHelpModal) {
     return;
   }
 
-  // Block navigation during loading state
   const isLoading = loading || isLoadingMore;
-
   switch (event.key) {
     case 'j': {
-      // Skip navigation when loading or no logs
       if (isLoading || sortedAllLogs.length === 0) return;
-      // Navigate to next log
       const currentIdxJ = selectedLogId ? sortedAllLogs.findIndex((l) => l.id === selectedLogId) : -1;
       const nextIdxJ = currentIdxJ < sortedAllLogs.length - 1 ? currentIdxJ + 1 : currentIdxJ;
       if (nextIdxJ !== currentIdxJ || currentIdxJ === -1) {
@@ -358,9 +322,7 @@ function handleKeyboardShortcut(event: KeyboardEvent) {
       break;
     }
     case 'k': {
-      // Skip navigation when loading or no logs
       if (isLoading || sortedAllLogs.length === 0) return;
-      // Navigate to previous log
       const currentIdxK = selectedLogId ? sortedAllLogs.findIndex((l) => l.id === selectedLogId) : -1;
       if (currentIdxK > 0) {
         selectedLogId = sortedAllLogs[currentIdxK - 1]?.id ?? null;
@@ -370,28 +332,23 @@ function handleKeyboardShortcut(event: KeyboardEvent) {
       break;
     }
     case 'Enter': {
-      // Open modal for selected log (only when a log is selected)
       const selectedForEnter = selectedLogId ? sortedAllLogs.find((l) => l.id === selectedLogId) : null;
       if (selectedForEnter) {
         selectedLog = selectedForEnter;
         showDetailModal = true;
         event.preventDefault();
       }
-      // Don't preventDefault when no selection - allow buttons to work normally
       break;
     }
     case '/':
-      // Focus search input
       event.preventDefault();
       searchInputRef?.focus();
       break;
     case 'l':
-      // Toggle live mode (skip if paused due to search)
       if (isLivePaused) return;
       liveEnabled = !liveEnabled;
       break;
     case '?':
-      // Open help modal
       showHelpModal = true;
       event.preventDefault();
       break;
@@ -406,7 +363,6 @@ function handleKeyboardShortcut(event: KeyboardEvent) {
 {:else}
   {#key data.project.id}
   <div class="space-y-4 sm:space-y-6">
-    <!-- Header -->
     <div class="flex items-center justify-between gap-2">
       <div class="flex items-center gap-2 sm:gap-4 min-w-0">
         <a
@@ -420,7 +376,6 @@ function handleKeyboardShortcut(event: KeyboardEvent) {
         <h1 class="text-lg sm:text-2xl font-bold truncate">{data.project.name}</h1>
       </div>
 
-      <!-- Desktop/Tablet header actions -->
       <div data-testid="project-header-actions" class="hidden sm:flex items-center gap-2">
         <a
           href="/projects/{data.project.id}/incidents"
@@ -449,12 +404,9 @@ function handleKeyboardShortcut(event: KeyboardEvent) {
       </div>
     </div>
 
-    <!-- Filters Bar -->
     <div class="flex flex-wrap items-center gap-2 sm:gap-4">
-      <!-- Live Toggle - always visible -->
       <LiveToggle bind:enabled={liveEnabled} disabled={isLivePaused} isConnected={sseConnected} />
 
-      <!-- Connection Status -->
       <ConnectionStatus
         isConnecting={liveEnabled && !sseConnected && !streamError}
         error={streamError}
@@ -469,9 +421,7 @@ function handleKeyboardShortcut(event: KeyboardEvent) {
         </span>
       {/if}
 
-      <!-- Filter Panel - collapsible on mobile, inline on desktop -->
       <FilterPanel {activeFilterCount}>
-        <!-- Search Input -->
         <div data-testid="search-container" class="w-full sm:w-auto sm:flex-1 sm:max-w-sm">
           <SearchInput
             bind:value={searchValue}
@@ -481,17 +431,14 @@ function handleKeyboardShortcut(event: KeyboardEvent) {
           />
         </div>
 
-        <!-- Level Filter -->
         <div class="w-full sm:w-auto overflow-x-auto">
           <LevelFilter value={selectedLevels} onchange={handleLevelChange} />
         </div>
 
-        <!-- Time Range Picker -->
         <div class="w-full sm:w-auto">
           <TimeRangePicker value={selectedRange} onchange={handleTimeRangeChange} />
         </div>
 
-        <!-- Export Button - only show when logs exist -->
         {#if allLogs.length > 0}
           <div class="w-full sm:w-auto">
             <ExportButton
@@ -503,11 +450,9 @@ function handleKeyboardShortcut(event: KeyboardEvent) {
           </div>
         {/if}
 
-        <!-- Clear Filters Button -->
         <ClearFiltersButton visible={activeFilterCount > 0} onclick={clearFilters} />
       </FilterPanel>
 
-      <!-- Active Filter Chips (Desktop) -->
       <ActiveFilterChips
         levels={selectedLevels}
         search={searchValue}
@@ -518,7 +463,6 @@ function handleKeyboardShortcut(event: KeyboardEvent) {
       />
     </div>
 
-    <!-- Log Table (responsive: cards on mobile, table on desktop) -->
     <LogTable
       logs={allLogs}
       {loading}
@@ -532,7 +476,6 @@ function handleKeyboardShortcut(event: KeyboardEvent) {
       bind:sortDirection
     />
 
-    <!-- Load More Button -->
     {#if nextCursor}
       <div class="flex justify-center py-4">
         <Button
@@ -551,7 +494,6 @@ function handleKeyboardShortcut(event: KeyboardEvent) {
       </div>
     {/if}
 
-    <!-- Pagination Info -->
     {#if data.pagination.total > 0}
       <div class="text-xs sm:text-sm text-muted-foreground">
         Showing {Math.min(allLogs.length, data.pagination.limit)} of {data.pagination.totalIsCapped ? `${data.pagination.total.toLocaleString()}+` : data.pagination.total.toLocaleString()} logs
@@ -564,7 +506,6 @@ function handleKeyboardShortcut(event: KeyboardEvent) {
   {/key}
 {/if}
 
-<!-- Log Detail Modal -->
 {#if selectedLog}
   <LogDetailModal
     log={selectedLog}
@@ -574,8 +515,6 @@ function handleKeyboardShortcut(event: KeyboardEvent) {
   />
 {/if}
 
-<!-- Keyboard Help Modal -->
 <KeyboardHelpModal open={showHelpModal} onClose={() => showHelpModal = false} />
 
-<!-- Mobile Bottom Navigation -->
 <BottomNav projectId={data.project.id} />

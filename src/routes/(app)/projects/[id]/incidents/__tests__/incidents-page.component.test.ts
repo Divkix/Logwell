@@ -7,7 +7,6 @@ import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } fr
 import type { IncidentListItem } from "$lib/shared/types";
 import type { PageData } from "../$types";
 
-// Hoisted mocks so they can be referenced by the vi.mock factories below.
 const { mockGoto, mockToastError } = vi.hoisted(() => ({
   mockGoto: vi.fn().mockResolvedValue(undefined),
   mockToastError: vi.fn(),
@@ -41,7 +40,6 @@ vi.mock("$lib/hooks/use-incident-stream.svelte", () => ({
   }),
 }));
 
-// Import the page after mocks are registered.
 import IncidentsPage from "../+page.svelte";
 
 function makeIncident(overrides: Partial<IncidentListItem> = {}): IncidentListItem {
@@ -99,7 +97,6 @@ describe("IncidentsPage", () => {
       if (url.includes("/incidents?cursor=")) {
         return Promise.resolve(makeLoadMoreResponse());
       }
-      // Detail/timeline requests: non-OK so the page skips schema parsing.
       return Promise.resolve(new Response(null, { status: 500 }));
     });
   });
@@ -113,7 +110,6 @@ describe("IncidentsPage", () => {
   it("appends Load More incidents to the base list for display", async () => {
     const { rerender } = render(IncidentsPage, { props: { data: makeData() } });
 
-    // Base list: 2 incidents.
     expect(screen.getAllByTestId("incident-row")).toHaveLength(2);
 
     const loadMoreButton = screen.getByRole("button", { name: /load more/i });
@@ -126,17 +122,12 @@ describe("IncidentsPage", () => {
       expect.stringContaining("/api/projects/proj_1/incidents?cursor=cursor_1"),
     );
 
-    // After loading more, the page must be re-rendered (simulating the same
-    // data flowing back from the `?incident=` navigation) with the SAME
-    // status/range filters but a selected incident id.
     await rerender({
       data: makeData({
         filters: { status: "open", range: "24h", selectedIncidentId: "inc_1" },
       }),
     });
 
-    // The bug: previously the reset effect wiped loaded-more items whenever
-    // the selection param changed. Loaded-more incidents must survive.
     await waitFor(() => {
       expect(screen.getAllByTestId("incident-row")).toHaveLength(4);
     });
@@ -151,8 +142,6 @@ describe("IncidentsPage", () => {
       expect(screen.getAllByTestId("incident-row")).toHaveLength(4);
     });
 
-    // A real filter change (status open -> resolved) must reset the list to
-    // the server-provided base data and drop loaded-more incidents.
     await rerender({
       data: makeData({
         incidents: [

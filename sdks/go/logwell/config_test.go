@@ -6,12 +6,10 @@ import (
 	"time"
 )
 
-// validAPIKey returns a valid API key for testing.
 func validAPIKey() string {
 	return "lw_" + "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" // 32 chars after lw_
 }
 
-// validEndpoint returns a valid endpoint for testing.
 func validEndpoint() string {
 	return "http://localhost:3000"
 }
@@ -68,7 +66,6 @@ func TestConfigValidateAPIKey(t *testing.T) {
 		apiKey    string
 		wantError bool
 	}{
-		// Valid API keys
 		{
 			name:      "valid with lowercase alphanumeric",
 			apiKey:    "lw_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0",
@@ -105,7 +102,6 @@ func TestConfigValidateAPIKey(t *testing.T) {
 			wantError: false,
 		},
 
-		// Invalid API keys
 		{
 			name:      "empty",
 			apiKey:    "",
@@ -180,7 +176,6 @@ func TestConfigValidateAPIKey(t *testing.T) {
 				t.Errorf("validateConfig() error = %v, want nil for apiKey %q", err, tt.apiKey)
 			}
 
-			// Check error type for invalid cases
 			if tt.wantError && err != nil {
 				logwellErr, ok := err.(*Error)
 				if !ok {
@@ -199,7 +194,6 @@ func TestConfigValidateEndpoint(t *testing.T) {
 		endpoint  string
 		wantError bool
 	}{
-		// Valid endpoints
 		{
 			name:      "http localhost with port",
 			endpoint:  "http://localhost:3000",
@@ -231,7 +225,6 @@ func TestConfigValidateEndpoint(t *testing.T) {
 			wantError: false,
 		},
 
-		// Invalid endpoints
 		{
 			name:      "empty",
 			endpoint:  "",
@@ -286,7 +279,6 @@ func TestConfigValidateEndpoint(t *testing.T) {
 				t.Errorf("validateConfig() error = %v, want nil for endpoint %q", err, tt.endpoint)
 			}
 
-			// Check error type for invalid cases
 			if tt.wantError && err != nil {
 				logwellErr, ok := err.(*Error)
 				if !ok {
@@ -305,13 +297,11 @@ func TestConfigValidateBatchSize(t *testing.T) {
 		batchSize int
 		wantError bool
 	}{
-		// Valid values
 		{"minimum valid (1)", 1, false},
 		{"maximum valid (100)", 100, false},
 		{"mid range (50)", 50, false},
 		{"default value (50)", 50, false},
 
-		// Invalid values
 		{"zero", 0, true},
 		{"negative", -1, true},
 		{"above max (101)", 101, true},
@@ -340,7 +330,6 @@ func TestConfigValidateFlushInterval(t *testing.T) {
 		flushInterval time.Duration
 		wantError     bool
 	}{
-		// Valid values
 		{"minimum valid (100ms)", 100 * time.Millisecond, false},
 		{"maximum valid (60s)", 60 * time.Second, false},
 		{"mid range (5s)", 5 * time.Second, false},
@@ -348,7 +337,6 @@ func TestConfigValidateFlushInterval(t *testing.T) {
 		{"500ms", 500 * time.Millisecond, false},
 		{"30 seconds", 30 * time.Second, false},
 
-		// Invalid values
 		{"zero", 0, true},
 		{"below min (99ms)", 99 * time.Millisecond, true},
 		{"below min (50ms)", 50 * time.Millisecond, true},
@@ -379,13 +367,11 @@ func TestConfigValidateMaxQueueSize(t *testing.T) {
 		maxQueueSize int
 		wantError    bool
 	}{
-		// Valid values
 		{"minimum valid (1)", 1, false},
 		{"maximum valid (100000)", 100000, false},
 		{"mid range (5000)", 5000, false},
 		{"default value (1000)", 1000, false},
 
-		// Invalid values
 		{"zero", 0, true},
 		{"negative", -1, true},
 		{"above max (100001)", 100001, true},
@@ -414,14 +400,12 @@ func TestConfigValidateMaxRetries(t *testing.T) {
 		maxRetries int
 		wantError  bool
 	}{
-		// Valid values
 		{"minimum valid (0)", 0, false},
 		{"maximum valid (10)", 10, false},
 		{"mid range (5)", 5, false},
 		{"default value (3)", 3, false},
 		{"one", 1, false},
 
-		// Invalid values
 		{"negative", -1, true},
 		{"above max (11)", 11, true},
 		{"way above max (100)", 100, true},
@@ -541,7 +525,6 @@ func TestConfigOptions(t *testing.T) {
 
 func TestConfigValidationBounds(t *testing.T) {
 	t.Run("bounds constants are correct", func(t *testing.T) {
-		// BatchSize bounds
 		if MinBatchSize != 1 {
 			t.Errorf("MinBatchSize = %d, want 1", MinBatchSize)
 		}
@@ -549,7 +532,6 @@ func TestConfigValidationBounds(t *testing.T) {
 			t.Errorf("MaxBatchSize = %d, want 100", MaxBatchSize)
 		}
 
-		// FlushInterval bounds
 		if MinFlushInterval != 100*time.Millisecond {
 			t.Errorf("MinFlushInterval = %v, want 100ms", MinFlushInterval)
 		}
@@ -557,7 +539,6 @@ func TestConfigValidationBounds(t *testing.T) {
 			t.Errorf("MaxFlushInterval = %v, want 60s", MaxFlushInterval)
 		}
 
-		// MaxQueueSize bounds
 		if MinMaxQueueSize != 1 {
 			t.Errorf("MinMaxQueueSize = %d, want 1", MinMaxQueueSize)
 		}
@@ -565,7 +546,6 @@ func TestConfigValidationBounds(t *testing.T) {
 			t.Errorf("MaxMaxQueueSize = %d, want 100000", MaxMaxQueueSize)
 		}
 
-		// MaxRetries bounds
 		if MinMaxRetries != 0 {
 			t.Errorf("MinMaxRetries = %d, want 0", MinMaxRetries)
 		}
@@ -577,7 +557,6 @@ func TestConfigValidationBounds(t *testing.T) {
 
 func TestConfigValidationMultipleErrors(t *testing.T) {
 	t.Run("validation fails fast on first error", func(t *testing.T) {
-		// Empty endpoint AND empty API key - should fail on endpoint first
 		cfg := &Config{
 			Endpoint:      "",
 			APIKey:        "",
@@ -594,7 +573,6 @@ func TestConfigValidationMultipleErrors(t *testing.T) {
 		if !ok {
 			t.Fatal("error is not *Error type")
 		}
-		// Should fail on endpoint first (checked before API key)
 		if logwellErr.Message != "endpoint is required" {
 			t.Errorf("error message = %q, want 'endpoint is required'", logwellErr.Message)
 		}

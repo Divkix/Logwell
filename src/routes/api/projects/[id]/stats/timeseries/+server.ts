@@ -34,22 +34,16 @@ import type { RequestEvent } from "./$types";
  * - 404 not_found: Project does not exist or not owned by user
  */
 export async function GET(event: RequestEvent): Promise<Response> {
-  // Require authentication and project ownership
   const authResult = await requireProjectOwnership(event, event.params.id);
   if (isErrorResponse(authResult)) return authResult;
 
   const db = await getDbClient(event.locals);
   const projectId = event.params.id;
 
-  // Parse range parameter (default to 24h)
   const range: TimeRange = parseTimeRange(event.url.searchParams.get("range")) ?? "24h";
 
-  // Parse optional from parameter (to sync with page server's time range)
   const fromParam = event.url.searchParams.get("from");
 
-  // Calculate time boundaries
-  // If 'from' is provided, use it to ensure consistency with page server
-  // Otherwise calculate from current time
   const rangeEnd = new Date();
   const rangeStart = fromParam
     ? (() => {
@@ -59,7 +53,6 @@ export async function GET(event: RequestEvent): Promise<Response> {
     : getTimeRangeStart(range, rangeEnd);
   const config = getTimeBucketConfig(range);
 
-  // Build WHERE conditions
   const conditions: SQL[] = [
     eq(log.projectId, projectId),
     gte(log.timestamp, rangeStart),

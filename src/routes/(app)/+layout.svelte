@@ -27,23 +27,18 @@ async function handleLogout() {
 <div class="flex min-h-screen flex-col">
   <header class="border-b bg-background">
     <div class="container mx-auto flex h-14 items-center justify-between px-4">
-      <!-- Logo/Title -->
       <a href="/" class="flex items-center gap-2 font-semibold text-lg">
         <Logo size={24} />
         <span>Logwell</span>
       </a>
 
-      <!-- Right side: User info, Theme toggle, Logout -->
       <div class="flex items-center gap-2 sm:gap-4">
-        <!-- User info - hidden on mobile -->
         <span class="hidden sm:inline text-sm text-muted-foreground">
           {data.user.name || data.user.email}
         </span>
 
-        <!-- Theme toggle -->
         <ThemeToggle />
 
-        <!-- Logout button - icon only on mobile, with text on larger screens -->
         <Button
           variant="ghost"
           size="sm"
@@ -58,7 +53,6 @@ async function handleLogout() {
     </div>
   </header>
 
-  <!-- Main content with bottom padding on mobile for bottom nav -->
   <main class="container mx-auto flex-1 px-4 py-6 pb-20 sm:pb-6">
     {@render children()}
   </main>

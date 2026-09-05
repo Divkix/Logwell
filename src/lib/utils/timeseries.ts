@@ -10,9 +10,6 @@ export interface TimeSeriesBucket {
   count: number;
 }
 
-/**
- * Get bucket configuration for a time range
- */
 export function getTimeBucketConfig(range: TimeRange): TimeBucketConfig {
   switch (range) {
     case "15m":
@@ -28,10 +25,6 @@ export function getTimeBucketConfig(range: TimeRange): TimeBucketConfig {
   }
 }
 
-/**
- * Group timestamps into bucket indices
- * Returns a map of bucketIndex -> count
- */
 export function bucketTimestamps(
   timestamps: Date[],
   config: TimeBucketConfig,
@@ -52,10 +45,6 @@ export function bucketTimestamps(
   return buckets;
 }
 
-/**
- * Fill in missing buckets with zero counts
- * Returns array of TimeSeriesBucket sorted chronologically
- */
 export function fillMissingBuckets(
   bucketCounts: Record<number, number>,
   config: TimeBucketConfig,

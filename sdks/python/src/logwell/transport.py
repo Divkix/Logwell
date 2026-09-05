@@ -52,32 +52,17 @@ class TransportConfig:
         )
 
 
+MAX_BACKOFF_SECONDS = 10.0
+
+
 def _backoff_seconds(attempt: int, base_delay: float = 0.1) -> float:
-    """Exponential backoff ceiling in seconds for a given attempt (no jitter).
-
-    Args:
-        attempt: Current attempt number (0-indexed)
-        base_delay: Base delay in seconds (default: 100ms)
-
-    Returns:
-        min(base_delay * 2^attempt, 10) — the ceiling used both by _delay
-        and as the cap for Retry-After sleeps (mirrors the TS SDK).
-
-    Note: `1 << attempt` is used instead of `2 ** attempt` because mypy
+    """Note: `1 << attempt` is used instead of `2 ** attempt` because mypy
     types `int ** int` as Any (no-any-return under --strict).
     """
-    return min(base_delay * (1 << attempt), 10.0)
+    return min(base_delay * (1 << attempt), MAX_BACKOFF_SECONDS)
 
 
 async def _delay(attempt: int, base_delay: float = 0.1) -> None:
-    """Delay with exponential backoff and jitter.
-
-    Args:
-        attempt: Current attempt number (0-indexed)
-        base_delay: Base delay in seconds (default: 100ms)
-
-    Formula: min(base_delay * 2^attempt, 10) + 30% jitter
-    """
     delay_secs = _backoff_seconds(attempt, base_delay)
     jitter = random.random() * delay_secs * 0.3
     await asyncio.sleep(delay_secs + jitter)
@@ -103,12 +88,10 @@ class HttpTransport:
         else:
             self._config = TransportConfig.from_logwell_config(config)
 
-        # Strip trailing slash to avoid double-slash in URL (PY-11)
         self._ingest_url = f"{self._config.endpoint.rstrip('/')}/v1/ingest"
         self._client: httpx.AsyncClient | None = None
 
     async def _get_client(self) -> httpx.AsyncClient:
-        """Get or create the HTTP client."""
         if self._client is None:
             self._client = httpx.AsyncClient(timeout=self._config.timeout)
         return self._client
@@ -145,16 +128,10 @@ class HttpTransport:
             except LogwellError as error:
                 last_error = error
 
-                # Don't retry non-retryable errors
                 if not error.retryable:
                     raise
 
-                # Don't delay after the last attempt
                 if attempt < self._config.max_retries:
-                    # Honor Retry-After header for 429 responses (PY-14), but cap
-                    # the sleep at the exponential backoff ceiling so a huge
-                    # Retry-After can't stall the retry loop longer than the
-                    # normal backoff would (mirrors TS).
                     retry_after = getattr(error, "retry_after", None)
                     if retry_after is not None:
                         await asyncio.sleep(min(retry_after, _backoff_seconds(attempt)))
@@ -164,17 +141,6 @@ class HttpTransport:
         raise last_error
 
     async def _do_request(self, logs: list[LogEntry]) -> IngestResponse:
-        """Execute the HTTP request.
-
-        Args:
-            logs: Array of log entries to send
-
-        Returns:
-            Parsed IngestResponse
-
-        Raises:
-            LogwellError: On network or HTTP errors
-        """
         client = await self._get_client()
 
         try:
@@ -203,12 +169,10 @@ class HttpTransport:
                 True,
             ) from e
 
-        # Handle error responses
         if not response.is_success:
             error_body = self._try_parse_error(response)
             raise self._create_error(response.status_code, error_body, response)
 
-        # Parse successful response, guarding against non-JSON bodies (PY-7)
         try:
             data: IngestResponse = response.json()
         except Exception:
@@ -216,14 +180,6 @@ class HttpTransport:
         return data
 
     def _try_parse_error(self, response: httpx.Response) -> str:
-        """Try to parse error message from response body.
-
-        Args:
-            response: HTTP response
-
-        Returns:
-            Error message string
-        """
         try:
             body: dict[str, Any] = response.json()
             return body.get("message") or body.get("error") or "Unknown error"
@@ -233,16 +189,6 @@ class HttpTransport:
     def _create_error(
         self, status: int, message: str, response: httpx.Response | None = None
     ) -> LogwellError:
-        """Create appropriate LogwellError based on status code.
-
-        Args:
-            status: HTTP status code
-            message: Error message
-            response: Optional response for header inspection
-
-        Returns:
-            LogwellError with appropriate code and retryable flag
-        """
         if status == 401:
             return LogwellError(
                 f"Authentication failed (401): {message}. "
@@ -270,7 +216,6 @@ class HttpTransport:
                 status,
                 True,
             )
-            # Parse Retry-After header (PY-14)
             if response is not None:
                 retry_after_header = response.headers.get("Retry-After")
                 if retry_after_header:

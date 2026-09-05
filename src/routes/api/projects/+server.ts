@@ -31,12 +31,10 @@ import type { RequestEvent } from "./$types";
  * Note: API keys are NOT included in list response for security.
  */
 export async function GET(event: RequestEvent): Promise<Response> {
-  // Require session authentication
   const { user } = await requireAuth(event);
 
   const db = await getDbClient(event.locals);
 
-  // Query projects owned by the authenticated user
   const projects = await db
     .select({
       id: project.id,
@@ -48,9 +46,6 @@ export async function GET(event: RequestEvent): Promise<Response> {
     .where(eq(project.ownerId, user.id))
     .orderBy(desc(project.createdAt));
 
-  // Get log counts for all projects in a single GROUP BY query instead of a
-  // per-project COUNT loop. This keeps the query count constant regardless of
-  // how many projects the user owns.
   const projectIds = projects.map((p) => p.id);
   const logCounts =
     projectIds.length > 0
@@ -99,20 +94,16 @@ export async function GET(event: RequestEvent): Promise<Response> {
  * - 400 duplicate_name: Project name already exists
  */
 export async function POST(event: RequestEvent): Promise<Response> {
-  // CSRF protection for state-changing request
   const csrfError = checkCsrfOrigin(event);
   if (csrfError) return csrfError;
 
-  // Validate Content-Type
   const contentTypeError = requireJsonContentType(event.request);
   if (contentTypeError) return contentTypeError;
 
-  // Require session authentication
   const { user } = await requireAuth(event);
 
   const db = await getDbClient(event.locals);
 
-  // Parse request body
   let body: unknown;
   try {
     body = await event.request.json();
@@ -120,7 +111,6 @@ export async function POST(event: RequestEvent): Promise<Response> {
     return apiError(400, "invalid_json", "Invalid JSON body");
   }
 
-  // Validate request body
   const validation = projectCreatePayloadSchema.safeParse(body);
   if (!validation.success) {
     const issues = validation.error.issues ?? [];
@@ -133,7 +123,6 @@ export async function POST(event: RequestEvent): Promise<Response> {
 
   const { name } = validation.data;
 
-  // Check for duplicate name scoped to the current user
   const [existing] = await db
     .select({ id: project.id })
     .from(project)
@@ -143,8 +132,6 @@ export async function POST(event: RequestEvent): Promise<Response> {
     return apiError(400, "duplicate_name", "A project with this name already exists");
   }
 
-  // Generate new project with current user as owner. The plaintext key is
-  // returned once below and never persisted — only its hash is stored.
   const generatedApiKey = generateApiKey();
   const newProject = {
     id: nanoid(),
@@ -153,7 +140,6 @@ export async function POST(event: RequestEvent): Promise<Response> {
     ownerId: user.id,
   };
 
-  // Insert project
   const [created] = await db.insert(project).values(newProject).returning();
   if (!created) return apiError(500, "internal_error", "Failed to create project");
 
@@ -161,7 +147,6 @@ export async function POST(event: RequestEvent): Promise<Response> {
     {
       id: created.id,
       name: created.name,
-      // Shown only once; the plaintext key is not stored and cannot be retrieved later.
       apiKey: generatedApiKey,
       createdAt: created.createdAt?.toISOString(),
       updatedAt: created.updatedAt?.toISOString(),

@@ -34,7 +34,6 @@ describe("KeyboardHelpModal", () => {
       render(KeyboardHelpModal, { props: { open: true } });
 
       for (const shortcut of SHORTCUTS) {
-        // Check that the key is displayed (as kbd element text)
         expect(screen.getByText(shortcut.key)).toBeInTheDocument();
       }
     });
@@ -90,7 +89,6 @@ describe("KeyboardHelpModal", () => {
     it("does not throw when onClose is not provided", async () => {
       render(KeyboardHelpModal, { props: { open: true } });
 
-      // Should not throw
       await expect(fireEvent.keyDown(document, { key: "Escape" })).resolves.not.toThrow();
     });
   });
@@ -166,7 +164,6 @@ describe("KeyboardHelpModal", () => {
     it("shortcut keys have aria-labels", () => {
       render(KeyboardHelpModal, { props: { open: true } });
 
-      // Query directly for kbd elements since they don't have a standard ARIA role
       const allKbds = document.querySelectorAll("kbd");
       expect(allKbds.length).toBe(SHORTCUTS.length);
       for (const kbd of allKbds) {

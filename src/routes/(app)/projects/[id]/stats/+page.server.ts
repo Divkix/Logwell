@@ -11,25 +11,20 @@ export const load: PageServerLoad = async (event) => {
   const { project: projectData } = await requireProjectOwnershipPage(event, projectId);
   const db = await getDbClient(event.locals);
 
-  // Parse query parameters - default to 24h for stats overview
   const url = event.url;
   const rangeParam = url.searchParams.get("range") || "24h";
 
-  // Calculate time range
   const range = parseTimeRange(rangeParam);
   const fromDate = range ? getTimeRangeStart(range) : null;
 
-  // Build WHERE conditions
   const conditions: SQL[] = [eq(log.projectId, projectId)];
 
-  // Time range filter
   if (fromDate) {
     conditions.push(gte(log.timestamp, fromDate));
   }
 
   const whereClause = and(...conditions);
 
-  // Get level distribution counts
   const levelCounts = await db
     .select({
       level: log.level,
@@ -39,7 +34,6 @@ export const load: PageServerLoad = async (event) => {
     .where(whereClause)
     .groupBy(log.level);
 
-  // Convert level counts to object and calculate total
   const levelCountsObj: Record<string, number> = {};
   let totalLogs = 0;
 
@@ -50,7 +44,6 @@ export const load: PageServerLoad = async (event) => {
     }
   }
 
-  // Calculate percentages
   const levelPercentagesObj: Record<string, number> = {};
 
   if (totalLogs > 0) {
@@ -73,7 +66,6 @@ export const load: PageServerLoad = async (event) => {
     },
     filters: {
       range: rangeParam,
-      // Pass the exact timestamp used so timeseries can use the same range
       from: fromDate?.toISOString() ?? null,
     },
   };

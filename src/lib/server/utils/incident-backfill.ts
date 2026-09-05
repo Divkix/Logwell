@@ -16,10 +16,6 @@ export interface BackfillProjectResult {
   touchedIncidents: number;
 }
 
-/**
- * Backfills incident fields for project logs in a time window.
- * Idempotent: repeated runs should not change already-correct rows.
- */
 export async function backfillProjectIncidents(
   db: DatabaseClient,
   projectId: string,
@@ -143,7 +139,6 @@ export async function backfillProjectIncidents(
       updatedLogs++;
     }
 
-    // Recompute stats for all touched incidents based on their actual linked logs
     const touchedIncidentIds = touchedIncidents.map((i) => i.id);
     if (touchedIncidentIds.length > 0) {
       for (const incidentId of touchedIncidentIds) {
@@ -152,7 +147,6 @@ export async function backfillProjectIncidents(
             firstSeen: sql<string>`MIN(${log.timestamp})`,
             lastSeen: sql<string>`MAX(${log.timestamp})`,
             totalEvents: sql<number>`COUNT(*)`,
-            // Use CASE to order levels: debug=1 < info=2 < warn=3 < error=4 < fatal=5
             highestLevel: sql<LogLevel>`(ARRAY['debug','info','warn','error','fatal'])[MAX(
               CASE ${log.level}
                 WHEN 'debug' THEN 1

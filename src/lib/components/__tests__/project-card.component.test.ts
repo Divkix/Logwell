@@ -2,7 +2,6 @@ import { cleanup, render, screen } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import ProjectCard from "../project-card.svelte";
 
-// Mock formatRelativeTime to have deterministic output
 vi.mock("$lib/utils/format", () => ({
   formatRelativeTime: vi.fn((date: Date) => {
     const diffMs = Date.now() - date.getTime();
@@ -24,7 +23,7 @@ describe("ProjectCard", () => {
     id: "proj_123",
     name: "my-backend",
     logCount: 15420,
-    lastActivity: new Date(Date.now() - 2 * 60 * 1000), // 2 minutes ago
+    lastActivity: new Date(Date.now() - 2 * 60 * 1000),
   };
 
   afterEach(() => {
@@ -75,7 +74,6 @@ describe("ProjectCard", () => {
   it("View Logs button is rendered", () => {
     render(ProjectCard, { props: { project: baseProject } });
 
-    // Button is now a regular button - navigation is handled by parent anchor wrapper
     const button = screen.getByRole("button", { name: /view logs/i });
     expect(button).toBeInTheDocument();
   });

@@ -5,16 +5,6 @@ let cleanupStarted = false;
 let cleanupIntervalId: ReturnType<typeof setInterval> | null = null;
 let isRunning = false;
 
-/**
- * Starts the log cleanup scheduler.
- *
- * - Runs cleanup immediately on first call
- * - Schedules periodic cleanup at configured interval
- * - Handles errors gracefully (logs and continues)
- * - Only starts once (subsequent calls are no-ops)
- *
- * @returns true if scheduler was started, false if already running
- */
 export function startCleanupScheduler(): boolean {
   if (cleanupStarted) {
     return false;
@@ -22,10 +12,8 @@ export function startCleanupScheduler(): boolean {
 
   cleanupStarted = true;
 
-  // Run immediately on startup
   void runCleanupWithGuard();
 
-  // Schedule periodic runs
   cleanupIntervalId = setInterval(runCleanupWithGuard, RETENTION_CONFIG.LOG_CLEANUP_INTERVAL_MS);
 
   console.log(
@@ -35,25 +23,15 @@ export function startCleanupScheduler(): boolean {
   return true;
 }
 
-/**
- * Stops the cleanup scheduler.
- * Primarily useful for testing.
- */
 export function stopCleanupScheduler(): void {
   if (cleanupIntervalId) {
     clearInterval(cleanupIntervalId);
     cleanupIntervalId = null;
   }
   cleanupStarted = false;
-  // Clear the overlap guard so a later startCleanupScheduler() can run an
-  // immediate cycle again (otherwise a cycle still in flight — or one whose
-  // promise never settled — would make the next start a no-op).
   isRunning = false;
 }
 
-/**
- * Overlap guard: skips the cycle if a previous one is still running.
- */
 async function runCleanupWithGuard(): Promise<void> {
   if (isRunning) return;
   isRunning = true;
@@ -64,10 +42,6 @@ async function runCleanupWithGuard(): Promise<void> {
   }
 }
 
-/**
- * Runs a single cleanup cycle.
- * Handles errors gracefully to prevent scheduler crash.
- */
 async function runCleanup(): Promise<void> {
   try {
     const result = await cleanupOldLogs();

@@ -29,7 +29,6 @@ import { checkRateLimit, INGEST_RPM } from "$lib/server/utils/rate-limit";
  * Uses project API key authentication (Authorization: Bearer lw_xxx).
  */
 export const POST: RequestHandler = async ({ request, locals }) => {
-  // Validate Content-Type
   const contentTypeError = requireJsonContentType(request);
   if (contentTypeError) return contentTypeError;
 
@@ -39,8 +38,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   try {
     projectId = await validateApiKey(request, db);
 
-    // Re-verify project exists to prevent stale cache (multi-process) from causing FK violations.
-    // This intentionally adds one DB read per ingest request for correctness across processes.
     const [projectRow] = await db
       .select({ id: project.id })
       .from(project)
@@ -55,7 +52,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     throw err;
   }
 
-  // Apply rate limiting per project
   if (!checkRateLimit(`ingest:${projectId}`, INGEST_RPM)) {
     return new Response(JSON.stringify({ error: "rate_limited" }), {
       status: 429,
@@ -73,9 +69,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     );
   }
 
-  // Batch size is enforced accurately against the real log-record count after
-  // normalization below (resourceLogs.length is the resource count, not the
-  // record count, so an early heuristic could reject valid payloads).
   let normalized: NormalizedOtlpLogsResult;
   try {
     normalized = normalizeOtlpLogsRequest(body);
@@ -167,10 +160,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
             };
           });
 
-          // The union DatabaseClient type prevents TypeScript from resolving the
-          // .returning(fields) overload on the transaction builder. The cast is
-          // necessary; the explicit column map is the source of truth and
-          // ensures `search` (the generated tsvector) is never fetched.
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const insertedLogs: StreamLog[] = await (
             tx.insert(log).values(logEntries) as any

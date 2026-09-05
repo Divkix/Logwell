@@ -40,7 +40,6 @@ async function copyKey() {
 <svelte:document onkeydown={handleKeyDown} />
 
 {#if open}
-  <!-- Backdrop -->
   <button
     type="button"
     data-testid="api-key-reveal-overlay"
@@ -50,7 +49,6 @@ async function copyKey() {
     tabindex="-1"
   ></button>
 
-  <!-- Dialog -->
   <div
     role="dialog"
     aria-labelledby="api-key-reveal-title"
@@ -63,7 +61,6 @@ async function copyKey() {
       className,
     )}
   >
-    <!-- Header -->
     <div class="mb-4 flex items-center justify-between">
       <h2 id="api-key-reveal-title" class="text-lg font-semibold">Save your API key</h2>
       <button

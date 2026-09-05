@@ -1,10 +1,5 @@
 import type { LogLevel } from "$lib/server/db/schema";
 
-/**
- * Returns the HSL color string for a given log level
- * @param level - The log level (debug, info, warn, error, fatal)
- * @returns HSL color string in format "hsl(h, s%, l%)"
- */
 export function getLevelColor(level: LogLevel): string {
   switch (level) {
     case "debug":
@@ -20,11 +15,6 @@ export function getLevelColor(level: LogLevel): string {
   }
 }
 
-/**
- * Returns the Tailwind CSS background class for a given log level
- * @param level - The log level (debug, info, warn, error, fatal)
- * @returns Tailwind CSS class string (e.g., "bg-blue-500/20")
- */
 export function getLevelBgClass(level: LogLevel): string {
   switch (level) {
     case "debug":

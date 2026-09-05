@@ -23,11 +23,9 @@ import type { RequestEvent } from "./$types";
  * - 404 not_found: Project does not exist or not owned by user
  */
 export async function POST(event: RequestEvent): Promise<Response> {
-  // CSRF protection for state-changing request
   const csrfError = checkCsrfOrigin(event);
   if (csrfError) return csrfError;
 
-  // Require authentication and project ownership
   const authResult = await requireProjectOwnership(event, event.params.id);
   if (isErrorResponse(authResult)) return authResult;
 
@@ -35,14 +33,10 @@ export async function POST(event: RequestEvent): Promise<Response> {
   const db = await getDbClient(event.locals);
   const projectId = event.params.id;
 
-  // Generate new API key. Only the hash is persisted; the plaintext key is
-  // returned once below and cannot be retrieved later.
   const newApiKey = generateApiKey();
 
-  // Invalidate the old API key's cache entry before replacing its stored hash
   invalidateApiKeyCacheByHash(projectData.apiKeyHash);
 
-  // Update project with the new API key hash
   await db
     .update(project)
     .set({

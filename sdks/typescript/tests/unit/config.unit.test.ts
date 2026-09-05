@@ -27,7 +27,6 @@ describe("API_KEY_REGEX", () => {
   });
 
   it("allows hyphens and underscores in key body", () => {
-    // Must be exactly 32 chars after lw_ prefix
     const withHyphen = "lw_aBcDeFgHiJkLmNo-qRsTuVwXyZ123456";
     const withUnderscore = "lw_aBcDeFgHiJkLmNo_qRsTuVwXyZ123456";
     expect(API_KEY_REGEX.test(withHyphen)).toBe(true);

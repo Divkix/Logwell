@@ -4,10 +4,6 @@ import { username } from "better-auth/plugins";
 import { env } from "./config/env";
 import type { DatabaseClient } from "./db/db";
 
-/**
- * Creates a better-auth instance with the provided database
- * @param database - Drizzle database instance (postgres-js or PGlite)
- */
 export function createAuth(database: DatabaseClient) {
   return betterAuth({
     database: drizzleAdapter(database, {
@@ -15,23 +11,18 @@ export function createAuth(database: DatabaseClient) {
     }),
     emailAndPassword: {
       enabled: true,
-      autoSignIn: true, // Automatically sign in after signup
+      autoSignIn: true,
     },
     plugins: [username()],
     session: {
-      expiresIn: 60 * 60 * 24 * 7, // 7 days
-      updateAge: 60 * 60 * 24, // Update session every 24 hours
+      expiresIn: 60 * 60 * 24 * 7,
+      updateAge: 60 * 60 * 24,
     },
     secret: env.BETTER_AUTH_SECRET,
-    // Self-hosted app - trust the configured ORIGIN for reverse proxies/tunnels
     trustedOrigins: [process.env.ORIGIN].filter(Boolean) as string[],
   });
 }
 
-/**
- * Default auth instance using production database
- * Lazy-loaded to avoid importing $env/dynamic/private in test environments
- */
 let _auth: ReturnType<typeof createAuth> | undefined;
 let _initPromise: Promise<void> | undefined;
 
@@ -50,8 +41,6 @@ async function initAuth(): Promise<void> {
 export const auth = new Proxy({} as ReturnType<typeof createAuth>, {
   get(_target, prop) {
     if (!_auth) {
-      // For synchronous access, we need to throw if not initialized
-      // The hooks.server.ts should call initAuth() first
       throw new Error("Auth not initialized. Call initAuth() before accessing auth properties.");
     }
     return _auth[prop as keyof typeof _auth];
@@ -60,8 +49,5 @@ export const auth = new Proxy({} as ReturnType<typeof createAuth>, {
 
 export { initAuth };
 
-/**
- * Type exports for better-auth session and user
- */
 export type Session = ReturnType<typeof createAuth>["$Infer"]["Session"]["session"];
 export type User = ReturnType<typeof createAuth>["$Infer"]["Session"]["user"];

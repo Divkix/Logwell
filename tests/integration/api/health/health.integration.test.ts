@@ -10,11 +10,9 @@ describe("Health Check Endpoint", () => {
   let mockEvent: Parameters<typeof GET>[0];
 
   beforeEach(async () => {
-    // Create in-memory PGlite database for testing
     pglite = new PGlite();
     db = drizzle(pglite, { schema });
 
-    // Run migrations
     await pglite.exec(`
       CREATE TABLE IF NOT EXISTS project (
         id TEXT PRIMARY KEY,
@@ -25,7 +23,6 @@ describe("Health Check Endpoint", () => {
       );
     `);
 
-    // Create mock event with database
     mockEvent = {
       locals: { db } as unknown as App.Locals,
       request: new Request("http://localhost/api/health"),
@@ -94,7 +91,6 @@ describe("Health Check Endpoint", () => {
 
   describe("GET /api/health - unhealthy states", () => {
     it("returns 503 when database connection fails", async () => {
-      // Create new event without valid db (simulating connection failure)
       const failingEvent = {
         ...mockEvent,
         locals: { db: null } as unknown as App.Locals,
@@ -109,7 +105,6 @@ describe("Health Check Endpoint", () => {
     });
 
     it("includes error message when database check fails", async () => {
-      // Create event with broken db mock
       const brokenDb = {
         execute: () => {
           throw new Error("Connection refused");
@@ -134,7 +129,6 @@ describe("Health Check Endpoint", () => {
       const response = await GET(mockEvent);
       const body = await response.json();
 
-      // Verify all expected fields exist
       expect(body).toHaveProperty("status");
       expect(body).toHaveProperty("database");
       expect(body).toHaveProperty("timestamp");

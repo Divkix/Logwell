@@ -49,7 +49,6 @@ function handleInput(event: Event) {
   }, DEBOUNCE_DELAY_MS);
 }
 
-// Cleanup on component destroy
 $effect(() => {
   return () => {
     clearDebounceTimer();

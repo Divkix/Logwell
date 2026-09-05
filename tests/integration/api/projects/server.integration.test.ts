@@ -11,10 +11,6 @@ import { hashApiKey } from "$lib/server/utils/api-key";
 import { GET, POST } from "../../../../src/routes/api/projects/+server";
 import { seedLogs, seedProject, seedProjects } from "../../../fixtures/db";
 
-/**
- * Helper to create a mock SvelteKit RequestEvent for session-authenticated routes.
- * Adds a same-origin Origin header to state-changing requests so they pass CSRF checks.
- */
 function createRequestEvent(
   request: Request,
   db: PgliteDatabase<typeof schema>,
@@ -52,9 +48,6 @@ function createRequestEvent(
   } as unknown;
 }
 
-/**
- * Helper to assert that a promise rejects with a SvelteKit HTTP error
- */
 async function expectHttpError(
   promise: Promise<unknown>,
   expectedStatus: number,
@@ -85,7 +78,6 @@ describe("GET /api/projects", () => {
     cleanup = setup.cleanup;
     auth = createAuth(db);
 
-    // Create authenticated user
     const signUpResult = await auth.api.signUpEmail({
       body: {
         email: "test@example.com",
@@ -141,10 +133,8 @@ describe("GET /api/projects", () => {
     });
 
     it("returns projects with log counts", async () => {
-      // Create 2 projects
       const [project1, project2] = await seedProjects(db, 2, { ownerId: userId });
 
-      // Add logs: 5 to project1, 0 to project2
       await seedLogs(db, project1!.id, 5);
 
       const request = new Request("http://localhost/api/projects", {
@@ -159,7 +149,6 @@ describe("GET /api/projects", () => {
       expect(body).toHaveProperty("projects");
       expect(body.projects).toHaveLength(2);
 
-      // Find projects by id
       const returnedProject1 = body.projects.find((p: { id: string }) => p.id === project1!.id);
       const returnedProject2 = body.projects.find((p: { id: string }) => p.id === project2!.id);
 
@@ -174,9 +163,7 @@ describe("GET /api/projects", () => {
     });
 
     it("returns projects ordered by createdAt descending", async () => {
-      // Create projects with specific timestamps
       const oldProject = await seedProject(db, { name: "old-project", ownerId: userId });
-      // Wait a bit to ensure different timestamps
       await new Promise((resolve) => setTimeout(resolve, 10));
       const newProject = await seedProject(db, { name: "new-project", ownerId: userId });
 
@@ -190,7 +177,6 @@ describe("GET /api/projects", () => {
       expect(response.status).toBe(200);
       const body = await response.json();
 
-      // Newest first
       expect(body.projects[0].id).toBe(newProject.id);
       expect(body.projects[1].id).toBe(oldProject.id);
     });
@@ -199,9 +185,6 @@ describe("GET /api/projects", () => {
       const [project1, project2] = await seedProjects(db, 2, { ownerId: userId });
       await seedLogs(db, project1!.id, 5);
 
-      // The count query must GROUP BY projectId in one pass. A per-project
-      // COUNT loop selects `{ count }` without a projectId — that shape must
-      // never reach the database.
       const originalSelect = db.select.bind(db);
       vi.spyOn(db, "select").mockImplementation(((fields?: unknown) => {
         if (fields && typeof fields === "object" && "count" in fields && !("projectId" in fields)) {
@@ -257,7 +240,6 @@ describe("POST /api/projects", () => {
     cleanup = setup.cleanup;
     auth = createAuth(db);
 
-    // Create authenticated user
     const signUpResult = await auth.api.signUpEmail({
       body: {
         email: "test@example.com",
@@ -324,7 +306,6 @@ describe("POST /api/projects", () => {
       expect(body).toHaveProperty("createdAt");
       expect(body).toHaveProperty("updatedAt");
 
-      // Verify project was actually created in database
       const [dbProject] = await db.select().from(project).where(eq(project.id, body.id));
       expect(dbProject).toBeDefined();
       expect(dbProject!.name).toBe("my-new-project");
@@ -332,7 +313,6 @@ describe("POST /api/projects", () => {
     });
 
     it("returns 400 for duplicate name for same user", async () => {
-      // Create existing project
       await seedProject(db, { name: "existing-project", ownerId: userId });
 
       const request = new Request("http://localhost/api/projects", {
@@ -355,10 +335,8 @@ describe("POST /api/projects", () => {
     });
 
     it("allows different users to create projects with the same name", async () => {
-      // Create a project for the first user
       await seedProject(db, { name: "shared-project-name", ownerId: userId });
 
-      // Create a second user
       const signUpResult2 = await auth.api.signUpEmail({
         body: {
           email: "other@example.com",
@@ -381,7 +359,6 @@ describe("POST /api/projects", () => {
         session: sessionData2.session,
       };
 
-      // Second user tries to create a project with the same name
       const request = new Request("http://localhost/api/projects", {
         method: "POST",
         headers: {
@@ -507,7 +484,6 @@ describe("POST /api/projects", () => {
     });
 
     it("generates unique API keys for each project", async () => {
-      // Create two projects
       const request1 = new Request("http://localhost/api/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

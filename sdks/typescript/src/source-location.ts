@@ -59,7 +59,6 @@ export function parseStackFrame(frameLine: string): SourceLocation | undefined {
     return undefined;
   }
 
-  // Try V8 format with parentheses first (most common, handles all edge cases)
   let match = V8_PAREN_REGEX.exec(frameLine);
   if (match) {
     const sourceFile = match[1];
@@ -72,7 +71,6 @@ export function parseStackFrame(frameLine: string): SourceLocation | undefined {
     }
   }
 
-  // Try V8 format without parentheses (anonymous functions)
   match = V8_BARE_REGEX.exec(frameLine);
   if (match) {
     const sourceFile = match[1];
@@ -85,7 +83,6 @@ export function parseStackFrame(frameLine: string): SourceLocation | undefined {
     }
   }
 
-  // Try SpiderMonkey/JSC format (Firefox/Safari)
   match = SPIDERMONKEY_REGEX.exec(frameLine);
   if (match) {
     const sourceFile = match[1];
@@ -134,8 +131,6 @@ export function captureSourceLocation(skipFrames: number): SourceLocation | unde
   const firstLine = lines[0] || "";
   const hasErrorHeader = /^[\w$]*Error(:|$)/.test(firstLine);
 
-  // Calculate target frame index:
-  // Skip: header (if present) + captureSourceLocation frame + skipFrames
   const headerOffset = hasErrorHeader ? 1 : 0;
   const targetFrameIndex = headerOffset + 1 + skipFrames;
 

@@ -9,9 +9,6 @@ import { clearApiKeyCache } from "$lib/server/utils/api-key";
 import { GET } from "../../../../../../src/routes/api/projects/[id]/stats/timeseries/+server";
 import { seedLogs, seedProject } from "../../../../../fixtures/db";
 
-/**
- * Helper to create a mock SvelteKit RequestEvent for [id]/stats/timeseries routes
- */
 function createRequestEvent(
   request: Request,
   db: PgliteDatabase<typeof schema>,
@@ -42,9 +39,6 @@ function createRequestEvent(
   } as unknown;
 }
 
-/**
- * Helper to assert that a promise rejects with a SvelteKit HTTP error
- */
 async function expectHttpError(
   promise: Promise<unknown>,
   expectedStatus: number,
@@ -76,7 +70,6 @@ describe("GET /api/projects/[id]/stats/timeseries", () => {
     auth = createAuth(db);
     clearApiKeyCache();
 
-    // Create authenticated user
     const signUpResult = await auth.api.signUpEmail({
       body: {
         email: "test@example.com",
@@ -216,7 +209,6 @@ describe("GET /api/projects/[id]/stats/timeseries", () => {
   describe("Empty State", () => {
     it("returns all zero counts when no logs in range", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
-      // Don't seed any logs
 
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/stats/timeseries?range=24h`,
@@ -272,7 +264,6 @@ describe("GET /api/projects/[id]/stats/timeseries", () => {
       const testProject = await seedProject(db, { ownerId: userId });
       const now = new Date();
 
-      // Seed exactly 7 logs 30 minutes ago (should be in one specific bucket for 1h range)
       const thirtyMinAgo = new Date(now.getTime() - 30 * 60 * 1000);
       await seedLogs(db, testProject.id, 7, { timestamp: thirtyMinAgo });
 
@@ -285,7 +276,6 @@ describe("GET /api/projects/[id]/stats/timeseries", () => {
       const response = await GET(event as never);
       const data = await response.json();
 
-      // Find the bucket with logs (should have count 7)
       const nonZeroBuckets = data.buckets.filter((b: { count: number }) => b.count > 0);
       expect(nonZeroBuckets).toHaveLength(1);
       expect(nonZeroBuckets[0].count).toBe(7);
@@ -296,7 +286,6 @@ describe("GET /api/projects/[id]/stats/timeseries", () => {
       const testProject = await seedProject(db, { ownerId: userId });
       const now = new Date();
 
-      // Seed logs at different hours
       await seedLogs(db, testProject.id, 5, {
         timestamp: new Date(now.getTime() - 2 * 60 * 60 * 1000), // 2 hours ago
       });
@@ -384,11 +373,9 @@ describe("GET /api/projects/[id]/stats/timeseries", () => {
       const testProject = await seedProject(db, { ownerId: userId });
       const now = new Date();
 
-      // Seed old logs (before the 24h range - should be excluded)
       await seedLogs(db, testProject.id, 10, {
         timestamp: new Date(now.getTime() - 25 * 60 * 60 * 1000), // 25 hours ago
       });
-      // Seed recent logs (within the 24h range - should be included)
       await seedLogs(db, testProject.id, 5, {
         timestamp: new Date(now.getTime() - 1 * 60 * 60 * 1000), // 1 hour ago
       });
@@ -402,7 +389,6 @@ describe("GET /api/projects/[id]/stats/timeseries", () => {
       const response = await GET(event as never);
       const data = await response.json();
 
-      // Should only count the 5 recent logs
       expect(data.totalCount).toBe(5);
     });
   });

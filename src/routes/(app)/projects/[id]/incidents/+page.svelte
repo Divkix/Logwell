@@ -59,14 +59,9 @@ const projectId = data.project.id;
 
 const isNavigating = $derived($navigating?.to?.url.pathname.endsWith('/incidents') ?? false);
 
-// Base incident list from server data (reflects the current status/range filter).
 // svelte-ignore state_referenced_locally
 let incidents = $state<IncidentListItem[]>([...data.incidents]);
 
-// Incidents loaded via "Load More". Kept separate so the reset effect below
-// only wipes them when the actual status/range filters change, not when the
-// `?incident=` selection param changes (which would otherwise discard loaded
-// items when the user clicks an incident row to select it).
 let loadedMore = $state<IncidentListItem[]>([]);
 
 // svelte-ignore state_referenced_locally
@@ -85,14 +80,10 @@ let refreshTimeout: ReturnType<typeof setTimeout> | null = null;
 let pendingIncidentUpdates: ClientIncident[] = [];
 let detailRequestId = 0;
 
-// Previous filter values tracked privately (not reactive) so the reset effect
-// can distinguish real filter changes from `?incident=` URL updates.
 let prevProjectId: string | null = null;
 let prevStatus: IncidentStatus | null = null;
 let prevRange: IncidentRange | null = null;
 
-// Merge base + loaded-more, dedup by id (base wins), filter by status, and
-// sort by lastSeen descending. This is the displayed list.
 const displayedIncidents = $derived.by(() => {
   const byId = new Map<string, IncidentListItem>();
   for (const item of incidents) byId.set(item.id, item);
@@ -167,10 +158,6 @@ $effect(() => {
   };
 });
 
-// Reset effect — only clears the incident list + loaded-more when the project
-// or the status/range filters actually change.  A `?incident=` selection
-// navigation (which changes `data.filters.selectedIncidentId` but keeps
-// status/range identical) must NOT wipe loaded-more items.
 // svelte-ignore state_referenced_locally
 $effect(() => {
   // svelte-ignore state_referenced_locally
@@ -212,7 +199,7 @@ async function fetchIncidentDetail(incidentId: string) {
       fetch(`/api/projects/${projectId}/incidents/${incidentId}/timeline?range=${selectedRange}`),
     ]);
 
-    if (myId !== detailRequestId) return; // stale, discard
+    if (myId !== detailRequestId) return;
 
     if (!detailRes.ok || !timelineRes.ok) {
       detail = null;
@@ -223,7 +210,7 @@ async function fetchIncidentDetail(incidentId: string) {
     const detailJson = await detailRes.json();
     const timelineJson = await timelineRes.json();
 
-    if (myId !== detailRequestId) return; // stale after awaiting json
+    if (myId !== detailRequestId) return;
 
     const detailParsed = incidentDetailSchema.safeParse(detailJson);
     const timelineParsed = incidentTimelineSchema.safeParse(timelineJson);

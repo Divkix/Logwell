@@ -12,23 +12,19 @@ import type { PageData } from './$types';
 
 const { data }: { data: PageData } = $props();
 
-// Local state (intentionally capture initial value - managed via URL navigation)
 // svelte-ignore state_referenced_locally
 let selectedRange = $state<TimeRange>((data.filters.range as TimeRange) || '24h');
 let loading = $state(false);
 
-// Timeseries chart state
 let timeseriesData = $state<TimeSeriesBucket[]>([]);
 let timeseriesLoading = $state(true);
 let timeseriesError = $state<string | undefined>();
 let fetchController: AbortController | null = null;
 
-// Fetch timeseries data
 async function fetchTimeseries(range: TimeRange, from: string | null, signal: AbortSignal) {
   timeseriesLoading = true;
   timeseriesError = undefined;
   try {
-    // Pass the 'from' timestamp to sync with page server's time range
     const params = new URLSearchParams({ range });
     if (from) {
       params.set('from', from);
@@ -52,21 +48,17 @@ async function fetchTimeseries(range: TimeRange, from: string | null, signal: Ab
   }
 }
 
-// Fetch timeseries on mount and when data changes (page reload updates data.filters.from)
 $effect(() => {
-  // Cancel previous in-flight request
   fetchController?.abort();
   fetchController = new AbortController();
   const signal = fetchController.signal;
   fetchTimeseries(selectedRange, data.filters.from, signal);
 
-  // Abort the last in-flight request on unmount
   return () => {
     fetchController?.abort();
   };
 });
 
-// Show skeleton when navigating TO this page
 const isNavigating = $derived($navigating?.to?.url.pathname.endsWith('/stats') ?? false);
 
 function handleTimeRangeChange(range: TimeRange) {
@@ -90,7 +82,6 @@ async function updateFilters() {
   }
 }
 
-// Prepare chart data
 const chartData = $derived({
   levelCounts: data.stats.levelCounts,
   levelPercentages: data.stats.levelPercentages,
@@ -101,7 +92,6 @@ const chartData = $derived({
   <StatsSkeleton />
 {:else}
   <div class="space-y-4 sm:space-y-6">
-    <!-- Header -->
     <div class="flex items-center justify-between gap-2">
       <div class="flex items-center gap-2 sm:gap-4 min-w-0">
         <a
@@ -116,7 +106,6 @@ const chartData = $derived({
       </div>
     </div>
 
-    <!-- Stats Header -->
     <div class="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center justify-between gap-3 sm:gap-4">
       <div>
         <h2 class="text-base sm:text-lg font-semibold">Log Level Distribution</h2>
@@ -125,13 +114,11 @@ const chartData = $derived({
         </p>
       </div>
 
-      <!-- Time range picker with horizontal scroll on mobile -->
       <div class="w-full sm:w-auto overflow-x-auto">
         <TimeRangePicker value={selectedRange} onchange={handleTimeRangeChange} disabled={loading} />
       </div>
     </div>
 
-    <!-- Level Distribution Chart Section -->
     <div class="flex justify-center py-4 sm:py-8">
       {#if loading}
         <div class="flex flex-col gap-4">
@@ -150,7 +137,6 @@ const chartData = $derived({
       {/if}
     </div>
 
-    <!-- Timeseries Chart Section -->
     <section class="mt-6 sm:mt-8">
       <h3 class="text-base sm:text-lg font-semibold mb-4">Logs Over Time</h3>
       <div class="h-[250px] sm:h-[300px]">
@@ -163,7 +149,6 @@ const chartData = $derived({
       </div>
     </section>
 
-    <!-- Summary Stats -->
     <div class="text-center text-xs sm:text-sm text-muted-foreground">
       {#if data.stats.totalLogs > 0}
         <p>
@@ -186,5 +171,4 @@ const chartData = $derived({
   </div>
 {/if}
 
-<!-- Mobile Bottom Navigation -->
 <BottomNav projectId={data.project.id} />

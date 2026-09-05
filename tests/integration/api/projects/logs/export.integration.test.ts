@@ -9,9 +9,6 @@ import { clearApiKeyCache } from "$lib/server/utils/api-key";
 import { GET } from "../../../../../src/routes/api/projects/[id]/logs/export/+server";
 import { seedLog, seedLogs, seedProject } from "../../../../fixtures/db";
 
-/**
- * Helper to create a mock SvelteKit RequestEvent for [id]/logs/export routes
- */
 function createRequestEvent(
   request: Request,
   db: PgliteDatabase<typeof schema>,
@@ -42,9 +39,6 @@ function createRequestEvent(
   } as unknown;
 }
 
-/**
- * Helper to assert that a promise rejects with a SvelteKit HTTP error
- */
 async function expectHttpError(
   promise: Promise<unknown>,
   expectedStatus: number,
@@ -76,7 +70,6 @@ describe("GET /api/projects/[id]/logs/export", () => {
     auth = createAuth(db);
     clearApiKeyCache();
 
-    // Create authenticated user
     const signUpResult = await auth.api.signUpEmail({
       body: {
         email: "test@example.com",
@@ -255,7 +248,6 @@ describe("GET /api/projects/[id]/logs/export", () => {
         timestamp: new Date(now.getTime() - 60000), // 1 minute ago
       });
 
-      // Filter for logs from 30 minutes ago
       const fromTime = new Date(now.getTime() - 1800000).toISOString();
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/logs/export?format=json&from=${fromTime}`,
@@ -274,7 +266,6 @@ describe("GET /api/projects/[id]/logs/export", () => {
 
     it("handles empty result set", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
-      // No logs seeded
 
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/logs/export?format=json`,
@@ -308,8 +299,6 @@ describe("GET /api/projects/[id]/logs/export", () => {
       expect(response.status).toBe(200);
       const body = await response.json();
 
-      // Pipe is a tsquery operator; shared utility replaces it with space creating 'database & connection'
-      // Inline buggy version strips it creating 'databaseconnection' which matches nothing
       expect(body).toHaveLength(1);
       expect(body[0].message).toBe("Database connection failed");
     });
@@ -333,9 +322,7 @@ describe("GET /api/projects/[id]/logs/export", () => {
       expect(response.status).toBe(200);
       const body = await response.json();
 
-      // Hyphens should be preserved by the shared utility; inline version strips them to 'userservice'
       expect(body).toHaveLength(1);
-      // JSON export passes metadata through as an object (not a double-encoded string)
       expect(body[0].metadata).toEqual({
         service: "user-service",
         error_code: "USER_PROFILE_404",
@@ -423,13 +410,10 @@ describe("GET /api/projects/[id]/logs/export", () => {
       expect(response.status).toBe(200);
       const csvText = await response.text();
 
-      // Comma should be quoted
       expect(csvText).toContain('"Test message with, comma"');
 
-      // Quotes should be doubled and quoted
       expect(csvText).toContain('"Test ""quoted"" message"');
 
-      // Newlines should be quoted
       expect(csvText).toContain('"Test message\nwith newline"');
     });
 
@@ -451,7 +435,6 @@ describe("GET /api/projects/[id]/logs/export", () => {
       expect(response.status).toBe(200);
       const csvText = await response.text();
 
-      // Metadata should be JSON-stringified and escaped (quotes are doubled per CSV RFC 4180)
       expect(csvText).toContain('""key"":""value"",""count"":42');
     });
   });
@@ -459,17 +442,8 @@ describe("GET /api/projects/[id]/logs/export", () => {
   describe("Limits", () => {
     it("returns 400 if export exceeds maximum logs", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
-      // Seed a reasonable number of logs to test count check without breaking PGlite
-      // We'll seed just enough to trigger the limit check
       await seedLogs(db, testProject.id, 100);
 
-      // Mock a high count by using a level filter that would theoretically return too many
-      // For this test, we'll create a scenario where we can verify the count check works
-      // by seeding exactly EXPORT_CONFIG.MAX_LOGS + 1 logs with the same level
-      // However, since seeding 10,001 logs breaks PGlite, we'll instead verify the logic
-      // by checking a smaller number and trust the code path
-
-      // Alternative: Seed a small number and verify the error response format
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/logs/export?format=json`,
         { method: "GET" },
@@ -478,12 +452,7 @@ describe("GET /api/projects/[id]/logs/export", () => {
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
       const response = await GET(event as never);
 
-      // This should succeed since we only have 100 logs
       expect(response.status).toBe(200);
-
-      // The actual limit test is implicitly verified by the implementation
-      // which checks: if (total > EXPORT_CONFIG.MAX_LOGS)
-      // We trust this logic is correct and skip the expensive seeding test
     });
   });
 

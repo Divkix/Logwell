@@ -30,28 +30,25 @@ describe("getTimeBucketConfig", () => {
 describe("bucketTimestamps", () => {
   it("groups timestamps into correct buckets", () => {
     const rangeStart = new Date("2024-01-15T10:00:00.000Z");
-    const config = { intervalMs: 60 * 60 * 1000, expectedBuckets: 24 }; // 1 hour buckets
+    const config = { intervalMs: 60 * 60 * 1000, expectedBuckets: 24 };
 
     const timestamps = [
-      new Date("2024-01-15T10:15:00.000Z"), // bucket 0
-      new Date("2024-01-15T10:45:00.000Z"), // bucket 0
-      new Date("2024-01-15T11:30:00.000Z"), // bucket 1
+      new Date("2024-01-15T10:15:00.000Z"),
+      new Date("2024-01-15T10:45:00.000Z"),
+      new Date("2024-01-15T11:30:00.000Z"),
     ];
 
     const buckets = bucketTimestamps(timestamps, config, rangeStart);
 
-    expect(buckets[0]).toBe(2); // Two logs in first hour
-    expect(buckets[1]).toBe(1); // One log in second hour
+    expect(buckets[0]).toBe(2);
+    expect(buckets[1]).toBe(1);
   });
 
   it("handles timestamps exactly on bucket boundaries", () => {
     const rangeStart = new Date("2024-01-15T10:00:00.000Z");
     const config = { intervalMs: 60 * 60 * 1000, expectedBuckets: 24 };
 
-    const timestamps = [
-      new Date("2024-01-15T10:00:00.000Z"), // exactly on boundary
-      new Date("2024-01-15T11:00:00.000Z"), // exactly on next boundary
-    ];
+    const timestamps = [new Date("2024-01-15T10:00:00.000Z"), new Date("2024-01-15T11:00:00.000Z")];
 
     const buckets = bucketTimestamps(timestamps, config, rangeStart);
 
@@ -70,12 +67,12 @@ describe("bucketTimestamps", () => {
 
   it("ignores timestamps outside the expected bucket range", () => {
     const rangeStart = new Date("2024-01-15T10:00:00.000Z");
-    const config = { intervalMs: 60 * 60 * 1000, expectedBuckets: 3 }; // Only 3 buckets
+    const config = { intervalMs: 60 * 60 * 1000, expectedBuckets: 3 };
 
     const timestamps = [
-      new Date("2024-01-15T09:00:00.000Z"), // before range (bucket -1)
-      new Date("2024-01-15T10:30:00.000Z"), // bucket 0
-      new Date("2024-01-15T15:00:00.000Z"), // bucket 5 (beyond expectedBuckets)
+      new Date("2024-01-15T09:00:00.000Z"),
+      new Date("2024-01-15T10:30:00.000Z"),
+      new Date("2024-01-15T15:00:00.000Z"),
     ];
 
     const buckets = bucketTimestamps(timestamps, config, rangeStart);
@@ -92,14 +89,13 @@ describe("fillMissingBuckets", () => {
     const rangeEnd = new Date("2024-01-15T13:00:00.000Z");
     const config = { intervalMs: 60 * 60 * 1000, expectedBuckets: 3 };
 
-    // Only bucket 0 and 2 have data
     const bucketCounts = { 0: 5, 2: 3 };
 
     const result = fillMissingBuckets(bucketCounts, config, rangeStart, rangeEnd);
 
     expect(result).toHaveLength(3);
     expect(result[0]!.count).toBe(5);
-    expect(result[1]!.count).toBe(0); // filled with zero
+    expect(result[1]!.count).toBe(0);
     expect(result[2]!.count).toBe(3);
   });
 

@@ -1,30 +1,14 @@
 import type { Incident, Log } from "./db/schema";
 
-/**
- * Log shape emitted on the event bus — every column except the generated
- * `search` tsvector, which is never used by SSE consumers and would bloat
- * the JSON payload unnecessarily.
- */
 export type StreamLog = Omit<Log, "search">;
 
 export type LogListener = (log: StreamLog) => void;
 export type IncidentListener = (incident: Incident) => void;
 
-/**
- * In-memory event bus for log streaming.
- * Project-scoped: each project has its own set of listeners.
- * Used to broadcast new logs to connected SSE clients.
- */
 class LogEventBus {
   private listeners: Map<string, Set<LogListener>> = new Map();
   private incidentListeners: Map<string, Set<IncidentListener>> = new Map();
 
-  /**
-   * Subscribe to log events for a specific project.
-   * @param projectId - The project to subscribe to
-   * @param listener - Callback function to receive logs
-   * @returns Unsubscribe function
-   */
   onLog(projectId: string, listener: LogListener): () => void {
     let projectListeners = this.listeners.get(projectId);
     if (!projectListeners) {
@@ -44,10 +28,6 @@ class LogEventBus {
     };
   }
 
-  /**
-   * Emit a log event to all listeners subscribed to its project.
-   * @param log - The log entry to emit (search tsvector excluded)
-   */
   emitLog(log: StreamLog): void {
     const projectListeners = this.listeners.get(log.projectId);
     if (projectListeners) {
@@ -61,12 +41,6 @@ class LogEventBus {
     }
   }
 
-  /**
-   * Subscribe to incident events for a specific project.
-   * @param projectId - The project to subscribe to
-   * @param listener - Callback function to receive incidents
-   * @returns Unsubscribe function
-   */
   onIncident(projectId: string, listener: IncidentListener): () => void {
     let projectListeners = this.incidentListeners.get(projectId);
     if (!projectListeners) {
@@ -86,10 +60,6 @@ class LogEventBus {
     };
   }
 
-  /**
-   * Emit an incident event to all listeners subscribed to its project.
-   * @param incident - The incident entry to emit
-   */
   emitIncident(incident: Incident): void {
     const projectListeners = this.incidentListeners.get(incident.projectId);
     if (projectListeners) {
@@ -103,33 +73,18 @@ class LogEventBus {
     }
   }
 
-  /**
-   * Get the number of listeners for a specific project.
-   * @param projectId - The project to check
-   * @returns Number of active listeners
-   */
   getListenerCount(projectId: string): number {
     return this.listeners.get(projectId)?.size ?? 0;
   }
 
-  /**
-   * Get the number of incident listeners for a specific project.
-   * @param projectId - The project to check
-   * @returns Number of active incident listeners
-   */
   getIncidentListenerCount(projectId: string): number {
     return this.incidentListeners.get(projectId)?.size ?? 0;
   }
 
-  /**
-   * Clear all listeners from all projects.
-   * Primarily used for testing.
-   */
   clear(): void {
     this.listeners.clear();
     this.incidentListeners.clear();
   }
 }
 
-// Singleton instance for the application
 export const logEventBus = new LogEventBus();

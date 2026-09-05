@@ -48,12 +48,6 @@ export function validateApiKeyFormat(apiKey: string): boolean {
   return API_KEY_REGEX.test(apiKey);
 }
 
-/**
- * Validates a URL string, requiring http or https protocol
- *
- * @param url - URL string to validate
- * @throws LogwellError if the URL is invalid or uses a non-http/https scheme
- */
 function validateEndpointUrl(url: string): void {
   let parsed: URL;
   try {
@@ -74,7 +68,6 @@ function validateEndpointUrl(url: string): void {
  * @throws LogwellError if configuration is invalid
  */
 export function validateConfig(config: Partial<LogwellConfig>): ResolvedConfig {
-  // Validate required fields
   if (!config.apiKey) {
     throw new LogwellError("apiKey is required", "INVALID_CONFIG");
   }
@@ -83,7 +76,6 @@ export function validateConfig(config: Partial<LogwellConfig>): ResolvedConfig {
     throw new LogwellError("endpoint is required", "INVALID_CONFIG");
   }
 
-  // Validate API key format
   if (!validateApiKeyFormat(config.apiKey)) {
     throw new LogwellError(
       "Invalid API key format. Expected: lw_[32 characters]",
@@ -91,10 +83,8 @@ export function validateConfig(config: Partial<LogwellConfig>): ResolvedConfig {
     );
   }
 
-  // Validate endpoint URL (also checks protocol)
   validateEndpointUrl(config.endpoint);
 
-  // Validate numeric options — lower bounds
   if (config.batchSize !== undefined && config.batchSize <= 0) {
     throw new LogwellError("batchSize must be positive", "INVALID_CONFIG");
   }
@@ -115,7 +105,6 @@ export function validateConfig(config: Partial<LogwellConfig>): ResolvedConfig {
     throw new LogwellError("timeout must be a positive finite number", "INVALID_CONFIG");
   }
 
-  // Validate numeric options — upper bounds (TS-7)
   if (config.batchSize !== undefined && config.batchSize > 100) {
     throw new LogwellError("batchSize cannot exceed 100 (server limit)", "INVALID_CONFIG");
   }
@@ -132,10 +121,8 @@ export function validateConfig(config: Partial<LogwellConfig>): ResolvedConfig {
     throw new LogwellError("flushInterval cannot exceed 60000ms", "INVALID_CONFIG");
   }
 
-  // Normalize endpoint: strip trailing slash
   const endpoint = config.endpoint.replace(/\/$/, "");
 
-  // Return merged config with all defaults — typed as ResolvedConfig (no cast needed)
   return {
     apiKey: config.apiKey,
     endpoint,

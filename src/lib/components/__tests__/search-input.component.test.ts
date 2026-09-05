@@ -16,7 +16,6 @@ describe("SearchInput", () => {
   it("renders search icon", () => {
     render(SearchInput);
 
-    // Search icon should be rendered (lucide Search icon)
     const searchIcon = document.querySelector('[data-testid="search-icon"]');
     expect(searchIcon).toBeInTheDocument();
   });
@@ -43,7 +42,6 @@ describe("SearchInput", () => {
       const input = screen.getByRole("textbox");
       await fireEvent.input(input, { target: { value: "error" } });
 
-      // Should not emit immediately
       expect(onSearch).not.toHaveBeenCalled();
     });
 
@@ -54,7 +52,6 @@ describe("SearchInput", () => {
       const input = screen.getByRole("textbox");
       await fireEvent.input(input, { target: { value: "error" } });
 
-      // Advance timers by 300ms
       vi.advanceTimersByTime(300);
 
       expect(onSearch).toHaveBeenCalledTimes(1);
@@ -67,19 +64,15 @@ describe("SearchInput", () => {
 
       const input = screen.getByRole("textbox");
 
-      // Type first value
       await fireEvent.input(input, { target: { value: "err" } });
-      vi.advanceTimersByTime(200); // 200ms passed
+      vi.advanceTimersByTime(200);
 
-      // Type more before 300ms
       await fireEvent.input(input, { target: { value: "error" } });
-      vi.advanceTimersByTime(200); // 400ms total, but only 200ms since last input
+      vi.advanceTimersByTime(200);
 
-      // Should not have emitted yet
       expect(onSearch).not.toHaveBeenCalled();
 
-      // Complete the debounce
-      vi.advanceTimersByTime(100); // 300ms since last input
+      vi.advanceTimersByTime(100);
 
       expect(onSearch).toHaveBeenCalledTimes(1);
       expect(onSearch).toHaveBeenCalledWith("error");
@@ -101,7 +94,6 @@ describe("SearchInput", () => {
       vi.advanceTimersByTime(50);
       await fireEvent.input(input, { target: { value: "error" } });
 
-      // Not yet
       expect(onSearch).not.toHaveBeenCalled();
 
       vi.advanceTimersByTime(300);
@@ -155,8 +147,6 @@ describe("SearchInput", () => {
 
   describe("ref bindable prop", () => {
     it("exposes input element via ref prop", () => {
-      // We can verify the ref is bound by checking that the input element exists
-      // and has the expected attributes when rendered
       render(SearchInput);
 
       const input = screen.getByRole("textbox");
@@ -220,7 +210,6 @@ describe("SearchInput", () => {
       const input = screen.getByRole("textbox");
       input.focus();
 
-      // Should not throw
       await expect(fireEvent.keyDown(input, { key: "Escape" })).resolves.not.toThrow();
     });
   });
