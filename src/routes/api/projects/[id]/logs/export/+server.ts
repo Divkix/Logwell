@@ -1,10 +1,10 @@
-import { and, count, desc, eq, gte, inArray, lte, type SQL, sql } from "drizzle-orm";
+import { and, count, eq, gte, inArray, lte, type SQL, sql } from "drizzle-orm";
 import { EXPORT_CONFIG } from "$lib/server/config/performance";
 import { getDbClient } from "$lib/server/db/db";
 import { log } from "$lib/server/db/schema";
 import { apiError } from "$lib/server/utils/api-error";
-import { cursorRowLessThan, microsColumn } from "$lib/server/utils/cursor";
 import { escapeCSVField } from "$lib/server/utils/csv-serializer";
+import { queryLogs } from "$lib/server/utils/log-query";
 import { isErrorResponse, requireProjectOwnership } from "$lib/server/utils/project-guard";
 import { buildSearchQuery } from "$lib/server/utils/search";
 import { parseLevelFilter } from "$lib/shared/schemas/log";
@@ -134,40 +134,23 @@ export async function GET(event: RequestEvent): Promise<Response> {
         try {
           ctrl.enqueue(encoder.encode(`${CSV_HEADERS.join(",")}\n`));
 
-          let cursorMicros: number | null = null;
-          let cursorId: string | null = null;
+          let cursor: string | null = null;
           let fetched = 0;
 
           while (fetched < EXPORT_CONFIG.MAX_LOGS) {
-            const batchConditions: SQL[] = [...conditions];
-            if (cursorMicros !== null && cursorId !== null) {
-              batchConditions.push(
-                cursorRowLessThan(log.timestamp, log.id, cursorMicros, cursorId),
-              );
-            }
+            const page = await queryLogs(db, {
+              projectId,
+              levels,
+              from: fromDate && !Number.isNaN(fromDate.getTime()) ? fromDate : null,
+              to: toDate && !Number.isNaN(toDate.getTime()) ? toDate : null,
+              search: searchParam,
+              cursor,
+              limit: EXPORT_BATCH_SIZE,
+            });
 
-            const batch = await db
-              .select({
-                id: log.id,
-                level: log.level,
-                message: log.message,
-                metadata: log.metadata,
-                sourceFile: log.sourceFile,
-                lineNumber: log.lineNumber,
-                requestId: log.requestId,
-                userId: log.userId,
-                ipAddress: log.ipAddress,
-                timestamp: log.timestamp,
-                micros: microsColumn(log.timestamp),
-              })
-              .from(log)
-              .where(and(...batchConditions))
-              .orderBy(desc(log.timestamp), desc(log.id))
-              .limit(EXPORT_BATCH_SIZE);
+            if (page.logs.length === 0) break;
 
-            if (batch.length === 0) break;
-
-            for (const l of batch) {
+            for (const l of page.logs) {
               const values: unknown[] = [
                 l.id,
                 l.timestamp?.toISOString() ?? "",
@@ -183,12 +166,9 @@ export async function GET(event: RequestEvent): Promise<Response> {
               ctrl.enqueue(encoder.encode(`${values.map(escapeCSVField).join(",")}\n`));
             }
 
-            fetched += batch.length;
-            const last = batch.at(-1)!;
-            cursorMicros = Math.round(last.micros);
-            cursorId = last.id;
-
-            if (batch.length < EXPORT_BATCH_SIZE) break;
+            fetched += page.logs.length;
+            if (!page.hasMore || !page.nextCursor) break;
+            cursor = page.nextCursor;
           }
 
           ctrl.close();
@@ -212,39 +192,24 @@ export async function GET(event: RequestEvent): Promise<Response> {
       try {
         ctrl.enqueue(encoder.encode("["));
 
-        let cursorMicros: number | null = null;
-        let cursorId: string | null = null;
+        let cursor: string | null = null;
         let fetched = 0;
         let first = true;
 
         while (fetched < EXPORT_CONFIG.MAX_LOGS) {
-          const batchConditions: SQL[] = [...conditions];
-          if (cursorMicros !== null && cursorId !== null) {
-            batchConditions.push(cursorRowLessThan(log.timestamp, log.id, cursorMicros, cursorId));
-          }
+          const page = await queryLogs(db, {
+            projectId,
+            levels,
+            from: fromDate && !Number.isNaN(fromDate.getTime()) ? fromDate : null,
+            to: toDate && !Number.isNaN(toDate.getTime()) ? toDate : null,
+            search: searchParam,
+            cursor,
+            limit: EXPORT_BATCH_SIZE,
+          });
 
-          const batch = await db
-            .select({
-              id: log.id,
-              level: log.level,
-              message: log.message,
-              metadata: log.metadata,
-              sourceFile: log.sourceFile,
-              lineNumber: log.lineNumber,
-              requestId: log.requestId,
-              userId: log.userId,
-              ipAddress: log.ipAddress,
-              timestamp: log.timestamp,
-              micros: microsColumn(log.timestamp),
-            })
-            .from(log)
-            .where(and(...batchConditions))
-            .orderBy(desc(log.timestamp), desc(log.id))
-            .limit(EXPORT_BATCH_SIZE);
+          if (page.logs.length === 0) break;
 
-          if (batch.length === 0) break;
-
-          for (const l of batch) {
+          for (const l of page.logs) {
             const exportable = {
               id: l.id,
               level: l.level,
@@ -261,12 +226,9 @@ export async function GET(event: RequestEvent): Promise<Response> {
             first = false;
           }
 
-          fetched += batch.length;
-          const last = batch.at(-1)!;
-          cursorMicros = Math.round(last.micros);
-          cursorId = last.id;
-
-          if (batch.length < EXPORT_BATCH_SIZE) break;
+          fetched += page.logs.length;
+          if (!page.hasMore || !page.nextCursor) break;
+          cursor = page.nextCursor;
         }
 
         ctrl.enqueue(encoder.encode("]"));

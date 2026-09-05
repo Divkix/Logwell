@@ -1,17 +1,8 @@
 import { json } from "@sveltejs/kit";
-import { and, desc, eq, gte, inArray, lte, type SQL, sql } from "drizzle-orm";
 import { getDbClient } from "$lib/server/db/db";
-import { log } from "$lib/server/db/schema";
 import { apiError } from "$lib/server/utils/api-error";
-import { cappedLogCount } from "$lib/server/utils/capped-count";
-import {
-  decodeCursor,
-  encodeCursor,
-  cursorRowLessThan,
-  microsColumn,
-} from "$lib/server/utils/cursor";
+import { InvalidCursorError, queryLogs } from "$lib/server/utils/log-query";
 import { isErrorResponse, requireProjectOwnership } from "$lib/server/utils/project-guard";
-import { buildSearchQuery } from "$lib/server/utils/search";
 import { parseLevelFilter } from "$lib/shared/schemas/log";
 import type { RequestEvent } from "./$types";
 
@@ -80,81 +71,27 @@ export async function GET(event: RequestEvent): Promise<Response> {
   const fromDate = fromParam ? new Date(fromParam) : null;
   const toDate = toParam ? new Date(toParam) : null;
 
-  const conditions: SQL[] = [eq(log.projectId, projectId)];
-
-  if (cursorParam) {
-    try {
-      const { micros: cursorMicros, id: cursorId } = decodeCursor(cursorParam);
-
-      conditions.push(cursorRowLessThan(log.timestamp, log.id, cursorMicros, cursorId));
-    } catch (error) {
-      return apiError(
-        400,
-        "invalid_cursor",
-        error instanceof Error ? error.message : "Invalid cursor",
-      );
+  let result: Awaited<ReturnType<typeof queryLogs>>;
+  try {
+    result = await queryLogs(db, {
+      projectId,
+      levels,
+      from: fromDate && !Number.isNaN(fromDate.getTime()) ? fromDate : null,
+      to: toDate && !Number.isNaN(toDate.getTime()) ? toDate : null,
+      search: searchParam,
+      cursor: cursorParam,
+      limit,
+      offset,
+    });
+  } catch (error) {
+    if (error instanceof InvalidCursorError) {
+      return apiError(400, "invalid_cursor", error.message);
     }
+    throw error;
   }
-
-  if (levels && levels.length > 0) {
-    conditions.push(inArray(log.level, levels));
-  }
-
-  if (fromDate && !Number.isNaN(fromDate.getTime())) {
-    conditions.push(gte(log.timestamp, fromDate));
-  }
-  if (toDate && !Number.isNaN(toDate.getTime())) {
-    conditions.push(lte(log.timestamp, toDate));
-  }
-
-  if (searchParam?.trim()) {
-    const tsquery = buildSearchQuery(searchParam);
-    if (tsquery) {
-      conditions.push(sql`${log.search} @@ to_tsquery('english', ${tsquery})`);
-    }
-  }
-
-  const whereClause = and(...conditions);
-
-  const countResult = cursorParam ? undefined : await cappedLogCount(db, whereClause);
-  const total = countResult?.total;
-  const totalIsCapped = countResult?.capped ?? false;
-
-  const logs = await db
-    .select({
-      id: log.id,
-      projectId: log.projectId,
-      incidentId: log.incidentId,
-      fingerprint: log.fingerprint,
-      serviceName: log.serviceName,
-      level: log.level,
-      message: log.message,
-      metadata: log.metadata,
-      sourceFile: log.sourceFile,
-      lineNumber: log.lineNumber,
-      requestId: log.requestId,
-      userId: log.userId,
-      ipAddress: log.ipAddress,
-      timestamp: log.timestamp,
-      micros: microsColumn(log.timestamp),
-    })
-    .from(log)
-    .where(whereClause)
-    .orderBy(desc(log.timestamp), desc(log.id))
-    .limit(limit + 1)
-    .offset(cursorParam ? 0 : offset);
-
-  const hasMore = logs.length > limit;
-
-  const logsToReturn = hasMore ? logs.slice(0, limit) : logs;
-
-  const nextCursor =
-    hasMore && logsToReturn.length > 0
-      ? encodeCursor(Math.round(logsToReturn.at(-1)!.micros), logsToReturn.at(-1)!.id)
-      : null;
 
   return json({
-    logs: logsToReturn.map((l) => ({
+    logs: result.logs.map((l) => ({
       id: l.id,
       projectId: l.projectId,
       incidentId: l.incidentId,
@@ -170,9 +107,9 @@ export async function GET(event: RequestEvent): Promise<Response> {
       ipAddress: l.ipAddress,
       timestamp: l.timestamp?.toISOString(),
     })),
-    total: total ?? null,
-    total_is_capped: totalIsCapped,
-    has_more: hasMore,
-    nextCursor,
+    total: result.total,
+    total_is_capped: result.totalIsCapped,
+    has_more: result.hasMore,
+    nextCursor: result.nextCursor,
   });
 }
