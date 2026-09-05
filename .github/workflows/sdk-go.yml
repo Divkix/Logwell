@@ -46,8 +46,9 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v7
         with:
-          go-version: stable
-
+          # Pinned to the repo toolchain (go.mod + test matrix): golangci-lint
+          # v2.10.1 is built with Go 1.26 and panics loading Go 1.27 stdlib sources.
+          go-version: "1.26.x"
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
