@@ -15,14 +15,10 @@ import { buildSearchQuery } from "$lib/server/utils/search";
 import { parseLevelFilter } from "$lib/shared/schemas/log";
 import type { RequestEvent } from "./$types";
 
-// Constants for pagination limits
 const DEFAULT_LIMIT = 100;
 const MIN_LIMIT = 1;
 const MAX_LIMIT = 500;
 
-/**
- * Clamp a number within a range
- */
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
@@ -56,14 +52,12 @@ function clamp(value: number, min: number, max: number): number {
  * - 404 not_found: Project does not exist or not owned by user
  */
 export async function GET(event: RequestEvent): Promise<Response> {
-  // Require authentication and project ownership
   const authResult = await requireProjectOwnership(event, event.params.id);
   if (isErrorResponse(authResult)) return authResult;
 
   const db = await getDbClient(event.locals);
   const projectId = event.params.id;
 
-  // Parse query parameters
   const url = event.url;
   const limitParam = url.searchParams.get("limit");
   const offsetParam = url.searchParams.get("offset");
@@ -73,35 +67,25 @@ export async function GET(event: RequestEvent): Promise<Response> {
   const fromParam = url.searchParams.get("from");
   const toParam = url.searchParams.get("to");
 
-  // Parse and clamp limit
   const limit = clamp(
     limitParam ? Number.parseInt(limitParam, 10) || DEFAULT_LIMIT : DEFAULT_LIMIT,
     MIN_LIMIT,
     MAX_LIMIT,
   );
 
-  // Parse offset (fallback for backward compatibility)
   const offset = offsetParam ? Math.max(0, Number.parseInt(offsetParam, 10) || 0) : 0;
 
-  // Parse level filter
   const levels = parseLevelFilter(levelParam);
 
-  // Parse time range
   const fromDate = fromParam ? new Date(fromParam) : null;
   const toDate = toParam ? new Date(toParam) : null;
 
-  // Build WHERE conditions
   const conditions: SQL[] = [eq(log.projectId, projectId)];
 
-  // Cursor-based pagination condition
   if (cursorParam) {
     try {
       const { micros: cursorMicros, id: cursorId } = decodeCursor(cursorParam);
 
-      // Row-value comparison: (timestamp, id) < (cursorTimestamp, cursorId).
-      // Comparing the full row (instead of a millisecond-truncated timestamp
-      // with an id tie-break) means rows that share the cursor's millisecond
-      // are tie-broken on id and never skipped.
       conditions.push(cursorRowLessThan(log.timestamp, log.id, cursorMicros, cursorId));
     } catch (error) {
       return apiError(
@@ -112,12 +96,10 @@ export async function GET(event: RequestEvent): Promise<Response> {
     }
   }
 
-  // Level filter
   if (levels && levels.length > 0) {
     conditions.push(inArray(log.level, levels));
   }
 
-  // Time range filters
   if (fromDate && !Number.isNaN(fromDate.getTime())) {
     conditions.push(gte(log.timestamp, fromDate));
   }
@@ -125,7 +107,6 @@ export async function GET(event: RequestEvent): Promise<Response> {
     conditions.push(lte(log.timestamp, toDate));
   }
 
-  // Full-text search
   if (searchParam?.trim()) {
     const tsquery = buildSearchQuery(searchParam);
     if (tsquery) {
@@ -135,16 +116,10 @@ export async function GET(event: RequestEvent): Promise<Response> {
 
   const whereClause = and(...conditions);
 
-  // Skip COUNT(*) when a cursor is provided (subsequent pages); saves a DB round-trip.
-  // On the first page use a bounded count (capped at LOG_COUNT_CEILING) so the query
-  // stops scanning after that many rows even for expensive predicates (e.g. full-text search).
   const countResult = cursorParam ? undefined : await cappedLogCount(db, whereClause);
   const total = countResult?.total;
   const totalIsCapped = countResult?.capped ?? false;
 
-  // Fetch logs with pagination (query one extra to detect hasMore).
-  // `micros` carries the row's exact microsecond timestamp so the cursor can
-  // tie-break rows that share the same millisecond.
   const logs = await db
     .select({
       id: log.id,
@@ -167,15 +142,12 @@ export async function GET(event: RequestEvent): Promise<Response> {
     .where(whereClause)
     .orderBy(desc(log.timestamp), desc(log.id))
     .limit(limit + 1)
-    .offset(cursorParam ? 0 : offset); // Only use offset if cursor is not provided
+    .offset(cursorParam ? 0 : offset);
 
-  // Determine if there are more logs from the overflow row
   const hasMore = logs.length > limit;
 
-  // Slice to the requested limit before returning
   const logsToReturn = hasMore ? logs.slice(0, limit) : logs;
 
-  // Compute next cursor if there are more logs
   const nextCursor =
     hasMore && logsToReturn.length > 0
       ? encodeCursor(Math.round(logsToReturn.at(-1)!.micros), logsToReturn.at(-1)!.id)

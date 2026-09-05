@@ -12,23 +12,15 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
-// Project table
 export const project = pgTable(
   "project",
   {
     id: text("id").primaryKey(),
     name: text("name").notNull(),
-    // API keys are stored hashed only (SHA-256). The plaintext key is shown to
-    // the user once at creation/regeneration and never persisted.
     apiKeyHash: text("api_key_hash").notNull().unique(),
-    // Owner of the project - required for authorization
     ownerId: text("owner_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
-    // Log retention configuration:
-    // - null: use system default (LOG_RETENTION_DAYS env var)
-    // - 0: never auto-delete logs
-    // - >0: delete logs older than N days
     retentionDays: integer("retention_days"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
@@ -41,21 +33,17 @@ export const project = pgTable(
   ],
 );
 
-// Type exports for project
 export type Project = typeof project.$inferSelect;
 export type NewProject = typeof project.$inferInsert;
 
-// Custom tsvector type for Drizzle
 const tsvector = customType<{ data: string }>({
   dataType() {
     return "tsvector";
   },
 });
 
-// Log level enum
 export const logLevelEnum = pgEnum("log_level", ["debug", "info", "warn", "error", "fatal"]);
 
-// Incident table with fingerprint grouping
 export const incident = pgTable(
   "incident",
   {
@@ -84,11 +72,9 @@ export const incident = pgTable(
   ],
 );
 
-// Type exports for incident
 export type Incident = typeof incident.$inferSelect;
 export type NewIncident = typeof incident.$inferInsert;
 
-// Log table with full-text search
 export const log = pgTable(
   "log",
   {
@@ -152,19 +138,14 @@ export const log = pgTable(
     index("idx_log_timestamp").on(table.timestamp),
     index("idx_log_level").on(table.level),
     index("idx_log_project_timestamp").on(table.projectId, table.timestamp),
-    // GIN index for full-text search
     index("idx_log_search").using("gin", table.search),
   ],
 );
 
-// Type exports for log
 export type Log = typeof log.$inferSelect;
 export type NewLog = typeof log.$inferInsert;
 export type LogLevel = "debug" | "info" | "warn" | "error" | "fatal";
 
-// better-auth tables
-
-// User table
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
@@ -180,11 +161,9 @@ export const user = pgTable("user", {
     .notNull(),
 });
 
-// Type exports for user
 export type User = typeof user.$inferSelect;
 export type NewUser = typeof user.$inferInsert;
 
-// Session table
 export const session = pgTable(
   "session",
   {
@@ -205,11 +184,9 @@ export const session = pgTable(
   (table) => [index("session_userId_idx").on(table.userId)],
 );
 
-// Type exports for session
 export type Session = typeof session.$inferSelect;
 export type NewSession = typeof session.$inferInsert;
 
-// Account table
 export const account = pgTable(
   "account",
   {
@@ -239,11 +216,9 @@ export const account = pgTable(
   ],
 );
 
-// Type exports for account
 export type Account = typeof account.$inferSelect;
 export type NewAccount = typeof account.$inferInsert;
 
-// Verification table
 export const verification = pgTable(
   "verification",
   {
@@ -260,6 +235,5 @@ export const verification = pgTable(
   (table) => [index("verification_identifier_idx").on(table.identifier)],
 );
 
-// Type exports for verification
 export type Verification = typeof verification.$inferSelect;
 export type NewVerification = typeof verification.$inferInsert;

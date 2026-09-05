@@ -1,11 +1,4 @@
-// Package main demonstrates basic usage of the Logwell Go SDK.
-//
-// This example shows how to create a client and send logs to a Logwell server.
-// Replace the endpoint and API key with your actual values.
-//
-// Usage:
-//
-//	cd sdks/go && go run ./examples/basic/
+// Command basic demonstrates minimal Logwell usage: create a client, log, flush, shut down.
 package main
 
 import (
@@ -19,7 +12,6 @@ import (
 )
 
 func main() {
-	// Get endpoint and API key from environment, with fallback for demo
 	endpoint := os.Getenv("LOGWELL_ENDPOINT")
 	if endpoint == "" {
 		endpoint = "http://localhost:3000"
@@ -27,11 +19,9 @@ func main() {
 
 	apiKey := os.Getenv("LOGWELL_API_KEY")
 	if apiKey == "" {
-		// Demo key that matches the validation regex (lw_ + 32 chars)
 		apiKey = "lw_00000000000000000000000000000000"
 	}
 
-	// Create a new Logwell client with options
 	client, err := logwell.New(
 		endpoint,
 		apiKey,
@@ -51,7 +41,6 @@ func main() {
 	fmt.Printf("Endpoint: %s\n", endpoint)
 	fmt.Println()
 
-	// Log some messages
 	client.Info("Application started")
 	client.Info("User logged in", logwell.M{"userId": "user-123", "email": "user@example.com"})
 	client.Info("Processing request", logwell.M{
@@ -60,10 +49,8 @@ func main() {
 		"path":      "/api/orders",
 	})
 
-	// Simulate some application activity
 	fmt.Println("Logged 3 info messages")
 
-	// Add more logs to trigger auto-flush (default batch size is 50)
 	for i := 0; i < 48; i++ {
 		client.Info("Processing item", logwell.M{
 			"itemId":   fmt.Sprintf("item-%d", i),
@@ -73,7 +60,6 @@ func main() {
 
 	fmt.Println("Logged 48 more messages (total: 51, should trigger auto-flush)")
 
-	// Give some time for the flush to complete
 	time.Sleep(100 * time.Millisecond)
 
 	fmt.Println()

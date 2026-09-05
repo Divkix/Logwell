@@ -4,19 +4,16 @@ import type { Log } from "$lib/server/db/schema";
 import CreateProjectModal from "../create-project-modal.svelte";
 import LogDetailModal from "../log-detail-modal.svelte";
 
-// Mock clipboard API
 const mockClipboard = {
   writeText: vi.fn().mockResolvedValue(undefined),
 };
 Object.assign(navigator, { clipboard: mockClipboard });
 
-// Mock toast functions
 vi.mock("$lib/utils/toast", () => ({
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
 }));
 
-// Mock formatFullDate utility
 vi.mock("$lib/utils/format", () => ({
   formatFullDate: vi.fn((date: Date) => {
     return date.toISOString().replace("T", " ").replace("Z", " UTC");
@@ -79,15 +76,12 @@ describe("Accessibility: Modal Focus Management", () => {
 
       expect(focusableElements.length).toBeGreaterThan(0);
 
-      // Get the last focusable element
       const lastFocusable = focusableElements[focusableElements.length - 1] as HTMLElement;
       const firstFocusable = focusableElements[0] as HTMLElement;
 
-      // Focus the last element and press Tab - should wrap to first
       lastFocusable.focus();
       await fireEvent.keyDown(modal, { key: "Tab" });
 
-      // The focus trap should cycle - verify the trap is active by checking elements exist
       expect(firstFocusable).toBeInTheDocument();
       expect(lastFocusable).toBeInTheDocument();
     });
@@ -103,11 +97,9 @@ describe("Accessibility: Modal Focus Management", () => {
       const lastFocusable = focusableElements[focusableElements.length - 1] as HTMLElement;
       const firstFocusable = focusableElements[0] as HTMLElement;
 
-      // Focus the first element and shift+tab - should wrap to last
       firstFocusable.focus();
       await fireEvent.keyDown(modal, { key: "Tab", shiftKey: true });
 
-      // The focus trap should cycle - verify the trap is active
       expect(firstFocusable).toBeInTheDocument();
       expect(lastFocusable).toBeInTheDocument();
     });
@@ -116,16 +108,13 @@ describe("Accessibility: Modal Focus Management", () => {
       render(LogDetailModal, { props: { log: baseLog, open: true } });
 
       const closeButton = screen.getByTestId("close-button");
-      // Verify the close button is present and can be focused
       expect(closeButton).toBeInTheDocument();
       expect(closeButton).toHaveAttribute("aria-label", "Close log details");
-      // Manually focus and verify it works
       closeButton.focus();
       expect(document.activeElement).toBe(closeButton);
     });
 
     it("restores focus to trigger element when modal closes", async () => {
-      // Create a trigger button
       const triggerButton = document.createElement("button");
       triggerButton.id = "trigger";
       triggerButton.textContent = "Open Modal";
@@ -136,13 +125,10 @@ describe("Accessibility: Modal Focus Management", () => {
         props: { log: baseLog, open: true, triggerElement: triggerButton },
       });
 
-      // Wait for initial focus
       await new Promise((resolve) => setTimeout(resolve, 50));
 
-      // Close the modal
       await rerender({ log: baseLog, open: false, triggerElement: triggerButton });
 
-      // Focus should return to trigger
       await waitFor(
         () => {
           expect(document.activeElement).toBe(triggerButton);
@@ -171,7 +157,6 @@ describe("Accessibility: Modal Focus Management", () => {
       lastFocusable.focus();
       await fireEvent.keyDown(modal, { key: "Tab" });
 
-      // Verify focus trap is set up
       expect(firstFocusable).toBeInTheDocument();
       expect(lastFocusable).toBeInTheDocument();
     });
@@ -180,10 +165,8 @@ describe("Accessibility: Modal Focus Management", () => {
       render(CreateProjectModal, { props: { open: true } });
 
       const nameInput = screen.getByLabelText(/name/i);
-      // Verify the input is present and can be focused
       expect(nameInput).toBeInTheDocument();
       expect(nameInput).toHaveAttribute("id", "project-name");
-      // Manually focus and verify it works
       nameInput.focus();
       expect(document.activeElement).toBe(nameInput);
     });
@@ -198,7 +181,6 @@ describe("Accessibility: Modal Focus Management", () => {
         props: { open: true, triggerElement: triggerButton },
       });
 
-      // Wait for initial focus
       await new Promise((resolve) => setTimeout(resolve, 50));
 
       await rerender({ open: false, triggerElement: triggerButton });
@@ -356,7 +338,6 @@ describe("Accessibility: Keyboard Navigation", () => {
       const modal = screen.getByRole("dialog");
       const buttons = modal.querySelectorAll("button");
 
-      // Verify all buttons are focusable
       expect(buttons.length).toBeGreaterThan(0);
       buttons.forEach((button) => {
         expect(button).not.toHaveAttribute("tabindex", "-1");
@@ -367,7 +348,6 @@ describe("Accessibility: Keyboard Navigation", () => {
       render(LogDetailModal, { props: { log: baseLog, open: true } });
 
       const copyIdButton = screen.getByTestId("copy-id-button");
-      // Verify button is properly accessible
       expect(copyIdButton).toHaveAttribute("type", "button");
       expect(copyIdButton).toHaveAttribute("aria-label");
       expect(copyIdButton.getAttribute("aria-label")).toContain("clipboard");
@@ -377,7 +357,6 @@ describe("Accessibility: Keyboard Navigation", () => {
       render(LogDetailModal, { props: { log: baseLog, open: true } });
 
       const closeButton = screen.getByTestId("close-button");
-      // Focus-visible classes indicate proper focus styling
       expect(closeButton.className).toMatch(/focus:ring|focus:outline|focus-visible/);
     });
   });
@@ -386,7 +365,6 @@ describe("Accessibility: Keyboard Navigation", () => {
 describe("Accessibility: Live Regions", () => {
   afterEach(() => {
     cleanup();
-    // Clean up any live regions created
     const liveRegion = document.getElementById("sr-announcer");
     if (liveRegion) {
       liveRegion.remove();
@@ -394,13 +372,10 @@ describe("Accessibility: Live Regions", () => {
   });
 
   it("announceToScreenReader creates accessible live region", async () => {
-    // Import the function directly to test it
     const { announceToScreenReader } = await import("$lib/utils/focus-trap");
 
-    // Call the announce function
     announceToScreenReader("Test announcement");
 
-    // Wait for the live region to be created
     await waitFor(
       () => {
         const liveRegion = document.getElementById("sr-announcer");

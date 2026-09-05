@@ -6,7 +6,6 @@ import (
 	"time"
 )
 
-// assertConfigError asserts that an error is a Logwell Error with the expected code.
 func assertConfigError(t *testing.T, err error, expectedCode ErrorCode) {
 	t.Helper()
 
@@ -24,7 +23,6 @@ func assertConfigError(t *testing.T, err error, expectedCode ErrorCode) {
 	}
 }
 
-// assertLogCount asserts the number of logs received.
 func assertLogCount(t *testing.T, logs []LogEntry, expected int) {
 	t.Helper()
 
@@ -33,7 +31,6 @@ func assertLogCount(t *testing.T, logs []LogEntry, expected int) {
 	}
 }
 
-// assertLogMetadata asserts that log metadata matches expected key-value pairs.
 func assertLogMetadata(t *testing.T, log LogEntry, expected map[string]string) {
 	t.Helper()
 
@@ -46,14 +43,12 @@ func assertLogMetadata(t *testing.T, log LogEntry, expected map[string]string) {
 	}
 }
 
-// clearTestLogs clears the test server's log buffer.
 func clearTestLogs(ts *testServer) {
 	ts.mu.Lock()
 	ts.logs = ts.logs[:0]
 	ts.mu.Unlock()
 }
 
-// logAndWait sends a log entry and waits for it to be flushed.
 func logAndWait(client *Client, ts *testServer, logFn func(string, ...map[string]any), message string, metadata ...map[string]any) LogEntry {
 	clearTestLogs(ts)
 
@@ -73,7 +68,6 @@ func logAndWait(client *Client, ts *testServer, logFn func(string, ...map[string
 	return logs[len(logs)-1]
 }
 
-// createTestClient creates a client with the given options and error handling.
 func createTestClient(t *testing.T, ts *testServer, opts ...Option) *Client {
 	t.Helper()
 
@@ -88,7 +82,6 @@ func createTestClient(t *testing.T, ts *testServer, opts ...Option) *Client {
 	return client
 }
 
-// childLogHelper creates a child logger, sends a log, and returns the received log entry.
 func childLogHelper(t *testing.T, parent *Client, ts *testServer, childOpts []ChildOption, message string) LogEntry {
 	t.Helper()
 
@@ -112,7 +105,6 @@ func childLogHelper(t *testing.T, parent *Client, ts *testServer, childOpts []Ch
 	return logs[len(logs)-1]
 }
 
-// setupAndLogWithMetadata creates a client, clears logs, sends a log with metadata, and returns the received log.
 func setupAndLogWithMetadata(t *testing.T, ts *testServer, clientOpts []Option, message string, metadata ...map[string]any) LogEntry {
 	t.Helper()
 

@@ -45,15 +45,12 @@ export class Logwell {
     existingQueue?: BatchQueue,
     parentMetadata?: Record<string, unknown>,
   ) {
-    // Validate and apply defaults (returns ResolvedConfig directly, no cast needed)
     this.config = validateConfig(config);
     this.parentMetadata = parentMetadata;
 
-    // Use existing queue (for child loggers) or create new one with its own transport
     if (existingQueue) {
       this.queue = existingQueue;
       this.ownsQueue = false;
-      // transport is the parent's, accessed via queue's sendBatch — no allocation needed
     } else {
       this.ownsQueue = true;
       this.transport = new HttpTransport({
@@ -81,11 +78,6 @@ export class Logwell {
     return this.queue.size;
   }
 
-  /**
-   * Internal log method with source location capture.
-   * @param entry - The log entry
-   * @param skipFrames - Number of frames to skip for source location (2 for public methods)
-   */
   private _addLog(entry: LogEntry, skipFrames: number): void {
     if (this.stopped) return;
 
@@ -112,44 +104,26 @@ export class Logwell {
     this.queue.add(fullEntry);
   }
 
-  /**
-   * Log a message at the specified level
-   */
   log(entry: LogEntry): void {
     this._addLog(entry, 2);
   }
 
-  /**
-   * Log a debug message
-   */
   debug(message: string, metadata?: Record<string, unknown>): void {
     this._addLog({ level: "debug", message, metadata }, 2);
   }
 
-  /**
-   * Log an info message
-   */
   info(message: string, metadata?: Record<string, unknown>): void {
     this._addLog({ level: "info", message, metadata }, 2);
   }
 
-  /**
-   * Log a warning message
-   */
   warn(message: string, metadata?: Record<string, unknown>): void {
     this._addLog({ level: "warn", message, metadata }, 2);
   }
 
-  /**
-   * Log an error message
-   */
   error(message: string, metadata?: Record<string, unknown>): void {
     this._addLog({ level: "error", message, metadata }, 2);
   }
 
-  /**
-   * Log a fatal error message
-   */
   fatal(message: string, metadata?: Record<string, unknown>): void {
     this._addLog({ level: "fatal", message, metadata }, 2);
   }
@@ -172,8 +146,6 @@ export class Logwell {
   async shutdown(): Promise<IngestResponse | null> {
     this.stopped = true;
     if (!this.ownsQueue) {
-      // Child loggers share the parent's queue; shutting one down must not
-      // flush or stop the shared queue (matches the Go/Python child contract).
       return null;
     }
     return this.queue.shutdown();
@@ -203,8 +175,6 @@ export class Logwell {
       ...this.parentMetadata,
       ...options.metadata,
     };
-    // Preserve `undefined` metadata when neither the parent nor the options
-    // provide any (an empty merge must stay `undefined`, not become `{}`).
     const childMetadata =
       this.parentMetadata === undefined && options.metadata === undefined
         ? undefined

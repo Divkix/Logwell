@@ -9,9 +9,6 @@ import { clearApiKeyCache } from "$lib/server/utils/api-key";
 import { GET } from "../../../../../src/routes/api/projects/[id]/logs/+server";
 import { seedLog, seedLogs, seedProject } from "../../../../fixtures/db";
 
-/**
- * Helper to create a mock SvelteKit RequestEvent for [id]/logs routes
- */
 function createRequestEvent(
   request: Request,
   db: PgliteDatabase<typeof schema>,
@@ -42,9 +39,6 @@ function createRequestEvent(
   } as unknown;
 }
 
-/**
- * Helper to assert that a promise rejects with a SvelteKit HTTP error
- */
 async function expectHttpError(
   promise: Promise<unknown>,
   expectedStatus: number,
@@ -76,7 +70,6 @@ describe("GET /api/projects/[id]/logs", () => {
     auth = createAuth(db);
     clearApiKeyCache();
 
-    // Create authenticated user
     const signUpResult = await auth.api.signUpEmail({
       body: {
         email: "test@example.com",
@@ -121,7 +114,6 @@ describe("GET /api/projects/[id]/logs", () => {
     it("returns logs ordered by timestamp DESC", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
 
-      // Create logs with specific timestamps to verify ordering
       const now = new Date();
       const log1 = await seedLog(db, testProject.id, {
         message: "First log",
@@ -147,7 +139,6 @@ describe("GET /api/projects/[id]/logs", () => {
       const body = await response.json();
 
       expect(body.logs).toHaveLength(3);
-      // Logs should be ordered newest first (DESC)
       expect(body.logs[0]!.id).toBe(log3.id);
       expect(body.logs[1]!.id).toBe(log2.id);
       expect(body.logs[2]!.id).toBe(log1.id);
@@ -204,7 +195,6 @@ describe("GET /api/projects/[id]/logs", () => {
       expect(response.status).toBe(200);
       const body = await response.json();
 
-      // MIN_LIMIT is 1, so limit=50 returns 50 logs
       expect(body.logs).toHaveLength(50);
     });
 
@@ -223,7 +213,6 @@ describe("GET /api/projects/[id]/logs", () => {
       expect(response.status).toBe(200);
       const body = await response.json();
 
-      // Should clamp to maximum 500
       expect(body.logs).toHaveLength(500);
     });
   });
@@ -232,7 +221,6 @@ describe("GET /api/projects/[id]/logs", () => {
     it("respects offset parameter for pagination", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
 
-      // Create logs with specific order
       const now = new Date();
       const logs = [];
       for (let i = 0; i < 5; i++) {
@@ -243,7 +231,6 @@ describe("GET /api/projects/[id]/logs", () => {
         logs.push(log);
       }
 
-      // Request with offset=2
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/logs?limit=100&offset=2`,
         { method: "GET" },
@@ -255,7 +242,6 @@ describe("GET /api/projects/[id]/logs", () => {
       expect(response.status).toBe(200);
       const body = await response.json();
 
-      // Should skip the first 2 logs (newest) and return remaining 3
       expect(body.logs).toHaveLength(3);
       expect(body.logs[0]!.id).toBe(logs[2]!.id);
     });
@@ -313,7 +299,6 @@ describe("GET /api/projects/[id]/logs", () => {
       const testProject = await seedProject(db, { ownerId: userId });
 
       const now = new Date();
-      // Old log (before the 'from' filter - should be excluded)
       await seedLog(db, testProject.id, {
         message: "Old log",
         timestamp: new Date(now.getTime() - 3600000), // 1 hour ago
@@ -323,7 +308,6 @@ describe("GET /api/projects/[id]/logs", () => {
         timestamp: new Date(now.getTime() - 60000), // 1 minute ago
       });
 
-      // Filter for logs from 30 minutes ago
       const fromTime = new Date(now.getTime() - 1800000).toISOString();
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/logs?from=${fromTime}`,
@@ -348,13 +332,11 @@ describe("GET /api/projects/[id]/logs", () => {
         message: "Old log",
         timestamp: new Date(now.getTime() - 3600000), // 1 hour ago
       });
-      // Recent log (after the 'to' filter - should be excluded)
       await seedLog(db, testProject.id, {
         message: "Recent log",
         timestamp: new Date(now.getTime() - 60000), // 1 minute ago
       });
 
-      // Filter for logs up to 30 minutes ago
       const toTime = new Date(now.getTime() - 1800000).toISOString();
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/logs?to=${toTime}`,
@@ -388,7 +370,6 @@ describe("GET /api/projects/[id]/logs", () => {
         timestamp: new Date(now.getTime() - 60000), // 1 minute ago
       });
 
-      // Filter for logs between 90 minutes ago and 30 minutes ago
       const fromTime = new Date(now.getTime() - 5400000).toISOString();
       const toTime = new Date(now.getTime() - 1800000).toISOString();
       const request = new Request(
@@ -461,16 +442,9 @@ describe("GET /api/projects/[id]/logs", () => {
       expect(body.logs[0]!.metadata).toHaveProperty("service", "payment-gateway");
     });
 
-    // Plan 014: verify the single-parse to_tsvector still indexes all five source fields.
-    // Each test seeds a log whose searchable term appears ONLY in one non-message field,
-    // confirming the COALESCE/|| concatenation covers that field.
-    // The sentinel log gets a unique message prefix ("bodyonly-", "resonly-", "scopeonly-")
-    // so we can distinguish it from other logs returned by the search via the message field
-    // (body/resourceAttributes/scopeAttributes are not projected by the logs API).
     it("performs full-text search on body (single-parse tsvector covers body field)", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
 
-      // "glacier" only appears in body — message is generic
       await seedLog(db, testProject.id, {
         message: "bodyonly-sentinel log entry",
         body: { text: "glacier mountain alpine" },
@@ -498,7 +472,6 @@ describe("GET /api/projects/[id]/logs", () => {
     it("performs full-text search on resource_attributes (single-parse tsvector covers resource_attributes field)", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
 
-      // "archipelago" only appears in resource_attributes
       await seedLog(db, testProject.id, {
         message: "resonly-sentinel log entry",
         resourceAttributes: { "service.name": "archipelago-service" },
@@ -526,7 +499,6 @@ describe("GET /api/projects/[id]/logs", () => {
     it("performs full-text search on scope_attributes (single-parse tsvector covers scope_attributes field)", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
 
-      // "phosphorescent" only appears in scope_attributes
       await seedLog(db, testProject.id, {
         message: "scopeonly-sentinel log entry",
         scopeAttributes: { library: "phosphorescent-sdk" },
@@ -569,7 +541,6 @@ describe("GET /api/projects/[id]/logs", () => {
       expect(response.status).toBe(200);
       const body = await response.json();
 
-      // Should match logs containing both "connection" and "failed"
       expect(body.logs.length).toBeGreaterThanOrEqual(1);
     });
 
@@ -590,8 +561,6 @@ describe("GET /api/projects/[id]/logs", () => {
       expect(response.status).toBe(200);
       const body = await response.json();
 
-      // Pipe is a tsquery operator; shared utility replaces it with space creating 'database & connection'
-      // Inline buggy version strips it creating 'databaseconnection' which matches nothing
       expect(body.logs).toHaveLength(1);
       expect(body.logs[0]!.message).toBe("Database connection failed");
     });
@@ -615,7 +584,6 @@ describe("GET /api/projects/[id]/logs", () => {
       expect(response.status).toBe(200);
       const body = await response.json();
 
-      // Hyphens should be preserved by the shared utility; inline version strips them to 'userservice'
       expect(body.logs).toHaveLength(1);
       expect(body.logs[0]!.metadata).toHaveProperty("service", "user-service");
     });
@@ -686,10 +654,8 @@ describe("GET /api/projects/[id]/logs", () => {
     it("returns has_more=false when last page equals limit (cursor boundary)", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
 
-      // Create exactly 200 logs (2 full pages of 100)
       await seedLogs(db, testProject.id, 200);
 
-      // First page
       const request1 = new Request(
         `http://localhost/api/projects/${testProject.id}/logs?limit=100`,
         { method: "GET" },
@@ -702,7 +668,6 @@ describe("GET /api/projects/[id]/logs", () => {
       expect(body1.has_more).toBe(true);
       expect(body1.nextCursor).toBeTruthy();
 
-      // Second page (exactly 100 remaining)
       const request2 = new Request(
         `http://localhost/api/projects/${testProject.id}/logs?limit=100&cursor=${body1.nextCursor}`,
         { method: "GET" },
@@ -790,7 +755,6 @@ describe("GET /api/projects/[id]/logs", () => {
       expect(returnedLog).toHaveProperty("userId", "user_456");
       expect(returnedLog).toHaveProperty("ipAddress", "192.168.1.1");
       expect(returnedLog).toHaveProperty("timestamp");
-      // Should NOT return the search vector field
       expect(returnedLog).not.toHaveProperty("search");
     });
   });

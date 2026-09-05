@@ -5,7 +5,6 @@ const SKELETON_ROW_COUNT = 10;
 </script>
 
 <div data-testid="log-stream-skeleton" class="space-y-6">
-  <!-- Header Skeleton -->
   <div data-testid="log-stream-skeleton-header" class="flex items-center justify-between">
     <div class="flex items-center gap-4">
       <Skeleton class="h-4 w-4" />
@@ -17,7 +16,6 @@ const SKELETON_ROW_COUNT = 10;
     </div>
   </div>
 
-  <!-- Filters Bar Skeleton -->
   <div data-testid="log-stream-skeleton-filters" class="flex flex-wrap items-center gap-4">
     <Skeleton class="h-6 w-16" />
     <Skeleton class="h-9 w-64 flex-1 max-w-sm" />
@@ -25,7 +23,6 @@ const SKELETON_ROW_COUNT = 10;
     <Skeleton class="h-9 w-32" />
   </div>
 
-  <!-- Log Table Skeleton -->
   <div data-testid="log-stream-skeleton-table" class="w-full">
     <table class="w-full caption-bottom text-sm">
       <thead class="border-b">
@@ -59,6 +56,5 @@ const SKELETON_ROW_COUNT = 10;
     </table>
   </div>
 
-  <!-- Pagination Skeleton -->
   <Skeleton class="h-4 w-48" />
 </div>

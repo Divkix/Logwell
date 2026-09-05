@@ -25,7 +25,6 @@ describe("CreateProjectModal", () => {
     const submitButton = screen.getByRole("button", { name: "Create" });
     await user.click(submitButton);
 
-    // The empty-string validation from the schema: min(1) → "Project name cannot be empty"
     const error = screen.getByTestId("error-message");
     expect(error).toBeInTheDocument();
     expect(error).toHaveTextContent(/cannot be empty/i);

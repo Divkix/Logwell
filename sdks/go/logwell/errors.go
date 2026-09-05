@@ -96,7 +96,6 @@ func NewErrorWithCause(code ErrorCode, message string, cause error) *Error {
 	}
 }
 
-// isRetryable returns whether an error code indicates a retryable error.
 func isRetryable(code ErrorCode) bool {
 	switch code {
 	case ErrNetworkError, ErrRateLimited, ErrServerError:

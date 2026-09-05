@@ -1,48 +1,17 @@
 import { createHash } from "node:crypto";
 
-/**
- * UUID matcher.
- */
 const UUID_REGEX = /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/gi;
 
-/**
- * Hex identifier matcher.
- * Matches long hex chunks and 0x-prefixed values.
- * Requires at least one a-f letter so pure numeric tokens fall through to NUMBER_REGEX.
- */
 const HEX_ID_REGEX = /\b0x[0-9a-f]+\b|\b(?=[0-9a-f]*[a-f])[0-9a-f]{12,}\b/gi;
 
-/**
- * IPv4 matcher.
- */
 const IPV4_REGEX = /\b(?:\d{1,3}\.){3}\d{1,3}\b/g;
 
-/**
- * Numeric token matcher.
- */
 const NUMBER_REGEX = /\d+/g;
 
-/**
- * Whitespace collapse matcher.
- */
 const WHITESPACE_REGEX = /\s+/g;
 
-/**
- * Truncated fingerprint length.
- */
 export const INCIDENT_FINGERPRINT_LENGTH = 32;
 
-/**
- * Normalizes a log message for incident grouping.
- *
- * Order is intentionally fixed:
- * 1) lowercase + trim
- * 2) replace UUID
- * 3) replace hex IDs
- * 4) replace IPv4
- * 5) replace numeric tokens
- * 6) collapse whitespace
- */
 export function normalizeIncidentMessage(message: string): string {
   const normalized = message
     .toLowerCase()
@@ -57,9 +26,6 @@ export function normalizeIncidentMessage(message: string): string {
   return normalized || "unknown error";
 }
 
-/**
- * Builds the fingerprint seed using stable context.
- */
 export function buildIncidentFingerprintSeed(params: {
   serviceName: string | null;
   sourceFile: string | null;
@@ -73,16 +39,10 @@ export function buildIncidentFingerprintSeed(params: {
   return `${serviceName}|${sourceFile}|${lineNumber}|${params.normalizedMessage}`;
 }
 
-/**
- * Returns a stable SHA-256 based fingerprint (truncated hex).
- */
 export function hashIncidentFingerprint(seed: string): string {
   return createHash("sha256").update(seed).digest("hex").slice(0, INCIDENT_FINGERPRINT_LENGTH);
 }
 
-/**
- * Builds a stable incident fingerprint from message + source context.
- */
 export function buildIncidentFingerprint(params: {
   message: string;
   serviceName: string | null;

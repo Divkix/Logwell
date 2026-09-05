@@ -11,8 +11,6 @@ import (
 	"time"
 )
 
-// decodeRequestBody validates the request body against the real server format
-// using generic map decoding so any JSON tag mismatch in LogEntry is caught.
 func decodeRequestBody(t *testing.T, r *http.Request) []LogEntry {
 	var raw []map[string]any
 	if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
@@ -30,14 +28,12 @@ func decodeRequestBody(t *testing.T, r *http.Request) []LogEntry {
 	return entries
 }
 
-// TestTransport_SuccessfulRequest tests that a 200 response succeeds without retry.
 func TestTransport_SuccessfulRequest(t *testing.T) {
 	var requestCount int32
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt32(&requestCount, 1)
 
-		// Verify request headers
 		if got := r.Header.Get("Authorization"); got != "Bearer test-api-key" {
 			t.Errorf("Authorization header = %q, want %q", got, "Bearer test-api-key")
 		}
@@ -45,7 +41,6 @@ func TestTransport_SuccessfulRequest(t *testing.T) {
 			t.Errorf("Content-Type header = %q, want %q", got, "application/json")
 		}
 
-		// Verify request body format against real server expectations
 		entries := decodeRequestBody(t, r)
 		if len(entries) != 1 {
 			t.Errorf("len(entries) = %d, want 1", len(entries))
@@ -71,7 +66,6 @@ func TestTransport_SuccessfulRequest(t *testing.T) {
 	}
 }
 
-// TestTransport_RetryOn5xx tests that 5xx errors trigger retries.
 func TestTransport_RetryOn5xx(t *testing.T) {
 	testCases := []struct {
 		name       string
@@ -89,7 +83,6 @@ func TestTransport_RetryOn5xx(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				count := atomic.AddInt32(&requestCount, 1)
 
-				// Fail first 2 attempts, succeed on third
 				if count < 3 {
 					w.WriteHeader(tc.statusCode)
 					json.NewEncoder(w).Encode(map[string]string{"error": "server error"})
@@ -118,14 +111,12 @@ func TestTransport_RetryOn5xx(t *testing.T) {
 	}
 }
 
-// TestTransport_RetryOn429 tests that 429 (rate limited) triggers retries.
 func TestTransport_RetryOn429(t *testing.T) {
 	var requestCount int32
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		count := atomic.AddInt32(&requestCount, 1)
 
-		// Rate limit first 2 attempts
 		if count < 3 {
 			w.WriteHeader(http.StatusTooManyRequests)
 			json.NewEncoder(w).Encode(map[string]string{"error": "rate limited"})
@@ -152,7 +143,6 @@ func TestTransport_RetryOn429(t *testing.T) {
 	}
 }
 
-// TestTransport_NoRetryOn401 tests that 401 errors do NOT retry.
 func TestTransport_NoRetryOn401(t *testing.T) {
 	var requestCount int32
 
@@ -186,7 +176,6 @@ func TestTransport_NoRetryOn401(t *testing.T) {
 	}
 }
 
-// TestTransport_NoRetryOn400 tests that 400 (validation error) does NOT retry.
 func TestTransport_NoRetryOn400(t *testing.T) {
 	var requestCount int32
 
@@ -220,9 +209,7 @@ func TestTransport_NoRetryOn400(t *testing.T) {
 	}
 }
 
-// TestTransport_RetryOnNetworkError tests retry on network-level errors.
 func TestTransport_RetryOnNetworkError(t *testing.T) {
-	// Create transport pointing to non-existent server (connection refused)
 	transport := newHTTPTransport("http://127.0.0.1:1", "test-api-key")
 	transport.maxRetries = 2 // Reduce retries to speed up test
 
@@ -244,21 +231,16 @@ func TestTransport_RetryOnNetworkError(t *testing.T) {
 		t.Errorf("error code = %q, want %q", logwellErr.Code, ErrNetworkError)
 	}
 
-	// Should have taken some time due to retry backoff
-	// With 2 retries: attempt 0 (immediate), attempt 1 (100ms backoff), attempt 2 (200ms backoff)
-	// Minimum time should be > 100ms (at least one backoff)
 	if elapsed < 50*time.Millisecond {
 		t.Errorf("elapsed time %v suggests no retry backoff occurred", elapsed)
 	}
 }
 
-// TestTransport_ContextCancellation tests that context cancellation stops retries.
 func TestTransport_ContextCancellation(t *testing.T) {
 	var requestCount int32
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt32(&requestCount, 1)
-		// Always return 500 to trigger retry
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": "server error"})
 	}))
@@ -267,10 +249,8 @@ func TestTransport_ContextCancellation(t *testing.T) {
 	transport := newHTTPTransport(server.URL, "test-api-key")
 	logs := []LogEntry{{Level: LevelInfo, Message: "test"}}
 
-	// Create context that cancels after first request
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// Cancel context after a short delay (during first backoff)
 	go func() {
 		time.Sleep(50 * time.Millisecond)
 		cancel()
@@ -289,14 +269,12 @@ func TestTransport_ContextCancellation(t *testing.T) {
 		t.Errorf("error code = %q, want ErrNetworkError or ErrServerError", logwellErr.Code)
 	}
 
-	// Should have made only 1-2 requests before context canceled during backoff
 	count := atomic.LoadInt32(&requestCount)
 	if count > 2 {
 		t.Errorf("requestCount = %d, expected <= 2 (context should stop retries)", count)
 	}
 }
 
-// TestTransport_MaxRetriesExhausted tests that errors are returned after max retries.
 func TestTransport_MaxRetriesExhausted(t *testing.T) {
 	var requestCount int32
 
@@ -324,14 +302,12 @@ func TestTransport_MaxRetriesExhausted(t *testing.T) {
 		t.Errorf("error code = %q, want %q", logwellErr.Code, ErrServerError)
 	}
 
-	// Should have made exactly maxRetries + 1 attempts
 	expectedCount := int32(transport.maxRetries + 1)
 	if atomic.LoadInt32(&requestCount) != expectedCount {
 		t.Errorf("requestCount = %d, want %d", requestCount, expectedCount)
 	}
 }
 
-// TestTransport_BackoffCalculation tests the exponential backoff formula.
 func TestTransport_BackoffCalculation(t *testing.T) {
 	transport := newHTTPTransport("http://example.com", "test-api-key")
 
@@ -341,19 +317,14 @@ func TestTransport_BackoffCalculation(t *testing.T) {
 		minExpected  time.Duration
 		maxExpected  time.Duration
 	}{
-		// Attempt 1: 100ms * 2^1 = 200ms, +0-30% jitter = [200ms, 260ms]
 		{1, 200 * time.Millisecond, 200 * time.Millisecond, 260 * time.Millisecond},
-		// Attempt 2: 100ms * 2^2 = 400ms, +0-30% jitter = [400ms, 520ms]
 		{2, 400 * time.Millisecond, 400 * time.Millisecond, 520 * time.Millisecond},
-		// Attempt 3: 100ms * 2^3 = 800ms, +0-30% jitter = [800ms, 1040ms]
 		{3, 800 * time.Millisecond, 800 * time.Millisecond, 1040 * time.Millisecond},
-		// Attempt 10: capped at 10s, +0-30% jitter = [10s, 13s]
 		{10, 10 * time.Second, 10 * time.Second, 13 * time.Second},
 	}
 
 	for _, tc := range testCases {
 		t.Run("attempt_"+string(rune('0'+tc.attempt)), func(t *testing.T) {
-			// Run multiple times to account for jitter randomness
 			for i := 0; i < 100; i++ {
 				delay := transport.calculateBackoff(tc.attempt)
 
@@ -366,7 +337,6 @@ func TestTransport_BackoffCalculation(t *testing.T) {
 	}
 }
 
-// TestTransport_IsRetryableError tests error classification logic.
 func TestTransport_IsRetryableError(t *testing.T) {
 	transport := newHTTPTransport("http://example.com", "test-api-key")
 
@@ -422,7 +392,6 @@ func TestTransport_IsRetryableError(t *testing.T) {
 	}
 }
 
-// TestTransport_ErrorMessageParsing tests that error messages are extracted from responses.
 func TestTransport_ErrorMessageParsing(t *testing.T) {
 	testCases := []struct {
 		name          string
@@ -481,7 +450,6 @@ func TestTransport_ErrorMessageParsing(t *testing.T) {
 	}
 }
 
-// TestTransport_RequestBody tests that the request body is correctly formatted.
 func TestTransport_RequestBody(t *testing.T) {
 	var receivedBody []map[string]any
 
@@ -513,7 +481,6 @@ func TestTransport_RequestBody(t *testing.T) {
 		t.Fatalf("len(receivedBody) = %d, want 2", len(receivedBody))
 	}
 
-	// Verify first log using raw map keys (catches JSON tag mismatches)
 	if got, want := fmt.Sprintf("%v", receivedBody[0]["message"]), "message 1"; got != want {
 		t.Errorf("receivedBody[0][\"message\"] = %v, want %v", got, want)
 	}
@@ -521,12 +488,10 @@ func TestTransport_RequestBody(t *testing.T) {
 		t.Errorf("receivedBody[0][\"service\"] = %v, want %v", got, want)
 	}
 
-	// Verify second log
 	if got, want := fmt.Sprintf("%v", receivedBody[1]["level"]), string(LevelError); got != want {
 		t.Errorf("receivedBody[1][\"level\"] = %v, want %v", got, want)
 	}
 
-	// Verify metadata object is present
 	meta, ok := receivedBody[1]["metadata"].(map[string]any)
 	if !ok {
 		t.Fatalf("receivedBody[1][\"metadata\"] is not an object")

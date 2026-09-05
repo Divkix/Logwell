@@ -48,7 +48,6 @@ describe("ClearFiltersButton", () => {
       render(ClearFiltersButton, { props: { visible: true } });
 
       const button = screen.getByTestId("clear-filters-button");
-      // Should not throw error
       await user.click(button);
     });
   });
@@ -75,7 +74,6 @@ describe("ClearFiltersButton", () => {
 
       const button = screen.getByTestId("clear-filters-button");
       expect(button).toBeInTheDocument();
-      // Button should have ghost variant classes (we check it's rendered, actual class check is implementation detail)
     });
 
     it("renders with small size", () => {
@@ -83,7 +81,6 @@ describe("ClearFiltersButton", () => {
 
       const button = screen.getByTestId("clear-filters-button");
       expect(button).toBeInTheDocument();
-      // Button should have small size classes (we check it's rendered)
     });
   });
 });

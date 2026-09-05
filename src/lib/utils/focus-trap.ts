@@ -1,26 +1,8 @@
-/**
- * Focus trap utility for modals and dialogs.
- * Implements WCAG 2.1 focus management requirements.
- */
-
 export interface FocusTrapOptions {
-  /**
-   * Element that should receive focus when the trap is activated.
-   * If not provided, the first focusable element will be focused.
-   */
   initialFocus?: HTMLElement | string | null;
 
-  /**
-   * Element that should receive focus when the trap is deactivated.
-   * If not provided, focus will return to the element that was focused
-   * before the trap was activated.
-   */
   returnFocus?: HTMLElement | null;
 
-  /**
-   * Whether to automatically focus the first focusable element.
-   * @default true
-   */
   autoFocus?: boolean;
 }
 
@@ -33,26 +15,17 @@ const FOCUSABLE_SELECTOR = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(", ");
 
-/**
- * Gets all focusable elements within a container.
- */
 function getFocusableElements(container: HTMLElement): HTMLElement[] {
   const elements = container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
   return Array.from(elements).filter((el) => {
-    // Check if element is visible
     const style = window.getComputedStyle(el);
     return style.display !== "none" && style.visibility !== "hidden" && el.offsetParent !== null;
   });
 }
 
-/**
- * Creates a focus trap for the given container element.
- * Returns cleanup functions for the trap.
- */
 function createFocusTrap(container: HTMLElement, options: FocusTrapOptions = {}) {
   const { initialFocus, returnFocus, autoFocus = true } = options;
 
-  // Store the previously focused element
   const previouslyFocused = (returnFocus || document.activeElement) as HTMLElement | null;
 
   function handleKeyDown(event: KeyboardEvent) {
@@ -67,13 +40,11 @@ function createFocusTrap(container: HTMLElement, options: FocusTrapOptions = {})
     if (!firstFocusable || !lastFocusable) return;
 
     if (event.shiftKey) {
-      // Shift + Tab: if on first element, wrap to last
       if (document.activeElement === firstFocusable) {
         event.preventDefault();
         lastFocusable.focus();
       }
     } else {
-      // Tab: if on last element, wrap to first
       if (document.activeElement === lastFocusable) {
         event.preventDefault();
         firstFocusable.focus();
@@ -81,7 +52,6 @@ function createFocusTrap(container: HTMLElement, options: FocusTrapOptions = {})
     }
   }
 
-  // Set initial focus
   function setInitialFocus() {
     if (!autoFocus) return;
 
@@ -95,7 +65,6 @@ function createFocusTrap(container: HTMLElement, options: FocusTrapOptions = {})
     } else if (initialFocus instanceof HTMLElement) {
       elementToFocus = initialFocus;
     } else {
-      // Default to first focusable element
       elementToFocus = focusableElements[0] ?? null;
     }
 
@@ -108,15 +77,10 @@ function createFocusTrap(container: HTMLElement, options: FocusTrapOptions = {})
     }
   }
 
-  // Activate the trap
   container.addEventListener("keydown", handleKeyDown);
   setInitialFocus();
 
-  // Return cleanup and restore focus functions
   return {
-    /**
-     * Deactivates the focus trap and restores focus to the previously focused element.
-     */
     deactivate() {
       container.removeEventListener("keydown", handleKeyDown);
       if (previouslyFocused && typeof previouslyFocused.focus === "function") {
@@ -126,10 +90,6 @@ function createFocusTrap(container: HTMLElement, options: FocusTrapOptions = {})
   };
 }
 
-/**
- * Svelte action for creating a focus trap on an element.
- * Usage: <div use:focusTrap={{ initialFocus: '.close-button' }}>
- */
 export function focusTrap(node: HTMLElement, options: FocusTrapOptions = {}) {
   let trap = createFocusTrap(node, options);
 
@@ -144,16 +104,10 @@ export function focusTrap(node: HTMLElement, options: FocusTrapOptions = {}) {
   };
 }
 
-/**
- * Announces a message to screen readers using a live region.
- * @param message The message to announce
- * @param priority 'polite' for non-urgent, 'assertive' for important announcements
- */
 export function announceToScreenReader(
   message: string,
   priority: "polite" | "assertive" = "polite",
 ) {
-  // Look for existing live region or create one
   let liveRegion = document.getElementById("sr-announcer");
 
   if (!liveRegion) {
@@ -167,10 +121,8 @@ export function announceToScreenReader(
     document.body.appendChild(liveRegion);
   }
 
-  // Update priority if needed
   liveRegion.setAttribute("aria-live", priority);
 
-  // Clear and set message (necessary for repeat announcements)
   liveRegion.textContent = "";
   requestAnimationFrame(() => {
     if (liveRegion) {

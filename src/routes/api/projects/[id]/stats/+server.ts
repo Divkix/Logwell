@@ -39,26 +39,21 @@ import type { RequestEvent } from "./$types";
  * - 404 not_found: Project does not exist or not owned by user
  */
 export async function GET(event: RequestEvent): Promise<Response> {
-  // Require authentication and project ownership
   const authResult = await requireProjectOwnership(event, event.params.id);
   if (isErrorResponse(authResult)) return authResult;
 
   const db = await getDbClient(event.locals);
   const projectId = event.params.id;
 
-  // Parse query parameters for time range
   const url = event.url;
   const fromParam = url.searchParams.get("from");
   const toParam = url.searchParams.get("to");
 
-  // Parse time range
   const fromDate = fromParam ? new Date(fromParam) : null;
   const toDate = toParam ? new Date(toParam) : null;
 
-  // Build WHERE conditions
   const conditions: SQL[] = [eq(log.projectId, projectId)];
 
-  // Time range filters
   if (fromDate && !Number.isNaN(fromDate.getTime())) {
     conditions.push(gte(log.timestamp, fromDate));
   }
@@ -68,7 +63,6 @@ export async function GET(event: RequestEvent): Promise<Response> {
 
   const whereClause = and(...conditions);
 
-  // Get level distribution counts
   const levelCounts = await db
     .select({
       level: log.level,
@@ -78,7 +72,6 @@ export async function GET(event: RequestEvent): Promise<Response> {
     .where(whereClause)
     .groupBy(log.level);
 
-  // Convert level counts to object and calculate total
   const levelCountsObj: Record<string, number> = {};
   let totalLogs = 0;
 
@@ -89,7 +82,6 @@ export async function GET(event: RequestEvent): Promise<Response> {
     }
   }
 
-  // Calculate percentages
   const levelPercentagesObj: Record<string, number> = {};
 
   if (totalLogs > 0) {

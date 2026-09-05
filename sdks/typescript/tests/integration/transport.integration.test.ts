@@ -282,8 +282,6 @@ describe("HttpTransport", () => {
 
       await expect(transport.send([createLogFixture()])).rejects.toThrow();
 
-      // First request is immediate, delays should increase
-      // We can't test exact timing, but we can verify the pattern
       expect(delays.length).toBe(3);
     });
   });

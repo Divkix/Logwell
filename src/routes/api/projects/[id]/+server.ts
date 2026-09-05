@@ -38,7 +38,6 @@ import type { RequestEvent } from "./$types";
  * - 404 not_found: Project does not exist or not owned by user
  */
 export async function GET(event: RequestEvent): Promise<Response> {
-  // Require authentication and project ownership
   const result = await requireProjectOwnership(event, event.params.id);
   if (isErrorResponse(result)) return result;
 
@@ -46,13 +45,11 @@ export async function GET(event: RequestEvent): Promise<Response> {
   const db = await getDbClient(event.locals);
   const projectId = event.params.id;
 
-  // Get total log count
   const [logCountResult] = await db
     .select({ count: count() })
     .from(log)
     .where(eq(log.projectId, projectId));
 
-  // Get level distribution
   const levelCounts = await db
     .select({
       level: log.level,
@@ -62,7 +59,6 @@ export async function GET(event: RequestEvent): Promise<Response> {
     .where(eq(log.projectId, projectId))
     .groupBy(log.level);
 
-  // Convert level counts to object
   const levelCountsObj: Record<string, number> = {};
   for (const { level, count: levelCount } of levelCounts) {
     if (level) {
@@ -110,22 +106,18 @@ export async function GET(event: RequestEvent): Promise<Response> {
  * - 404 not_found: Project does not exist or not owned by user
  */
 export async function PATCH(event: RequestEvent): Promise<Response> {
-  // CSRF protection for state-changing request
   const csrfError = checkCsrfOrigin(event);
   if (csrfError) return csrfError;
 
-  // Validate Content-Type
   const contentTypeError = requireJsonContentType(event.request);
   if (contentTypeError) return contentTypeError;
 
-  // Require authentication and project ownership
   const authResult = await requireProjectOwnership(event, event.params.id);
   if (isErrorResponse(authResult)) return authResult;
 
   const db = await getDbClient(event.locals);
   const projectId = event.params.id;
 
-  // Parse request body
   let body: unknown;
   try {
     body = await event.request.json();
@@ -133,7 +125,6 @@ export async function PATCH(event: RequestEvent): Promise<Response> {
     return json({ error: "invalid_json", message: "Invalid JSON body" }, { status: 400 });
   }
 
-  // Validate request body
   const result = projectUpdatePayloadSchema.safeParse(body);
   if (!result.success) {
     const errorMessage = result.error.issues?.[0]?.message || "Validation failed";
@@ -143,7 +134,6 @@ export async function PATCH(event: RequestEvent): Promise<Response> {
   const { name, retentionDays } = result.data;
   const { project: currentProject } = authResult;
 
-  // Check for duplicate name scoped to the current user (if name is being updated)
   if (name) {
     const existing = await db.query.project.findFirst({
       where: and(
@@ -160,7 +150,6 @@ export async function PATCH(event: RequestEvent): Promise<Response> {
     }
   }
 
-  // Empty payload is a no-op; return current project without touching updatedAt
   if (name === undefined && retentionDays === undefined) {
     return json({
       id: currentProject.id,
@@ -171,7 +160,6 @@ export async function PATCH(event: RequestEvent): Promise<Response> {
     });
   }
 
-  // Build update object dynamically to only include provided fields
   const updateData: { name?: string; retentionDays?: number | null; updatedAt?: Date } = {};
 
   if (name !== undefined) {
@@ -186,7 +174,6 @@ export async function PATCH(event: RequestEvent): Promise<Response> {
     updateData.updatedAt = new Date();
   }
 
-  // Update project (ownership already verified)
   const [updated] = await db
     .update(project)
     .set(updateData)
@@ -223,11 +210,9 @@ export async function PATCH(event: RequestEvent): Promise<Response> {
  * - 404 not_found: Project does not exist or not owned by user
  */
 export async function DELETE(event: RequestEvent): Promise<Response> {
-  // CSRF protection for state-changing request
   const csrfError = checkCsrfOrigin(event);
   if (csrfError) return csrfError;
 
-  // Require authentication and project ownership
   const authResult = await requireProjectOwnership(event, event.params.id);
   if (isErrorResponse(authResult)) return authResult;
 
@@ -235,10 +220,8 @@ export async function DELETE(event: RequestEvent): Promise<Response> {
   const db = await getDbClient(event.locals);
   const projectId = event.params.id;
 
-  // Invalidate API key cache BEFORE deleting project to close TOCTOU window
   invalidateApiKeyCacheByHash(projectData.apiKeyHash);
 
-  // Delete project (logs will cascade delete via FK constraint)
   await db.delete(project).where(eq(project.id, projectId));
 
   return json({

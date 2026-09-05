@@ -10,7 +10,6 @@ export const load: PageServerLoad = async (event) => {
   const { project: projectData } = await requireProjectOwnershipPage(event, projectId);
   const db = await getDbClient(event.locals);
 
-  // Get log stats: total count and oldest log date
   const [logStats] = await db
     .select({
       totalLogs: count(),

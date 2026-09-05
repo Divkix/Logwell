@@ -6,42 +6,32 @@ import { Button } from '$lib/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader } from '$lib/components/ui/card';
 import { Input } from '$lib/components/ui/input';
 
-// Form state
 let username = $state('');
 let password = $state('');
 let error = $state('');
 let isLoading = $state(false);
 
-// Validation state
 let usernameError = $state('');
 let passwordError = $state('');
 
-// Reference to password input for auto-focus
 let passwordInput: HTMLInputElement | null = $state(null);
 
-// Focus password field on mount
 $effect(() => {
   if (passwordInput) {
     passwordInput.focus();
   }
 });
 
-/**
- * Validates form fields
- * Returns true if valid, false otherwise
- */
 function validateForm(): boolean {
   let isValid = true;
   usernameError = '';
   passwordError = '';
 
-  // Check username
   if (!username.trim()) {
     usernameError = 'Username is required';
     isValid = false;
   }
 
-  // Check password
   if (!password) {
     passwordError = 'Password is required';
     isValid = false;
@@ -50,16 +40,11 @@ function validateForm(): boolean {
   return isValid;
 }
 
-/**
- * Handle form submission
- */
 async function handleSubmit(event: Event) {
   event.preventDefault();
 
-  // Clear previous errors
   error = '';
 
-  // Validate form
   if (!validateForm()) {
     return;
   }
@@ -74,30 +59,25 @@ async function handleSubmit(event: Event) {
       },
       {
         onSuccess: async () => {
-          // Invalidate all load functions to refresh session data, then navigate
           await invalidateAll();
           await goto('/');
         },
         onError: (ctx) => {
-          // Handle error from better-auth
           error = ctx.error?.message || 'Invalid credentials';
         },
       },
     );
 
     if (signInError) {
-      // Show error message
       error = signInError.message || 'Invalid credentials';
       return;
     }
 
-    // If we have data but onSuccess didn't fire, redirect manually
     if (data?.user) {
       await invalidateAll();
       await goto('/');
     }
   } catch (err) {
-    // Handle unexpected errors
     error = 'An unexpected error occurred. Please try again.';
   } finally {
     isLoading = false;
@@ -120,7 +100,6 @@ async function handleSubmit(event: Event) {
     </CardHeader>
     <CardContent>
       <form onsubmit={(e) => { e.preventDefault(); handleSubmit(e); }} novalidate class="flex flex-col gap-4">
-        <!-- Username field -->
         <div class="flex flex-col gap-2">
           <label for="username" class="text-sm font-medium">Username</label>
           <Input
@@ -137,7 +116,6 @@ async function handleSubmit(event: Event) {
           {/if}
         </div>
 
-        <!-- Password field -->
         <div class="flex flex-col gap-2">
           <label for="password" class="text-sm font-medium">Password</label>
           <Input
@@ -155,12 +133,10 @@ async function handleSubmit(event: Event) {
           {/if}
         </div>
 
-        <!-- Error message -->
         {#if error}
           <p class="text-destructive text-sm text-center">{error}</p>
         {/if}
 
-        <!-- Submit button -->
         <Button type="submit" class="w-full" disabled={isLoading}>
           {#if isLoading}
             <span class="flex items-center gap-2">

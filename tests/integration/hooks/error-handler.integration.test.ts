@@ -68,7 +68,6 @@ describe("Global Error Handler", () => {
 
       const result = handleError(context);
 
-      // Should not expose internal error details
       expect(result.message).not.toContain("secret123");
       expect(result.message).toBe("Internal server error");
     });
@@ -81,7 +80,6 @@ describe("Global Error Handler", () => {
 
       const result = handleError(context);
 
-      // 4xx errors can show user-friendly messages
       expect(result.message).toBe("Project name already exists");
     });
 
@@ -114,9 +112,7 @@ describe("Global Error Handler", () => {
 
       const result = handleError(context);
 
-      // ID should be URL-safe (nanoid uses A-Za-z0-9_-)
       expect(result.id).toMatch(/^[A-Za-z0-9_-]+$/);
-      // ID should be exactly 12 characters (as specified in handleError)
       expect(result.id.length).toBe(12);
     });
   });

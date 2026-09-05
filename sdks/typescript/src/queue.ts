@@ -57,7 +57,6 @@ export class BatchQueue {
       return;
     }
 
-    // Handle queue overflow
     if (this.queue.length >= this.config.maxQueueSize) {
       const dropped = this.queue.shift();
       this.config.onError?.(
@@ -70,12 +69,10 @@ export class BatchQueue {
 
     this.queue.push(entry);
 
-    // Start timer on first entry
     if (!this.flushTimer && !this.stopped) {
       this.startTimer();
     }
 
-    // Flush immediately if batch size reached
     if (this.queue.length >= this.config.batchSize) {
       void this.flush();
     }
@@ -88,7 +85,6 @@ export class BatchQueue {
    * @returns Last response from the server, or null if queue was empty
    */
   async flush(): Promise<IngestResponse | null> {
-    // Prevent concurrent flushes
     if (this.flushing || this.queue.length === 0) {
       return null;
     }
@@ -97,12 +93,10 @@ export class BatchQueue {
     this.stopTimer();
 
     this._flushPromise = (async () => {
-      // Snapshot current queue length so concurrent adds during flush are deferred
       const snapshotLength = this.queue.length;
       let sent = 0;
       let lastResponse: IngestResponse | null = null;
       try {
-        // Send in chunks bounded by batchSize, up to the snapshot count
         while (sent < snapshotLength) {
           const remaining = snapshotLength - sent;
           const chunkSize = Math.min(this.config.batchSize, remaining);
@@ -112,7 +106,6 @@ export class BatchQueue {
           try {
             response = await this.sendBatch(batch);
           } catch (error) {
-            // Re-queue failed batch at front, respect maxQueueSize
             const requeued = [...batch, ...this.queue];
             this.queue.length = 0;
             this.queue.push(...requeued.slice(0, this.config.maxQueueSize));
@@ -128,9 +121,6 @@ export class BatchQueue {
             break; // stop flushing on error
           }
           lastResponse = response;
-          // onFlush is a user callback — a throw must not look like a send
-          // failure (no re-queue, no interrupted flush), so report it via
-          // onError instead.
           try {
             this.config.onFlush?.(batch.length);
           } catch (error) {
@@ -175,10 +165,6 @@ export class BatchQueue {
 
     const response = await this.flush();
 
-    // flush() re-queues failed batches and reports via onError instead of
-    // throwing. After the final shutdown flush, any remaining logs mean the
-    // flush did not fully succeed — surface that so shutdown does not report
-    // success while logs are dropped on exit.
     if (this.queue.length > 0) {
       throw new LogwellError(
         `Shutdown flush failed: ${this.queue.length} log(s) could not be delivered`,
@@ -192,14 +178,10 @@ export class BatchQueue {
   }
 
   private startTimer(): void {
-    // Idempotent: clear any pending timer first so startTimer can never
-    // stack a duplicate flush timer.
     this.stopTimer();
     const timer = setTimeout(() => {
       void this.flush();
     }, this.config.flushInterval);
-    // Allow Node processes to exit while a flush is merely pending. Bun's
-    // timer objects don't expose unref(), so guard the call at runtime.
     const refable = timer as { unref?: () => void } | null;
     if (typeof refable === "object" && refable !== null && "unref" in refable) {
       refable.unref?.();

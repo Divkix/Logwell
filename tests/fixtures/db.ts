@@ -3,49 +3,27 @@ import { nanoid } from "nanoid";
 import * as schema from "../../src/lib/server/db/schema";
 import { hashApiKey } from "../../src/lib/server/utils/api-key";
 
-/**
- * Type for project creation/selection
- */
 export type ProjectInsert = typeof schema.project.$inferInsert;
 export type ProjectSelect = typeof schema.project.$inferSelect;
 
-/**
- * Type for user creation/selection
- */
 export type UserInsert = typeof schema.user.$inferInsert;
 export type UserSelect = typeof schema.user.$inferSelect;
 
-/**
- * Type for log creation/selection
- */
 export type LogInsert = typeof schema.log.$inferInsert;
 export type LogSelect = typeof schema.log.$inferSelect;
 
-/**
- * Generates a unique API key in the format: lw_<32-random-chars>
- */
 export function generateApiKey(): string {
   return `lw_${nanoid(32)}`;
 }
 
-/**
- * Cache for default test user per database instance
- * Uses WeakMap to avoid memory leaks when db instances are garbage collected
- */
 const defaultUserCache = new WeakMap<PgliteDatabase<typeof schema>, UserSelect>();
 
-/**
- * Gets or creates a default test user for the given database
- * Used when ownerId is not explicitly provided to seedProject
- */
 export async function getOrCreateDefaultUser(
   db: PgliteDatabase<typeof schema>,
 ): Promise<UserSelect> {
-  // Check cache first
   const cached = defaultUserCache.get(db);
   if (cached) return cached;
 
-  // Create a default test user
   const userId = nanoid();
   const [user] = await db
     .insert(schema.user)
@@ -59,21 +37,13 @@ export async function getOrCreateDefaultUser(
 
   if (!user) throw new Error("Failed to create test user");
 
-  // Cache and return
   defaultUserCache.set(db, user);
   return user;
 }
 
-/**
- * Factory function to create test projects
- * Note: ownerId must be provided (use getOrCreateDefaultUser if you don't have a specific user)
- */
 export function createProjectFactory(
   overrides: Partial<ProjectInsert> & { ownerId: string },
 ): ProjectInsert {
-  // API keys are stored hashed only. Derive the hash from a fresh random key
-  // unless the caller provides an explicit apiKeyHash. apiKeyHash is applied
-  // after the spread so overrides can't leave it inconsistent.
   const apiKeyHash = overrides.apiKeyHash ?? hashApiKey(generateApiKey());
   return {
     id: nanoid(),
@@ -83,9 +53,6 @@ export function createProjectFactory(
   };
 }
 
-/**
- * Factory function to create test logs
- */
 export function createLogFactory(overrides: Partial<LogInsert> = {}): LogInsert {
   return {
     id: nanoid(),
@@ -102,16 +69,11 @@ export function createLogFactory(overrides: Partial<LogInsert> = {}): LogInsert 
   };
 }
 
-/**
- * Seed multiple projects into the database
- * If ownerId is not provided, creates a default test user automatically
- */
 export async function seedProjects(
   db: PgliteDatabase<typeof schema>,
   count: number = 3,
   overrides: Partial<ProjectInsert> = {},
 ): Promise<ProjectSelect[]> {
-  // Get or create default user if ownerId not provided
   const ownerId = overrides.ownerId ?? (await getOrCreateDefaultUser(db)).id;
 
   const projects: ProjectInsert[] = Array.from({ length: count }, () =>
@@ -121,15 +83,10 @@ export async function seedProjects(
   return await db.insert(schema.project).values(projects).returning();
 }
 
-/**
- * Seed a single project into the database
- * If ownerId is not provided, creates a default test user automatically
- */
 export async function seedProject(
   db: PgliteDatabase<typeof schema>,
   overrides: Partial<ProjectInsert> = {},
 ): Promise<ProjectSelect> {
-  // Get or create default user if ownerId not provided
   const ownerId = overrides.ownerId ?? (await getOrCreateDefaultUser(db)).id;
 
   const project = createProjectFactory({ ...overrides, ownerId });
@@ -138,11 +95,6 @@ export async function seedProject(
   return result;
 }
 
-/**
- * Seed a single project and return the row together with the plaintext API key.
- * The plaintext key is never stored (only its hash is) — this helper exposes it
- * for tests that need to authenticate ingestion requests.
- */
 export async function seedProjectWithApiKey(
   db: PgliteDatabase<typeof schema>,
   overrides: Omit<Partial<ProjectInsert>, "apiKeyHash"> = {},
@@ -153,9 +105,6 @@ export async function seedProjectWithApiKey(
   return { ...result, apiKey };
 }
 
-/**
- * Seed multiple logs into the database
- */
 export async function seedLogs(
   db: PgliteDatabase<typeof schema>,
   projectId: string,
@@ -169,9 +118,6 @@ export async function seedLogs(
   return await db.insert(schema.log).values(logs).returning();
 }
 
-/**
- * Seed a single log into the database
- */
 export async function seedLog(
   db: PgliteDatabase<typeof schema>,
   projectId: string,
@@ -183,9 +129,6 @@ export async function seedLog(
   return result;
 }
 
-/**
- * Generic seeder for test data
- */
 export async function seedTestData(
   db: PgliteDatabase<typeof schema>,
   data: {

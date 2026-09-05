@@ -1,6 +1,3 @@
-/**
- * Client-side incident shape from SSE payloads.
- */
 export interface ClientIncident {
   id: string;
   projectId: string;
@@ -105,9 +102,7 @@ export function useIncidentStream(options: UseIncidentStreamOptions): UseInciden
         try {
           const incidents = JSON.parse(event.data) as ClientIncident[];
           onIncidents?.(incidents);
-        } catch {
-          // ignore malformed payload
-        }
+        } catch {}
       }
     }
   }
@@ -187,7 +182,6 @@ export function useIncidentStream(options: UseIncidentStreamOptions): UseInciden
         onError?.(_error);
         setConnected(false);
 
-        // Don't reconnect on permanent errors (404)
         if (_error.message.startsWith("HTTP 404:")) return;
 
         scheduleReconnect();

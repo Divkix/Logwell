@@ -57,7 +57,6 @@ describe("BatchQueue", () => {
         queue.add(log);
       }
 
-      // Allow microtask queue to process
       await vi.runAllTimersAsync();
 
       expect(mockSendBatch).toHaveBeenCalledTimes(1);
@@ -81,7 +80,6 @@ describe("BatchQueue", () => {
 
       queue.add(log);
 
-      // Fast-forward time
       await vi.advanceTimersByTimeAsync(1000);
 
       expect(mockSendBatch).toHaveBeenCalledTimes(1);
@@ -102,7 +100,6 @@ describe("BatchQueue", () => {
       queue.add(createLogFixture());
       await queue.flush();
 
-      // Add another and wait for interval
       queue.add(createLogFixture());
       await vi.advanceTimersByTimeAsync(1000);
 
@@ -118,8 +115,6 @@ describe("BatchQueue", () => {
 
       await vi.advanceTimersByTimeAsync(1000);
 
-      // Only one timer fires: a stacked duplicate would trigger a second
-      // (empty) flush.
       expect(flushSpy).toHaveBeenCalledTimes(1);
     });
   });
@@ -257,7 +252,6 @@ describe("BatchQueue", () => {
 
       await queue.flush();
 
-      // Logs should be re-queued
       expect(queue.size).toBe(1);
     });
 
@@ -272,11 +266,9 @@ describe("BatchQueue", () => {
       queue.add(createLogFixture());
       await queue.flush();
 
-      // The send succeeded: the log is delivered, not re-queued.
       expect(mockSendBatch).toHaveBeenCalledTimes(1);
       expect(onFlush).toHaveBeenCalledWith(1);
       expect(queue.size).toBe(0);
-      // The callback failure is reported without being treated as a send failure.
       expect(onError).toHaveBeenCalledTimes(1);
       expect((onError.mock.calls[0][0] as Error).message).toBe("callback failed");
     });
@@ -294,13 +286,10 @@ describe("BatchQueue", () => {
       const config = { ...defaultConfig, onFlush, onError };
       const queue = new BatchQueue(mockSendBatch, config);
 
-      // First flush: send succeeds, onFlush throws -> onError, no re-queue.
       queue.add(createLogFixture());
       await queue.flush();
       expect(queue.size).toBe(0);
 
-      // Second flush: send fails -> the batch is re-queued and onError gets
-      // the send error (not the callback error).
       queue.add(createLogFixture());
       await queue.flush();
       expect(queue.size).toBe(1);
@@ -327,11 +316,9 @@ describe("BatchQueue", () => {
       queue.add(createLogFixture());
       await queue.shutdown();
 
-      // Add more and advance time
       queue.add(createLogFixture());
       await vi.advanceTimersByTimeAsync(2000);
 
-      // Should only be called once (from shutdown flush)
       expect(mockSendBatch).toHaveBeenCalledTimes(1);
     });
 
@@ -352,14 +339,12 @@ describe("BatchQueue", () => {
     it("handles concurrent add and flush", async () => {
       const queue = new BatchQueue(mockSendBatch, defaultConfig);
 
-      // Add logs while flushing
       queue.add(createLogFixture());
       const flushPromise = queue.flush();
       queue.add(createLogFixture());
 
       await flushPromise;
 
-      // Second log should still be in queue
       expect(queue.size).toBe(1);
     });
 
@@ -380,7 +365,6 @@ describe("BatchQueue", () => {
       await flush1;
       await flush2;
 
-      // Should only send once
       expect(mockSendBatch).toHaveBeenCalledTimes(1);
     });
   });

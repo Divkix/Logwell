@@ -1,12 +1,5 @@
 import { log } from "$lib/server/db/schema";
 
-/**
- * Column map shared by both ingest endpoints' insert `.returning(...)` calls.
- *
- * It lists every `log` column **except** the generated `search` tsvector, which
- * must never be fetched into the SSE payload. Keeping a single definition means
- * `/v1/logs` and `/v1/ingest` can never silently drift to emit different shapes.
- */
 export const LOG_RETURNING_COLUMNS = {
   id: log.id,
   projectId: log.projectId,
@@ -41,10 +34,6 @@ export const LOG_RETURNING_COLUMNS = {
   timestamp: log.timestamp,
 } as const;
 
-/**
- * Builds the JSON body shared by both ingest endpoints. `rejected`/`errors` are
- * only included when at least one record was rejected.
- */
 export function buildIngestResponse(accepted: number, rejected: number, errors: string[]) {
   const response: { accepted: number; rejected?: number; errors?: string[] } = { accepted };
   if (rejected > 0) {

@@ -6,15 +6,8 @@ import type * as schema from "../../src/lib/server/db/schema";
 import { user } from "../../src/lib/server/db/schema";
 import { setupTestDatabase } from "../../src/lib/server/db/test-db";
 
-// Admin username constant (matches the one in seed-admin.ts)
 const ADMIN_USERNAME = "admin";
 
-/**
- * Test helper that mimics the seed-admin script logic
- * @param db - Database instance
- * @param adminPassword - Admin password
- * @param adminUsername - Admin username (defaults to ADMIN_USERNAME constant)
- */
 async function seedAdmin(
   db: PgliteDatabase<typeof schema>,
   adminPassword: string,
@@ -22,7 +15,6 @@ async function seedAdmin(
 ): Promise<{ created: boolean; message: string }> {
   const auth = createAuth(db);
 
-  // Validate password
   if (!adminPassword || adminPassword.length < 8) {
     throw new Error("ADMIN_PASSWORD must be at least 8 characters long");
   }
@@ -30,14 +22,12 @@ async function seedAdmin(
   // Generate email from username (using .local TLD as localhost is rejected by email validation)
   const generatedEmail = `${adminUsername}@logwell.local`;
 
-  // Check if admin already exists by username
   const existingAdmin = await db.select().from(user).where(eq(user.username, adminUsername));
 
   if (existingAdmin.length > 0) {
     return { created: false, message: "Admin user already exists, skipping" };
   }
 
-  // Create admin user via better-auth with username
   const result = await auth.api.signUpEmail({
     body: {
       email: generatedEmail,
@@ -77,7 +67,6 @@ describe("seed-admin", () => {
     expect(result.created).toBe(true);
     expect(result.message).toBe("Admin user created successfully");
 
-    // Verify user was created in database with username
     const users = await db.select().from(user).where(eq(user.username, ADMIN_USERNAME));
     expect(users).toHaveLength(1);
     expect(users[0].name).toBe("Admin");
@@ -89,16 +78,13 @@ describe("seed-admin", () => {
   it("should skip if admin already exists", async () => {
     const adminPassword = "test-admin-password-123";
 
-    // Create admin user first
     const firstResult = await seedAdmin(db, adminPassword);
     expect(firstResult.created).toBe(true);
 
-    // Try to create again
     const secondResult = await seedAdmin(db, adminPassword);
     expect(secondResult.created).toBe(false);
     expect(secondResult.message).toBe("Admin user already exists, skipping");
 
-    // Verify still only one user
     const users = await db.select().from(user).where(eq(user.username, ADMIN_USERNAME));
     expect(users).toHaveLength(1);
   });
@@ -110,7 +96,6 @@ describe("seed-admin", () => {
 
     expect(result.created).toBe(true);
 
-    // Verify user was created with username
     const users = await db.select().from(user).where(eq(user.username, ADMIN_USERNAME));
     expect(users).toHaveLength(1);
   });
@@ -122,7 +107,6 @@ describe("seed-admin", () => {
 
     expect(result.created).toBe(true);
 
-    // Verify the generated email format
     const users = await db.select().from(user);
     expect(users).toHaveLength(1);
     expect(users[0].username).toBe(ADMIN_USERNAME);
@@ -137,7 +121,6 @@ describe("seed-admin", () => {
 
     expect(result.created).toBe(true);
 
-    // Verify user was created with custom username
     const users = await db.select().from(user).where(eq(user.username, customUsername));
     expect(users).toHaveLength(1);
     expect(users[0].username).toBe(customUsername);
@@ -148,10 +131,8 @@ describe("seed-admin", () => {
     const adminPassword = "test-admin-password-123";
     const auth = createAuth(db);
 
-    // Create admin user
     await seedAdmin(db, adminPassword);
 
-    // Try to sign in using username (not email)
     const signInResult = await auth.api.signInUsername({
       body: {
         username: ADMIN_USERNAME,
@@ -159,10 +140,8 @@ describe("seed-admin", () => {
       },
     });
 
-    // Check that sign in succeeded (no error)
     expect((signInResult as { error?: unknown }).error).toBeUndefined();
 
-    // Verify user exists in database with correct username
     const users = await db.select().from(user).where(eq(user.username, ADMIN_USERNAME));
     expect(users).toHaveLength(1);
     expect(users[0].username).toBe(ADMIN_USERNAME);
@@ -189,10 +168,8 @@ describe("seed-admin", () => {
     const auth = createAuth(db);
     const adminPassword = "test-admin-password-123";
 
-    // First signup succeeds.
     await seedAdmin(db, adminPassword);
 
-    // Second signup with the same username must throw.
     const duplicateSignup = auth.api.signUpEmail({
       body: {
         email: `${ADMIN_USERNAME}@logwell.local`,

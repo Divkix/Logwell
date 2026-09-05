@@ -9,7 +9,6 @@ export {
   Item,
   Item as DropdownMenuItem,
   Root,
-  //
   Root as DropdownMenu,
   Trigger,
   Trigger as DropdownMenuTrigger,

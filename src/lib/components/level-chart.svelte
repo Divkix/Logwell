@@ -15,24 +15,19 @@ interface Props {
 
 const { data, class: className }: Props = $props();
 
-// Ordered log levels for consistent rendering
 const LOG_LEVELS: LogLevel[] = ['debug', 'info', 'warn', 'error', 'fatal'];
 
-// Chart dimensions
 const SIZE = 200;
 const CENTER = SIZE / 2;
 const OUTER_RADIUS = 80;
 const INNER_RADIUS = 50;
 
-// Active levels with count > 0
 const activeLevels = $derived(LOG_LEVELS.filter((level) => (data.levelCounts[level] ?? 0) > 0));
 
-// Total log count
 const totalCount = $derived(
   Object.values(data.levelCounts).reduce((sum, count) => sum + (count ?? 0), 0),
 );
 
-// Convert polar coordinates to cartesian
 function polarToCartesian(radius: number, angleInDegrees: number): { x: number; y: number } {
   const angleInRadians = ((angleInDegrees - 90) * Math.PI) / 180;
   return {
@@ -41,7 +36,6 @@ function polarToCartesian(radius: number, angleInDegrees: number): { x: number; 
   };
 }
 
-// Generate SVG arc path for donut segment
 function describeArc(startAngle: number, endAngle: number): string {
   const startOuter = polarToCartesian(OUTER_RADIUS, startAngle);
   const endOuter = polarToCartesian(OUTER_RADIUS, endAngle);
@@ -76,7 +70,6 @@ function describeArc(startAngle: number, endAngle: number): string {
   ].join(' ');
 }
 
-// Segment data with calculated SVG paths
 interface Segment {
   level: LogLevel;
   paths: string[];
@@ -94,7 +87,6 @@ const segments = $derived.by(() => {
     const color = getLevelColor(level);
 
     if (sweepAngle >= 360) {
-      // Full circle requires two half-arcs for SVG rendering
       result.push({
         level,
         paths: [describeArc(0, 179.99), describeArc(180, 359.99)],
@@ -114,7 +106,6 @@ const segments = $derived.by(() => {
   return result;
 });
 
-// Format percentage with minimal decimal places
 function formatPercentage(value: number): string {
   const formatted = value.toFixed(1);
   return formatted.endsWith('.0') ? Math.round(value).toString() : formatted;

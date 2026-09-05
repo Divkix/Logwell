@@ -20,10 +20,6 @@ interface Props {
   appUrl?: string;
   selectedIndex?: number;
   selectedId?: string | null;
-  /**
-   * Bindable sort state. When the parent binds these, the parent can use the
-   * same sorted order as the rendered table (e.g. j/k keyboard navigation).
-   */
   sortKey?: SortField | null;
   sortDirection?: SortDirection;
 }
@@ -43,12 +39,10 @@ let {
   sortDirection = $bindable(null),
 }: Props = $props();
 
-// Show quick start empty state when no filters and project/appUrl provided
 const showQuickstartEmptyState = $derived(!hasFilters && project && appUrl);
 
 const SKELETON_ROW_COUNT = 8;
 
-// Determine empty state message and test id based on hasFilters
 const emptyStateMessage = $derived(hasFilters ? 'No logs match your filters' : 'No logs yet');
 const emptyStateTestId = $derived(hasFilters ? 'log-table-no-results' : 'log-table-empty');
 
@@ -79,7 +73,6 @@ const sortedLogs = $derived(sortLogs(logs, sortKey, sortDirection));
 </script>
 
 <div data-testid="log-table" class={cn('w-full', className)}>
-  <!-- Mobile: Card-based layout (< 640px) -->
   <div class="space-y-2 sm:hidden">
     {#if loading}
       {#each Array(SKELETON_ROW_COUNT) as _}
@@ -107,7 +100,6 @@ const sortedLogs = $derived(sortLogs(logs, sortKey, sortDirection));
     {/if}
   </div>
 
-  <!-- Tablet/Desktop: Table layout (>= 640px) -->
   <table class="hidden sm:table w-full caption-bottom text-sm">
     <thead data-testid="log-table-header" class="border-b">
       <tr class="border-b transition-colors">

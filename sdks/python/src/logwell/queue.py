@@ -22,7 +22,6 @@ if TYPE_CHECKING:
 
     from logwell.types import LogwellConfig
 
-# Type alias for the send batch callback
 SendBatchFn = Callable[[list[LogEntry]], Awaitable[IngestResponse]]
 
 
@@ -93,7 +92,7 @@ class BatchQueue:
         self._send_batch = send_batch
         self._queue: deque[LogEntry] = deque()
         self._lock = threading.Lock()
-        self._loop_lock = threading.Lock()  # Separate lock for event-loop creation (PY-3)
+        self._loop_lock = threading.Lock()
         self._timer_future: ConcurrentFuture[Any] | None = None
         self._flush_future: ConcurrentFuture[Any] | None = None
         self._flushing = False
@@ -121,7 +120,6 @@ class BatchQueue:
             if self._stopped:
                 return
 
-            # Handle queue overflow
             if len(self._queue) >= self._config.max_queue_size:
                 dropped = self._queue.popleft()
                 msg = dropped.get("message", "")[:50]
@@ -137,15 +135,11 @@ class BatchQueue:
 
             self._queue.append(entry)
 
-            # Start timer on first entry
             timer_future = getattr(self, "_timer_future", None)
             if (timer_future is None or timer_future.done()) and not self._stopped:
                 self._start_timer()
-
-            # Flush immediately if batch size reached
             should_flush = len(self._queue) >= self._config.batch_size
 
-        # Invoke callback outside the lock to prevent re-entrant deadlock (PY-1)
         if overflow_error is not None and self._config.on_error:
             self._config.on_error(overflow_error)
 
@@ -153,22 +147,10 @@ class BatchQueue:
             self._trigger_flush()
 
     def _trigger_flush(self) -> None:
-        """Trigger an asynchronous flush operation.
-
-        This method schedules the flush to run in the background
-        without blocking the caller.
-
-        Never schedules a second flush while one is already in flight: the
-        `_flushing` flag is set under `_lock` BEFORE the coroutine is
-        scheduled, so `_flush_future` always tracks the real in-flight flush
-        and a late trigger cannot overwrite it with a no-op future (PY-M6).
-        """
         with self._lock:
             if self._flushing or self._stopped:
                 return
             self._flushing = True
-            # Schedule + record the future under the same lock so `_flush_future`
-            # is always the ACTUAL in-flight future whenever `_flushing` is True.
             loop = self._ensure_loop()
             self._flush_future = asyncio.run_coroutine_threadsafe(self._do_flush(), loop)
 
@@ -190,8 +172,6 @@ class BatchQueue:
             if self._flushing:
                 return None
             self._flushing = True
-            # Schedule + record the future under the same lock so `_flush_future`
-            # is always the ACTUAL in-flight future whenever `_flushing` is True.
             future = asyncio.run_coroutine_threadsafe(self._do_flush(), loop)
             self._flush_future = future
         try:
@@ -201,16 +181,6 @@ class BatchQueue:
             return future.result()
 
     async def _do_flush(self) -> IngestResponse | None:
-        """Internal flush implementation.
-
-        Sends the snapshotted queue in chunks bounded by batch_size so a single
-        request never exceeds the server's per-request limit (PY-1/PY-2 isolation
-        preserved: callbacks run OUTSIDE self._lock).
-
-        The caller (`flush()` or `_trigger_flush()`) must set `_flushing = True`
-        before scheduling this coroutine; this method clears it on every exit
-        path (PY-M6).
-        """
         with self._lock:
             if len(self._queue) == 0:
                 self._flushing = False
@@ -218,7 +188,6 @@ class BatchQueue:
 
             self._stop_timer()
 
-            # Snapshot current queue and clear it
             snapshot = list(self._queue)
             self._queue.clear()
 
@@ -232,12 +201,11 @@ class BatchQueue:
             chunk = snapshot[sent : sent + batch_size]
             try:
                 last_response = await self._send_batch(chunk)
-            except Exception as error:  # noqa: BLE001 - re-queued + reported below
+            except Exception as error:  # noqa: BLE001
                 send_error = error
                 failed_remaining = snapshot[sent:]
                 break
             sent += len(chunk)
-            # Success path — call on_flush in its own try/except (PY-2)
             if self._config.on_flush:
                 try:
                     self._config.on_flush(len(chunk))
@@ -246,15 +214,12 @@ class BatchQueue:
                         self._config.on_error(flush_err)
 
         if send_error is not None:
-            # Re-queue only the undelivered remainder at the front (original order)
             with self._lock:
                 self._queue.extendleft(reversed(failed_remaining))
 
-                # Restart timer to retry
                 if not self._stopped:
                     self._start_timer()
 
-            # Invoke callback outside the lock (PY-1)
             if self._config.on_error:
                 self._config.on_error(send_error)
 
@@ -262,7 +227,6 @@ class BatchQueue:
                 self._flushing = False
             return last_response
 
-        # Restart timer if more logs remain (added during flush)
         with self._lock:
             self._flushing = False
             if len(self._queue) > 0 and not self._stopped:
@@ -283,11 +247,6 @@ class BatchQueue:
             self._stopped = True
             self._stop_timer()
 
-        # Await any in-flight flush so logs already moved out of the queue are not
-        # lost when _stop_loop() kills the background loop. Only do this from a
-        # different thread than the queue loop to avoid awaiting our own future.
-        # Loop on _flushing (not just on a single _flush_future snapshot) so
-        # shutdown always waits for the ACTUAL in-flight future (PY-M6).
         if threading.current_thread() is not self._queue_thread:
             while True:
                 with self._lock:
@@ -296,10 +255,6 @@ class BatchQueue:
                 if not flushing:
                     break
                 if in_flight is not None and in_flight.done():
-                    # The in-flight flush terminated without clearing the flag
-                    # (only possible if an on_error callback raised inside
-                    # _do_flush). The error was already surfaced via on_error;
-                    # clear the flag and move on so shutdown cannot hang.
                     with self._lock:
                         if self._flushing:
                             self._flushing = False
@@ -317,11 +272,6 @@ class BatchQueue:
         self._stop_loop()
 
     def _ensure_loop(self) -> asyncio.AbstractEventLoop:
-        """Ensure a background event loop is running (double-checked locking, PY-3).
-
-        Uses a dedicated _loop_lock separate from _lock so this method can be
-        called safely from within code that already holds _lock.
-        """
         loop = self._queue_loop
         if loop is not None and not loop.is_closed():
             return loop
@@ -329,7 +279,6 @@ class BatchQueue:
             loop = self._queue_loop
             if loop is None or loop.is_closed():
                 loop = asyncio.new_event_loop()
-                # Assign before starting the thread so _run_loop sees it
                 self._queue_loop = loop
                 thread = threading.Thread(target=self._run_loop, daemon=True)
                 thread.start()
@@ -337,13 +286,11 @@ class BatchQueue:
         return self._queue_loop  # type: ignore[return-value]
 
     def _run_loop(self) -> None:
-        """Run the background event loop."""
         assert self._queue_loop is not None
         asyncio.set_event_loop(self._queue_loop)
         self._queue_loop.run_forever()
 
     def _stop_loop(self) -> None:
-        """Stop the background event loop and thread."""
         if self._queue_loop is None or self._queue_thread is None:
             return
 
@@ -357,19 +304,11 @@ class BatchQueue:
         self._queue_thread = None
 
     def _start_timer(self) -> None:
-        """Start the flush timer.
-
-        Note: Must be called while holding the lock.
-        """
         self._stop_timer()
         loop = self._ensure_loop()
         self._timer_future = asyncio.run_coroutine_threadsafe(self._timer_coro(), loop)
 
     def _stop_timer(self) -> None:
-        """Stop the flush timer.
-
-        Note: Must be called while holding the lock.
-        """
         future = getattr(self, "_timer_future", None)
         if future is not None:
             if not future.done():
@@ -377,7 +316,6 @@ class BatchQueue:
             self._timer_future = None
 
     async def _timer_coro(self) -> None:
-        """Handle timer expiration by triggering a flush."""
         my_future = getattr(self, "_timer_future", None)
         try:
             await asyncio.sleep(self._config.flush_interval)

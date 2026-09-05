@@ -1,7 +1,6 @@
 import * as sonner from "svelte-sonner";
 import { describe, expect, it, vi } from "vite-plus/test";
 
-// Mock svelte-sonner
 vi.mock("svelte-sonner", () => ({
   toast: {
     success: vi.fn(),
@@ -13,7 +12,6 @@ vi.mock("svelte-sonner", () => ({
   },
 }));
 
-// Import after mocking
 import { toastError, toastSuccess } from "./toast";
 
 describe("Toast Utility", () => {

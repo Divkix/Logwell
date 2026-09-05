@@ -30,7 +30,6 @@ const hasActiveFilters = $derived(levels.length > 0 || search || range !== defau
 
 {#if hasActiveFilters}
   <div data-testid="active-filter-chips" class="hidden sm:flex items-center gap-2 flex-wrap">
-    <!-- Level chips -->
     {#each levels as level}
       <button
         data-testid="filter-chip-level-{level}"
@@ -48,7 +47,6 @@ const hasActiveFilters = $derived(levels.length > 0 || search || range !== defau
       </button>
     {/each}
 
-    <!-- Search chip -->
     {#if search}
       <button
         data-testid="filter-chip-search"
@@ -61,7 +59,6 @@ const hasActiveFilters = $derived(levels.length > 0 || search || range !== defau
       </button>
     {/if}
 
-    <!-- Range chip (only if not default) -->
     {#if range !== defaultRange}
       <button
         data-testid="filter-chip-range"

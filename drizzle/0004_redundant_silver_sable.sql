@@ -1,10 +1,6 @@
--- Migration: Add owner_id to project table
--- Requires at least one user to exist if projects exist
 
--- Step 0: Pre-flight check - fail fast with clear error
 DO $$
 BEGIN
-  -- Check if projects exist but no users exist
   IF EXISTS (SELECT 1 FROM "project" LIMIT 1)
      AND NOT EXISTS (SELECT 1 FROM "user" LIMIT 1) THEN
     RAISE EXCEPTION
@@ -12,7 +8,6 @@ BEGIN
   END IF;
 END $$;--> statement-breakpoint
 
--- Step 1: Add owner_id column as nullable (idempotent - skip if exists)
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -23,12 +18,10 @@ BEGIN
   END IF;
 END $$;--> statement-breakpoint
 
--- Step 2: Backfill existing projects with the first user
 UPDATE "project" SET "owner_id" = (
   SELECT "id" FROM "user" ORDER BY "created_at" ASC LIMIT 1
 ) WHERE "owner_id" IS NULL;--> statement-breakpoint
 
--- Step 3: Make NOT NULL (idempotent - skip if already NOT NULL)
 DO $$
 BEGIN
   IF EXISTS (
@@ -41,7 +34,6 @@ BEGIN
   END IF;
 END $$;--> statement-breakpoint
 
--- Step 4: Add foreign key (idempotent - skip if exists)
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -54,5 +46,4 @@ BEGIN
   END IF;
 END $$;--> statement-breakpoint
 
--- Step 5: Create index (idempotent - skip if exists)
 CREATE INDEX IF NOT EXISTS "idx_project_owner_id" ON "project" USING btree ("owner_id");

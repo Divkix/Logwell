@@ -14,14 +14,12 @@ const { open, onClose, class: className }: Props = $props();
 
 let previouslyFocusedElement: HTMLElement | null = $state(null);
 
-// Store the previously focused element when modal opens
 $effect(() => {
   if (open && !previouslyFocusedElement) {
     previouslyFocusedElement = document.activeElement as HTMLElement;
   }
 });
 
-// Restore focus when modal closes
 $effect(() => {
   if (!open && previouslyFocusedElement) {
     previouslyFocusedElement.focus();
@@ -35,7 +33,6 @@ function handleKeyDown(event: KeyboardEvent) {
   }
 }
 
-// Group shortcuts by category
 const navigationShortcuts = $derived(SHORTCUTS.filter((s) => s.group === 'navigation'));
 const searchShortcuts = $derived(SHORTCUTS.filter((s) => s.group === 'search'));
 const otherShortcuts = $derived(SHORTCUTS.filter((s) => s.group === 'other'));
@@ -44,7 +41,6 @@ const otherShortcuts = $derived(SHORTCUTS.filter((s) => s.group === 'other'));
 <svelte:document onkeydown={handleKeyDown} />
 
 {#if open}
-  <!-- Backdrop -->
   <button
     type="button"
     data-testid="modal-overlay"
@@ -54,7 +50,6 @@ const otherShortcuts = $derived(SHORTCUTS.filter((s) => s.group === 'other'));
     tabindex="-1"
   ></button>
 
-  <!-- Dialog -->
   <div
     role="dialog"
     aria-labelledby="keyboard-help-title"
@@ -67,7 +62,6 @@ const otherShortcuts = $derived(SHORTCUTS.filter((s) => s.group === 'other'));
       className,
     )}
   >
-    <!-- Header -->
     <div class="mb-4 flex items-center justify-between">
       <h2 id="keyboard-help-title" class="text-lg font-semibold">Keyboard Shortcuts</h2>
       <button
@@ -81,9 +75,7 @@ const otherShortcuts = $derived(SHORTCUTS.filter((s) => s.group === 'other'));
       </button>
     </div>
 
-    <!-- Content -->
     <div class="space-y-6">
-      <!-- Navigation shortcuts -->
       <section>
         <h3 class="text-muted-foreground mb-2 text-sm font-medium">Navigation</h3>
         <ul class="space-y-1">
@@ -101,7 +93,6 @@ const otherShortcuts = $derived(SHORTCUTS.filter((s) => s.group === 'other'));
         </ul>
       </section>
 
-      <!-- Search shortcuts -->
       <section>
         <h3 class="text-muted-foreground mb-2 text-sm font-medium">Search & Filters</h3>
         <ul class="space-y-1">
@@ -119,7 +110,6 @@ const otherShortcuts = $derived(SHORTCUTS.filter((s) => s.group === 'other'));
         </ul>
       </section>
 
-      <!-- Other shortcuts -->
       <section>
         <h3 class="text-muted-foreground mb-2 text-sm font-medium">Other</h3>
         <ul class="space-y-1">

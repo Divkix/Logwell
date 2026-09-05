@@ -76,7 +76,6 @@ describe("HttpTransport - serialization failures", () => {
       statusCode: 400,
       retryable: false,
     });
-    // Never reached the network.
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

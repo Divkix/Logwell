@@ -10,10 +10,6 @@ import { getSession } from "$lib/server/session";
 import { GET, PATCH } from "../../../../src/routes/api/projects/[id]/+server";
 import { seedProject } from "../../../fixtures/db";
 
-/**
- * Helper to create a mock SvelteKit RequestEvent for session-authenticated routes.
- * Adds a same-origin Origin header to state-changing requests so they pass CSRF checks.
- */
 function createRequestEvent(
   request: Request,
   db: PgliteDatabase<typeof schema>,
@@ -52,9 +48,6 @@ function createRequestEvent(
   } as unknown;
 }
 
-/**
- * Helper to assert that a promise rejects with a SvelteKit HTTP error
- */
 async function expectHttpError(
   promise: Promise<unknown>,
   expectedStatus: number,
@@ -85,7 +78,6 @@ describe("PATCH /api/projects/[id] with retentionDays", () => {
     cleanup = setup.cleanup;
     auth = createAuth(db);
 
-    // Create authenticated user
     const signUpResult = await auth.api.signUpEmail({
       body: {
         email: "test@example.com",
@@ -133,7 +125,6 @@ describe("PATCH /api/projects/[id] with retentionDays", () => {
 
   describe("retentionDays updates", () => {
     it("should update retentionDays to null", async () => {
-      // Seed project with existing retentionDays value
       const testProject = await seedProject(db, { retentionDays: 30, ownerId: userId });
 
       const request = new Request(`http://localhost/api/projects/${testProject.id}`, {
@@ -151,7 +142,6 @@ describe("PATCH /api/projects/[id] with retentionDays", () => {
       const body = await response.json();
       expect(body.retentionDays).toBeNull();
 
-      // Verify in database
       const [dbProject] = await db.select().from(project).where(eq(project.id, testProject.id));
       expect(dbProject!.retentionDays).toBeNull();
     });
@@ -174,7 +164,6 @@ describe("PATCH /api/projects/[id] with retentionDays", () => {
       const body = await response.json();
       expect(body.retentionDays).toBe(0);
 
-      // Verify in database
       const [dbProject] = await db.select().from(project).where(eq(project.id, testProject.id));
       expect(dbProject!.retentionDays).toBe(0);
     });
@@ -197,7 +186,6 @@ describe("PATCH /api/projects/[id] with retentionDays", () => {
       const body = await response.json();
       expect(body.retentionDays).toBe(90);
 
-      // Verify in database
       const [dbProject] = await db.select().from(project).where(eq(project.id, testProject.id));
       expect(dbProject!.retentionDays).toBe(90);
     });
@@ -278,7 +266,6 @@ describe("PATCH /api/projects/[id] with retentionDays", () => {
       expect(body.retentionDays).toBe(45);
       expect(body.name).toBe("new-name");
 
-      // Verify in database
       const [dbProject] = await db.select().from(project).where(eq(project.id, testProject.id));
       expect(dbProject!.retentionDays).toBe(45);
       expect(dbProject!.name).toBe("new-name");
@@ -303,7 +290,6 @@ describe("PATCH /api/projects/[id] with retentionDays", () => {
       expect(body.name).toBe("updated-project");
       expect(body.retentionDays).toBe(60);
 
-      // Verify in database
       const [dbProject] = await db.select().from(project).where(eq(project.id, testProject.id));
       expect(dbProject!.name).toBe("updated-project");
       expect(dbProject!.retentionDays).toBe(60);
@@ -324,7 +310,6 @@ describe("GET /api/projects/[id] retentionDays", () => {
     cleanup = setup.cleanup;
     auth = createAuth(db);
 
-    // Create authenticated user
     const signUpResult = await auth.api.signUpEmail({
       body: {
         email: "test@example.com",

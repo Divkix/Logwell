@@ -12,17 +12,14 @@ import type { PageData } from './$types';
 
 const { data }: { data: PageData } = $props();
 
-// Show skeleton when navigating TO this page
 const isLoading = $derived(
   $navigating?.to?.url.pathname === '/' || $navigating?.to?.url.pathname === '',
 );
 
-// Create a local copy of projects for state management
 // svelte-ignore state_referenced_locally
 let projects = $state([...data.projects]);
 let isCreateModalOpen = $state(false);
 
-// One-time API key reveal shown right after a project is created
 let revealedApiKey = $state('');
 let isKeyRevealOpen = $state(false);
 
@@ -53,7 +50,6 @@ async function handleCreateProject(name: string) {
     throw new Error(result.message || 'Failed to create project');
   }
 
-  // Add new project to the list (at the beginning since we order by createdAt DESC)
   projects = [
     {
       id: result.id,
@@ -66,7 +62,6 @@ async function handleCreateProject(name: string) {
     ...projects,
   ];
 
-  // Surface the plaintext key once — it is never returned again.
   if (result.apiKey) {
     revealedApiKey = result.apiKey;
     isKeyRevealOpen = true;
@@ -80,7 +75,6 @@ async function handleCreateProject(name: string) {
   <DashboardSkeleton />
 {:else}
   <div class="space-y-6">
-    <!-- Header -->
     <div class="flex items-center justify-between">
       <h1 class="text-2xl font-bold">Dashboard</h1>
       <Button onclick={openCreateModal}>
@@ -89,9 +83,7 @@ async function handleCreateProject(name: string) {
       </Button>
     </div>
 
-    <!-- Content -->
     {#if projects.length === 0}
-      <!-- Empty State -->
       <div class="flex flex-col items-center justify-center py-12 text-center">
         <FolderPlusIcon class="size-16 text-muted-foreground/50 mb-4" />
         <h2 class="text-lg font-semibold mb-2">No projects yet</h2>
@@ -105,7 +97,6 @@ async function handleCreateProject(name: string) {
         </Button>
       </div>
     {:else}
-      <!-- Project Grid -->
       <div data-testid="project-grid" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {#each projects as project (project.id)}
           <a
@@ -128,12 +119,10 @@ async function handleCreateProject(name: string) {
   </div>
 {/if}
 
-<!-- Create Project Modal -->
 <CreateProjectModal
   open={isCreateModalOpen}
   onClose={closeCreateModal}
   onCreate={handleCreateProject}
 />
 
-<!-- One-time API key reveal after creation -->
 <ApiKeyRevealModal open={isKeyRevealOpen} apiKey={revealedApiKey} onClose={closeKeyReveal} />

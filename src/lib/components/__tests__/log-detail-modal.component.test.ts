@@ -3,13 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test"
 import type { Log } from "$lib/server/db/schema";
 import LogDetailModal from "../log-detail-modal.svelte";
 
-// Mock clipboard API
 const mockClipboard = {
   writeText: vi.fn().mockResolvedValue(undefined),
 };
 Object.assign(navigator, { clipboard: mockClipboard });
 
-// Mock formatFullDate utility
 vi.mock("$lib/utils/format", () => ({
   formatFullDate: vi.fn((date: Date) => {
     return date.toISOString().replace("T", " ").replace("Z", " UTC");
@@ -130,7 +128,6 @@ describe("LogDetailModal", () => {
     it("displays timestamp in full date format", () => {
       render(LogDetailModal, { props: { log: baseLog, open: true } });
 
-      // The mocked formatFullDate returns ISO format
       expect(screen.getByText(/2024-01-15 14:30:45\.123 UTC/)).toBeInTheDocument();
     });
 
@@ -152,7 +149,6 @@ describe("LogDetailModal", () => {
     it("displays metadata in formatted JSON", () => {
       render(LogDetailModal, { props: { log: baseLog, open: true } });
 
-      // Check for JSON structure with indentation
       const metadataElement = screen.getByTestId("log-metadata");
       expect(metadataElement).toBeInTheDocument();
       expect(metadataElement.textContent).toContain('"userId"');

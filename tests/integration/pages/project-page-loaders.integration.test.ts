@@ -1,13 +1,3 @@
-/**
- * Integration tests for (app) page server loaders.
- *
- * Proves that:
- * 1. Page loaders route DB access through getDbClient(event.locals), so an
- *    injected PGlite test DB is honoured (the seam works end-to-end).
- * 2. A non-owner receives a SvelteKit 404 error (error PAGE, not a JSON blob)
- *    for each migrated loader — preserving the existence-hiding invariant.
- */
-
 import type { HttpError } from "@sveltejs/kit";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
 import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
@@ -34,10 +24,6 @@ const loadProjectStats = (
 const loadProjectIncidents = (
   await import("../../../src/routes/(app)/projects/[id]/incidents/+page.server")
 ).load as LoadFn;
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 function createLoadEvent(
   db: PgliteDatabase<typeof schema>,
@@ -105,10 +91,6 @@ async function expectSvelteKit404(promise: Promise<unknown>): Promise<void> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
 describe("(app) page loaders — injected PGlite DB seam", () => {
   let db: PgliteDatabase<typeof schema>;
   let cleanup: () => Promise<void>;
@@ -130,9 +112,6 @@ describe("(app) page loaders — injected PGlite DB seam", () => {
     await cleanup();
   });
 
-  // -------------------------------------------------------------------------
-  // Dashboard (root list loader)
-  // -------------------------------------------------------------------------
   describe("(app)/+page.server.ts — dashboard list loader", () => {
     it("returns only the authenticated owner's projects via injected PGlite DB", async () => {
       const ownedProject = await seedProject(db, { name: "owned-project", ownerId: owner.userId });
@@ -152,9 +131,6 @@ describe("(app) page loaders — injected PGlite DB seam", () => {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Projects/[id] — logs loader
-  // -------------------------------------------------------------------------
   describe("(app)/projects/[id]/+page.server.ts — logs loader", () => {
     it("returns project data via injected PGlite DB for the owner", async () => {
       const proj = await seedProject(db, { name: "test-proj", ownerId: owner.userId });
@@ -179,9 +155,6 @@ describe("(app) page loaders — injected PGlite DB seam", () => {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Projects/[id]/stats — stats loader
-  // -------------------------------------------------------------------------
   describe("(app)/projects/[id]/stats/+page.server.ts — stats loader", () => {
     it("returns stats data via injected PGlite DB for the owner", async () => {
       const proj = await seedProject(db, { name: "stats-proj", ownerId: owner.userId });
@@ -201,9 +174,6 @@ describe("(app) page loaders — injected PGlite DB seam", () => {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Projects/[id]/settings — settings loader
-  // -------------------------------------------------------------------------
   describe("(app)/projects/[id]/settings/+page.server.ts — settings loader", () => {
     it("returns settings data via injected PGlite DB for the owner", async () => {
       const proj = await seedProject(db, { name: "settings-proj", ownerId: owner.userId });
@@ -223,9 +193,6 @@ describe("(app) page loaders — injected PGlite DB seam", () => {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Projects/[id]/incidents — incidents loader
-  // -------------------------------------------------------------------------
   describe("(app)/projects/[id]/incidents/+page.server.ts — incidents loader", () => {
     it("returns incidents data via injected PGlite DB for the owner", async () => {
       const proj = await seedProject(db, { name: "incidents-proj", ownerId: owner.userId });

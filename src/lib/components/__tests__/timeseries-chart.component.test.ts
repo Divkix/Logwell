@@ -2,9 +2,8 @@ import { cleanup, render, screen } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import TimeseriesChart from "../timeseries-chart.svelte";
 
-// Mock the browser environment check
 vi.mock("$app/environment", () => ({
-  browser: false, // Set to false for testing non-browser states
+  browser: false,
 }));
 
 const mockData = [
@@ -71,7 +70,6 @@ describe("TimeseriesChart", () => {
       render(TimeseriesChart, {
         props: { data: [], range: "24h", loading: true, error: "Some error" },
       });
-      // Loading takes precedence
       expect(screen.getByTestId("timeseries-skeleton")).toBeInTheDocument();
       expect(screen.queryByTestId("timeseries-error")).not.toBeInTheDocument();
     });
@@ -120,18 +118,13 @@ describe("TimeseriesChart", () => {
   });
 
   describe("Chart Rendering (non-browser)", () => {
-    // Since we mocked browser to false, the chart won't render
-    // but the container should still be there without skeleton/empty/error
     it("does not render chart in non-browser environment", () => {
       render(TimeseriesChart, { props: { data: mockData, range: "24h" } });
 
-      // Container exists
       expect(screen.getByTestId("timeseries-chart")).toBeInTheDocument();
 
-      // Chart is not rendered (browser check fails)
       expect(screen.queryByTestId("timeseries-chart-rendered")).not.toBeInTheDocument();
 
-      // No error/loading/empty states shown either
       expect(screen.queryByTestId("timeseries-skeleton")).not.toBeInTheDocument();
       expect(screen.queryByTestId("timeseries-empty")).not.toBeInTheDocument();
       expect(screen.queryByTestId("timeseries-error")).not.toBeInTheDocument();

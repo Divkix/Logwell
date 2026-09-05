@@ -161,13 +161,11 @@ describe("Logwell Client - Source Location", () => {
       child.info("From child");
       const result = await child.shutdown();
 
-      // Child shutdown is a no-op on the shared queue (matches Go/Python).
       expect(result).toBeNull();
       expect(flushSpy).not.toHaveBeenCalled();
       expect(shutdownSpy).not.toHaveBeenCalled();
       expect(client.queueSize).toBe(1);
 
-      // The child is stopped; the parent's shared queue is untouched.
       child.info("After child shutdown");
       expect(client.queueSize).toBe(1);
     });

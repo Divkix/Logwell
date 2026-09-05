@@ -13,8 +13,6 @@ export default defineConfig({
     ignorePatterns: [".claude/**"],
   },
   lint: {
-    // sdks/** is independently linted (sdks/typescript has its own vp check +
-    // tsconfig + CI; go/python have their own tools). .claude/** is generated.
     ignorePatterns: ["sdks/**", ".claude/**"],
     jsPlugins: [{ name: "vite-plus", specifier: "vite-plus/oxlint-plugin" }],
     rules: { "vite-plus/prefer-vite-plus-imports": "error" },

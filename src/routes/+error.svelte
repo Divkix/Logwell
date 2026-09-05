@@ -28,30 +28,25 @@ const errorTitle = $derived(errorTitles[errorCode] || 'Error');
 
 <div class="min-h-screen flex items-center justify-center bg-background p-4">
   <div class="text-center max-w-md space-y-6">
-    <!-- Error Icon -->
     <div class="flex justify-center">
       <div class="rounded-full bg-destructive/10 p-4">
         <AlertTriangleIcon class="size-12 text-destructive" />
       </div>
     </div>
 
-    <!-- Error Code and Title -->
     <div class="space-y-2">
       <h1 class="text-6xl font-bold text-foreground">{errorCode}</h1>
       <h2 class="text-xl font-semibold text-muted-foreground">{errorTitle}</h2>
     </div>
 
-    <!-- Error Message -->
     <p class="text-muted-foreground">{errorMessage}</p>
 
-    <!-- Error ID for tracking (only for 5xx errors) -->
     {#if errorId && errorCode >= 500}
       <p class="text-xs text-muted-foreground/60 font-mono">
         Error ID: {errorId}
       </p>
     {/if}
 
-    <!-- Actions -->
     <div class="flex flex-col sm:flex-row items-center justify-center gap-3 pt-4">
       <Button onclick={reload} variant="outline">
         <RefreshCwIcon class="mr-2 size-4" />

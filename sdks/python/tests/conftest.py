@@ -1,11 +1,3 @@
-"""Pytest fixtures for Logwell SDK tests.
-
-Provides reusable fixtures for:
-- Valid/invalid configurations
-- Mock HTTP responses
-- Sample log entries
-"""
-
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -21,26 +13,18 @@ if TYPE_CHECKING:
     from logwell.types import IngestResponse, LogEntry, LogwellConfig
 
 
-# =============================================================================
-# Valid Configurations
-# =============================================================================
-
-
 @pytest.fixture
 def valid_api_key() -> str:
-    """A valid API key in lw_[32 chars] format."""
     return "lw_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 
 
 @pytest.fixture
 def valid_endpoint() -> str:
-    """A valid HTTPS endpoint URL."""
     return "https://logs.example.com"
 
 
 @pytest.fixture
 def valid_config(valid_api_key: str, valid_endpoint: str) -> LogwellConfig:
-    """Minimal valid configuration with required fields only."""
     return {
         "api_key": valid_api_key,
         "endpoint": valid_endpoint,
@@ -49,7 +33,6 @@ def valid_config(valid_api_key: str, valid_endpoint: str) -> LogwellConfig:
 
 @pytest.fixture
 def valid_config_full(valid_api_key: str, valid_endpoint: str) -> LogwellConfig:
-    """Complete valid configuration with all fields."""
     return {
         "api_key": valid_api_key,
         "endpoint": valid_endpoint,
@@ -64,21 +47,14 @@ def valid_config_full(valid_api_key: str, valid_endpoint: str) -> LogwellConfig:
 
 @pytest.fixture
 def valid_config_localhost() -> LogwellConfig:
-    """Valid config with localhost endpoint (for local testing)."""
     return {
         "api_key": "lw_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "endpoint": "http://localhost:3000",
     }
 
 
-# =============================================================================
-# Invalid Configurations
-# =============================================================================
-
-
 @pytest.fixture
 def invalid_config_missing_api_key(valid_endpoint: str) -> dict[str, Any]:
-    """Config missing required api_key field."""
     return {
         "endpoint": valid_endpoint,
     }
@@ -86,7 +62,6 @@ def invalid_config_missing_api_key(valid_endpoint: str) -> dict[str, Any]:
 
 @pytest.fixture
 def invalid_config_missing_endpoint(valid_api_key: str) -> dict[str, Any]:
-    """Config missing required endpoint field."""
     return {
         "api_key": valid_api_key,
     }
@@ -94,7 +69,6 @@ def invalid_config_missing_endpoint(valid_api_key: str) -> dict[str, Any]:
 
 @pytest.fixture
 def invalid_config_empty_api_key(valid_endpoint: str) -> dict[str, Any]:
-    """Config with empty api_key string."""
     return {
         "api_key": "",
         "endpoint": valid_endpoint,
@@ -103,7 +77,6 @@ def invalid_config_empty_api_key(valid_endpoint: str) -> dict[str, Any]:
 
 @pytest.fixture
 def invalid_config_empty_endpoint(valid_api_key: str) -> dict[str, Any]:
-    """Config with empty endpoint string."""
     return {
         "api_key": valid_api_key,
         "endpoint": "",
@@ -112,7 +85,6 @@ def invalid_config_empty_endpoint(valid_api_key: str) -> dict[str, Any]:
 
 @pytest.fixture
 def invalid_config_bad_api_key_format(valid_endpoint: str) -> dict[str, Any]:
-    """Config with malformed API key (wrong prefix)."""
     return {
         "api_key": "bad_key_format",
         "endpoint": valid_endpoint,
@@ -121,7 +93,6 @@ def invalid_config_bad_api_key_format(valid_endpoint: str) -> dict[str, Any]:
 
 @pytest.fixture
 def invalid_config_short_api_key(valid_endpoint: str) -> dict[str, Any]:
-    """Config with API key too short."""
     return {
         "api_key": "lw_short",
         "endpoint": valid_endpoint,
@@ -130,7 +101,6 @@ def invalid_config_short_api_key(valid_endpoint: str) -> dict[str, Any]:
 
 @pytest.fixture
 def invalid_config_long_api_key(valid_endpoint: str) -> dict[str, Any]:
-    """Config with API key too long."""
     return {
         "api_key": "lw_" + "a" * 40,
         "endpoint": valid_endpoint,
@@ -139,7 +109,6 @@ def invalid_config_long_api_key(valid_endpoint: str) -> dict[str, Any]:
 
 @pytest.fixture
 def invalid_config_bad_endpoint_format(valid_api_key: str) -> dict[str, Any]:
-    """Config with malformed endpoint URL (missing scheme)."""
     return {
         "api_key": valid_api_key,
         "endpoint": "logs.example.com",
@@ -148,7 +117,6 @@ def invalid_config_bad_endpoint_format(valid_api_key: str) -> dict[str, Any]:
 
 @pytest.fixture
 def invalid_config_bad_endpoint_relative(valid_api_key: str) -> dict[str, Any]:
-    """Config with relative endpoint path."""
     return {
         "api_key": valid_api_key,
         "endpoint": "/api/logs",
@@ -157,7 +125,6 @@ def invalid_config_bad_endpoint_relative(valid_api_key: str) -> dict[str, Any]:
 
 @pytest.fixture
 def invalid_config_negative_batch_size(valid_api_key: str, valid_endpoint: str) -> dict[str, Any]:
-    """Config with negative batch_size."""
     return {
         "api_key": valid_api_key,
         "endpoint": valid_endpoint,
@@ -167,7 +134,6 @@ def invalid_config_negative_batch_size(valid_api_key: str, valid_endpoint: str) 
 
 @pytest.fixture
 def invalid_config_zero_batch_size(valid_api_key: str, valid_endpoint: str) -> dict[str, Any]:
-    """Config with zero batch_size."""
     return {
         "api_key": valid_api_key,
         "endpoint": valid_endpoint,
@@ -179,7 +145,6 @@ def invalid_config_zero_batch_size(valid_api_key: str, valid_endpoint: str) -> d
 def invalid_config_negative_flush_interval(
     valid_api_key: str, valid_endpoint: str
 ) -> dict[str, Any]:
-    """Config with negative flush_interval."""
     return {
         "api_key": valid_api_key,
         "endpoint": valid_endpoint,
@@ -191,7 +156,6 @@ def invalid_config_negative_flush_interval(
 def invalid_config_negative_max_queue_size(
     valid_api_key: str, valid_endpoint: str
 ) -> dict[str, Any]:
-    """Config with negative max_queue_size."""
     return {
         "api_key": valid_api_key,
         "endpoint": valid_endpoint,
@@ -201,7 +165,6 @@ def invalid_config_negative_max_queue_size(
 
 @pytest.fixture
 def invalid_config_negative_max_retries(valid_api_key: str, valid_endpoint: str) -> dict[str, Any]:
-    """Config with negative max_retries."""
     return {
         "api_key": valid_api_key,
         "endpoint": valid_endpoint,
@@ -225,7 +188,6 @@ def invalid_configs(
     invalid_config_negative_max_queue_size: dict[str, Any],
     invalid_config_negative_max_retries: dict[str, Any],
 ) -> list[dict[str, Any]]:
-    """Collection of all invalid configurations for parametrized tests."""
     return [
         invalid_config_missing_api_key,
         invalid_config_missing_endpoint,
@@ -243,14 +205,8 @@ def invalid_configs(
     ]
 
 
-# =============================================================================
-# Mock HTTP Responses
-# =============================================================================
-
-
 @pytest.fixture
 def mock_success_response() -> IngestResponse:
-    """Successful ingest API response."""
     return {
         "accepted": 10,
     }
@@ -258,7 +214,6 @@ def mock_success_response() -> IngestResponse:
 
 @pytest.fixture
 def mock_partial_success_response() -> IngestResponse:
-    """Partial success response with some rejections."""
     return {
         "accepted": 8,
         "rejected": 2,
@@ -268,7 +223,6 @@ def mock_partial_success_response() -> IngestResponse:
 
 @pytest.fixture
 def mock_full_rejection_response() -> IngestResponse:
-    """Response where all logs were rejected."""
     return {
         "accepted": 0,
         "rejected": 10,
@@ -278,7 +232,6 @@ def mock_full_rejection_response() -> IngestResponse:
 
 @pytest.fixture
 def mock_httpx_success_response(mock_success_response: IngestResponse) -> httpx.Response:
-    """Mock httpx.Response for successful request."""
     return httpx.Response(
         status_code=200,
         json=mock_success_response,
@@ -287,7 +240,6 @@ def mock_httpx_success_response(mock_success_response: IngestResponse) -> httpx.
 
 @pytest.fixture
 def mock_httpx_unauthorized_response() -> httpx.Response:
-    """Mock httpx.Response for 401 Unauthorized."""
     return httpx.Response(
         status_code=401,
         json={"error": "Invalid API key"},
@@ -296,7 +248,6 @@ def mock_httpx_unauthorized_response() -> httpx.Response:
 
 @pytest.fixture
 def mock_httpx_rate_limited_response() -> httpx.Response:
-    """Mock httpx.Response for 429 Rate Limited."""
     return httpx.Response(
         status_code=429,
         json={"error": "Too many requests"},
@@ -306,7 +257,6 @@ def mock_httpx_rate_limited_response() -> httpx.Response:
 
 @pytest.fixture
 def mock_httpx_server_error_response() -> httpx.Response:
-    """Mock httpx.Response for 500 Server Error."""
     return httpx.Response(
         status_code=500,
         json={"error": "Internal server error"},
@@ -315,21 +265,14 @@ def mock_httpx_server_error_response() -> httpx.Response:
 
 @pytest.fixture
 def mock_httpx_validation_error_response() -> httpx.Response:
-    """Mock httpx.Response for 400 Bad Request."""
     return httpx.Response(
         status_code=400,
         json={"error": "Validation failed", "details": ["Invalid log level"]},
     )
 
 
-# =============================================================================
-# Sample Log Entries
-# =============================================================================
-
-
 @pytest.fixture
 def sample_log_entry() -> LogEntry:
-    """A minimal valid log entry."""
     return {
         "level": "info",
         "message": "Test log message",
@@ -338,7 +281,6 @@ def sample_log_entry() -> LogEntry:
 
 @pytest.fixture
 def sample_log_entry_full() -> LogEntry:
-    """A complete log entry with all fields populated."""
     return {
         "level": "error",
         "message": "Something went wrong",
@@ -352,7 +294,6 @@ def sample_log_entry_full() -> LogEntry:
 
 @pytest.fixture
 def sample_log_entries() -> list[LogEntry]:
-    """A batch of varied log entries."""
     return [
         {"level": "debug", "message": "Debug message"},
         {"level": "info", "message": "Info message"},
@@ -364,7 +305,6 @@ def sample_log_entries() -> list[LogEntry]:
 
 @pytest.fixture
 def sample_log_entry_with_metadata() -> LogEntry:
-    """Log entry with complex metadata."""
     return {
         "level": "info",
         "message": "User action",
@@ -377,30 +317,18 @@ def sample_log_entry_with_metadata() -> LogEntry:
     }
 
 
-# =============================================================================
-# Callback Fixtures
-# =============================================================================
-
-
 @pytest.fixture
 def mock_on_error() -> MagicMock:
-    """Mock on_error callback for testing error handling."""
     return MagicMock()
 
 
 @pytest.fixture
 def mock_on_flush() -> MagicMock:
-    """Mock on_flush callback for testing flush events."""
     return MagicMock()
 
 
 @pytest.fixture
 def capture_errors() -> tuple[list[Exception], Callable[[Exception], None]]:
-    """Capture errors in a list for assertions.
-
-    Returns:
-        Tuple of (error_list, callback_function)
-    """
     errors: list[Exception] = []
 
     def on_error(error: Exception) -> None:
@@ -411,11 +339,6 @@ def capture_errors() -> tuple[list[Exception], Callable[[Exception], None]]:
 
 @pytest.fixture
 def capture_flushes() -> tuple[list[int], Callable[[int], None]]:
-    """Capture flush counts in a list for assertions.
-
-    Returns:
-        Tuple of (count_list, callback_function)
-    """
     counts: list[int] = []
 
     def on_flush(count: int) -> None:
@@ -424,20 +347,13 @@ def capture_flushes() -> tuple[list[int], Callable[[int], None]]:
     return counts, on_flush
 
 
-# =============================================================================
-# Test Helpers
-# =============================================================================
-
-
 @pytest.fixture
 def timestamp_now() -> str:
-    """Current UTC timestamp in ISO format."""
     return datetime.now(timezone.utc).isoformat()
 
 
 @pytest.fixture
 def make_log_entry() -> Callable[..., LogEntry]:
-    """Factory fixture for creating log entries with custom fields."""
 
     def _make(
         level: str = "info",
@@ -456,7 +372,6 @@ def make_log_entry() -> Callable[..., LogEntry]:
 
 @pytest.fixture
 def make_config(valid_api_key: str, valid_endpoint: str) -> Callable[..., LogwellConfig]:
-    """Factory fixture for creating configs with custom overrides."""
 
     def _make(**overrides: Any) -> LogwellConfig:
         config: LogwellConfig = {

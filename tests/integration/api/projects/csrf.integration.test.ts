@@ -9,9 +9,6 @@ import { DELETE, PATCH } from "../../../../src/routes/api/projects/[id]/+server"
 import { POST as POST_REGENERATE } from "../../../../src/routes/api/projects/[id]/regenerate/+server";
 import { seedProject } from "../../../fixtures/db";
 
-/**
- * Helper to create a mock SvelteKit RequestEvent
- */
 function createRequestEvent(
   request: Request,
   db: PgliteDatabase<typeof schema>,

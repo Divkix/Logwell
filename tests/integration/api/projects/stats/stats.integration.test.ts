@@ -9,9 +9,6 @@ import { clearApiKeyCache } from "$lib/server/utils/api-key";
 import { GET } from "../../../../../src/routes/api/projects/[id]/stats/+server";
 import { seedLogs, seedProject } from "../../../../fixtures/db";
 
-/**
- * Helper to create a mock SvelteKit RequestEvent for [id]/stats routes
- */
 function createRequestEvent(
   request: Request,
   db: PgliteDatabase<typeof schema>,
@@ -42,9 +39,6 @@ function createRequestEvent(
   } as unknown;
 }
 
-/**
- * Helper to assert that a promise rejects with a SvelteKit HTTP error
- */
 async function expectHttpError(
   promise: Promise<unknown>,
   expectedStatus: number,
@@ -76,7 +70,6 @@ describe("GET /api/projects/[id]/stats", () => {
     auth = createAuth(db);
     clearApiKeyCache();
 
-    // Create authenticated user
     const signUpResult = await auth.api.signUpEmail({
       body: {
         email: "test@example.com",
@@ -121,7 +114,6 @@ describe("GET /api/projects/[id]/stats", () => {
     it("returns level distribution counts", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
 
-      // Seed logs with different levels
       await seedLogs(db, testProject.id, 10, { level: "debug" });
       await seedLogs(db, testProject.id, 25, { level: "info" });
       await seedLogs(db, testProject.id, 8, { level: "warn" });
@@ -152,7 +144,6 @@ describe("GET /api/projects/[id]/stats", () => {
     it("returns only levels that have logs", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
 
-      // Only seed info and error logs
       await seedLogs(db, testProject.id, 15, { level: "info" });
       await seedLogs(db, testProject.id, 5, { level: "error" });
 
@@ -170,7 +161,6 @@ describe("GET /api/projects/[id]/stats", () => {
         info: 15,
         error: 5,
       });
-      // Should not include levels with zero counts
       expect(body.levelCounts).not.toHaveProperty("debug");
       expect(body.levelCounts).not.toHaveProperty("warn");
       expect(body.levelCounts).not.toHaveProperty("fatal");
@@ -181,7 +171,6 @@ describe("GET /api/projects/[id]/stats", () => {
     it("calculates percentages correctly", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
 
-      // Total of 100 logs for easy percentage calculation
       await seedLogs(db, testProject.id, 50, { level: "info" }); // 50%
       await seedLogs(db, testProject.id, 30, { level: "warn" }); // 30%
       await seedLogs(db, testProject.id, 20, { level: "error" }); // 20%
@@ -205,7 +194,6 @@ describe("GET /api/projects/[id]/stats", () => {
     it("handles percentages with decimal precision", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
 
-      // Total of 3 logs for fractional percentages
       await seedLogs(db, testProject.id, 1, { level: "info" }); // 33.33%
       await seedLogs(db, testProject.id, 1, { level: "warn" }); // 33.33%
       await seedLogs(db, testProject.id, 1, { level: "error" }); // 33.33%
@@ -221,7 +209,6 @@ describe("GET /api/projects/[id]/stats", () => {
       const body = await response.json();
 
       expect(body).toHaveProperty("levelPercentages");
-      // Each should be approximately 33.33%
       expect(body.levelPercentages.info).toBeCloseTo(33.33, 1);
       expect(body.levelPercentages.warn).toBeCloseTo(33.33, 1);
       expect(body.levelPercentages.error).toBeCloseTo(33.33, 1);
@@ -259,18 +246,15 @@ describe("GET /api/projects/[id]/stats", () => {
       const testProject = await seedProject(db, { ownerId: userId });
 
       const now = new Date();
-      // Old logs (before the 'from' filter - should be excluded)
       await seedLogs(db, testProject.id, 10, {
         level: "info",
         timestamp: new Date(now.getTime() - 7200000), // 2 hours ago
       });
-      // Recent logs (after the 'from' filter - should be included)
       await seedLogs(db, testProject.id, 5, {
         level: "error",
         timestamp: new Date(now.getTime() - 60000), // 1 minute ago
       });
 
-      // Filter for logs from 1 hour ago
       const fromTime = new Date(now.getTime() - 3600000).toISOString();
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/stats?from=${fromTime}`,
@@ -283,7 +267,6 @@ describe("GET /api/projects/[id]/stats", () => {
       expect(response.status).toBe(200);
       const body = await response.json();
 
-      // Should only count the 5 recent error logs
       expect(body.totalLogs).toBe(5);
       expect(body.levelCounts).toEqual({ error: 5 });
     });
@@ -292,18 +275,15 @@ describe("GET /api/projects/[id]/stats", () => {
       const testProject = await seedProject(db, { ownerId: userId });
 
       const now = new Date();
-      // Old logs (before the 'to' filter - should be included)
       await seedLogs(db, testProject.id, 8, {
         level: "warn",
         timestamp: new Date(now.getTime() - 7200000), // 2 hours ago
       });
-      // Recent logs (after the 'to' filter - should be excluded)
       await seedLogs(db, testProject.id, 12, {
         level: "info",
         timestamp: new Date(now.getTime() - 60000), // 1 minute ago
       });
 
-      // Filter for logs up to 1 hour ago
       const toTime = new Date(now.getTime() - 3600000).toISOString();
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/stats?to=${toTime}`,
@@ -316,7 +296,6 @@ describe("GET /api/projects/[id]/stats", () => {
       expect(response.status).toBe(200);
       const body = await response.json();
 
-      // Should only count the 8 old warn logs
       expect(body.totalLogs).toBe(8);
       expect(body.levelCounts).toEqual({ warn: 8 });
     });
@@ -325,12 +304,10 @@ describe("GET /api/projects/[id]/stats", () => {
       const testProject = await seedProject(db, { ownerId: userId });
 
       const now = new Date();
-      // Very old logs (before the 'from' - should be excluded)
       await seedLogs(db, testProject.id, 5, {
         level: "debug",
         timestamp: new Date(now.getTime() - 14400000), // 4 hours ago
       });
-      // Middle logs (within range - should be included)
       await seedLogs(db, testProject.id, 10, {
         level: "info",
         timestamp: new Date(now.getTime() - 5400000), // 1.5 hours ago
@@ -339,13 +316,11 @@ describe("GET /api/projects/[id]/stats", () => {
         level: "error",
         timestamp: new Date(now.getTime() - 5400000), // 1.5 hours ago
       });
-      // Recent logs (after 'to' - should be excluded)
       await seedLogs(db, testProject.id, 7, {
         level: "fatal",
         timestamp: new Date(now.getTime() - 60000), // 1 minute ago
       });
 
-      // Filter for logs between 2 hours ago and 1 hour ago
       const fromTime = new Date(now.getTime() - 7200000).toISOString();
       const toTime = new Date(now.getTime() - 3600000).toISOString();
       const request = new Request(
@@ -359,7 +334,6 @@ describe("GET /api/projects/[id]/stats", () => {
       expect(response.status).toBe(200);
       const body = await response.json();
 
-      // Should only count the 13 middle logs (10 info + 3 error)
       expect(body.totalLogs).toBe(13);
       expect(body.levelCounts).toEqual({ info: 10, error: 3 });
     });
@@ -404,13 +378,11 @@ describe("GET /api/projects/[id]/stats", () => {
       const testProject = await seedProject(db, { ownerId: userId });
 
       const now = new Date();
-      // All logs are old
       await seedLogs(db, testProject.id, 10, {
         level: "info",
         timestamp: new Date(now.getTime() - 7200000), // 2 hours ago
       });
 
-      // Filter for last 30 minutes (no logs in this range)
       const fromTime = new Date(now.getTime() - 1800000).toISOString();
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/stats?from=${fromTime}`,

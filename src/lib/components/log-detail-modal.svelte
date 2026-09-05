@@ -36,14 +36,12 @@ const sourceInfo = $derived(
 
 let previouslyFocusedElement: HTMLElement | null = $state(null);
 
-// Store the previously focused element when modal opens
 $effect(() => {
   if (open && !previouslyFocusedElement) {
     previouslyFocusedElement = (triggerElement || document.activeElement) as HTMLElement;
   }
 });
 
-// Restore focus when modal closes
 $effect(() => {
   if (!open && previouslyFocusedElement) {
     previouslyFocusedElement.focus();
@@ -66,7 +64,6 @@ function handleKeyDown(event: KeyboardEvent) {
 <svelte:document onkeydown={handleKeyDown} />
 
 {#if open}
-  <!-- Backdrop -->
   <button
     type="button"
     data-testid="modal-overlay"
@@ -76,7 +73,6 @@ function handleKeyDown(event: KeyboardEvent) {
     tabindex="-1"
   ></button>
 
-  <!-- Dialog -->
   <div
     role="dialog"
     aria-labelledby="log-detail-title"
@@ -89,7 +85,6 @@ function handleKeyDown(event: KeyboardEvent) {
       className,
     )}
   >
-      <!-- Header -->
       <div class="mb-4 flex items-center justify-between">
         <h2 id="log-detail-title" class="text-lg font-semibold">Log Details</h2>
         <button
@@ -103,9 +98,7 @@ function handleKeyDown(event: KeyboardEvent) {
         </button>
       </div>
 
-      <!-- Content -->
       <div class="space-y-4 overflow-y-auto max-h-[60vh]">
-        <!-- ID -->
         <div class="flex items-center justify-between">
           <div>
             <span class="text-muted-foreground text-sm">ID</span>
@@ -122,7 +115,6 @@ function handleKeyDown(event: KeyboardEvent) {
           </button>
         </div>
 
-        <!-- Level -->
         <div>
           <span class="text-muted-foreground text-sm">Level</span>
           <div class="mt-1">
@@ -130,7 +122,6 @@ function handleKeyDown(event: KeyboardEvent) {
           </div>
         </div>
 
-        <!-- Timestamp -->
         <div>
           <span class="text-muted-foreground text-sm">Timestamp</span>
           <p class="font-mono text-sm">
@@ -138,7 +129,6 @@ function handleKeyDown(event: KeyboardEvent) {
           </p>
         </div>
 
-        <!-- Message -->
         <div class="flex items-start justify-between gap-2">
           <div class="flex-1">
             <span class="text-muted-foreground text-sm">Message</span>
@@ -155,13 +145,11 @@ function handleKeyDown(event: KeyboardEvent) {
           </button>
         </div>
 
-        <!-- Source -->
         <div>
           <span class="text-muted-foreground text-sm">Source</span>
           <p class="font-mono text-sm">{sourceInfo ?? 'N/A'}</p>
         </div>
 
-        <!-- Request ID -->
         <div class="flex items-center justify-between">
           <div>
             <span class="text-muted-foreground text-sm">Request ID</span>
@@ -197,19 +185,16 @@ function handleKeyDown(event: KeyboardEvent) {
           </div>
         {/if}
 
-        <!-- User ID -->
         <div>
           <span class="text-muted-foreground text-sm">User ID</span>
           <p class="font-mono text-sm">{log.userId ?? 'N/A'}</p>
         </div>
 
-        <!-- IP Address -->
         <div>
           <span class="text-muted-foreground text-sm">IP Address</span>
           <p class="font-mono text-sm">{log.ipAddress ?? 'N/A'}</p>
         </div>
 
-        <!-- Metadata -->
         <div data-testid="metadata-section" aria-label="Log metadata">
           <div class="flex items-center justify-between">
             <span class="text-muted-foreground text-sm">Metadata</span>

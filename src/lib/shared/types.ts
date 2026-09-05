@@ -1,7 +1,3 @@
-/**
- * Re-export commonly used types for convenient importing
- */
-
 export {
   INCIDENT_RANGES,
   INCIDENT_STATUSES,

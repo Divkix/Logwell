@@ -7,28 +7,19 @@ import (
 	"time"
 )
 
-// batchQueue is a thread-safe queue for batching log entries.
-// It holds entries until explicitly flushed, batch size is reached,
-// or flush interval elapses.
 type batchQueue struct {
 	entries []LogEntry
 	mu      sync.Mutex
 
-	// Timer-based auto-flush
 	flushInterval time.Duration
 	flushFn       func()
 	timer         *time.Timer
-	generation    int64 // incremented on each timer stop/restart to detect stale callbacks
+	generation    int64
 
-	// Overflow protection
 	maxQueueSize int
 	onError      func(*Error)
 }
 
-// newBatchQueue creates a new batch queue with optional auto-flush and overflow protection.
-// If flushInterval > 0 and flushFn is provided, the queue will
-// automatically call flushFn after flushInterval of inactivity.
-// If maxQueueSize > 0, the queue will drop oldest entries when capacity is reached.
 func newBatchQueue(flushInterval time.Duration, flushFn func(), maxQueueSize int, onError func(*Error)) *batchQueue {
 	return &batchQueue{
 		entries:       make([]LogEntry, 0),
@@ -39,18 +30,12 @@ func newBatchQueue(flushInterval time.Duration, flushFn func(), maxQueueSize int
 	}
 }
 
-// add appends a log entry to the queue.
-// Starts a fresh auto-flush timer if auto-flush is enabled.
-// If the queue is at max capacity, drops the oldest entry and calls onError.
 func (q *batchQueue) add(entry LogEntry) {
 	q.mu.Lock()
 
-	// Check for overflow - drop oldest entry if at max capacity
 	if q.maxQueueSize > 0 && len(q.entries) >= q.maxQueueSize {
-		// Drop oldest entry (FIFO)
 		q.entries = q.entries[1:]
 
-		// Call onError callback outside the lock to avoid deadlock
 		if q.onError != nil {
 			onError := q.onError
 			q.mu.Unlock()
@@ -61,16 +46,11 @@ func (q *batchQueue) add(entry LogEntry) {
 
 	q.entries = append(q.entries, entry)
 
-	// Start a fresh auto-flush timer if enabled
 	q.startTimerLocked()
 
 	q.mu.Unlock()
 }
 
-// prepend adds entries to the front of the queue.
-// Used to re-queue entries after a failed flush.
-// Enforces maxQueueSize by truncating combined entries if needed.
-// Starts a fresh auto-flush timer if auto-flush is enabled.
 func (q *batchQueue) prepend(entries []LogEntry) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -79,16 +59,13 @@ func (q *batchQueue) prepend(entries []LogEntry) {
 		return
 	}
 
-	// Prepend entries to the front: new slice = entries + existing.
-	// Pre-allocate to avoid aliasing the caller's slice (appendAssign).
 	combined := make([]LogEntry, 0, len(entries)+len(q.entries))
 	combined = append(combined, entries...)
 	combined = append(combined, q.entries...)
 	if q.maxQueueSize > 0 && len(combined) > q.maxQueueSize {
 		dropped := len(combined) - q.maxQueueSize
-		combined = combined[:q.maxQueueSize] // keep newest (prepended) entries
+		combined = combined[:q.maxQueueSize]
 
-		// Surface overflow via the same onError path add() uses.
 		if q.onError != nil {
 			onError := q.onError
 			q.mu.Unlock()
@@ -98,27 +75,15 @@ func (q *batchQueue) prepend(entries []LogEntry) {
 	}
 	q.entries = combined
 
-	// Start a fresh auto-flush timer if enabled
 	q.startTimerLocked()
 }
 
-// startTimerLocked stops any existing auto-flush timer and starts a fresh one
-// with a new generation. Must be called with q.mu held.
-//
-// A fired timer is never Reset: once a timer has fired its callback has been
-// dispatched, and Reset on such a timer without stopping it first is racy — it
-// may fail to re-arm, stranding entries without a live timer. Stopping the old
-// timer (bumping the generation so any stale in-flight callback becomes a
-// no-op) and creating a fresh timer guarantees that a pending auto-flush timer
-// always exists after enqueue.
 func (q *batchQueue) startTimerLocked() {
 	if q.flushInterval <= 0 || q.flushFn == nil {
 		return
 	}
 
 	if q.timer != nil {
-		// Stop the previous timer; bump the generation so a callback from a
-		// fired/stopped timer is invalidated.
 		atomic.AddInt64(&q.generation, 1)
 		q.timer.Stop()
 		q.timer = nil
@@ -128,19 +93,16 @@ func (q *batchQueue) startTimerLocked() {
 	flushFn := q.flushFn
 	q.timer = time.AfterFunc(q.flushInterval, func() {
 		if atomic.LoadInt64(&q.generation) != gen {
-			return // stale callback, ignore
+			return
 		}
 		flushFn()
 	})
 }
 
-// flush returns all queued entries and clears the queue.
-// Stops the flush timer if running.
 func (q *batchQueue) flush() []LogEntry {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
-	// Stop the flush timer if running; bump generation to invalidate stale callbacks
 	if q.timer != nil {
 		atomic.AddInt64(&q.generation, 1)
 		q.timer.Stop()
@@ -151,24 +113,18 @@ func (q *batchQueue) flush() []LogEntry {
 		return nil
 	}
 
-	// Take ownership of current entries
 	entries := q.entries
-	// Allocate new slice for future entries
 	q.entries = make([]LogEntry, 0)
 
 	return entries
 }
 
-// size returns the current number of entries in the queue.
 func (q *batchQueue) size() int {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	return len(q.entries)
 }
 
-// stopTimer stops the auto-flush timer if running.
-// Bumps the generation counter so any in-flight timer callbacks become no-ops.
-// Used during shutdown to prevent timer fires after shutdown starts.
 func (q *batchQueue) stopTimer() {
 	q.mu.Lock()
 	defer q.mu.Unlock()

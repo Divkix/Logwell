@@ -105,7 +105,6 @@ describe("Project retention_days column", () => {
       await seedProject(db, { retentionDays: 30 });
       await seedProject(db, { retentionDays: 90 });
 
-      // Find projects with 30 day retention
       const projects30 = await db.select().from(project).where(eq(project.retentionDays, 30));
 
       expect(projects30).toHaveLength(2);

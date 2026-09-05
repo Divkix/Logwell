@@ -8,15 +8,11 @@ import { page } from '$app/stores';
 import { cn } from '$lib/utils';
 
 interface Props {
-  /**
-   * Project ID for project-specific navigation (logs, stats, settings)
-   */
   projectId?: string;
 }
 
 const { projectId }: Props = $props();
 
-// Determine active page
 const currentPath = $derived($page.url.pathname);
 const isHomePage = $derived(currentPath === '/');
 const isLogsPage = $derived(projectId && currentPath === `/projects/${projectId}`);
@@ -29,14 +25,12 @@ const activeClass = 'text-primary';
 const inactiveClass = 'text-muted-foreground hover:text-foreground';
 </script>
 
-<!-- Bottom navigation - mobile only (< 640px) -->
 <nav
   data-testid="bottom-nav"
   class="fixed bottom-0 left-0 right-0 z-50 bg-background border-t sm:hidden"
   aria-label="Main navigation"
 >
   <div class="flex items-center justify-around py-1">
-    <!-- Home/Dashboard -->
     <a
       href="/"
       data-testid="nav-home"
@@ -49,7 +43,6 @@ const inactiveClass = 'text-muted-foreground hover:text-foreground';
     </a>
 
     {#if projectId}
-      <!-- Logs -->
       <a
         href="/projects/{projectId}"
         data-testid="nav-logs"
@@ -61,7 +54,6 @@ const inactiveClass = 'text-muted-foreground hover:text-foreground';
         <span>Logs</span>
       </a>
 
-      <!-- Incidents -->
       <a
         href="/projects/{projectId}/incidents"
         data-testid="nav-incidents"
@@ -73,7 +65,6 @@ const inactiveClass = 'text-muted-foreground hover:text-foreground';
         <span>Incidents</span>
       </a>
 
-      <!-- Stats -->
       <a
         href="/projects/{projectId}/stats"
         data-testid="nav-stats"
@@ -85,7 +76,6 @@ const inactiveClass = 'text-muted-foreground hover:text-foreground';
         <span>Stats</span>
       </a>
 
-      <!-- Settings -->
       <a
         href="/projects/{projectId}/settings"
         data-testid="nav-settings"

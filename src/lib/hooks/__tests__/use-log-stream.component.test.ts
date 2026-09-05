@@ -4,9 +4,6 @@
 import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from "vite-plus/test";
 import type { ClientLog } from "$lib/stores/logs.svelte";
 
-/**
- * Helper to create a mock SSE response with a readable stream
- */
 function createMockSSEResponse(events: Array<{ event: string; data: string }>): Response {
   let eventIndex = 0;
 
@@ -33,9 +30,6 @@ function createMockSSEResponse(events: Array<{ event: string; data: string }>): 
   });
 }
 
-/**
- * Helper to create a mock SSE response that delays between events
- */
 function createDelayedMockSSEResponse(
   events: Array<{ event: string; data: string; delayMs?: number }>,
 ): Response {
@@ -67,9 +61,6 @@ function createDelayedMockSSEResponse(
   });
 }
 
-/**
- * Helper to create a mock response that errors
- */
 function createErrorResponse(status: number, message: string): Response {
   return new Response(JSON.stringify({ error: message }), {
     status,
@@ -77,9 +68,6 @@ function createErrorResponse(status: number, message: string): Response {
   });
 }
 
-/**
- * Helper to create sample log data
- */
 function createSampleLog(overrides: Partial<ClientLog> = {}): ClientLog {
   return {
     id: `log-${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -108,7 +96,6 @@ describe("useLogStream", () => {
     vi.resetModules();
     fetchMock = vi.spyOn(globalThis, "fetch");
 
-    // Import fresh module for each test
     const module = await import("../use-log-stream.svelte");
     useLogStream = module.useLogStream;
   });
@@ -133,7 +120,6 @@ describe("useLogStream", () => {
         onLogs,
       });
 
-      // Wait for connection attempt
       await vi.waitFor(() => {
         expect(fetchMock).toHaveBeenCalled();
       });
@@ -157,7 +143,6 @@ describe("useLogStream", () => {
         onLogs,
       });
 
-      // Wait a tick to ensure no fetch was called
       await new Promise((resolve) => setTimeout(resolve, 10));
 
       expect(fetchMock).not.toHaveBeenCalled();
@@ -176,12 +161,10 @@ describe("useLogStream", () => {
         onLogs: vi.fn(),
       });
 
-      // Should be connecting while waiting for response
       await vi.waitFor(() => {
         expect(stream.isConnecting).toBe(true);
       });
 
-      // Resolve the fetch
       resolveResponse(
         createMockSSEResponse([{ event: "heartbeat", data: JSON.stringify({ ts: Date.now() }) }]),
       );
@@ -289,7 +272,6 @@ describe("useLogStream", () => {
         onLogs,
       });
 
-      // Wait for stream to process
       await new Promise((resolve) => setTimeout(resolve, 50));
 
       expect(onLogs).not.toHaveBeenCalled();
@@ -320,7 +302,6 @@ describe("useLogStream", () => {
         expect(onLogs).toHaveBeenCalled();
       });
 
-      // Should still process the valid batch
       expect(onLogs).toHaveBeenCalledWith(
         expect.arrayContaining([expect.objectContaining({ id: "valid-log" })]),
       );
@@ -333,10 +314,8 @@ describe("useLogStream", () => {
     it("attempts reconnection after connection error", async () => {
       vi.useFakeTimers();
 
-      // First connection fails
       fetchMock.mockRejectedValueOnce(new Error("Network error"));
 
-      // Second connection succeeds
       const mockResponse = createMockSSEResponse([
         { event: "heartbeat", data: JSON.stringify({ ts: Date.now() }) },
       ]);
@@ -350,11 +329,9 @@ describe("useLogStream", () => {
         onError,
       });
 
-      // Wait for first connection attempt
       await vi.advanceTimersByTimeAsync(0);
       expect(fetchMock).toHaveBeenCalledTimes(1);
 
-      // Advance timer to trigger reconnection (default: 3000ms)
       await vi.advanceTimersByTimeAsync(3000);
 
       expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -366,7 +343,6 @@ describe("useLogStream", () => {
     it("uses exponential backoff for reconnection", async () => {
       vi.useFakeTimers();
 
-      // All connections fail
       fetchMock.mockRejectedValue(new Error("Network error"));
 
       const stream = useLogStream({
@@ -375,15 +351,12 @@ describe("useLogStream", () => {
         onLogs: vi.fn(),
       });
 
-      // First attempt
       await vi.advanceTimersByTimeAsync(0);
       expect(fetchMock).toHaveBeenCalledTimes(1);
 
-      // Second attempt after 3s
       await vi.advanceTimersByTimeAsync(3000);
       expect(fetchMock).toHaveBeenCalledTimes(2);
 
-      // Third attempt after 6s (exponential backoff)
       await vi.advanceTimersByTimeAsync(6000);
       expect(fetchMock).toHaveBeenCalledTimes(3);
 
@@ -394,7 +367,6 @@ describe("useLogStream", () => {
     it("resets reconnection attempts on successful connection", async () => {
       vi.useFakeTimers();
 
-      // First fails, second succeeds, third (after disconnect) succeeds
       fetchMock
         .mockRejectedValueOnce(new Error("Network error"))
         .mockResolvedValueOnce(
@@ -407,11 +379,9 @@ describe("useLogStream", () => {
         onLogs: vi.fn(),
       });
 
-      // First attempt fails
       await vi.advanceTimersByTimeAsync(0);
       expect(fetchMock).toHaveBeenCalledTimes(1);
 
-      // Reconnect after 3s succeeds
       await vi.advanceTimersByTimeAsync(3000);
       expect(fetchMock).toHaveBeenCalledTimes(2);
 
@@ -430,17 +400,13 @@ describe("useLogStream", () => {
         onLogs: vi.fn(),
       });
 
-      // First attempt
       await vi.advanceTimersByTimeAsync(0);
       expect(fetchMock).toHaveBeenCalledTimes(1);
 
-      // Disconnect before reconnection
       stream.disconnect();
 
-      // Advance timer past reconnection time
       await vi.advanceTimersByTimeAsync(10000);
 
-      // Should not have attempted reconnection
       expect(fetchMock).toHaveBeenCalledTimes(1);
 
       vi.useRealTimers();
@@ -457,26 +423,21 @@ describe("useLogStream", () => {
         enabled: true,
         onLogs: vi.fn(),
         onError,
-        maxReconnectAttempts: 3, // 3 reconnect attempts AFTER initial failure
+        maxReconnectAttempts: 3,
       });
 
-      // First attempt (initial)
       await vi.advanceTimersByTimeAsync(0);
       expect(fetchMock).toHaveBeenCalledTimes(1);
 
-      // 1st reconnect after 3s
       await vi.advanceTimersByTimeAsync(3000);
       expect(fetchMock).toHaveBeenCalledTimes(2);
 
-      // 2nd reconnect after 6s (exponential backoff)
       await vi.advanceTimersByTimeAsync(6000);
       expect(fetchMock).toHaveBeenCalledTimes(3);
 
-      // 3rd reconnect after 12s (exponential backoff)
       await vi.advanceTimersByTimeAsync(12000);
       expect(fetchMock).toHaveBeenCalledTimes(4);
 
-      // Should NOT attempt 4th reconnect (total: 1 initial + 3 reconnects = 4)
       await vi.advanceTimersByTimeAsync(24000);
       expect(fetchMock).toHaveBeenCalledTimes(4);
 
@@ -521,10 +482,8 @@ describe("useLogStream", () => {
         onLogs: vi.fn(),
       });
 
-      // First attempt fails
       await vi.advanceTimersByTimeAsync(0);
 
-      // Disconnect while reconnection is scheduled
       stream.disconnect();
 
       expect(clearTimeoutSpy).toHaveBeenCalled();
@@ -569,7 +528,6 @@ describe("useLogStream", () => {
         onLogs: vi.fn(),
       });
 
-      // Wait for first connection
       await vi.waitFor(() => {
         expect(fetchMock).toHaveBeenCalledTimes(1);
       });

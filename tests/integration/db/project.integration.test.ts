@@ -8,9 +8,6 @@ import { project } from "../../../src/lib/server/db/schema";
 import { setupTestDatabase } from "../../../src/lib/server/db/test-db";
 import { getOrCreateDefaultUser } from "../../fixtures/db";
 
-/**
- * Generates a unique API key in the format: lw_<32-random-chars>
- */
 function generateApiKey(): string {
   return `lw_${nanoid(32)}`;
 }
@@ -58,7 +55,6 @@ describe("Project Table Schema", () => {
     const apiKey1 = generateApiKey();
     const apiKey2 = generateApiKey();
 
-    // Create first project for user1
     await db.insert(project).values({
       id: nanoid(),
       name: projectName,
@@ -66,7 +62,6 @@ describe("Project Table Schema", () => {
       ownerId: userId,
     });
 
-    // Attempt to create second project with same name for same user should fail
     await expect(
       db.insert(project).values({
         id: nanoid(),
@@ -76,7 +71,6 @@ describe("Project Table Schema", () => {
       }),
     ).rejects.toThrow();
 
-    // Create a different user
     const otherUserId = nanoid();
     await db.insert(schema.user).values({
       id: otherUserId,
@@ -85,7 +79,6 @@ describe("Project Table Schema", () => {
       emailVerified: false,
     });
 
-    // Same project name for different user should succeed
     const apiKey3 = generateApiKey();
     const [otherProject] = await db
       .insert(project)
@@ -107,7 +100,6 @@ describe("Project Table Schema", () => {
     const apiKey = generateApiKey();
     const projectName = "api-key-test";
 
-    // Create project
     await db.insert(project).values({
       id: projectId,
       name: projectName,
@@ -115,7 +107,6 @@ describe("Project Table Schema", () => {
       ownerId: userId,
     });
 
-    // Find by API key hash
     const [foundProject] = await db
       .select()
       .from(project)

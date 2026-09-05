@@ -1,61 +1,27 @@
 import type { ClientLog } from "$lib/stores/logs.svelte";
 
-/**
- * Configuration options for the useLogStream hook
- */
 export interface UseLogStreamOptions {
-  /** Project ID to stream logs from */
   projectId: string;
-  /** Whether the stream should be active */
   enabled: boolean;
-  /** Callback when new log batches arrive */
   onLogs?: (logs: ClientLog[]) => void;
-  /** Callback when an error occurs */
   onError?: (error: Error) => void;
-  /** Callback when connection state changes */
   onConnectionChange?: (connected: boolean) => void;
-  /** Maximum number of reconnection attempts (default: 5) */
   maxReconnectAttempts?: number;
-  /** Base delay for reconnection in ms (default: 3000) */
   reconnectBaseDelay?: number;
 }
 
-/**
- * Return type for the useLogStream hook
- */
 export interface UseLogStreamReturn {
-  /** Whether currently connected to the SSE stream */
   isConnected: boolean;
-  /** Whether currently attempting to connect */
   isConnecting: boolean;
-  /** Current error, if any */
   error: Error | null;
-  /** Manually initiate connection */
   connect: () => void;
-  /** Manually disconnect */
   disconnect: () => void;
-  /** Change the project subscribed to by the stream */
   setProjectId: (id: string) => void;
 }
 
-/**
- * Default configuration values
- */
 const DEFAULT_MAX_RECONNECT_ATTEMPTS = 5;
 const DEFAULT_RECONNECT_BASE_DELAY = 3000;
 
-/**
- * Hook for subscribing to real-time log streams via SSE
- *
- * Features:
- * - Automatic connection management based on `enabled` flag
- * - SSE event parsing for log batches
- * - Automatic reconnection with exponential backoff
- * - Clean disconnection with proper cleanup
- *
- * @param options - Hook configuration options
- * @returns Stream control interface
- */
 export function useLogStream(options: UseLogStreamOptions): UseLogStreamReturn {
   const {
     projectId,
@@ -67,7 +33,6 @@ export function useLogStream(options: UseLogStreamOptions): UseLogStreamReturn {
     reconnectBaseDelay = DEFAULT_RECONNECT_BASE_DELAY,
   } = options;
 
-  // Internal state
   // NOTE: these are intentionally plain (non-reactive) variables. connect()/disconnect() mutate
   // them and are invoked from a component $effect; making them $state caused the effect to take a
   // reactive dependency on them (via connect()'s guard reads) while also writing them, producing an
@@ -83,9 +48,6 @@ export function useLogStream(options: UseLogStreamOptions): UseLogStreamReturn {
   let _projectId = projectId;
   let _epoch = 0;
 
-  /**
-   * Updates connection state and triggers callback
-   */
   function setConnected(connected: boolean): void {
     if (_isConnected !== connected) {
       _isConnected = connected;
@@ -119,26 +81,17 @@ export function useLogStream(options: UseLogStreamOptions): UseLogStreamReturn {
     return buffer;
   }
 
-  /**
-   * Processes parsed SSE events
-   */
   function processSSEEvents(events: Array<{ event: string; data: string }>): void {
     for (const event of events) {
       if (event.event === "logs") {
         try {
           const logs = JSON.parse(event.data) as ClientLog[];
           onLogs?.(logs);
-        } catch {
-          // Silently ignore malformed JSON - continue processing other events
-        }
+        } catch {}
       }
-      // Heartbeat events are intentionally ignored
     }
   }
 
-  /**
-   * Schedules a reconnection attempt with exponential backoff
-   */
   function scheduleReconnect(): void {
     if (_isDisconnected) return;
     if (_reconnectAttempts >= maxReconnectAttempts) return;
@@ -153,11 +106,7 @@ export function useLogStream(options: UseLogStreamOptions): UseLogStreamReturn {
     }, delay);
   }
 
-  /**
-   * Connects to the SSE endpoint
-   */
   function connect(): void {
-    // Prevent duplicate connections
     if (_isConnecting || _isConnected) return;
 
     _isDisconnected = false;
@@ -199,7 +148,6 @@ export function useLogStream(options: UseLogStreamOptions): UseLogStreamReturn {
             buffer = processSSEBuffer(buffer);
           }
         } catch (error) {
-          // Stream was aborted or errored
           if (myEpoch === _epoch && !_isDisconnected) {
             _error = error instanceof Error ? error : new Error(String(error));
             onError?.(_error);
@@ -208,7 +156,6 @@ export function useLogStream(options: UseLogStreamOptions): UseLogStreamReturn {
           reader.releaseLock();
         }
 
-        // Connection closed (stream ended)
         if (myEpoch === _epoch && !_isDisconnected) {
           setConnected(false);
           scheduleReconnect();
@@ -218,7 +165,6 @@ export function useLogStream(options: UseLogStreamOptions): UseLogStreamReturn {
         if (myEpoch !== _epoch) return;
         _isConnecting = false;
 
-        // Ignore abort errors from intentional disconnection
         if (error?.name === "AbortError" && _isDisconnected) {
           return;
         }
@@ -227,28 +173,21 @@ export function useLogStream(options: UseLogStreamOptions): UseLogStreamReturn {
         onError?.(_error);
         setConnected(false);
 
-        // Don't reconnect on permanent errors (404)
         if (_error.message.startsWith("HTTP 404:")) return;
 
-        // Schedule reconnection attempt
         scheduleReconnect();
       });
   }
 
-  /**
-   * Disconnects from the SSE endpoint
-   */
   function disconnect(): void {
     _epoch++;
     _isDisconnected = true;
 
-    // Clear any pending reconnection
     if (_reconnectTimeoutId) {
       clearTimeout(_reconnectTimeoutId);
       _reconnectTimeoutId = null;
     }
 
-    // Abort current connection
     if (_abortController) {
       _abortController.abort();
       _abortController = null;
@@ -268,9 +207,7 @@ export function useLogStream(options: UseLogStreamOptions): UseLogStreamReturn {
     }
   }
 
-  // Auto-connect if enabled on creation (only in browser)
   if (enabled && typeof window !== "undefined") {
-    // Use queueMicrotask to allow the return value to be captured first
     queueMicrotask(() => {
       connect();
     });

@@ -2,15 +2,10 @@ import { delay, HttpResponse, http } from "msw";
 
 const BASE_URL = "https://test.logwell.io";
 
-/**
- * Default MSW handlers for Logwell API
- */
 export const handlers = [
-  // Success response for /v1/ingest
   http.post(`${BASE_URL}/v1/ingest`, async ({ request }) => {
     const authHeader = request.headers.get("Authorization");
 
-    // Check authentication
     if (!authHeader?.startsWith("Bearer lw_")) {
       return HttpResponse.json(
         { error: "unauthorized", message: "Missing or invalid authorization header" },
@@ -18,7 +13,6 @@ export const handlers = [
       );
     }
 
-    // Parse body
     let body: unknown;
     try {
       body = await request.json();
@@ -29,7 +23,6 @@ export const handlers = [
       );
     }
 
-    // Count logs
     const logs = Array.isArray(body) ? body : [body];
     const accepted = logs.length;
 
@@ -37,9 +30,6 @@ export const handlers = [
   }),
 ];
 
-/**
- * Error handlers for specific test scenarios
- */
 export const errorHandlers = {
   unauthorized: http.post(`${BASE_URL}/v1/ingest`, () =>
     HttpResponse.json({ error: "unauthorized", message: "Invalid API key" }, { status: 401 }),

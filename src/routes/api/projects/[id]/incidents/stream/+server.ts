@@ -18,7 +18,6 @@ function formatSSEEvent(event: string, data: string): string {
  * Requires session authentication and project ownership.
  */
 export async function POST(event: RequestEvent): Promise<Response> {
-  // CSRF check
   const csrfError = checkCsrfOrigin(event);
   if (csrfError) return csrfError;
 
@@ -28,9 +27,6 @@ export async function POST(event: RequestEvent): Promise<Response> {
   const projectId = event.params.id;
   let cleanupFn: (() => void) | null = null;
 
-  // Use a CountQueuingStrategy with a generous highWaterMark so normal
-  // ingest bursts never drive desiredSize to 0; genuine backpressure only
-  // triggers when the queue actually exceeds the mark (desiredSize < 0).
   const stream = new ReadableStream(
     {
       start(controller) {
@@ -44,20 +40,17 @@ export async function POST(event: RequestEvent): Promise<Response> {
           try {
             const size = (controller as ReadableStreamDefaultController).desiredSize;
             if (size !== null && size < 0) {
-              // Stream backpressure: slow consumer — drop this event but keep the stream open
               return "backpressure";
             }
             controller.enqueue(encoder.encode(formatSSEEvent(eventName, data)));
             return "sent";
           } catch {
-            // Controller closed
             return "closed";
           }
         };
 
         const flushBatch = () => {
           if (batch.length > 0) {
-            // Only a closed controller is terminal; backpressure just drops this event.
             if (sendEvent("incidents", JSON.stringify(batch)) === "closed") cleanup();
             batch = [];
           }
@@ -94,9 +87,7 @@ export async function POST(event: RequestEvent): Promise<Response> {
           if (flushTimeout) clearTimeout(flushTimeout);
           try {
             controller.close();
-          } catch {
-            // already closed
-          }
+          } catch {}
         };
 
         cleanupFn = cleanup;

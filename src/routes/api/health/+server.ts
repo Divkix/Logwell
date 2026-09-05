@@ -3,13 +3,8 @@ import { sql } from "drizzle-orm";
 import { type DatabaseClient, getDbClient } from "$lib/server/db/db";
 import type { RequestEvent } from "./$types";
 
-// Track server start time for uptime calculation
 const serverStartTime = Date.now();
 
-/**
- * Check database connectivity by executing a simple query.
- * Returns `null` when the client could not be constructed (e.g. missing env).
- */
 async function checkDatabase(
   db: DatabaseClient | null,
 ): Promise<{ connected: boolean; error?: string }> {
@@ -17,7 +12,6 @@ async function checkDatabase(
     return { connected: false, error: "Database client not available" };
   }
   try {
-    // Execute a simple query to verify connectivity
     await db.execute(sql`SELECT 1`);
     return { connected: true };
   } catch (error) {
@@ -26,9 +20,6 @@ async function checkDatabase(
   }
 }
 
-/**
- * Health check response type
- */
 interface HealthResponse {
   status: "healthy" | "unhealthy";
   database: "connected" | "disconnected";
@@ -62,9 +53,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
   let db: DatabaseClient | null = null;
   try {
     db = await getDbClient(event.locals);
-  } catch {
-    // Production singleton failed to load (e.g. missing DATABASE_URL)
-  }
+  } catch {}
   const dbStatus = await checkDatabase(db);
 
   const isHealthy = dbStatus.connected;
@@ -78,7 +67,6 @@ export async function GET(event: RequestEvent): Promise<Response> {
     version: __APP_VERSION__,
   };
 
-  // Include generic error message when unhealthy (log the real error server-side)
   if (!isHealthy && dbStatus.error) {
     console.error("[health] Database connectivity check failed:", dbStatus.error);
     responseBody.error = "database unavailable";

@@ -1,13 +1,7 @@
 import type { Log } from "$lib/server/db/schema";
 
-/**
- * Sort fields supported by the logs table.
- */
 export type SortField = "timestamp" | "level" | "message";
 
-/**
- * Sort direction for the logs table. `null` means no active sort.
- */
 export type SortDirection = "asc" | "desc" | null;
 
 const LEVEL_SORT_PRIORITY: Record<string, number> = {
@@ -18,15 +12,6 @@ const LEVEL_SORT_PRIORITY: Record<string, number> = {
   debug: 1,
 };
 
-/**
- * Sort logs by the given field/direction without mutating the input array.
- *
- * Returns the original array unchanged when no sort is active so the table
- * (and the page's j/k row navigation) keep the pre-sort order.
- *
- * Shared by log-table.svelte and the logs page so the rows the user sees
- * always match the array the keyboard navigation walks.
- */
 export function sortLogs(logs: Log[], field: SortField | null, direction: SortDirection): Log[] {
   if (!field || !direction) return logs;
 

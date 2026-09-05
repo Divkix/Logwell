@@ -16,9 +16,6 @@ interface Props {
 
 const { projectId, level, search, range }: Props = $props();
 
-/**
- * Build export URL with current filters
- */
 function buildExportUrl(format: 'csv' | 'json'): string {
   const params = new URLSearchParams();
   params.set('format', format);
@@ -31,7 +28,6 @@ function buildExportUrl(format: 'csv' | 'json'): string {
     params.set('search', search);
   }
 
-  // Convert time range to from/to timestamps
   const fromDate = range ? getTimeRangeStart(range) : null;
   if (fromDate) {
     params.set('from', fromDate.toISOString());
@@ -40,9 +36,6 @@ function buildExportUrl(format: 'csv' | 'json'): string {
   return `/api/projects/${projectId}/logs/export?${params}`;
 }
 
-/**
- * Fetch export and trigger download, or show toast on error
- */
 async function handleExport(format: 'csv' | 'json') {
   try {
     const response = await fetch(buildExportUrl(format));
@@ -53,7 +46,6 @@ async function handleExport(format: 'csv' | 'json') {
         const data = (await response.json()) as { message?: string };
         if (data.message) message = data.message;
       } catch {
-        // ignore JSON parse error
       }
       toastError(message);
       return;
@@ -62,7 +54,6 @@ async function handleExport(format: 'csv' | 'json') {
     const blob = await response.blob();
     const blobUrl = window.URL.createObjectURL(blob);
 
-    // Parse filename from Content-Disposition header
     const contentDisposition = response.headers.get('content-disposition');
     let filename = `logs-export.${format}`;
     if (contentDisposition) {

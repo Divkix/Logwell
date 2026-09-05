@@ -4,16 +4,10 @@ import { log, project } from "$lib/server/db/schema";
 import { requireAuth } from "$lib/server/utils/auth-guard";
 import type { PageServerLoad } from "./$types";
 
-/**
- * Dashboard page server load function.
- * Fetches all projects owned by the current user with log counts and last activity.
- */
 export const load: PageServerLoad = async (event) => {
-  // Require session authentication
   const { user } = await requireAuth(event);
   const db = await getDbClient(event.locals);
 
-  // Query only projects owned by the current user
   const projects = await db
     .select({
       id: project.id,
@@ -25,16 +19,13 @@ export const load: PageServerLoad = async (event) => {
     .where(eq(project.ownerId, user.id))
     .orderBy(desc(project.createdAt));
 
-  // Get log counts and last activity for each project
   const projectsWithStats = await Promise.all(
     projects.map(async (p) => {
-      // Get log count
       const [logCountResult] = await db
         .select({ count: count() })
         .from(log)
         .where(eq(log.projectId, p.id));
 
-      // Get last log timestamp
       const [lastLogResult] = await db
         .select({ lastActivity: max(log.timestamp) })
         .from(log)

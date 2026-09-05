@@ -5,13 +5,7 @@ import type { Snippet } from 'svelte';
 import { Button } from '$lib/components/ui/button/index.js';
 
 interface Props {
-  /**
-   * Number of active filters to display in badge
-   */
   activeFilterCount?: number;
-  /**
-   * The filter content to render in the panel
-   */
   children: Snippet;
 }
 
@@ -33,7 +27,6 @@ function handleKeydown(event: KeyboardEvent) {
   }
 }
 
-// Add global keydown listener when panel is open
 $effect(() => {
   if (isOpen && typeof window !== 'undefined') {
     window.addEventListener('keydown', handleKeydown);
@@ -43,7 +36,6 @@ $effect(() => {
 });
 </script>
 
-<!-- Mobile filter toggle - only visible on mobile (< 640px) -->
 <div class="sm:hidden">
   <Button
     data-testid="filter-toggle"
@@ -67,7 +59,6 @@ $effect(() => {
   </Button>
 </div>
 
-<!-- Collapsible filter panel - mobile only -->
 {#if isOpen}
   <div
     data-testid="filter-panel"
@@ -85,7 +76,6 @@ $effect(() => {
     </div>
   </div>
 
-  <!-- Backdrop for mobile filter panel -->
   <button
     type="button"
     class="fixed inset-0 z-30 bg-black/50 sm:hidden cursor-default"
@@ -94,7 +84,6 @@ $effect(() => {
   ></button>
 {/if}
 
-<!-- Desktop/Tablet: render filters inline - visible on sm and above -->
 <div data-testid="filter-desktop" class="hidden sm:contents">
   {@render children()}
 </div>

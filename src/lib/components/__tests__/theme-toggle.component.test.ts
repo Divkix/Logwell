@@ -1,7 +1,6 @@
 import { cleanup, render, screen } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
-// Mock mode-watcher module before importing component
 const mockToggleMode = vi.fn();
 let mockCurrentMode = "light";
 
@@ -14,7 +13,6 @@ vi.mock("mode-watcher", () => ({
   toggleMode: () => mockToggleMode(),
 }));
 
-// Import component after mock setup
 import ThemeToggle from "../theme-toggle.svelte";
 
 describe("ThemeToggle", () => {
@@ -31,7 +29,6 @@ describe("ThemeToggle", () => {
     const button = screen.getByRole("button", { name: /toggle theme/i });
     expect(button).toBeInTheDocument();
 
-    // Sun icon should be visible in light mode
     const sunIcon = button.querySelector('[data-testid="sun-icon"]');
     expect(sunIcon).toBeInTheDocument();
   });
@@ -43,7 +40,6 @@ describe("ThemeToggle", () => {
     const button = screen.getByRole("button", { name: /toggle theme/i });
     expect(button).toBeInTheDocument();
 
-    // Moon icon should be visible in dark mode
     const moonIcon = button.querySelector('[data-testid="moon-icon"]');
     expect(moonIcon).toBeInTheDocument();
   });

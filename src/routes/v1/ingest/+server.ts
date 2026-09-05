@@ -29,19 +29,15 @@ import { parseSimpleIngestRequest, SimpleIngestError } from "$lib/server/utils/s
  * [{ "level": "info", "message": "Log 1" }, { "level": "error", "message": "Log 2" }]
  */
 export const POST: RequestHandler = async ({ request, locals }) => {
-  // Validate Content-Type
   const contentTypeError = requireJsonContentType(request);
   if (contentTypeError) return contentTypeError;
 
   const db = await getDbClient(locals);
 
-  // Validate API key
   let projectId: string;
   try {
     projectId = await validateApiKey(request, db);
 
-    // Re-verify project exists to prevent stale cache (multi-process) from causing FK violations.
-    // This intentionally adds one DB read per ingest request for correctness across processes.
     const [projectRow] = await db
       .select({ id: project.id })
       .from(project)
@@ -56,7 +52,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     throw err;
   }
 
-  // Apply rate limiting per project
   if (!checkRateLimit(`ingest:${projectId}`, INGEST_RPM)) {
     return json(
       { error: "rate_limited", message: "Rate limit exceeded. Retry in 60 seconds." },
@@ -64,7 +59,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     );
   }
 
-  // Parse JSON body
   let body: unknown;
   try {
     body = await request.json();
@@ -75,7 +69,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     );
   }
 
-  // Early batch size check before full parse (BU-7)
   if (Array.isArray(body) && body.length > API_CONFIG.BATCH_INSERT_LIMIT) {
     return json(
       {
@@ -86,7 +79,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     );
   }
 
-  // Parse and validate logs
   let result: ReturnType<typeof parseSimpleIngestRequest>;
   try {
     result = parseSimpleIngestRequest(body);
@@ -144,7 +136,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
               timestamp: record.timestamp,
               metadata: record.metadata,
               resourceAttributes: record.resourceAttributes,
-              // OTLP-specific fields are null for simple API
               timeUnixNano: null,
               observedTimeUnixNano: null,
               severityNumber: null,
@@ -169,10 +160,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
             };
           });
 
-          // The union DatabaseClient type prevents TypeScript from resolving the
-          // .returning(fields) overload on the transaction builder. The cast is
-          // necessary; the explicit column map is the source of truth and
-          // ensures `search` (the generated tsvector) is never fetched.
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const insertedLogs: StreamLog[] = await (
             tx.insert(log).values(logEntries) as any
@@ -181,7 +168,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
         })
       : { insertedLogs: [], touchedIncidents: [] };
 
-  // Emit to event bus for real-time streaming
   for (const insertedLog of insertedLogs) {
     logEventBus.emitLog(insertedLog);
   }

@@ -172,7 +172,6 @@ describe("POST /v1/ingest (Simple API)", () => {
       const [inserted] = await db.select().from(log).where(eq(log.projectId, project.id));
       const after = new Date();
 
-      // Timestamp should be between before and after
       expect(inserted!.timestamp?.getTime()).toBeGreaterThanOrEqual(before.getTime());
       expect(inserted!.timestamp?.getTime()).toBeLessThanOrEqual(after.getTime());
     });
@@ -577,7 +576,6 @@ describe("POST /v1/ingest (Simple API)", () => {
     it("returns 401 instead of 500 when project is deleted after API key is cached", async () => {
       const project = await seedProjectWithApiKey(db);
 
-      // Populate cache by validating the API key
       const apiKeyRequest = new Request("http://localhost", {
         headers: {
           Authorization: `Bearer ${project.apiKey}`,
@@ -585,10 +583,8 @@ describe("POST /v1/ingest (Simple API)", () => {
       });
       await validateApiKey(apiKeyRequest, db);
 
-      // Simulate cross-process deletion: remove project from DB without clearing local cache
       await db.delete(projectTable).where(eq(projectTable.id, project.id));
 
-      // Attempt to ingest with cached (now stale) API key
       const request = new Request("http://localhost/v1/ingest", {
         method: "POST",
         headers: {
@@ -601,7 +597,6 @@ describe("POST /v1/ingest (Simple API)", () => {
       const event = createRequestEvent(request, db);
       const response = await POST(event as never);
 
-      // Should return 401 (unauthorized), not 500 (internal server error from FK violation)
       expect(response.status).toBe(401);
       const body = await response.json();
       expect(body.error).toBe("unauthorized");
@@ -610,13 +605,9 @@ describe("POST /v1/ingest (Simple API)", () => {
 
   describe("Rate limiting", () => {
     it("returns 429 with Retry-After when bucket is exhausted, and writes no logs", async () => {
-      // Fresh project = fresh bucket key; no bleed from other tests
       const project = await seedProjectWithApiKey(db);
 
-      // Drain the bucket for this project key directly via the same module-level map
-      while (checkRateLimit(`ingest:${project.id}`, INGEST_RPM)) {
-        // keep consuming tokens until the bucket is empty
-      }
+      while (checkRateLimit(`ingest:${project.id}`, INGEST_RPM)) {}
 
       const request = new Request("http://localhost/v1/ingest", {
         method: "POST",
@@ -635,7 +626,6 @@ describe("POST /v1/ingest (Simple API)", () => {
       const body = await response.json();
       expect(body.error).toBe("rate_limited");
 
-      // Confirm nothing was written to the DB
       const rows = await db.select().from(log).where(eq(log.projectId, project.id));
       expect(rows.length).toBe(0);
     });
@@ -644,12 +634,8 @@ describe("POST /v1/ingest (Simple API)", () => {
       const projectA = await seedProjectWithApiKey(db);
       const projectB = await seedProjectWithApiKey(db);
 
-      // Drain only project A's bucket
-      while (checkRateLimit(`ingest:${projectA.id}`, INGEST_RPM)) {
-        // consume until empty
-      }
+      while (checkRateLimit(`ingest:${projectA.id}`, INGEST_RPM)) {}
 
-      // Project A should now be rate limited
       const requestA = new Request("http://localhost/v1/ingest", {
         method: "POST",
         headers: {
@@ -662,7 +648,6 @@ describe("POST /v1/ingest (Simple API)", () => {
       const responseA = await POST(eventA as never);
       expect(responseA.status).toBe(429);
 
-      // Project B should still be allowed
       const requestB = new Request("http://localhost/v1/ingest", {
         method: "POST",
         headers: {
@@ -675,7 +660,6 @@ describe("POST /v1/ingest (Simple API)", () => {
       const responseB = await POST(eventB as never);
       expect(responseB.status).toBe(200);
 
-      // Confirm one log was written for B, none for A
       const rowsA = await db.select().from(log).where(eq(log.projectId, projectA.id));
       const rowsB = await db.select().from(log).where(eq(log.projectId, projectB.id));
       expect(rowsA.length).toBe(0);

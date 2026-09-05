@@ -3,7 +3,6 @@ import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import type { Log } from "$lib/server/db/schema";
 import LogRow from "../log-row.svelte";
 
-// Mock formatTimestamp to have deterministic output
 vi.mock("$lib/utils/format", () => ({
   formatTimestamp: vi.fn((date: Date) => {
     const hours = date.getUTCHours().toString().padStart(2, "0");
@@ -80,7 +79,6 @@ describe("LogRow", () => {
       const log = { ...baseLog, timestamp: null as unknown as Date };
       render(LogRow, { props: { log } });
 
-      // Should show a placeholder or handle gracefully
       expect(screen.getByTestId("log-timestamp-desktop")).toBeInTheDocument();
     });
   });
@@ -136,7 +134,6 @@ describe("LogRow", () => {
 
       const messageElement = screen.getByTestId("log-message-desktop");
       expect(messageElement).toBeInTheDocument();
-      // Should have CSS truncation class
       expect(messageElement).toHaveClass("truncate");
     });
 

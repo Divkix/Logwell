@@ -24,7 +24,6 @@ export {
   Portal,
   Portal as SelectPortal,
   Root,
-  //
   Root as Select,
   ScrollDownButton,
   ScrollDownButton as SelectScrollDownButton,

@@ -16,7 +16,6 @@ describe("Log Table Schema", () => {
   });
 
   it("should insert log entry with all fields", async () => {
-    // Create project first
     const testProject = await seedProject(db);
 
     const logId = nanoid();
@@ -50,33 +49,26 @@ describe("Log Table Schema", () => {
   });
 
   it("should cascade delete logs when project deleted", async () => {
-    // Create project
     const testProject = await seedProject(db);
 
-    // Create multiple logs for the project
     const log1 = createLogFactory({ projectId: testProject.id });
     const log2 = createLogFactory({ projectId: testProject.id });
     const log3 = createLogFactory({ projectId: testProject.id });
 
     await db.insert(log).values([log1, log2, log3]);
 
-    // Verify logs exist
     const logsBefore = await db.select().from(log).where(eq(log.projectId, testProject.id));
     expect(logsBefore).toHaveLength(3);
 
-    // Delete the project
     await db.delete(project).where(eq(project.id, testProject.id));
 
-    // Verify all logs are deleted
     const logsAfter = await db.select().from(log).where(eq(log.projectId, testProject.id));
     expect(logsAfter).toHaveLength(0);
   });
 
   it("should search logs by message content", async () => {
-    // Create project
     const testProject = await seedProject(db);
 
-    // Create logs with different messages
     const logs = [
       createLogFactory({
         projectId: testProject.id,
@@ -98,8 +90,6 @@ describe("Log Table Schema", () => {
 
     await db.insert(log).values(logs);
 
-    // Search for logs containing "authentication"
-    // Using to_tsquery for full-text search
     const searchResults = await db.execute<{ id: string; message: string }>(
       `SELECT id, message FROM log
        WHERE search @@ to_tsquery('english', 'authentication')
@@ -112,10 +102,8 @@ describe("Log Table Schema", () => {
   });
 
   it("should search logs by metadata content", async () => {
-    // Create project
     const testProject = await seedProject(db);
 
-    // Create logs with different metadata
     const logs = [
       createLogFactory({
         projectId: testProject.id,
@@ -141,7 +129,6 @@ describe("Log Table Schema", () => {
 
     await db.insert(log).values(logs);
 
-    // Search for logs with metadata containing "login"
     const searchResults = await db.execute<{ id: string; metadata: unknown }>(
       `SELECT id, metadata FROM log
        WHERE search @@ to_tsquery('english', 'login')
@@ -149,7 +136,6 @@ describe("Log Table Schema", () => {
     );
 
     expect(searchResults.rows.length).toBeGreaterThanOrEqual(2);
-    // Verify the results contain login action
     const metadataWithLogin = searchResults.rows.filter((row) => {
       const meta = row.metadata as { action?: string };
       return meta.action === "login";

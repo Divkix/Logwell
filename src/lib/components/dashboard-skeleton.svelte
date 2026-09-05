@@ -6,13 +6,11 @@ const SKELETON_CARD_COUNT = 8;
 </script>
 
 <div data-testid="dashboard-skeleton" class="space-y-6">
-  <!-- Header Skeleton -->
   <div data-testid="dashboard-skeleton-header" class="flex items-center justify-between">
     <Skeleton class="h-8 w-32" data-testid="skeleton-title" />
     <Skeleton class="h-9 w-36" data-testid="skeleton-button" />
   </div>
 
-  <!-- Project Cards Grid Skeleton -->
   <div
     data-testid="dashboard-skeleton-grid"
     class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"

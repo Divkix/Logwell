@@ -26,11 +26,8 @@ const CSV_HEADERS = [
   "ipAddress",
 ] as const;
 
-/**
- * Validate export format parameter
- */
 function validateFormat(formatParam: string | null): ExportFormat | null {
-  if (!formatParam) return "json"; // Default to JSON
+  if (!formatParam) return "json";
 
   const format = formatParam.toLowerCase();
   if (format === "csv" || format === "json") {
@@ -40,9 +37,6 @@ function validateFormat(formatParam: string | null): ExportFormat | null {
   return null;
 }
 
-/**
- * Generate filename for export with timestamp
- */
 function generateFilename(projectName: string, format: ExportFormat): string {
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-").split("T")[0];
   const sanitizedName = projectName.replace(/[^a-zA-Z0-9-_]/g, "-");
@@ -73,7 +67,6 @@ function generateFilename(projectName: string, format: ExportFormat): string {
  * - 404 not_found: Project does not exist or not owned by user
  */
 export async function GET(event: RequestEvent): Promise<Response> {
-  // Require authentication and project ownership
   const authResult = await requireProjectOwnership(event, event.params.id);
   if (isErrorResponse(authResult)) return authResult;
 
@@ -81,7 +74,6 @@ export async function GET(event: RequestEvent): Promise<Response> {
   const db = await getDbClient(event.locals);
   const projectId = event.params.id;
 
-  // Parse query parameters
   const url = event.url;
   const formatParam = url.searchParams.get("format");
   const levelParam = url.searchParams.get("level");
@@ -89,28 +81,22 @@ export async function GET(event: RequestEvent): Promise<Response> {
   const fromParam = url.searchParams.get("from");
   const toParam = url.searchParams.get("to");
 
-  // Validate format
   const format = validateFormat(formatParam);
   if (!format) {
     return apiError(400, "invalid_format", 'Invalid format parameter. Must be "csv" or "json".');
   }
 
-  // Parse level filter
   const levels = parseLevelFilter(levelParam);
 
-  // Parse time range
   const fromDate = fromParam ? new Date(fromParam) : null;
   const toDate = toParam ? new Date(toParam) : null;
 
-  // Build WHERE conditions
   const conditions: SQL[] = [eq(log.projectId, projectId)];
 
-  // Level filter
   if (levels && levels.length > 0) {
     conditions.push(inArray(log.level, levels));
   }
 
-  // Time range filters
   if (fromDate && !Number.isNaN(fromDate.getTime())) {
     conditions.push(gte(log.timestamp, fromDate));
   }
@@ -118,7 +104,6 @@ export async function GET(event: RequestEvent): Promise<Response> {
     conditions.push(lte(log.timestamp, toDate));
   }
 
-  // Full-text search
   if (searchParam?.trim()) {
     const tsquery = buildSearchQuery(searchParam);
     if (tsquery) {
@@ -128,7 +113,6 @@ export async function GET(event: RequestEvent): Promise<Response> {
 
   const whereClause = and(...conditions);
 
-  // Check count doesn't exceed limit
   const [countResult] = await db.select({ count: count() }).from(log).where(whereClause);
   const total = countResult?.count ?? 0;
 
@@ -140,7 +124,6 @@ export async function GET(event: RequestEvent): Promise<Response> {
     );
   }
 
-  // Generate filename
   const filename = generateFilename(projectData.name, format);
 
   const encoder = new TextEncoder();
@@ -151,9 +134,6 @@ export async function GET(event: RequestEvent): Promise<Response> {
         try {
           ctrl.enqueue(encoder.encode(`${CSV_HEADERS.join(",")}\n`));
 
-          // Cursor-based pagination to avoid loading all rows at once.
-          // `micros` keeps exact microsecond precision so same-millisecond
-          // rows tie-break on id and are never skipped.
           let cursorMicros: number | null = null;
           let cursorId: string | null = null;
           let fetched = 0;
@@ -227,7 +207,6 @@ export async function GET(event: RequestEvent): Promise<Response> {
     });
   }
 
-  // JSON format — stream as array
   const stream = new ReadableStream({
     async start(ctrl) {
       try {
@@ -271,8 +250,6 @@ export async function GET(event: RequestEvent): Promise<Response> {
               level: l.level,
               message: l.message,
               timestamp: l.timestamp?.toISOString() ?? "",
-              // Pass the parsed metadata through as an object (JSON.stringify
-              // on the whole row keeps it structured; CSV needs the string).
               metadata: l.metadata ?? null,
               sourceFile: l.sourceFile,
               lineNumber: l.lineNumber,

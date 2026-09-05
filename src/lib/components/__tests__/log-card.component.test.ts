@@ -3,7 +3,6 @@ import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import type { Log } from "$lib/server/db/schema";
 import LogCard from "../log-card.svelte";
 
-// Mock formatTimestamp to have deterministic output
 vi.mock("$lib/utils/format", () => ({
   formatTimestamp: vi.fn((date: Date) => {
     const hours = date.getUTCHours().toString().padStart(2, "0");

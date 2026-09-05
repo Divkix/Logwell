@@ -35,7 +35,6 @@ describe("cappedLogCount", () => {
     const project = await seedProject(db);
     await seedLogs(db, project.id, 3);
 
-    // Use a tiny ceiling to exercise the cap without seeding LOG_COUNT_CEILING rows.
     const result = await cappedLogCount(db, eq(log.projectId, project.id), 2);
 
     expect(result.total).toBe(2); // LIMIT 2 inside the subquery stops the scan
@@ -56,7 +55,6 @@ describe("cappedLogCount", () => {
     const project = await seedProject(db);
     await seedLogs(db, project.id, 5);
 
-    // Default ceiling is 10_000, far above 5 → exact count, not capped.
     const result = await cappedLogCount(db, eq(log.projectId, project.id));
 
     expect(LOG_COUNT_CEILING).toBe(10_000);

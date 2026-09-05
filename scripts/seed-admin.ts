@@ -4,15 +4,9 @@ import postgres from "postgres";
 import { createAuth } from "../src/lib/server/auth";
 import * as schema from "../src/lib/server/db/schema";
 
-// Admin username constant (configurable via ADMIN_USERNAME env var)
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "admin";
 
-/**
- * Seeds the admin user into the database
- * Uses ADMIN_PASSWORD and ADMIN_USERNAME from environment variables
- */
 async function seedAdmin() {
-  // Check for required environment variables
   const DATABASE_URL = process.env.DATABASE_URL;
   const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
@@ -32,13 +26,10 @@ async function seedAdmin() {
   // Using .local TLD as localhost is rejected by email validation
   const generatedEmail = `${ADMIN_USERNAME}@logwell.local`;
 
-  // Initialize database connection
   const client = postgres(DATABASE_URL);
   const db = drizzle(client, { schema });
 
   try {
-    // Create admin user via better-auth with username
-    // Idempotent: catch unique constraint errors and treat as success
     const auth = createAuth(db);
     try {
       const result = await auth.api.signUpEmail({
@@ -80,12 +71,10 @@ async function seedAdmin() {
     console.error("✗ Failed to seed admin user:", error);
     throw error;
   } finally {
-    // Close database connection
     await client.end();
   }
 }
 
-// Run the seed function
 seedAdmin().catch((error) => {
   console.error("Seed failed:", error);
   process.exit(1);

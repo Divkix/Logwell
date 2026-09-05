@@ -64,8 +64,6 @@ export async function GET(event: RequestEvent): Promise<Response> {
   if (cursorParam) {
     try {
       const { micros: cursorMicros, id: cursorId } = decodeCursor(cursorParam);
-      // Row-value comparison so same-millisecond rows tie-break on id and are
-      // never skipped (see logs route for details).
       conditions.push(cursorRowLessThan(incident.lastSeen, incident.id, cursorMicros, cursorId));
     } catch (error) {
       return apiError(
@@ -77,7 +75,6 @@ export async function GET(event: RequestEvent): Promise<Response> {
   }
 
   const whereClause = and(...conditions);
-  // Skip COUNT(*) when a cursor is provided (subsequent pages); saves a DB round-trip
   const total = cursorParam
     ? undefined
     : ((await db.select({ count: count() }).from(incident).where(whereClause))[0]?.count ?? 0);

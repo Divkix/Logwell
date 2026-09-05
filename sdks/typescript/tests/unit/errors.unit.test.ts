@@ -87,8 +87,6 @@ describe("LogwellError", () => {
       const json = JSON.stringify(error);
       const parsed = JSON.parse(json);
 
-      // Note: Error.message is not enumerable, so it won't be in JSON
-      // But code, statusCode, and retryable should be
       expect(parsed.code).toBe("SERVER_ERROR");
       expect(parsed.statusCode).toBe(500);
       expect(parsed.retryable).toBe(true);
@@ -107,7 +105,6 @@ describe("LogwellError", () => {
     it("supports cause option for error chaining", () => {
       const cause = new Error("Original error");
       const error = new LogwellError("Wrapped error", "NETWORK_ERROR", undefined, true);
-      // Set cause manually since we need to support it
       Object.defineProperty(error, "cause", { value: cause });
 
       expect(error.cause).toBe(cause);

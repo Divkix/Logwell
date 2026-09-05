@@ -21,14 +21,12 @@ let error = $state('');
 let isSubmitting = $state(false);
 let previouslyFocusedElement: HTMLElement | null = $state(null);
 
-// Store the previously focused element when modal opens
 $effect(() => {
   if (open && !previouslyFocusedElement) {
     previouslyFocusedElement = (triggerElement || document.activeElement) as HTMLElement;
   }
 });
 
-// Restore focus when modal closes
 $effect(() => {
   if (!open && previouslyFocusedElement) {
     previouslyFocusedElement.focus();
@@ -57,8 +55,6 @@ async function handleSubmit(event: Event) {
   event.preventDefault();
   error = '';
 
-  // Validate name against the shared project create schema (single source of
-  // truth with POST /api/projects).
   const trimmedName = name.trim();
   const validation = projectCreatePayloadSchema.safeParse({ name: trimmedName });
   if (!validation.success) {
@@ -86,7 +82,6 @@ async function handleSubmit(event: Event) {
 <svelte:document onkeydown={handleKeyDown} />
 
 {#if open}
-  <!-- Backdrop -->
   <button
     type="button"
     data-testid="modal-overlay"
@@ -96,7 +91,6 @@ async function handleSubmit(event: Event) {
     tabindex="-1"
   ></button>
 
-  <!-- Dialog -->
   <div
     role="dialog"
     aria-labelledby="create-project-title"
@@ -109,7 +103,6 @@ async function handleSubmit(event: Event) {
       className,
     )}
   >
-      <!-- Header -->
       <div class="mb-4 flex items-center justify-between">
         <h2 id="create-project-title" class="text-lg font-semibold">Create Project</h2>
         <button
@@ -123,7 +116,6 @@ async function handleSubmit(event: Event) {
         </button>
       </div>
 
-      <!-- Form -->
       <form onsubmit={handleSubmit} class="space-y-4">
         <div class="space-y-2">
           <label for="project-name" class="text-sm font-medium leading-none">

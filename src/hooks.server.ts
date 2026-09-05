@@ -8,61 +8,38 @@ import { startCleanupScheduler, stopCleanupScheduler } from "$lib/server/jobs/cl
 import { checkCsrfOrigin } from "$lib/server/utils/csrf";
 import { checkRateLimit, LOGIN_RPM } from "$lib/server/utils/rate-limit";
 
-// Initialize on server startup
 let initialized = false;
 
-/**
- * Ensures auth is initialized before handling requests.
- * Starts cleanup scheduler after auth initialization.
- */
 async function ensureInitialized(): Promise<void> {
   if (!initialized) {
-    // Initialize auth
     await initAuth();
 
-    // Start log cleanup scheduler after initialization
     startCleanupScheduler();
 
     initialized = true;
   }
 }
 
-// Graceful shutdown
 function gracefulShutdown(signal: string) {
   console.log(`[shutdown] ${signal} received`);
   stopCleanupScheduler();
-  // Give in-flight requests ~5s then exit
   setTimeout(() => process.exit(0), 5000);
 }
 process.once("SIGTERM", () => gracefulShutdown("SIGTERM"));
 process.once("SIGINT", () => gracefulShutdown("SIGINT"));
 
-/**
- * Combined SvelteKit handle hook for better-auth
- * - Populates event.locals with session/user data
- * - Routes /api/auth/* to better-auth handler
- */
 export const handle: Handle = async ({ event, resolve }) => {
-  // Skip auth during build
   if (building) {
     return resolve(event);
   }
 
   await ensureInitialized();
 
-  // Inject the DB on every route, including the fast-path routes below.
-  // Test injection seam — tests override this with a PGlite client via locals.db.
   event.locals.db = db;
 
   const pathname = event.url.pathname;
 
-  // Brute-force protection: rate limit login attempts per client IP.
   if (event.request.method === "POST" && pathname.startsWith("/api/auth/sign-in")) {
-    // Run the CSRF origin check BEFORE consuming a login rate-limit token so a
-    // cross-origin attacker can't burn the victim's login budget with forged
-    // requests (the victim's session cookie is sent automatically). Legitimate
-    // same-origin requests carry an Origin/Referer and pass unchanged; the
-    // later `/api/auth/*` CSRF gate still applies to the other auth endpoints.
     const csrfError = checkCsrfOrigin(event);
     if (csrfError) return csrfError;
 
@@ -80,7 +57,6 @@ export const handle: Handle = async ({ event, resolve }) => {
     }
   }
 
-  // Skip session lookup for paths that never need auth
   if (
     pathname.startsWith("/v1/") ||
     pathname === "/api/health" ||
@@ -89,12 +65,10 @@ export const handle: Handle = async ({ event, resolve }) => {
     return resolve(event);
   }
 
-  // Fetch current session from Better Auth
   const session = await auth.api.getSession({
     headers: event.request.headers,
   });
 
-  // Make session and user available on server
   if (session) {
     event.locals.session = session.session;
     event.locals.user = session.user;
@@ -115,16 +89,9 @@ export const handle: Handle = async ({ event, resolve }) => {
     if (csrfError) return csrfError;
   }
 
-  // Use better-auth's SvelteKit handler for proper routing
   return svelteKitHandler({ event, resolve, auth, building });
 };
 
-/**
- * Global error handler for server-side errors
- * - Logs errors with context for debugging
- * - Returns sanitized error messages to clients
- * - Generates unique error IDs for tracking
- */
 export const handleError: HandleServerError = ({ error, event, status, message }) => {
   return buildErrorResponse({
     error,

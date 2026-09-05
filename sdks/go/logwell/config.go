@@ -27,7 +27,6 @@ const (
 	MaxMaxRetries    = 10
 )
 
-// apiKeyRegex matches valid Logwell API keys: lw_ followed by exactly 32 alphanumeric chars including - and _.
 var apiKeyRegex = regexp.MustCompile(`^lw_[a-zA-Z0-9_-]{32}$`)
 
 // Config holds all configuration options for the Logwell client.
@@ -152,7 +151,6 @@ func WithHTTPClient(client *http.Client) Option {
 	}
 }
 
-// newDefaultConfig creates a Config with default values.
 func newDefaultConfig(endpoint, apiKey string) *Config {
 	return &Config{
 		Endpoint:              endpoint,
@@ -166,7 +164,6 @@ func newDefaultConfig(endpoint, apiKey string) *Config {
 	}
 }
 
-// validateEndpoint validates the endpoint configuration.
 func validateEndpoint(endpoint string) error {
 	if endpoint == "" {
 		return NewError(ErrInvalidConfig, "endpoint is required")
@@ -188,7 +185,6 @@ func validateEndpoint(endpoint string) error {
 	return nil
 }
 
-// validateAPIKey validates the API key format.
 func validateAPIKey(apiKey string) error {
 	if apiKey == "" {
 		return NewError(ErrInvalidConfig, "apiKey is required")
@@ -201,7 +197,6 @@ func validateAPIKey(apiKey string) error {
 	return nil
 }
 
-// validateBatchSize validates the batch size configuration.
 func validateBatchSize(batchSize int) error {
 	if batchSize < MinBatchSize || batchSize > MaxBatchSize {
 		return NewError(ErrInvalidConfig, "batchSize must be between 1 and 100")
@@ -209,7 +204,6 @@ func validateBatchSize(batchSize int) error {
 	return nil
 }
 
-// validateFlushInterval validates the flush interval configuration.
 func validateFlushInterval(flushInterval time.Duration) error {
 	if flushInterval < MinFlushInterval || flushInterval > MaxFlushInterval {
 		return NewError(ErrInvalidConfig, "flushInterval must be between 100ms and 60s")
@@ -217,7 +211,6 @@ func validateFlushInterval(flushInterval time.Duration) error {
 	return nil
 }
 
-// validateMaxQueueSize validates the max queue size configuration.
 func validateMaxQueueSize(maxQueueSize int) error {
 	if maxQueueSize < MinMaxQueueSize || maxQueueSize > MaxMaxQueueSize {
 		return NewError(ErrInvalidConfig, "maxQueueSize must be between 1 and 100000")
@@ -225,7 +218,6 @@ func validateMaxQueueSize(maxQueueSize int) error {
 	return nil
 }
 
-// validateMaxRetries validates the max retries configuration.
 func validateMaxRetries(maxRetries int) error {
 	if maxRetries < MinMaxRetries || maxRetries > MaxMaxRetries {
 		return NewError(ErrInvalidConfig, "maxRetries must be between 0 and 10")
@@ -233,7 +225,6 @@ func validateMaxRetries(maxRetries int) error {
 	return nil
 }
 
-// validateConfig validates the configuration and returns an error if invalid.
 func validateConfig(c *Config) error {
 	if err := validateEndpoint(c.Endpoint); err != nil {
 		return err
