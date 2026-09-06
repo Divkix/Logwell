@@ -1,9 +1,8 @@
 import { and, count, desc, eq, gte, lt, or, type SQL } from "drizzle-orm";
 import { INCIDENT_CONFIG } from "$lib/server/config/performance";
-import { getDbClient } from "$lib/server/db/db";
 import { incident } from "$lib/server/db/schema";
 import { decodeCursor, encodeCursor } from "$lib/server/utils/cursor";
-import { requireProjectOwnershipPage } from "$lib/server/utils/project-guard";
+import { requireOwnedProjectPage } from "$lib/server/utils/owned-project";
 import { getIncidentStatus } from "$lib/server/utils/incidents";
 import { INCIDENT_STATUSES, type IncidentRange, type IncidentStatus } from "$lib/shared/types";
 import { getTimeRangeStart } from "$lib/utils/format";
@@ -20,8 +19,7 @@ function clamp(value: number, min: number, max: number): number {
 
 export const load: PageServerLoad = async (event) => {
   const projectId = event.params.id;
-  const { project: projectData } = await requireProjectOwnershipPage(event, projectId);
-  const db = await getDbClient(event.locals);
+  const { project: projectData, db } = await requireOwnedProjectPage(event, projectId);
 
   const params = event.url.searchParams;
   const limit = clamp(

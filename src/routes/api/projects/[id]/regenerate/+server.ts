@@ -1,10 +1,8 @@
 import { json } from "@sveltejs/kit";
 import { eq } from "drizzle-orm";
-import { getDbClient } from "$lib/server/db/db";
 import { project } from "$lib/server/db/schema";
 import { generateApiKey, hashApiKey, invalidateApiKeyCacheByHash } from "$lib/server/utils/api-key";
-import { checkCsrfOrigin } from "$lib/server/utils/csrf";
-import { isErrorResponse, requireProjectOwnership } from "$lib/server/utils/project-guard";
+import { requireOwnedProjectRoute } from "$lib/server/utils/owned-project";
 import type { RequestEvent } from "./$types";
 
 /**
@@ -23,14 +21,10 @@ import type { RequestEvent } from "./$types";
  * - 404 not_found: Project does not exist or not owned by user
  */
 export async function POST(event: RequestEvent): Promise<Response> {
-  const csrfError = checkCsrfOrigin(event);
-  if (csrfError) return csrfError;
+  const authResult = await requireOwnedProjectRoute(event, event.params.id);
+  if (authResult instanceof Response) return authResult;
 
-  const authResult = await requireProjectOwnership(event, event.params.id);
-  if (isErrorResponse(authResult)) return authResult;
-
-  const { project: projectData } = authResult;
-  const db = await getDbClient(event.locals);
+  const { project: projectData, db } = authResult;
   const projectId = event.params.id;
 
   const newApiKey = generateApiKey();

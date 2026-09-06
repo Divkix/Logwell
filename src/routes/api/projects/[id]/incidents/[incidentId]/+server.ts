@@ -1,10 +1,10 @@
 import { json } from "@sveltejs/kit";
 import { and, eq, sql } from "drizzle-orm";
-import { getDbClient, getQueryRows } from "$lib/server/db/db";
+import { getQueryRows } from "$lib/server/db/db";
 import { incident, log } from "$lib/server/db/schema";
 import { apiError } from "$lib/server/utils/api-error";
 import { getIncidentStatus } from "$lib/server/utils/incidents";
-import { isErrorResponse, requireProjectOwnership } from "$lib/server/utils/project-guard";
+import { requireOwnedProjectRoute } from "$lib/server/utils/owned-project";
 import type { RequestEvent } from "./$types";
 
 type SourceFrequencyRow = {
@@ -27,10 +27,10 @@ type TraceFrequencyRow = {
  * GET /api/projects/[id]/incidents/[incidentId]
  */
 export async function GET(event: RequestEvent): Promise<Response> {
-  const authResult = await requireProjectOwnership(event, event.params.id);
-  if (isErrorResponse(authResult)) return authResult;
+  const authResult = await requireOwnedProjectRoute(event, event.params.id);
+  if (authResult instanceof Response) return authResult;
 
-  const db = await getDbClient(event.locals);
+  const { db } = authResult;
   const projectId = event.params.id;
   const incidentId = event.params.incidentId;
 

@@ -1,4 +1,4 @@
-import { requireAuth } from "$lib/server/utils/auth-guard";
+import { requireAuth } from "$lib/server/utils/owned-project";
 import type { LayoutServerLoad } from "./$types";
 
 export const load: LayoutServerLoad = async (event) => {

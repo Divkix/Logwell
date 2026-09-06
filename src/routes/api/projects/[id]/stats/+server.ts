@@ -1,8 +1,7 @@
 import { json } from "@sveltejs/kit";
 import { and, count, eq, gte, lte, type SQL } from "drizzle-orm";
-import { getDbClient } from "$lib/server/db/db";
 import { log } from "$lib/server/db/schema";
-import { isErrorResponse, requireProjectOwnership } from "$lib/server/utils/project-guard";
+import { requireOwnedProjectRoute } from "$lib/server/utils/owned-project";
 import type { RequestEvent } from "./$types";
 
 /**
@@ -39,10 +38,10 @@ import type { RequestEvent } from "./$types";
  * - 404 not_found: Project does not exist or not owned by user
  */
 export async function GET(event: RequestEvent): Promise<Response> {
-  const authResult = await requireProjectOwnership(event, event.params.id);
-  if (isErrorResponse(authResult)) return authResult;
+  const authResult = await requireOwnedProjectRoute(event, event.params.id);
+  if (authResult instanceof Response) return authResult;
 
-  const db = await getDbClient(event.locals);
+  const { db } = authResult;
   const projectId = event.params.id;
 
   const url = event.url;

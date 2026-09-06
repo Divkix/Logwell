@@ -5,7 +5,7 @@ import { getDbClient } from "$lib/server/db/db";
 import { log, project } from "$lib/server/db/schema";
 import { apiError } from "$lib/server/utils/api-error";
 import { generateApiKey, hashApiKey } from "$lib/server/utils/api-key";
-import { requireAuth } from "$lib/server/utils/auth-guard";
+import { requireAuth } from "$lib/server/utils/owned-project";
 import { requireJsonContentType } from "$lib/server/utils/content-type";
 import { checkCsrfOrigin } from "$lib/server/utils/csrf";
 import { projectCreatePayloadSchema } from "$lib/shared/schemas/project";

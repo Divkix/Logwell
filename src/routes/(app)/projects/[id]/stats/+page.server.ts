@@ -1,15 +1,13 @@
 import { and, count, eq, gte, type SQL } from "drizzle-orm";
-import { getDbClient } from "$lib/server/db/db";
 import { log } from "$lib/server/db/schema";
-import { requireProjectOwnershipPage } from "$lib/server/utils/project-guard";
+import { requireOwnedProjectPage } from "$lib/server/utils/owned-project";
 import { getTimeRangeStart } from "$lib/utils/format";
 import { parseTimeRange } from "$lib/utils/time-range";
 import type { PageServerLoad } from "./$types";
 
 export const load: PageServerLoad = async (event) => {
   const projectId = event.params.id;
-  const { project: projectData } = await requireProjectOwnershipPage(event, projectId);
-  const db = await getDbClient(event.locals);
+  const { project: projectData, db } = await requireOwnedProjectPage(event, projectId);
 
   const url = event.url;
   const rangeParam = url.searchParams.get("range") || "24h";

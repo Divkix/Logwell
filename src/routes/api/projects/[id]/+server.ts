@@ -1,11 +1,9 @@
 import { json } from "@sveltejs/kit";
 import { and, count, eq, ne } from "drizzle-orm";
-import { getDbClient } from "$lib/server/db/db";
 import { log, project } from "$lib/server/db/schema";
 import { invalidateApiKeyCacheByHash } from "$lib/server/utils/api-key";
 import { requireJsonContentType } from "$lib/server/utils/content-type";
-import { checkCsrfOrigin } from "$lib/server/utils/csrf";
-import { isErrorResponse, requireProjectOwnership } from "$lib/server/utils/project-guard";
+import { requireOwnedProjectRoute } from "$lib/server/utils/owned-project";
 import { projectUpdatePayloadSchema } from "$lib/shared/schemas/project";
 import type { RequestEvent } from "./$types";
 
@@ -38,11 +36,10 @@ import type { RequestEvent } from "./$types";
  * - 404 not_found: Project does not exist or not owned by user
  */
 export async function GET(event: RequestEvent): Promise<Response> {
-  const result = await requireProjectOwnership(event, event.params.id);
-  if (isErrorResponse(result)) return result;
+  const result = await requireOwnedProjectRoute(event, event.params.id);
+  if (result instanceof Response) return result;
 
-  const { project: projectData } = result;
-  const db = await getDbClient(event.locals);
+  const { project: projectData, db } = result;
   const projectId = event.params.id;
 
   const [logCountResult] = await db
@@ -106,16 +103,13 @@ export async function GET(event: RequestEvent): Promise<Response> {
  * - 404 not_found: Project does not exist or not owned by user
  */
 export async function PATCH(event: RequestEvent): Promise<Response> {
-  const csrfError = checkCsrfOrigin(event);
-  if (csrfError) return csrfError;
-
   const contentTypeError = requireJsonContentType(event.request);
   if (contentTypeError) return contentTypeError;
 
-  const authResult = await requireProjectOwnership(event, event.params.id);
-  if (isErrorResponse(authResult)) return authResult;
+  const authResult = await requireOwnedProjectRoute(event, event.params.id);
+  if (authResult instanceof Response) return authResult;
 
-  const db = await getDbClient(event.locals);
+  const { db } = authResult;
   const projectId = event.params.id;
 
   let body: unknown;
@@ -139,7 +133,7 @@ export async function PATCH(event: RequestEvent): Promise<Response> {
       where: and(
         eq(project.name, name),
         ne(project.id, projectId),
-        eq(project.ownerId, authResult.user.id),
+        eq(project.ownerId, currentProject.ownerId),
       ),
     });
     if (existing) {
@@ -210,14 +204,10 @@ export async function PATCH(event: RequestEvent): Promise<Response> {
  * - 404 not_found: Project does not exist or not owned by user
  */
 export async function DELETE(event: RequestEvent): Promise<Response> {
-  const csrfError = checkCsrfOrigin(event);
-  if (csrfError) return csrfError;
+  const authResult = await requireOwnedProjectRoute(event, event.params.id);
+  if (authResult instanceof Response) return authResult;
 
-  const authResult = await requireProjectOwnership(event, event.params.id);
-  if (isErrorResponse(authResult)) return authResult;
-
-  const { project: projectData } = authResult;
-  const db = await getDbClient(event.locals);
+  const { project: projectData, db } = authResult;
   const projectId = event.params.id;
 
   invalidateApiKeyCacheByHash(projectData.apiKeyHash);

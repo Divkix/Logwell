@@ -1,11 +1,10 @@
 import { and, count, eq, gte, inArray, lte, type SQL, sql } from "drizzle-orm";
 import { EXPORT_CONFIG } from "$lib/server/config/performance";
-import { getDbClient } from "$lib/server/db/db";
 import { log } from "$lib/server/db/schema";
 import { apiError } from "$lib/server/utils/api-error";
 import { escapeCSVField } from "$lib/server/utils/csv-serializer";
 import { queryLogs } from "$lib/server/utils/log-query";
-import { isErrorResponse, requireProjectOwnership } from "$lib/server/utils/project-guard";
+import { requireOwnedProjectRoute } from "$lib/server/utils/owned-project";
 import { buildSearchQuery } from "$lib/server/utils/search";
 import { parseLevelFilter } from "$lib/shared/schemas/log";
 import type { ExportFormat } from "$lib/types/export";
@@ -67,11 +66,10 @@ function generateFilename(projectName: string, format: ExportFormat): string {
  * - 404 not_found: Project does not exist or not owned by user
  */
 export async function GET(event: RequestEvent): Promise<Response> {
-  const authResult = await requireProjectOwnership(event, event.params.id);
-  if (isErrorResponse(authResult)) return authResult;
+  const authResult = await requireOwnedProjectRoute(event, event.params.id);
+  if (authResult instanceof Response) return authResult;
 
-  const { project: projectData } = authResult;
-  const db = await getDbClient(event.locals);
+  const { project: projectData, db } = authResult;
   const projectId = event.params.id;
 
   const url = event.url;
