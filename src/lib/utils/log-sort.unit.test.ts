@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import type { Log } from "$lib/server/db/schema";
-import { sortLogs } from "./log-sort";
+import { sortLogs, type SortDirection, type SortField } from "./log-sort";
 
 function createLog(overrides: Partial<Log> = {}): Log {
   return {
@@ -62,44 +62,27 @@ const sampleLogs: Log[] = [
 ];
 
 describe("sortLogs", () => {
-  it("returns the original array when no sort is active", () => {
-    const result = sortLogs(sampleLogs, null, null);
-    expect(result).toBe(sampleLogs);
-  });
+  it.each([
+    [null, null],
+    ["timestamp", null],
+  ] as [SortField | null, SortDirection][])(
+    "returns the original array when sort is inactive (%s, %s)",
+    (key, dir) => {
+      expect(sortLogs(sampleLogs, key, dir)).toBe(sampleLogs);
+    },
+  );
 
-  it("returns the original array when direction is null", () => {
-    const result = sortLogs(sampleLogs, "timestamp", null);
-    expect(result).toBe(sampleLogs);
-  });
-
-  it("sorts by timestamp ascending", () => {
-    const result = sortLogs(sampleLogs, "timestamp", "asc");
-    expect(result.map((l) => l.id)).toEqual(["log_1", "log_3", "log_2"]);
-  });
-
-  it("sorts by timestamp descending", () => {
-    const result = sortLogs(sampleLogs, "timestamp", "desc");
-    expect(result.map((l) => l.id)).toEqual(["log_2", "log_3", "log_1"]);
-  });
-
-  it("sorts by level severity ascending (debug < warn < error)", () => {
-    const result = sortLogs(sampleLogs, "level", "asc");
-    expect(result.map((l) => l.id)).toEqual(["log_2", "log_3", "log_1"]);
-  });
-
-  it("sorts by level severity descending (error > warn > debug)", () => {
-    const result = sortLogs(sampleLogs, "level", "desc");
-    expect(result.map((l) => l.id)).toEqual(["log_1", "log_3", "log_2"]);
-  });
-
-  it("sorts by message alphabetically ascending", () => {
-    const result = sortLogs(sampleLogs, "message", "asc");
-    expect(result.map((l) => l.id)).toEqual(["log_2", "log_1", "log_3"]);
-  });
-
-  it("sorts by message alphabetically descending", () => {
-    const result = sortLogs(sampleLogs, "message", "desc");
-    expect(result.map((l) => l.id)).toEqual(["log_3", "log_1", "log_2"]);
+  it.each([
+    ["timestamp", "asc", ["log_1", "log_3", "log_2"]],
+    ["timestamp", "desc", ["log_2", "log_3", "log_1"]],
+    ["level", "asc", ["log_2", "log_3", "log_1"]],
+    ["level", "desc", ["log_1", "log_3", "log_2"]],
+    ["message", "asc", ["log_2", "log_1", "log_3"]],
+    ["message", "desc", ["log_3", "log_1", "log_2"]],
+  ])("sorts by %s %s", (key, dir, expected) => {
+    expect(
+      sortLogs(sampleLogs, key as SortField, dir as Exclude<SortDirection, null>).map((l) => l.id),
+    ).toEqual(expected as string[]);
   });
 
   it("does not mutate the input array", () => {

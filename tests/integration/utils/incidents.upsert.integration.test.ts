@@ -239,4 +239,39 @@ describe("Incident upsert race condition", () => {
 
     expect(cacheIncident.lastSeen.getTime()).toBe(now.getTime() + 1500);
   });
+
+  it("updates firstSeen when a later batch contains older logs", async () => {
+    const project = await seedProject(db);
+    const fingerprint = "fp-out-of-order";
+    const base = {
+      level: "error",
+      message: "Database timeout",
+      sourceFile: "src/db.ts",
+      lineNumber: 42,
+      resourceAttributes: null,
+      metadata: null,
+      serviceName: "api",
+      fingerprint,
+      normalizedMessage: "database timeout",
+      incidentTitle: "Database timeout",
+      incidentId: null,
+    } as const;
+
+    await upsertIncidentsForPreparedLogs(db, project.id, [
+      { ...base, timestamp: new Date("2026-03-02T12:00:00.000Z") },
+    ]);
+    await upsertIncidentsForPreparedLogs(db, project.id, [
+      { ...base, timestamp: new Date("2026-03-01T12:00:00.000Z") },
+    ]);
+
+    const allIncidents = await db
+      .select()
+      .from(schema.incident)
+      .where(eq(schema.incident.projectId, project.id));
+
+    expect(allIncidents).toHaveLength(1);
+    expect(allIncidents[0]!.firstSeen.toISOString()).toBe("2026-03-01T12:00:00.000Z");
+    expect(allIncidents[0]!.lastSeen.toISOString()).toBe("2026-03-02T12:00:00.000Z");
+    expect(allIncidents[0]!.totalEvents).toBe(2);
+  });
 });

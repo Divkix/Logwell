@@ -56,62 +56,52 @@ describe("Performance Configuration", () => {
   });
 
   describe("Log Stream Configuration", () => {
-    it("exports DEFAULT_MAX_LOGS with value of 1000", async () => {
-      const { LOG_STREAM_CONFIG } = await import("./performance");
-      expect(LOG_STREAM_CONFIG.DEFAULT_MAX_LOGS).toBe(1000);
-    });
+    it.each([
+      [undefined, 1000, "default 1000"],
+      ["5000", 5000, "env override"],
+      ["20000", 10000, "clamped to upper limit"],
+    ] as [string | undefined, number, string][])(
+      "LOG_STREAM_MAX_LOGS=%s → %s (%s)",
+      async (value, expected) => {
+        vi.resetModules();
+        if (value === undefined) delete process.env.LOG_STREAM_MAX_LOGS;
+        else process.env.LOG_STREAM_MAX_LOGS = value as string;
+        const { LOG_STREAM_CONFIG } = await import("./performance");
+        expect(LOG_STREAM_CONFIG.DEFAULT_MAX_LOGS).toBe(expected);
+      },
+    );
 
     it("exports MAX_LOGS_UPPER_LIMIT with value of 10000", async () => {
       const { LOG_STREAM_CONFIG } = await import("./performance");
       expect(LOG_STREAM_CONFIG.MAX_LOGS_UPPER_LIMIT).toBe(10000);
     });
-
-    it("respects LOG_STREAM_MAX_LOGS environment variable", async () => {
-      process.env.LOG_STREAM_MAX_LOGS = "5000";
-      const { LOG_STREAM_CONFIG } = await import("./performance");
-      expect(LOG_STREAM_CONFIG.DEFAULT_MAX_LOGS).toBe(5000);
-    });
-
-    it("clamps DEFAULT_MAX_LOGS to MAX_LOGS_UPPER_LIMIT", async () => {
-      process.env.LOG_STREAM_MAX_LOGS = "20000";
-      const { LOG_STREAM_CONFIG } = await import("./performance");
-      expect(LOG_STREAM_CONFIG.DEFAULT_MAX_LOGS).toBe(10000);
-    });
   });
 
   describe("API Rate Limiting Configuration", () => {
-    it("exports BATCH_INSERT_LIMIT with default value of 100", async () => {
+    it.each([
+      ["BATCH_INSERT_LIMIT", 100],
+      ["DEFAULT_PAGE_SIZE", 100],
+      ["MAX_PAGE_SIZE", 500],
+    ])("exports %s with value %d", async (key, expected) => {
       const { API_CONFIG } = await import("./performance");
-      expect(API_CONFIG.BATCH_INSERT_LIMIT).toBe(100);
-    });
-
-    it("exports DEFAULT_PAGE_SIZE with value of 100", async () => {
-      const { API_CONFIG } = await import("./performance");
-      expect(API_CONFIG.DEFAULT_PAGE_SIZE).toBe(100);
-    });
-
-    it("exports MAX_PAGE_SIZE with value of 500", async () => {
-      const { API_CONFIG } = await import("./performance");
-      expect(API_CONFIG.MAX_PAGE_SIZE).toBe(500);
+      expect(API_CONFIG[key as keyof typeof API_CONFIG]).toBe(expected);
     });
   });
 
   describe("Incident Configuration", () => {
-    it("exports AUTO_RESOLVE_MINUTES with default value of 30", async () => {
-      const { INCIDENT_CONFIG } = await import("./performance");
-      expect(INCIDENT_CONFIG.AUTO_RESOLVE_MINUTES).toBe(30);
-    });
-
-    it("respects INCIDENT_AUTO_RESOLVE_MINUTES environment variable", async () => {
-      process.env.INCIDENT_AUTO_RESOLVE_MINUTES = "45";
-      const { INCIDENT_CONFIG } = await import("./performance");
-      expect(INCIDENT_CONFIG.AUTO_RESOLVE_MINUTES).toBe(45);
-    });
-
-    it("clamps INCIDENT_AUTO_RESOLVE_MINUTES to minimum", async () => {
-      process.env.INCIDENT_AUTO_RESOLVE_MINUTES = "0";
-      const { INCIDENT_CONFIG } = await import("./performance");
-      expect(INCIDENT_CONFIG.AUTO_RESOLVE_MINUTES).toBe(1);
-    });
+    it.each([
+      [undefined, 30, "default 30"],
+      ["45", 45, "env override"],
+      ["0", 1, "clamped to minimum"],
+    ] as [string | undefined, number, string][])(
+      "INCIDENT_AUTO_RESOLVE_MINUTES=%s → %s (%s)",
+      async (value, expected) => {
+        vi.resetModules();
+        if (value === undefined) delete process.env.INCIDENT_AUTO_RESOLVE_MINUTES;
+        else process.env.INCIDENT_AUTO_RESOLVE_MINUTES = value as string;
+        const { INCIDENT_CONFIG } = await import("./performance");
+        expect(INCIDENT_CONFIG.AUTO_RESOLVE_MINUTES).toBe(expected);
+      },
+    );
   });
 });

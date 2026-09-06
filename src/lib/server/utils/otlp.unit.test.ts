@@ -171,38 +171,30 @@ describe("severityNumberToLogLevel", () => {
 });
 
 describe("parseUint64String", () => {
-  it("accepts valid non-negative integer strings", () => {
-    expect(parseUint64String("0")).toBe("0");
-    expect(parseUint64String("1700000000000000000")).toBe("1700000000000000000");
-    expect(parseUint64String("  42  ")).toBe("42");
+  it.each([
+    ["0", "0"],
+    ["1700000000000000000", "1700000000000000000"],
+    ["  42  ", "42"],
+    [0, "0"],
+    [42, "42"],
+  ])("accepts %s as %s", (input, expected) => {
+    expect(parseUint64String(input)).toBe(expected);
   });
 
-  it("rejects negative string values", () => {
-    expect(parseUint64String("-1")).toBeNull();
-    expect(parseUint64String("-1000000")).toBeNull();
-    expect(parseUint64String("  -42  ")).toBeNull();
-  });
-
-  it("rejects negative number values", () => {
-    expect(parseUint64String(-1)).toBeNull();
-    expect(parseUint64String(-1000000)).toBeNull();
-  });
-
-  it("rejects non-integer number values", () => {
-    expect(parseUint64String(1.5)).toBeNull();
-    expect(parseUint64String(-1.5)).toBeNull();
-  });
-
-  it("rejects non-numeric strings", () => {
-    expect(parseUint64String("abc")).toBeNull();
-    expect(parseUint64String("1.5")).toBeNull();
-    expect(parseUint64String("")).toBeNull();
-    expect(parseUint64String(" ")).toBeNull();
-  });
-
-  it("accepts non-negative integer numbers", () => {
-    expect(parseUint64String(0)).toBe("0");
-    expect(parseUint64String(42)).toBe("42");
+  it.each([
+    ["-1"],
+    ["-1000000"],
+    ["  -42  "],
+    [-1],
+    [-1000000],
+    [1.5],
+    [-1.5],
+    ["abc"],
+    ["1.5"],
+    [""],
+    [" "],
+  ])("rejects %s", (input) => {
+    expect(parseUint64String(input)).toBeNull();
   });
 });
 

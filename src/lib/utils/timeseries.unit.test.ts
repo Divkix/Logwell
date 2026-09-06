@@ -2,28 +2,15 @@ import { describe, expect, it } from "vite-plus/test";
 import { bucketTimestamps, fillMissingBuckets, getTimeBucketConfig } from "./timeseries";
 
 describe("getTimeBucketConfig", () => {
-  it("returns 60000ms interval for 15m range", () => {
-    const config = getTimeBucketConfig("15m");
-    expect(config.intervalMs).toBe(60 * 1000);
-    expect(config.expectedBuckets).toBe(15);
-  });
-
-  it("returns 300000ms interval for 1h range", () => {
-    const config = getTimeBucketConfig("1h");
-    expect(config.intervalMs).toBe(5 * 60 * 1000);
-    expect(config.expectedBuckets).toBe(12);
-  });
-
-  it("returns 3600000ms interval for 24h range", () => {
-    const config = getTimeBucketConfig("24h");
-    expect(config.intervalMs).toBe(60 * 60 * 1000);
-    expect(config.expectedBuckets).toBe(24);
-  });
-
-  it("returns 21600000ms interval for 7d range", () => {
-    const config = getTimeBucketConfig("7d");
-    expect(config.intervalMs).toBe(6 * 60 * 60 * 1000);
-    expect(config.expectedBuckets).toBe(28);
+  it.each([
+    ["15m", 60 * 1000, 15],
+    ["1h", 5 * 60 * 1000, 12],
+    ["24h", 60 * 60 * 1000, 24],
+    ["7d", 6 * 60 * 60 * 1000, 28],
+  ])("returns %sms interval for %s range (%s buckets)", (range, intervalMs, expectedBuckets) => {
+    const config = getTimeBucketConfig(range as "15m");
+    expect(config.intervalMs).toBe(intervalMs);
+    expect(config.expectedBuckets).toBe(expectedBuckets);
   });
 });
 

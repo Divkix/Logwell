@@ -1,169 +1,78 @@
 import { describe, expect, it } from "vite-plus/test";
 import { decodeCursor, encodeCursor } from "./cursor";
 
+const TS = new Date("2024-01-15T10:30:00.000Z");
+
 describe("cursor utilities", () => {
   describe("encodeCursor", () => {
-    it("creates valid base64url string", () => {
-      const timestamp = new Date("2024-01-15T10:30:00.000Z");
-      const id = "log_123";
-
-      const cursor = encodeCursor(timestamp, id);
-
-      // Should be a non-empty string
+    it("creates a valid base64url string", () => {
+      const cursor = encodeCursor(TS, "log_123");
       expect(cursor).toBeTruthy();
-      expect(typeof cursor).toBe("string");
-
-      // Should be valid base64url (no +, /, or = characters)
       expect(cursor).toMatch(/^[A-Za-z0-9_-]+$/);
     });
 
-    it("handles IDs with underscores", () => {
-      const timestamp = new Date("2024-01-15T10:30:00.000Z");
-      const id = "log_with_underscores_123";
-
-      const cursor = encodeCursor(timestamp, id);
-
-      expect(cursor).toBeTruthy();
-      expect(typeof cursor).toBe("string");
+    it.each([["log_123"], ["log_with_underscores_123"], ["log_456"]])("roundtrips id %s", (id) => {
+      const result = decodeCursor(encodeCursor(TS, id));
+      expect(result.id).toBe(id);
+      expect(result.timestamp.toISOString()).toBe(TS.toISOString());
     });
 
     it("creates different cursors for different timestamps", () => {
-      const id = "same_id";
-      const timestamp1 = new Date("2024-01-15T10:30:00.000Z");
-      const timestamp2 = new Date("2024-01-15T10:31:00.000Z");
-
-      const cursor1 = encodeCursor(timestamp1, id);
-      const cursor2 = encodeCursor(timestamp2, id);
-
-      expect(cursor1).not.toBe(cursor2);
+      expect(encodeCursor(TS, "same_id")).not.toBe(
+        encodeCursor(new Date("2024-01-15T10:31:00.000Z"), "same_id"),
+      );
     });
 
     it("creates different cursors for different IDs", () => {
-      const timestamp = new Date("2024-01-15T10:30:00.000Z");
-      const id1 = "log_123";
-      const id2 = "log_456";
-
-      const cursor1 = encodeCursor(timestamp, id1);
-      const cursor2 = encodeCursor(timestamp, id2);
-
-      expect(cursor1).not.toBe(cursor2);
+      expect(encodeCursor(TS, "log_123")).not.toBe(encodeCursor(TS, "log_456"));
     });
   });
 
   describe("decodeCursor", () => {
-    it("parses cursor correctly", () => {
-      const timestamp = new Date("2024-01-15T10:30:00.000Z");
-      const id = "log_123";
-      const cursor = encodeCursor(timestamp, id);
-
-      const result = decodeCursor(cursor);
-
-      expect(result.timestamp.toISOString()).toBe(timestamp.toISOString());
-      expect(result.id).toBe(id);
-    });
-
-    it("handles IDs with underscores", () => {
-      const timestamp = new Date("2024-01-15T10:30:00.000Z");
-      const id = "log_with_underscores_123";
-      const cursor = encodeCursor(timestamp, id);
-
-      const result = decodeCursor(cursor);
-
-      expect(result.timestamp.toISOString()).toBe(timestamp.toISOString());
-      expect(result.id).toBe(id);
-    });
-
-    it("throws on invalid base64url", () => {
-      expect(() => decodeCursor("not-valid-base64!@#$%")).toThrow("Invalid cursor");
-    });
-
-    it("throws on missing separator", () => {
-      // Create a base64 string without underscore separator
-      const invalid = Buffer.from("2024-01-15T10:30:00.000Zlog123").toString("base64url");
-      expect(() => decodeCursor(invalid)).toThrow("Invalid cursor format");
-    });
-
-    it("throws on empty timestamp", () => {
-      const invalid = Buffer.from("_log_123").toString("base64url");
-      expect(() => decodeCursor(invalid)).toThrow("Invalid cursor format");
-    });
-
-    it("throws on empty id", () => {
-      const invalid = Buffer.from("2024-01-15T10:30:00.000Z_").toString("base64url");
-      expect(() => decodeCursor(invalid)).toThrow("Invalid cursor format");
-    });
-
-    it("throws on invalid timestamp", () => {
-      const invalid = Buffer.from("not-a-date_log_123").toString("base64url");
-      expect(() => decodeCursor(invalid)).toThrow("Invalid cursor format");
+    it.each([
+      ["not-valid-base64!@#$%", "Invalid cursor", "invalid base64url"],
+      [
+        Buffer.from("2024-01-15T10:30:00.000Zlog123").toString("base64url"),
+        "Invalid cursor format",
+        "missing separator",
+      ],
+      [Buffer.from("_log_123").toString("base64url"), "Invalid cursor format", "empty timestamp"],
+      [
+        Buffer.from("2024-01-15T10:30:00.000Z_").toString("base64url"),
+        "Invalid cursor format",
+        "empty id",
+      ],
+      [
+        Buffer.from("not-a-date_log_123").toString("base64url"),
+        "Invalid cursor format",
+        "invalid timestamp",
+      ],
+    ])("throws on %s (%s)", (cursor, message) => {
+      expect(() => decodeCursor(cursor)).toThrow(message);
     });
   });
 
   describe("roundtrip encode/decode", () => {
-    it("successfully roundtrips timestamp and id", () => {
-      const timestamp = new Date("2024-01-15T10:30:00.123Z");
-      const id = "log_abc_123";
-
-      const cursor = encodeCursor(timestamp, id);
-      const result = decodeCursor(cursor);
-
-      expect(result.timestamp.toISOString()).toBe(timestamp.toISOString());
-      expect(result.id).toBe(id);
-    });
-
-    it("handles timestamps with milliseconds", () => {
+    it("roundtrips millisecond timestamps exactly", () => {
       const timestamp = new Date("2024-01-15T10:30:00.999Z");
-      const id = "log_999";
-
-      const cursor = encodeCursor(timestamp, id);
-      const result = decodeCursor(cursor);
-
+      const result = decodeCursor(encodeCursor(timestamp, "log_999"));
       expect(result.timestamp.toISOString()).toBe(timestamp.toISOString());
-      expect(result.id).toBe(id);
-    });
-
-    it("handles various ID formats", () => {
-      const timestamp = new Date("2024-01-15T10:30:00.000Z");
-      const testIds = [
-        "simple",
-        "with_underscores",
-        "with-dashes",
-        "MixedCase123",
-        "log_2024_01_15_abc",
-      ];
-
-      for (const id of testIds) {
-        const cursor = encodeCursor(timestamp, id);
-        const result = decodeCursor(cursor);
-
-        expect(result.id).toBe(id);
-        expect(result.timestamp.toISOString()).toBe(timestamp.toISOString());
-      }
+      expect(result.id).toBe("log_999");
     });
 
     it("roundtrips microsecond-precision timestamps exactly", () => {
       const micros = 1767225600123456; // 2026-01-01T00:00:00.123456Z
-      const id = "log_123";
-
-      const cursor = encodeCursor(micros, id);
-      const result = decodeCursor(cursor);
-
+      const result = decodeCursor(encodeCursor(micros, "log_123"));
       expect(result.micros).toBe(micros);
-      expect(result.id).toBe(id);
-      // Convenience timestamp is millisecond-truncated (2026-01-01T00:00:00.123Z)
+      expect(result.id).toBe("log_123");
+      // Convenience timestamp is millisecond-truncated
       expect(result.timestamp.toISOString()).toBe("2026-01-01T00:00:00.123Z");
     });
 
-    it("decodes a number-overload cursor through the Date overload path", () => {
-      const timestamp = new Date("2024-01-15T10:30:00.000Z");
-      const micros = timestamp.getTime() * 1000;
-      const id = "log_123";
-
-      // Number-encoded and Date-encoded cursors for the same instant must
-      // decode to the same value (interop between API routes and page loaders).
-      const fromMicros = decodeCursor(encodeCursor(micros, id));
-      const fromDate = decodeCursor(encodeCursor(timestamp, id));
-
+    it("decodes number- and Date-encoded cursors to the same value", () => {
+      const micros = TS.getTime() * 1000;
+      const fromMicros = decodeCursor(encodeCursor(micros, "log_123"));
+      const fromDate = decodeCursor(encodeCursor(TS, "log_123"));
       expect(fromMicros.micros).toBe(micros);
       expect(fromMicros.micros).toBe(fromDate.micros);
       expect(fromMicros.timestamp.toISOString()).toBe(fromDate.timestamp.toISOString());
