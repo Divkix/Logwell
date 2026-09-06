@@ -1,9 +1,9 @@
 import { json } from "@sveltejs/kit";
 import { and, eq, gte, lte, type SQL, sql } from "drizzle-orm";
-import { type BucketCountRow, getDbClient, getQueryRows } from "$lib/server/db/db";
+import { type BucketCountRow, getQueryRows } from "$lib/server/db/db";
 import { incident, log } from "$lib/server/db/schema";
 import { apiError } from "$lib/server/utils/api-error";
-import { isErrorResponse, requireProjectOwnership } from "$lib/server/utils/project-guard";
+import { requireOwnedProjectRoute } from "$lib/server/utils/owned-project";
 import type { IncidentRange } from "$lib/shared/types";
 import { getTimeRangeStart } from "$lib/utils/format";
 import { parseTimeRange } from "$lib/utils/time-range";
@@ -14,10 +14,10 @@ import type { RequestEvent } from "./$types";
  * GET /api/projects/[id]/incidents/[incidentId]/timeline
  */
 export async function GET(event: RequestEvent): Promise<Response> {
-  const authResult = await requireProjectOwnership(event, event.params.id);
-  if (isErrorResponse(authResult)) return authResult;
+  const authResult = await requireOwnedProjectRoute(event, event.params.id);
+  if (authResult instanceof Response) return authResult;
 
-  const db = await getDbClient(event.locals);
+  const { db } = authResult;
   const projectId = event.params.id;
   const incidentId = event.params.incidentId;
 

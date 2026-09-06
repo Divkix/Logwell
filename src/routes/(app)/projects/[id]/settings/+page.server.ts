@@ -1,14 +1,12 @@
 import { count, eq, min } from "drizzle-orm";
 import { RETENTION_CONFIG } from "$lib/server/config/performance";
-import { getDbClient } from "$lib/server/db/db";
 import { log } from "$lib/server/db/schema";
-import { requireProjectOwnershipPage } from "$lib/server/utils/project-guard";
+import { requireOwnedProjectPage } from "$lib/server/utils/owned-project";
 import type { PageServerLoad } from "./$types";
 
 export const load: PageServerLoad = async (event) => {
   const projectId = event.params.id;
-  const { project: projectData } = await requireProjectOwnershipPage(event, projectId);
-  const db = await getDbClient(event.locals);
+  const { project: projectData, db } = await requireOwnedProjectPage(event, projectId);
 
   const [logStats] = await db
     .select({

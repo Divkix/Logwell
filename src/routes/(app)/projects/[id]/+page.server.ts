@@ -1,6 +1,5 @@
-import { getDbClient } from "$lib/server/db/db";
 import { InvalidCursorError, queryLogs } from "$lib/server/utils/log-query";
-import { requireProjectOwnershipPage } from "$lib/server/utils/project-guard";
+import { requireOwnedProjectPage } from "$lib/server/utils/owned-project";
 import { parseLevelFilter } from "$lib/shared/schemas/log";
 import { env } from "$lib/server/config/env";
 import { getTimeRangeStart } from "$lib/utils/format";
@@ -17,8 +16,7 @@ function clamp(value: number, min: number, max: number): number {
 
 export const load: PageServerLoad = async (event) => {
   const projectId = event.params.id;
-  const { project: projectData } = await requireProjectOwnershipPage(event, projectId);
-  const db = await getDbClient(event.locals);
+  const { project: projectData, db } = await requireOwnedProjectPage(event, projectId);
 
   const url = event.url;
   const limitParam = url.searchParams.get("limit");

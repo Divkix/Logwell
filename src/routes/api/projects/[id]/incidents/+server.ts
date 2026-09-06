@@ -1,7 +1,6 @@
 import { json } from "@sveltejs/kit";
 import { and, count, desc, eq, gte, lt, type SQL } from "drizzle-orm";
 import { INCIDENT_CONFIG } from "$lib/server/config/performance";
-import { getDbClient } from "$lib/server/db/db";
 import { incident } from "$lib/server/db/schema";
 import { apiError } from "$lib/server/utils/api-error";
 import {
@@ -11,7 +10,7 @@ import {
   microsColumn,
 } from "$lib/server/utils/cursor";
 import { getIncidentStatus } from "$lib/server/utils/incidents";
-import { isErrorResponse, requireProjectOwnership } from "$lib/server/utils/project-guard";
+import { requireOwnedProjectRoute } from "$lib/server/utils/owned-project";
 import { INCIDENT_STATUSES, type IncidentRange } from "$lib/shared/types";
 import { getTimeRangeStart } from "$lib/utils/format";
 import { parseTimeRange } from "$lib/utils/time-range";
@@ -29,10 +28,10 @@ function clamp(value: number, min: number, max: number): number {
  * GET /api/projects/[id]/incidents
  */
 export async function GET(event: RequestEvent): Promise<Response> {
-  const authResult = await requireProjectOwnership(event, event.params.id);
-  if (isErrorResponse(authResult)) return authResult;
+  const authResult = await requireOwnedProjectRoute(event, event.params.id);
+  if (authResult instanceof Response) return authResult;
 
-  const db = await getDbClient(event.locals);
+  const { db } = authResult;
   const projectId = event.params.id;
 
   const params = event.url.searchParams;

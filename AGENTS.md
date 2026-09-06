@@ -122,7 +122,7 @@ Two API families — **do not conflate them**:
 
 `/v1` is exempt from CSRF (SDKs/curl omit Origin/Referer). `/api` state-changing requests run `checkCsrfOrigin`: Origin mismatch / bad Referer / **neither header present** → 403.
 
-**Guards** (`auth-guard.ts`, `project-guard.ts`): `requireAuth` throws **401** for `/api/*`, **303** redirect to `/login` for pages; partial sessions rejected. Ownership failures return **404 (not 403)** to hide existence. `requireProjectOwnership` returns a JSON 404 `Response` (check `instanceof Response`); the page twin `requireProjectOwnershipPage` throws SvelteKit `error(404)`. Both share `findOwnedProject` (`ownerId === user.id`) — use the right twin for API vs page.
+**Guards** (`owned-project.ts`): `requireAuth` throws **401** for `/api/*`, **303** redirect to `/login` for pages; partial sessions rejected. Ownership failures return **404 (not 403)** to hide existence. `requireOwnedProjectRoute` runs method-aware CSRF first, then returns `{project, db}` or a JSON 404 `Response` (check `instanceof Response`); the page twin `requireOwnedProjectPage` throws SvelteKit `error(404)`. Both share one internal lookup (`ownerId === user.id`) — use the right twin for API vs page.
 
 **No programmatic read API.** API keys grant **write/ingest only**; logs/incidents read only via the session `/api` surface. Read/query API is unbuilt spike `plans/018`.
 

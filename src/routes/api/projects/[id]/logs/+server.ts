@@ -1,8 +1,7 @@
 import { json } from "@sveltejs/kit";
-import { getDbClient } from "$lib/server/db/db";
 import { apiError } from "$lib/server/utils/api-error";
 import { InvalidCursorError, queryLogs } from "$lib/server/utils/log-query";
-import { isErrorResponse, requireProjectOwnership } from "$lib/server/utils/project-guard";
+import { requireOwnedProjectRoute } from "$lib/server/utils/owned-project";
 import { parseLevelFilter } from "$lib/shared/schemas/log";
 import type { RequestEvent } from "./$types";
 
@@ -43,10 +42,10 @@ function clamp(value: number, min: number, max: number): number {
  * - 404 not_found: Project does not exist or not owned by user
  */
 export async function GET(event: RequestEvent): Promise<Response> {
-  const authResult = await requireProjectOwnership(event, event.params.id);
-  if (isErrorResponse(authResult)) return authResult;
+  const authResult = await requireOwnedProjectRoute(event, event.params.id);
+  if (authResult instanceof Response) return authResult;
 
-  const db = await getDbClient(event.locals);
+  const { db } = authResult;
   const projectId = event.params.id;
 
   const url = event.url;
