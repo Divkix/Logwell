@@ -13,16 +13,14 @@ import (
 
 type testServer struct {
 	*httptest.Server
-	mu       sync.Mutex
-	logs     []LogEntry
-	requests [][]LogEntry
-	handler  http.HandlerFunc
+	mu      sync.Mutex
+	logs    []LogEntry
+	handler http.HandlerFunc
 }
 
 func newTestServer() *testServer {
 	ts := &testServer{
-		logs:     make([]LogEntry, 0),
-		requests: make([][]LogEntry, 0),
+		logs: make([]LogEntry, 0),
 	}
 
 	ts.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -50,7 +48,6 @@ func newTestServer() *testServer {
 		}
 
 		ts.mu.Lock()
-		ts.requests = append(ts.requests, entries)
 		ts.logs = append(ts.logs, entries...)
 		ts.mu.Unlock()
 
@@ -66,14 +63,6 @@ func (ts *testServer) getLogs() []LogEntry {
 	defer ts.mu.Unlock()
 	result := make([]LogEntry, len(ts.logs))
 	copy(result, ts.logs)
-	return result
-}
-
-func (ts *testServer) getRequests() [][]LogEntry {
-	ts.mu.Lock()
-	defer ts.mu.Unlock()
-	result := make([][]LogEntry, len(ts.requests))
-	copy(result, ts.requests)
 	return result
 }
 
@@ -224,7 +213,6 @@ func TestClientRequeueOrderOnFailure(t *testing.T) {
 			entries = append(entries, entry)
 		}
 		ts.mu.Lock()
-		ts.requests = append(ts.requests, entries)
 		ts.logs = append(ts.logs, entries...)
 		ts.mu.Unlock()
 		w.WriteHeader(http.StatusOK)

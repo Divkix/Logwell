@@ -57,7 +57,7 @@ describe("TimeseriesChart", () => {
     expect(screen.queryByTestId("timeseries-chart-rendered")).not.toBeInTheDocument();
   });
 
-  it.each(["15m", "1h", "24h", "7d"])("accepts %s range", (range) => {
+  it.each(["15m", "1h", "24h", "7d"] as const)("accepts %s range", (range) => {
     render(TimeseriesChart, { props: { data: mockData, range } });
     expect(screen.getByTestId("timeseries-chart")).toBeInTheDocument();
   });
