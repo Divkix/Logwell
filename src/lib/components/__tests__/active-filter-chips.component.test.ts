@@ -1,6 +1,7 @@
 import { cleanup, render, screen } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import ActiveFilterChips from "../active-filter-chips.svelte";
+import ClearFiltersButton from "../clear-filters-button.svelte";
 
 describe("ActiveFilterChips", () => {
   afterEach(() => {
@@ -37,29 +38,34 @@ describe("ActiveFilterChips", () => {
     expect(screen.queryByTestId("filter-chip-range")).not.toBeInTheDocument();
   });
 
-  it("calls onRemoveLevel when level chip is clicked", async () => {
-    const onRemoveLevel = vi.fn();
-    render(ActiveFilterChips, {
-      props: { levels: ["error"], search: "", range: "1h", onRemoveLevel },
-    });
-    screen.getByTestId("filter-chip-level-error").click();
-    expect(onRemoveLevel).toHaveBeenCalledWith("error");
-  });
+  it.each([
+    ["level", "filter-chip-level-error", "onRemoveLevel", ["error"], "", "1h", "error"],
+    ["search", "filter-chip-search", "onRemoveSearch", [], "test", "1h", undefined],
+    ["range", "filter-chip-range", "onRemoveRange", [], "", "24h", undefined],
+  ] as const)(
+    "calls %s remove callback when its chip is clicked",
+    async (_kind, testId, prop, levels, search, range, expected) => {
+      const callback = vi.fn();
+      render(ActiveFilterChips, {
+        props: { levels: [...levels], search, range, [prop]: callback },
+      });
+      screen.getByTestId(testId).click();
+      if (expected === undefined) {
+        expect(callback).toHaveBeenCalled();
+      } else {
+        expect(callback).toHaveBeenCalledWith(expected);
+      }
+    },
+  );
 
-  it("calls onRemoveSearch when search chip is clicked", async () => {
-    const onRemoveSearch = vi.fn();
-    render(ActiveFilterChips, {
-      props: { levels: [], search: "test", range: "1h", onRemoveSearch },
-    });
-    screen.getByTestId("filter-chip-search").click();
-    expect(onRemoveSearch).toHaveBeenCalled();
-  });
+  it("shows a working clear-all button (canonical clear-filters home)", async () => {
+    const onclick = vi.fn();
+    const { rerender } = render(ClearFiltersButton, { props: { visible: false, onclick } });
+    expect(screen.queryByTestId("clear-filters-button")).not.toBeInTheDocument();
 
-  it("calls onRemoveRange when range chip is clicked", async () => {
-    const onRemoveRange = vi.fn();
-    render(ActiveFilterChips, { props: { levels: [], search: "", range: "24h", onRemoveRange } });
-    screen.getByTestId("filter-chip-range").click();
-    expect(onRemoveRange).toHaveBeenCalled();
+    await rerender({ visible: true, onclick });
+    screen.getByTestId("clear-filters-button").click();
+    expect(onclick).toHaveBeenCalledTimes(1);
   });
 
   it("has accessible labels on all chips", () => {

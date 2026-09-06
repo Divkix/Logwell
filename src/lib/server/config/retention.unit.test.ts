@@ -1,98 +1,56 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 describe("Retention Configuration", () => {
-  // Store original env
   const originalEnv = { ...process.env };
 
   beforeEach(() => {
-    // Reset module cache to allow re-importing with new env
     vi.resetModules();
   });
 
   afterEach(() => {
-    // Restore original env
     process.env = originalEnv;
     vi.resetModules();
   });
 
-  describe("LOG_RETENTION_DAYS", () => {
-    it("should default to 30 when not set", async () => {
-      vi.resetModules();
-      delete process.env.LOG_RETENTION_DAYS;
-      const { RETENTION_CONFIG } = await import("./performance");
-      expect(RETENTION_CONFIG.LOG_RETENTION_DAYS).toBe(30);
-    });
+  async function loadRetention(overrides: Record<string, string | undefined>) {
+    vi.resetModules();
+    for (const [key, value] of Object.entries(overrides)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+    return import("./performance");
+  }
 
-    it("should accept 0 (disabled)", async () => {
-      vi.resetModules();
-      process.env.LOG_RETENTION_DAYS = "0";
-      const { RETENTION_CONFIG } = await import("./performance");
-      expect(RETENTION_CONFIG.LOG_RETENTION_DAYS).toBe(0);
-    });
+  it.each([
+    [undefined, 30, "default 30"],
+    ["0", 0, "0 disables"],
+    ["-10", 0, "negative clamps to 0"],
+    ["5000", 3650, "above max clamps to 3650"],
+    ["90", 90, "in range"],
+    ["invalid", 30, "non-numeric ignored"],
+  ] as [string | undefined, number, string][])(
+    "LOG_RETENTION_DAYS=%s → %s (%s)",
+    async (value, expected) => {
+      const { RETENTION_CONFIG } = await loadRetention({
+        LOG_RETENTION_DAYS: value as string | undefined,
+      });
+      expect(RETENTION_CONFIG.LOG_RETENTION_DAYS).toBe(expected);
+    },
+  );
 
-    it("should clamp negative values to 0", async () => {
-      vi.resetModules();
-      process.env.LOG_RETENTION_DAYS = "-10";
-      const { RETENTION_CONFIG } = await import("./performance");
-      expect(RETENTION_CONFIG.LOG_RETENTION_DAYS).toBe(0);
-    });
-
-    it("should clamp values above 3650 to 3650", async () => {
-      vi.resetModules();
-      process.env.LOG_RETENTION_DAYS = "5000";
-      const { RETENTION_CONFIG } = await import("./performance");
-      expect(RETENTION_CONFIG.LOG_RETENTION_DAYS).toBe(3650);
-    });
-
-    it("should accept valid values within range", async () => {
-      vi.resetModules();
-      process.env.LOG_RETENTION_DAYS = "90";
-      const { RETENTION_CONFIG } = await import("./performance");
-      expect(RETENTION_CONFIG.LOG_RETENTION_DAYS).toBe(90);
-    });
-
-    it("should ignore invalid (non-numeric) values", async () => {
-      vi.resetModules();
-      process.env.LOG_RETENTION_DAYS = "invalid";
-      const { RETENTION_CONFIG } = await import("./performance");
-      expect(RETENTION_CONFIG.LOG_RETENTION_DAYS).toBe(30);
-    });
-  });
-
-  describe("LOG_CLEANUP_INTERVAL_MS", () => {
-    it("should default to 3600000 (1 hour) when not set", async () => {
-      vi.resetModules();
-      delete process.env.LOG_CLEANUP_INTERVAL_MS;
-      const { RETENTION_CONFIG } = await import("./performance");
-      expect(RETENTION_CONFIG.LOG_CLEANUP_INTERVAL_MS).toBe(3600000);
-    });
-
-    it("should clamp to minimum 60000 (1 minute)", async () => {
-      vi.resetModules();
-      process.env.LOG_CLEANUP_INTERVAL_MS = "30000";
-      const { RETENTION_CONFIG } = await import("./performance");
-      expect(RETENTION_CONFIG.LOG_CLEANUP_INTERVAL_MS).toBe(60000);
-    });
-
-    it("should clamp to maximum 86400000 (24 hours)", async () => {
-      vi.resetModules();
-      process.env.LOG_CLEANUP_INTERVAL_MS = "100000000";
-      const { RETENTION_CONFIG } = await import("./performance");
-      expect(RETENTION_CONFIG.LOG_CLEANUP_INTERVAL_MS).toBe(86400000);
-    });
-
-    it("should accept valid values within range", async () => {
-      vi.resetModules();
-      process.env.LOG_CLEANUP_INTERVAL_MS = "1800000";
-      const { RETENTION_CONFIG } = await import("./performance");
-      expect(RETENTION_CONFIG.LOG_CLEANUP_INTERVAL_MS).toBe(1800000);
-    });
-
-    it("should ignore invalid (non-numeric) values", async () => {
-      vi.resetModules();
-      process.env.LOG_CLEANUP_INTERVAL_MS = "invalid";
-      const { RETENTION_CONFIG } = await import("./performance");
-      expect(RETENTION_CONFIG.LOG_CLEANUP_INTERVAL_MS).toBe(3600000);
-    });
-  });
+  it.each([
+    [undefined, 3600000, "default 1 hour"],
+    ["30000", 60000, "below min clamps to 1 minute"],
+    ["100000000", 86400000, "above max clamps to 24 hours"],
+    ["1800000", 1800000, "in range"],
+    ["invalid", 3600000, "non-numeric ignored"],
+  ] as [string | undefined, number, string][])(
+    "LOG_CLEANUP_INTERVAL_MS=%s → %s (%s)",
+    async (value, expected) => {
+      const { RETENTION_CONFIG } = await loadRetention({
+        LOG_CLEANUP_INTERVAL_MS: value as string | undefined,
+      });
+      expect(RETENTION_CONFIG.LOG_CLEANUP_INTERVAL_MS).toBe(expected);
+    },
+  );
 });

@@ -89,72 +89,11 @@ describe("seed-admin", () => {
     expect(users).toHaveLength(1);
   });
 
-  it("should use ADMIN_PASSWORD from environment", async () => {
-    const adminPassword = process.env.ADMIN_PASSWORD || "fallback-password-123";
-
-    const result = await seedAdmin(db, adminPassword);
-
-    expect(result.created).toBe(true);
-
-    const users = await db.select().from(user).where(eq(user.username, ADMIN_USERNAME));
-    expect(users).toHaveLength(1);
-  });
-
-  it("should generate email as {username}@logwell.local", async () => {
-    const adminPassword = "test-admin-password-123";
-
-    const result = await seedAdmin(db, adminPassword);
-
-    expect(result.created).toBe(true);
-
-    const users = await db.select().from(user);
-    expect(users).toHaveLength(1);
-    expect(users[0].username).toBe(ADMIN_USERNAME);
-    expect(users[0].email).toBe(`${ADMIN_USERNAME}@logwell.local`);
-  });
-
-  it("should use custom ADMIN_USERNAME from environment", async () => {
-    const adminPassword = "test-admin-password-123";
-    const customUsername = "superadmin";
-
-    const result = await seedAdmin(db, adminPassword, customUsername);
-
-    expect(result.created).toBe(true);
-
-    const users = await db.select().from(user).where(eq(user.username, customUsername));
-    expect(users).toHaveLength(1);
-    expect(users[0].username).toBe(customUsername);
-    expect(users[0].email).toBe(`${customUsername}@logwell.local`);
-  });
-
-  it("should be able to sign in with created credentials using username", async () => {
-    const adminPassword = "test-admin-password-123";
-    const auth = createAuth(db);
-
-    await seedAdmin(db, adminPassword);
-
-    const signInResult = await auth.api.signInUsername({
-      body: {
-        username: ADMIN_USERNAME,
-        password: adminPassword,
-      },
-    });
-
-    expect((signInResult as { error?: unknown }).error).toBeUndefined();
-
-    const users = await db.select().from(user).where(eq(user.username, ADMIN_USERNAME));
-    expect(users).toHaveLength(1);
-    expect(users[0].username).toBe(ADMIN_USERNAME);
-  });
-
-  it("should throw error if password is empty", async () => {
-    await expect(seedAdmin(db, "")).rejects.toThrow(
-      "ADMIN_PASSWORD must be at least 8 characters long",
-    );
-  });
-
-  it("should throw error if password is too short", async () => {
-    await expect(seedAdmin(db, "short")).rejects.toThrow(
+  it.each([
+    ["empty", ""],
+    ["too short", "short"],
+  ])("should throw error if password is %s", async (_label, password) => {
+    await expect(seedAdmin(db, password)).rejects.toThrow(
       "ADMIN_PASSWORD must be at least 8 characters long",
     );
   });

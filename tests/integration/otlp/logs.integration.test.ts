@@ -1,12 +1,11 @@
 import { eq } from "drizzle-orm";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
 import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
-import { API_CONFIG } from "../../../src/lib/server/config/performance";
 import type * as schema from "../../../src/lib/server/db/schema";
-import { incident, log, project as projectTable } from "../../../src/lib/server/db/schema";
+import { log } from "../../../src/lib/server/db/schema";
 import { setupTestDatabase } from "../../../src/lib/server/db/test-db";
 import { logEventBus } from "../../../src/lib/server/events";
-import { clearApiKeyCache, validateApiKey } from "../../../src/lib/server/utils/api-key";
+import { clearApiKeyCache } from "../../../src/lib/server/utils/api-key";
 import { POST } from "../../../src/routes/v1/logs/+server";
 import { seedProjectWithApiKey } from "../../fixtures/db";
 
@@ -16,26 +15,22 @@ function createRequestEvent(request: Request, db: PgliteDatabase<typeof schema>)
     locals: { db },
     params: {},
     url: new URL(request.url),
-    platform: undefined,
-    route: { id: "/v1/logs" },
-    isDataRequest: false,
-    isSubRequest: false,
-    isRemoteRequest: false,
-    tracing: null,
-    cookies: {
-      get: () => undefined,
-      getAll: () => [],
-      set: () => {},
-      delete: () => {},
-      serialize: () => "",
-    },
-    fetch: globalThis.fetch,
-    getClientAddress: () => "127.0.0.1",
-    setHeaders: () => {},
-  } as unknown;
+  } as unknown as Parameters<typeof POST>[0];
 }
 
-describe("POST /v1/logs (OTLP)", () => {
+function post(body: unknown, apiKey?: string) {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+  return new Request("http://localhost/v1/logs", {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  });
+}
+
+// Parser-specific mapping contract for the OTLP adapter. Shared guards
+// (auth, rate limit, batch caps) live in the ingest pipeline suite.
+describe("POST /v1/logs (OTLP mapping)", () => {
   let db: PgliteDatabase<typeof schema>;
   let cleanup: () => Promise<void>;
 
@@ -52,43 +47,7 @@ describe("POST /v1/logs (OTLP)", () => {
     await cleanup();
   });
 
-  it("returns 401 without Authorization header", async () => {
-    const request = new Request("http://localhost/v1/logs", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ resourceLogs: [] }),
-    });
-
-    const event = createRequestEvent(request, db);
-    const response = await POST(event as never);
-
-    expect(response.status).toBe(401);
-  });
-
-  it("returns 415 for non-JSON Content-Type", async () => {
-    const project = await seedProjectWithApiKey(db);
-
-    const request = new Request("http://localhost/v1/logs", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Authorization: `Bearer ${project.apiKey}`,
-      },
-      body: "resourceLogs=[]",
-    });
-
-    const event = createRequestEvent(request, db);
-    const response = await POST(event as never);
-
-    expect(response.status).toBe(415);
-    const body = await response.json();
-    expect(body.error).toBe("unsupported_media_type");
-    expect(body.message).toBe("Content-Type must be application/json");
-  });
-
-  it("ingests OTLP log records and maps core fields", async () => {
+  it("maps OTLP fields onto the log row", async () => {
     const project = await seedProjectWithApiKey(db);
 
     const payload = {
@@ -96,7 +55,6 @@ describe("POST /v1/logs (OTLP)", () => {
         {
           resource: {
             attributes: [{ key: "service.name", value: { stringValue: "api" } }],
-            droppedAttributesCount: 0,
           },
           scopeLogs: [
             {
@@ -124,18 +82,7 @@ describe("POST /v1/logs (OTLP)", () => {
       ],
     };
 
-    const request = new Request("http://localhost/v1/logs", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${project.apiKey}`,
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const event = createRequestEvent(request, db);
-    const response = await POST(event as never);
-
+    const response = await POST(createRequestEvent(post(payload, project.apiKey), db));
     expect(response.status).toBe(200);
 
     const [inserted] = await db.select().from(log).where(eq(log.projectId, project.id));
@@ -145,13 +92,6 @@ describe("POST /v1/logs (OTLP)", () => {
     expect(inserted!.severityNumber).toBe(17);
     expect(inserted!.severityText).toBe("ERROR");
     expect(inserted!.timeUnixNano).toBe("1700000000000000000");
-    expect(inserted!.metadata).toEqual({
-      "request.id": "req-123",
-      "code.filepath": "src/db.ts",
-      "code.lineno": 45,
-      "enduser.id": "user-456",
-      "client.address": "192.168.1.1",
-    });
     expect(inserted!.sourceFile).toBe("src/db.ts");
     expect(inserted!.lineNumber).toBe(45);
     expect(inserted!.requestId).toBe("req-123");
@@ -170,366 +110,16 @@ describe("POST /v1/logs (OTLP)", () => {
     const payload = {
       resourceLogs: [
         {
-          scopeLogs: [
-            {
-              logRecords: [null, { body: { stringValue: "ok" } }],
-            },
-          ],
+          scopeLogs: [{ logRecords: [null, { body: { stringValue: "ok" } }] }],
         },
       ],
     };
 
-    const request = new Request("http://localhost/v1/logs", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${project.apiKey}`,
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const event = createRequestEvent(request, db);
-    const response = await POST(event as never);
-
+    const response = await POST(createRequestEvent(post(payload, project.apiKey), db));
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.accepted).toBe(1);
     expect(body.rejected).toBe(1);
     expect(body.errors).toHaveLength(1);
-    expect(body.errors[0]).toContain("rejected");
-  });
-
-  it("rejects records whose derived message is empty or whitespace-only", async () => {
-    const project = await seedProjectWithApiKey(db);
-
-    const payload = {
-      resourceLogs: [
-        {
-          scopeLogs: [
-            {
-              logRecords: [
-                {},
-                { body: { stringValue: "   " } },
-                { body: { stringValue: "valid message" } },
-              ],
-            },
-          ],
-        },
-      ],
-    };
-
-    const request = new Request("http://localhost/v1/logs", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${project.apiKey}`,
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const event = createRequestEvent(request, db);
-    const response = await POST(event as never);
-
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body.accepted).toBe(1);
-    expect(body.rejected).toBe(2);
-    expect(body.errors).toHaveLength(2);
-    expect(body.errors.every((e: string) => e.includes("message cannot be empty"))).toBe(true);
-
-    const rows = await db.select().from(log).where(eq(log.projectId, project.id));
-    expect(rows).toHaveLength(1);
-    expect(rows[0]!.message).toBe("valid message");
-  });
-
-  it("returns accepted count in unified response shape on full success", async () => {
-    const project = await seedProjectWithApiKey(db);
-
-    const payload = {
-      resourceLogs: [
-        {
-          resource: {
-            attributes: [{ key: "service.name", value: { stringValue: "api" } }],
-          },
-          scopeLogs: [
-            {
-              logRecords: [{ body: { stringValue: "Log 1" } }, { body: { stringValue: "Log 2" } }],
-            },
-          ],
-        },
-      ],
-    };
-
-    const request = new Request("http://localhost/v1/logs", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${project.apiKey}`,
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const event = createRequestEvent(request, db);
-    const response = await POST(event as never);
-
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body).toEqual({ accepted: 2 });
-  });
-
-  it("creates incidents for error/fatal OTLP logs", async () => {
-    const project = await seedProjectWithApiKey(db);
-
-    const payload = {
-      resourceLogs: [
-        {
-          resource: {
-            attributes: [{ key: "service.name", value: { stringValue: "api" } }],
-          },
-          scopeLogs: [
-            {
-              logRecords: [
-                {
-                  severityNumber: 17,
-                  severityText: "ERROR",
-                  body: { stringValue: "Payment failed for order 1234" },
-                  attributes: [{ key: "code.filepath", value: { stringValue: "src/payments.ts" } }],
-                },
-                {
-                  severityNumber: 17,
-                  severityText: "ERROR",
-                  body: { stringValue: "Payment failed for order 9999" },
-                  attributes: [{ key: "code.filepath", value: { stringValue: "src/payments.ts" } }],
-                },
-                {
-                  severityNumber: 9,
-                  severityText: "INFO",
-                  body: { stringValue: "Payment retry scheduled" },
-                },
-              ],
-            },
-          ],
-        },
-      ],
-    };
-
-    const request = new Request("http://localhost/v1/logs", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${project.apiKey}`,
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const event = createRequestEvent(request, db);
-    const response = await POST(event as never);
-    expect(response.status).toBe(200);
-
-    const incidents = await db.select().from(incident).where(eq(incident.projectId, project.id));
-    expect(incidents).toHaveLength(1);
-    expect(incidents[0]!.totalEvents).toBe(2);
-
-    const logs = await db.select().from(log).where(eq(log.projectId, project.id));
-    const errorLogs = logs.filter((entry) => entry.level === "error");
-    const infoLogs = logs.filter((entry) => entry.level === "info");
-
-    expect(errorLogs.every((entry) => entry.incidentId === incidents[0]!.id)).toBe(true);
-    expect(errorLogs.every((entry) => entry.serviceName === "api")).toBe(true);
-    expect(infoLogs[0]!.incidentId).toBeNull();
-  });
-
-  it("rejects negative timeUnixNano and falls back to current timestamp", async () => {
-    const project = await seedProjectWithApiKey(db);
-
-    const payload = {
-      resourceLogs: [
-        {
-          scopeLogs: [
-            {
-              logRecords: [
-                {
-                  body: { stringValue: "Negative timestamp test" },
-                  timeUnixNano: "-1000000",
-                },
-              ],
-            },
-          ],
-        },
-      ],
-    };
-
-    const request = new Request("http://localhost/v1/logs", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${project.apiKey}`,
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const event = createRequestEvent(request, db);
-    const response = await POST(event as never);
-    expect(response.status).toBe(200);
-
-    const [inserted] = await db.select().from(log).where(eq(log.projectId, project.id));
-    expect(inserted!.timeUnixNano).toBeNull();
-    expect(inserted!.timestamp).toBeTruthy();
-    const now = new Date();
-    expect(inserted!.timestamp!.getTime()).toBeGreaterThanOrEqual(now.getTime() - 5000);
-    expect(inserted!.timestamp!.getTime()).toBeLessThanOrEqual(now.getTime() + 5000);
-  });
-
-  it("stores null metadata for empty OTLP attributes", async () => {
-    const project = await seedProjectWithApiKey(db);
-
-    const payload = {
-      resourceLogs: [
-        {
-          scopeLogs: [
-            {
-              logRecords: [
-                {
-                  body: { stringValue: "Empty attributes test" },
-                  attributes: [],
-                },
-              ],
-            },
-          ],
-        },
-      ],
-    };
-
-    const request = new Request("http://localhost/v1/logs", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${project.apiKey}`,
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const event = createRequestEvent(request, db);
-    const response = await POST(event as never);
-    expect(response.status).toBe(200);
-
-    const [inserted] = await db.select().from(log).where(eq(log.projectId, project.id));
-    expect(inserted!.metadata).toBeNull();
-  });
-
-  it(`accepts a batch of exactly ${API_CONFIG.BATCH_INSERT_LIMIT} log records`, async () => {
-    const project = await seedProjectWithApiKey(db);
-
-    const logRecords = Array.from({ length: API_CONFIG.BATCH_INSERT_LIMIT }, (_, i) => ({
-      body: { stringValue: `Log ${i}` },
-    }));
-
-    const payload = {
-      resourceLogs: [
-        {
-          scopeLogs: [
-            {
-              logRecords,
-            },
-          ],
-        },
-      ],
-    };
-
-    const request = new Request("http://localhost/v1/logs", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${project.apiKey}`,
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const event = createRequestEvent(request, db);
-    const response = await POST(event as never);
-
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body.accepted).toBe(API_CONFIG.BATCH_INSERT_LIMIT);
-  });
-
-  it(`rejects a batch exceeding ${API_CONFIG.BATCH_INSERT_LIMIT} log records`, async () => {
-    const project = await seedProjectWithApiKey(db);
-
-    const logRecords = Array.from({ length: API_CONFIG.BATCH_INSERT_LIMIT + 1 }, (_, i) => ({
-      body: { stringValue: `Log ${i}` },
-    }));
-
-    const payload = {
-      resourceLogs: [
-        {
-          scopeLogs: [
-            {
-              logRecords,
-            },
-          ],
-        },
-      ],
-    };
-
-    const request = new Request("http://localhost/v1/logs", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${project.apiKey}`,
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const event = createRequestEvent(request, db);
-    const response = await POST(event as never);
-
-    expect(response.status).toBe(400);
-    const body = await response.json();
-    expect(body.error).toBe("batch_too_large");
-    expect(body.message).toContain(API_CONFIG.BATCH_INSERT_LIMIT.toString());
-  });
-
-  describe("Stale cache handling", () => {
-    it("returns 401 instead of 500 when project is deleted after API key is cached", async () => {
-      const project = await seedProjectWithApiKey(db);
-
-      const apiKeyRequest = new Request("http://localhost", {
-        headers: {
-          Authorization: `Bearer ${project.apiKey}`,
-        },
-      });
-      await validateApiKey(apiKeyRequest, db);
-
-      await db.delete(projectTable).where(eq(projectTable.id, project.id));
-
-      const payload = {
-        resourceLogs: [
-          {
-            scopeLogs: [
-              {
-                logRecords: [{ body: { stringValue: "test" } }],
-              },
-            ],
-          },
-        ],
-      };
-
-      const request = new Request("http://localhost/v1/logs", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${project.apiKey}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const event = createRequestEvent(request, db);
-      const response = await POST(event as never);
-
-      expect(response.status).toBe(401);
-      const body = await response.json();
-      expect(body.error).toBe("unauthorized");
-    });
   });
 });

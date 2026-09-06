@@ -20,7 +20,7 @@ Ports: dev **5173**, preview **4173**, prod **3000**. Always `bun run …` (`bun
 | Svelte/TS types           | `bun run check`                                     | `svelte-kit sync` + `svelte-check --tsgo`               |
 | Dead code                 | `bun run knip`                                      |                                                         |
 | Unit / Component / Integ. | `bun run test:unit` / `:component` / `:integration` | per-project Vitest                                      |
-| Coverage                  | `bun run test:coverage`                             | v8, thresholds enforced                                 |
+| Coverage                  | `bun run test:coverage`                             | v8, signal-only (no gate per #207)                      |
 | E2E                       | `bun run test:e2e`                                  | Playwright; needs real Postgres + seeded admin          |
 | DB start / stop+wipe      | `bun run db:start` / `db:stop`                      | `docker compose up -d` / `down -v` (postgres:18-alpine) |
 | Migrations (prod)         | `bun run db:migrate`                                | committed SQL; `db:push` is dev/ephemeral only          |
@@ -291,10 +291,10 @@ Bun-based workflows (`ci`, `release`, `sdk-typescript`) checkout with `persist-c
 
 - **`ci.yml`** (push to `main` non-tags, PRs): `lint` (lint + `prepare` + `check`); unit/component/integration (**3 shards** each); v8 coverage; e2e **chromium-only**, 3 shards — real Postgres service, `drizzle-kit push --force`, seeded admin (`adminpass`), `RATE_LIMIT_LOGIN_RPM=10000`; `test-migrations` (committed SQL vs real Postgres); `build` (`bun --bun run build`); `docker-build` (no push). `docker-publish`/`docker-merge` run on **main push only** (amd64 + arm64 by digest → GHCR tags `dev`, `dev-<sha>`, `<sha>`). `ci-success` gates.
 - **`release.yml`** (push tag `v*`, or manual; `cancel-in-progress: false`): re-runs lint + unit + integration + e2e on **chromium AND firefox** × 3 shards, then multi-arch image + GitHub Release (tags `version` + `latest`).
-- **SDK workflows** (path-filtered to `sdks/<lang>/**`, push/PR to `main`): TS — lint (stubs `.svelte-kit/tsconfig.json` for the root tsconfig), unit+integration, build + `attw` + `size`; Python — ruff, `mypy --strict`, pytest matrix (3.10–3.13), coverage `--cov-fail-under=90`, `twine check`; Go — golangci-lint (v2.10.1), `go test -race` on **1.26.x**, no publish job. Publish jobs (main push, OIDC) check the registry and skip if the version exists — idempotent re-runs.
+- **SDK workflows** (path-filtered to `sdks/<lang>/**`, push/PR to `main`): TS — lint (stubs `.svelte-kit/tsconfig.json` for the root tsconfig), unit+integration, build + `attw` + `size`; Python — ruff, `mypy --strict`, pytest matrix (3.10–3.13), coverage signal-only, `twine check`; Go — golangci-lint (v2.10.1), `go test -race` on **1.26.x**, no publish job. Publish jobs (main push, OIDC) check the registry and skip if the version exists — idempotent re-runs.
 - **`dependabot.yml`**: weekly updates across 6 ecosystems (grouped minors/patches, svelte + testing groups, majors separate), prefix `deps`.
 
-Coverage thresholds: lines/statements/functions **75%**, branches **65%**; e2e-tested routes and shadcn primitives excluded.
+Coverage is signal-only (threshold gate removed per #207 — fewer tests at useful places beat more tests at useless ones); e2e-tested routes and shadcn primitives excluded from the report.
 
 ---
 

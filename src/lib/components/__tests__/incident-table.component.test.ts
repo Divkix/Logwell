@@ -28,6 +28,20 @@ describe("IncidentTable", () => {
     expect(screen.getAllByText(/database timeout/i).length).toBeGreaterThan(0);
   });
 
+  it("renders OPEN and RESOLVED status badges (canonical badge home)", () => {
+    render(IncidentTable, {
+      props: {
+        incidents: [
+          sampleIncident({ status: "open" }),
+          sampleIncident({ id: "inc-2", status: "resolved" }),
+        ],
+      },
+    });
+    const labels = screen.getAllByTestId("incident-status-badge").map((badge) => badge.textContent);
+    expect(labels).toContain("OPEN");
+    expect(labels).toContain("RESOLVED");
+  });
+
   it("calls onSelect when row/card clicked", async () => {
     const onSelect = vi.fn();
     render(IncidentTable, { props: { incidents: [sampleIncident()], onSelect } });

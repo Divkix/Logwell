@@ -9,127 +9,36 @@ function makeEvent(method: string, url: string, headers: Record<string, string> 
   } as Parameters<typeof checkCsrfOrigin>[0];
 }
 
+const TEST_URL = "http://localhost/api/projects";
+
+// method, headers, allowed
+const cases: Array<[string, Record<string, string>, boolean]> = [
+  // Safe methods skip the check entirely.
+  ["GET", { Origin: "https://evil.com" }, true],
+  ["HEAD", {}, true],
+  ["OPTIONS", {}, true],
+  // Same-origin passes via Origin or Referer.
+  ["POST", { Origin: "http://localhost" }, true],
+  ["POST", { Referer: "http://localhost/projects" }, true],
+  ["PATCH", { Origin: "http://localhost" }, true],
+  ["DELETE", { Origin: "http://localhost" }, true],
+  // Cross-origin or missing credentials fail closed.
+  ["POST", { Origin: "https://evil.com" }, false],
+  ["POST", { Referer: "https://evil.com/phishing" }, false],
+  ["PATCH", { Origin: "https://attacker.example" }, false],
+  ["POST", {}, false],
+  // Subdomain lookalikes are not the origin.
+  ["POST", { Referer: "http://localhost.evil.com/" }, false],
+];
+
 describe("checkCsrfOrigin", () => {
-  describe("safe methods (always allowed)", () => {
-    it("allows GET requests regardless of Origin", () => {
-      const event = makeEvent("GET", "http://localhost/api/projects", {
-        Origin: "https://evil.com",
-      });
-      expect(checkCsrfOrigin(event)).toBeNull();
-    });
-
-    it("allows HEAD requests", () => {
-      const event = makeEvent("HEAD", "http://localhost/api/projects");
-      expect(checkCsrfOrigin(event)).toBeNull();
-    });
-
-    it("allows OPTIONS requests", () => {
-      const event = makeEvent("OPTIONS", "http://localhost/api/projects");
-      expect(checkCsrfOrigin(event)).toBeNull();
-    });
-  });
-
-  describe("same-origin requests", () => {
-    it("allows POST with matching Origin", () => {
-      const event = makeEvent("POST", "http://localhost/api/projects", {
-        Origin: "http://localhost",
-      });
-      expect(checkCsrfOrigin(event)).toBeNull();
-    });
-
-    it("allows POST with matching Referer", () => {
-      const event = makeEvent("POST", "http://localhost/api/projects", {
-        Referer: "http://localhost/projects",
-      });
-      expect(checkCsrfOrigin(event)).toBeNull();
-    });
-
-    it("rejects POST with neither Origin nor Referer (cookie routes)", async () => {
-      const event = makeEvent("POST", "http://localhost/api/projects");
-      const result = checkCsrfOrigin(event);
-      expect(result).not.toBeNull();
+  it.each(cases)("%s %j is %s", async (method, headers, allowed) => {
+    const result = checkCsrfOrigin(makeEvent(method, TEST_URL, headers));
+    if (allowed) {
+      expect(result).toBeNull();
+    } else {
       expect(result?.status).toBe(403);
-      const body = await result!.json();
-      expect(body.error).toBe("csrf_error");
-    });
-
-    it("allows POST with matching Origin and no Referer", () => {
-      const event = makeEvent("POST", "http://localhost/api/projects", {
-        Origin: "http://localhost",
-      });
-      expect(checkCsrfOrigin(event)).toBeNull();
-    });
-
-    it("allows PATCH with matching Origin", () => {
-      const event = makeEvent("PATCH", "http://localhost/api/projects/123", {
-        Origin: "http://localhost",
-      });
-      expect(checkCsrfOrigin(event)).toBeNull();
-    });
-
-    it("allows DELETE with matching Origin", () => {
-      const event = makeEvent("DELETE", "http://localhost/api/projects/123", {
-        Origin: "http://localhost",
-      });
-      expect(checkCsrfOrigin(event)).toBeNull();
-    });
-  });
-
-  describe("cross-origin requests (rejected)", () => {
-    it("rejects POST with mismatched Origin", () => {
-      const event = makeEvent("POST", "http://localhost/api/projects", {
-        Origin: "https://evil.com",
-      });
-      const result = checkCsrfOrigin(event);
-      expect(result).not.toBeNull();
-      expect(result?.status).toBe(403);
-    });
-
-    it("rejects POST with mismatched Referer", () => {
-      const event = makeEvent("POST", "http://localhost/api/projects", {
-        Referer: "https://evil.com/phishing",
-      });
-      const result = checkCsrfOrigin(event);
-      expect(result).not.toBeNull();
-      expect(result?.status).toBe(403);
-    });
-
-    it("rejects PATCH with mismatched Origin", () => {
-      const event = makeEvent("PATCH", "http://localhost/api/projects/123", {
-        Origin: "https://attacker.example",
-      });
-      const result = checkCsrfOrigin(event);
-      expect(result).not.toBeNull();
-      expect(result?.status).toBe(403);
-    });
-
-    it("returns csrf_error in response body for mismatched Origin", async () => {
-      const event = makeEvent("POST", "http://localhost/api/projects", {
-        Origin: "https://evil.com",
-      });
-      const result = checkCsrfOrigin(event);
-      expect(result).not.toBeNull();
-      const body = await result!.json();
-      expect(body.error).toBe("csrf_error");
-    });
-
-    it("returns csrf_error in response body for mismatched Referer", async () => {
-      const event = makeEvent("POST", "http://localhost/api/projects", {
-        Referer: "https://evil.com/attack",
-      });
-      const result = checkCsrfOrigin(event);
-      expect(result).not.toBeNull();
-      const body = await result!.json();
-      expect(body.error).toBe("csrf_error");
-    });
-
-    it("rejects Referer that does not start with origin + slash", () => {
-      const event = makeEvent("POST", "http://localhost/api/projects", {
-        Referer: "http://localhost.evil.com/",
-      });
-      const result = checkCsrfOrigin(event);
-      expect(result).not.toBeNull();
-      expect(result?.status).toBe(403);
-    });
+      expect((await result!.json()).error).toBe("csrf_error");
+    }
   });
 });

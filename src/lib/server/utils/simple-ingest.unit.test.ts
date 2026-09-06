@@ -5,14 +5,9 @@ describe("parseSimpleIngestRequest", () => {
   const validEntry = { level: "info", message: "test message" };
 
   describe("input validation", () => {
-    it("throws SimpleIngestError on null body", () => {
-      expect(() => parseSimpleIngestRequest(null)).toThrow(SimpleIngestError);
-      expect(() => parseSimpleIngestRequest(null)).toThrow("Request body cannot be empty");
-    });
-
-    it("throws SimpleIngestError on undefined body", () => {
-      expect(() => parseSimpleIngestRequest(undefined)).toThrow(SimpleIngestError);
-      expect(() => parseSimpleIngestRequest(undefined)).toThrow("Request body cannot be empty");
+    it.each([[null], [undefined]])("throws SimpleIngestError on %s body", (body) => {
+      expect(() => parseSimpleIngestRequest(body)).toThrow(SimpleIngestError);
+      expect(() => parseSimpleIngestRequest(body)).toThrow("Request body cannot be empty");
     });
 
     it("throws SimpleIngestError on empty array", () => {
@@ -34,53 +29,19 @@ describe("parseSimpleIngestRequest", () => {
   });
 
   describe("required fields", () => {
-    it("rejects entry missing level", () => {
-      const result = parseSimpleIngestRequest({ message: "test" });
+    it.each([
+      [{ message: "test" }, "missing required field 'level'", "missing level"],
+      [{ level: "invalid", message: "test" }, "invalid level 'invalid'", "invalid level"],
+      [{ level: "info" }, "missing required field 'message'", "missing message"],
+      [{ level: "info", message: 123 }, "message must be a string", "non-string message"],
+      [{ level: "info", message: "   " }, "message cannot be empty", "empty message"],
+      [[null], "must be an object", "null entry"],
+      [["not an object"], "must be an object", "string entry"],
+      [[123], "must be an object", "number entry"],
+    ] as [unknown, string, string][])("rejects %s (%s)", (input, message) => {
+      const result = parseSimpleIngestRequest(input);
       expect(result.rejected).toBe(1);
-      expect(result.errors[0]!).toContain("missing required field 'level'");
-    });
-
-    it("rejects entry with invalid level", () => {
-      const result = parseSimpleIngestRequest({ level: "invalid", message: "test" });
-      expect(result.rejected).toBe(1);
-      expect(result.errors[0]!).toContain("invalid level 'invalid'");
-      expect(result.errors[0]!).toContain("must be one of");
-    });
-
-    it("rejects entry missing message", () => {
-      const result = parseSimpleIngestRequest({ level: "info" });
-      expect(result.rejected).toBe(1);
-      expect(result.errors[0]!).toContain("missing required field 'message'");
-    });
-
-    it("rejects entry with non-string message", () => {
-      const result = parseSimpleIngestRequest({ level: "info", message: 123 });
-      expect(result.rejected).toBe(1);
-      expect(result.errors[0]!).toContain("message must be a string");
-    });
-
-    it("rejects entry with empty message", () => {
-      const result = parseSimpleIngestRequest({ level: "info", message: "   " });
-      expect(result.rejected).toBe(1);
-      expect(result.errors[0]!).toContain("message cannot be empty");
-    });
-
-    it("rejects null entry", () => {
-      const result = parseSimpleIngestRequest([null]);
-      expect(result.rejected).toBe(1);
-      expect(result.errors[0]!).toContain("must be an object");
-    });
-
-    it("rejects string entry", () => {
-      const result = parseSimpleIngestRequest(["not an object"]);
-      expect(result.rejected).toBe(1);
-      expect(result.errors[0]!).toContain("must be an object");
-    });
-
-    it("rejects number entry", () => {
-      const result = parseSimpleIngestRequest([123]);
-      expect(result.rejected).toBe(1);
-      expect(result.errors[0]!).toContain("must be an object");
+      expect(result.errors[0]!).toContain(message);
     });
   });
 
@@ -100,29 +61,16 @@ describe("parseSimpleIngestRequest", () => {
         expect(result.records[0]!.timestamp).toEqual(new Date(timestamp));
       });
 
-      it("uses current date for invalid timestamp", () => {
-        const before = Date.now();
-        const result = parseSimpleIngestRequest({ ...validEntry, timestamp: "invalid" });
-        const after = Date.now();
-        expect(result.records[0]!.timestamp.getTime()).toBeGreaterThanOrEqual(before);
-        expect(result.records[0]!.timestamp.getTime()).toBeLessThanOrEqual(after);
-      });
-
-      it("uses current date for missing timestamp", () => {
-        const before = Date.now();
-        const result = parseSimpleIngestRequest(validEntry);
-        const after = Date.now();
-        expect(result.records[0]!.timestamp.getTime()).toBeGreaterThanOrEqual(before);
-        expect(result.records[0]!.timestamp.getTime()).toBeLessThanOrEqual(after);
-      });
-
-      it("uses current date for non-string timestamp", () => {
-        const before = Date.now();
-        const result = parseSimpleIngestRequest({ ...validEntry, timestamp: 12345 });
-        const after = Date.now();
-        expect(result.records[0]!.timestamp.getTime()).toBeGreaterThanOrEqual(before);
-        expect(result.records[0]!.timestamp.getTime()).toBeLessThanOrEqual(after);
-      });
+      it.each([["invalid"], [12345], [undefined]])(
+        "falls back to now for timestamp %s",
+        (timestamp) => {
+          const before = Date.now();
+          const result = parseSimpleIngestRequest({ ...validEntry, timestamp });
+          const after = Date.now();
+          expect(result.records[0]!.timestamp.getTime()).toBeGreaterThanOrEqual(before);
+          expect(result.records[0]!.timestamp.getTime()).toBeLessThanOrEqual(after);
+        },
+      );
     });
 
     describe("service", () => {
@@ -131,13 +79,8 @@ describe("parseSimpleIngestRequest", () => {
         expect(result.records[0]!.resourceAttributes).toEqual({ "service.name": "my-app" });
       });
 
-      it("returns null resourceAttributes for missing service", () => {
-        const result = parseSimpleIngestRequest(validEntry);
-        expect(result.records[0]!.resourceAttributes).toBeNull();
-      });
-
-      it("returns null resourceAttributes for non-string service", () => {
-        const result = parseSimpleIngestRequest({ ...validEntry, service: 123 });
+      it.each([[undefined], [123]])("returns null resourceAttributes for service %s", (service) => {
+        const result = parseSimpleIngestRequest({ ...validEntry, service });
         expect(result.records[0]!.resourceAttributes).toBeNull();
       });
     });
@@ -149,25 +92,13 @@ describe("parseSimpleIngestRequest", () => {
         expect(result.records[0]!.metadata).toEqual(metadata);
       });
 
-      it("returns null metadata for missing metadata", () => {
-        const result = parseSimpleIngestRequest(validEntry);
-        expect(result.records[0]!.metadata).toBeNull();
-      });
-
-      it("returns null metadata for non-object metadata", () => {
-        const result = parseSimpleIngestRequest({ ...validEntry, metadata: "string" });
-        expect(result.records[0]!.metadata).toBeNull();
-      });
-
-      it("returns null metadata for null metadata", () => {
-        const result = parseSimpleIngestRequest({ ...validEntry, metadata: null });
-        expect(result.records[0]!.metadata).toBeNull();
-      });
-
-      it("returns null metadata for empty object metadata", () => {
-        const result = parseSimpleIngestRequest({ ...validEntry, metadata: {} });
-        expect(result.records[0]!.metadata).toBeNull();
-      });
+      it.each([[undefined], ["string"], [null], [{}]])(
+        "returns null metadata for %s",
+        (metadata) => {
+          const result = parseSimpleIngestRequest({ ...validEntry, metadata });
+          expect(result.records[0]!.metadata).toBeNull();
+        },
+      );
     });
   });
 
@@ -178,18 +109,8 @@ describe("parseSimpleIngestRequest", () => {
         expect(result.records[0]!.sourceFile).toBe("/app/index.ts");
       });
 
-      it("returns null sourceFile for missing sourceFile", () => {
-        const result = parseSimpleIngestRequest(validEntry);
-        expect(result.records[0]!.sourceFile).toBeNull();
-      });
-
-      it("returns null sourceFile for non-string sourceFile", () => {
-        const result = parseSimpleIngestRequest({ ...validEntry, sourceFile: 123 });
-        expect(result.records[0]!.sourceFile).toBeNull();
-      });
-
-      it("returns null sourceFile for null sourceFile", () => {
-        const result = parseSimpleIngestRequest({ ...validEntry, sourceFile: null });
+      it.each([[undefined], [123], [null]])("returns null sourceFile for %s", (sourceFile) => {
+        const result = parseSimpleIngestRequest({ ...validEntry, sourceFile });
         expect(result.records[0]!.sourceFile).toBeNull();
       });
     });
@@ -200,30 +121,13 @@ describe("parseSimpleIngestRequest", () => {
         expect(result.records[0]!.lineNumber).toBe(42);
       });
 
-      it("returns null lineNumber for missing lineNumber", () => {
-        const result = parseSimpleIngestRequest(validEntry);
-        expect(result.records[0]!.lineNumber).toBeNull();
-      });
-
-      it("returns null lineNumber for non-number lineNumber", () => {
-        const result = parseSimpleIngestRequest({ ...validEntry, lineNumber: "42" });
-        expect(result.records[0]!.lineNumber).toBeNull();
-      });
-
-      it("returns null lineNumber for zero", () => {
-        const result = parseSimpleIngestRequest({ ...validEntry, lineNumber: 0 });
-        expect(result.records[0]!.lineNumber).toBeNull();
-      });
-
-      it("returns null lineNumber for negative number", () => {
-        const result = parseSimpleIngestRequest({ ...validEntry, lineNumber: -5 });
-        expect(result.records[0]!.lineNumber).toBeNull();
-      });
-
-      it("returns null lineNumber for null", () => {
-        const result = parseSimpleIngestRequest({ ...validEntry, lineNumber: null });
-        expect(result.records[0]!.lineNumber).toBeNull();
-      });
+      it.each([[undefined], ["42"], [0], [-5], [null]])(
+        "returns null lineNumber for %s",
+        (lineNumber) => {
+          const result = parseSimpleIngestRequest({ ...validEntry, lineNumber });
+          expect(result.records[0]!.lineNumber).toBeNull();
+        },
+      );
     });
 
     describe("combined", () => {
@@ -240,39 +144,20 @@ describe("parseSimpleIngestRequest", () => {
   });
 
   describe("metadata extraction", () => {
-    it("extracts requestId from metadata using OTLP attribute keys", () => {
-      const result = parseSimpleIngestRequest({
-        ...validEntry,
-        metadata: { "request.id": "req-123" },
-      });
-      expect(result.records[0]!.requestId).toBe("req-123");
-    });
-
-    it("extracts userId from metadata using OTLP attribute keys", () => {
-      const result = parseSimpleIngestRequest({
-        ...validEntry,
-        metadata: { "enduser.id": "user-456" },
-      });
-      expect(result.records[0]!.userId).toBe("user-456");
-    });
-
-    it("extracts ipAddress from metadata using OTLP attribute keys", () => {
-      const result = parseSimpleIngestRequest({
-        ...validEntry,
-        metadata: { "client.address": "192.168.1.1" },
-      });
-      expect(result.records[0]!.ipAddress).toBe("192.168.1.1");
-    });
-
-    it("falls back to alternate metadata keys", () => {
-      const result = parseSimpleIngestRequest({
-        ...validEntry,
-        metadata: { request_id: "req-789", user_id: "user-999", ip_address: "10.0.0.1" },
-      });
-      expect(result.records[0]!.requestId).toBe("req-789");
-      expect(result.records[0]!.userId).toBe("user-999");
-      expect(result.records[0]!.ipAddress).toBe("10.0.0.1");
-    });
+    it.each([
+      [{ "request.id": "req-123" }, "requestId", "req-123", "OTLP request key"],
+      [{ "enduser.id": "user-456" }, "userId", "user-456", "OTLP user key"],
+      [{ "client.address": "192.168.1.1" }, "ipAddress", "192.168.1.1", "OTLP ip key"],
+      [{ request_id: "req-789" }, "requestId", "req-789", "fallback request key"],
+      [{ user_id: "user-999" }, "userId", "user-999", "fallback user key"],
+      [{ ip_address: "10.0.0.1" }, "ipAddress", "10.0.0.1", "fallback ip key"],
+    ] as [Record<string, string>, string, string, string][])(
+      "extracts %s from metadata (%s)",
+      (metadata, field, expected) => {
+        const result = parseSimpleIngestRequest({ ...validEntry, metadata });
+        expect(result.records[0]![field as "requestId"]).toBe(expected);
+      },
+    );
 
     it("returns null for missing metadata fields", () => {
       const result = parseSimpleIngestRequest(validEntry);
@@ -337,23 +222,11 @@ describe("parseSimpleIngestRequest", () => {
 });
 
 describe("SimpleIngestError", () => {
-  it("has correct name", () => {
+  it("carries its name, message, and prototype chain", () => {
     const error = new SimpleIngestError("test message");
     expect(error.name).toBe("SimpleIngestError");
-  });
-
-  it("has correct message", () => {
-    const error = new SimpleIngestError("test message");
     expect(error.message).toBe("test message");
-  });
-
-  it("is instance of Error", () => {
-    const error = new SimpleIngestError("test");
     expect(error).toBeInstanceOf(Error);
-  });
-
-  it("is instance of SimpleIngestError", () => {
-    const error = new SimpleIngestError("test");
     expect(error).toBeInstanceOf(SimpleIngestError);
   });
 });

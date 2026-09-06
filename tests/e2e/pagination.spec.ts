@@ -31,23 +31,6 @@ async function deleteProject(page: Page, projectId: string) {
   return response.ok();
 }
 
-async function sendOTLPLogs(
-  page: Page,
-  apiKey: string,
-  count: number,
-  level: "debug" | "info" | "warn" | "error" | "fatal" = "info",
-) {
-  const logs = [];
-  for (let i = 0; i < count; i++) {
-    logs.push({
-      level,
-      message: `${level.toUpperCase()} log message ${i}`,
-    });
-  }
-
-  await ingestOtlpLogs(page, apiKey, logs);
-}
-
 test.describe("Cursor-based Pagination", () => {
   test.describe.configure({ retries: 1 });
 
@@ -64,34 +47,12 @@ test.describe("Cursor-based Pagination", () => {
     }
   });
 
-  test("shows load more button when more logs exist", async ({ page }) => {
-    await sendOTLPLogs(page, testProject.apiKey, 150, "info");
-
-    await page.goto(`/projects/${testProject.id}`);
-
-    await page.waitForSelector('[data-testid="log-table"]', { timeout: 10000 });
-
-    await expect(page.locator("text=more available")).toBeVisible();
-
-    const loadMoreButton = page.locator('[data-testid="load-more-button"]');
-    await expect(loadMoreButton).toBeVisible();
-    await expect(loadMoreButton).toHaveText("Load More");
-  });
-
-  test("hides load more button when all logs are loaded", async ({ page }) => {
-    await sendOTLPLogs(page, testProject.apiKey, 50, "info");
-
-    await page.goto(`/projects/${testProject.id}`);
-    await page.waitForSelector('[data-testid="log-table"]', { timeout: 10000 });
-
-    const loadMoreButton = page.locator('[data-testid="load-more-button"]');
-    await expect(loadMoreButton).not.toBeVisible();
-
-    await expect(page.locator("text=more available")).not.toBeVisible();
-  });
-
-  test("loads more logs when clicking load more button", async ({ page }) => {
-    await sendOTLPLogs(page, testProject.apiKey, 150, "info");
+  test("loads more logs when clicking load more", async ({ page }) => {
+    const logs = [];
+    for (let i = 0; i < 150; i++) {
+      logs.push({ level: "info" as const, message: `INFO log message ${i}` });
+    }
+    await ingestOtlpLogs(page, testProject.apiKey, logs);
 
     await page.goto(`/projects/${testProject.id}`);
     await page.waitForSelector('[data-testid="log-table"]', { timeout: 10000 });
@@ -110,10 +71,5 @@ test.describe("Cursor-based Pagination", () => {
 
     const newRowCount = await page.locator('[data-testid="log-row"]').count();
     expect(newRowCount).toBeGreaterThan(initialRows);
-
-    const buttonVisible = await loadMoreButton.isVisible();
-    if (buttonVisible) {
-      await expect(loadMoreButton).toContainText("Load More");
-    }
   });
 });

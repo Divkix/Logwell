@@ -1,7 +1,8 @@
+import { describe, expect, it } from "vite-plus/test";
 import { FORM_ELEMENTS, SHORTCUTS, shouldBlockShortcut } from "./keyboard";
 
 function createMockKeyboardEvent(options: {
-  targetTagName?: string;
+  targetTagName?: string | null;
   isComposing?: boolean;
   ctrlKey?: boolean;
   altKey?: boolean;
@@ -15,10 +16,8 @@ function createMockKeyboardEvent(options: {
     metaKey = false,
   } = options;
 
-  const target = { tagName: targetTagName };
-
   return {
-    target,
+    target: targetTagName === null ? null : { tagName: targetTagName },
     isComposing,
     ctrlKey,
     altKey,
@@ -27,142 +26,50 @@ function createMockKeyboardEvent(options: {
 }
 
 describe("shouldBlockShortcut", () => {
-  describe("returns true for form elements", () => {
-    it("blocks shortcuts when target is INPUT element", () => {
-      const event = createMockKeyboardEvent({ targetTagName: "INPUT" });
-      expect(shouldBlockShortcut(event)).toBe(true);
-    });
+  it.each([
+    [{ targetTagName: "INPUT" }, "form input"],
+    [{ targetTagName: "TEXTAREA" }, "form textarea"],
+    [{ targetTagName: "SELECT" }, "form select"],
+    [{ isComposing: true }, "IME composition"],
+    [{ ctrlKey: true }, "ctrl"],
+    [{ altKey: true }, "alt"],
+    [{ metaKey: true }, "meta"],
+    [{ ctrlKey: true, altKey: true }, "multiple modifiers"],
+  ] as [Parameters<typeof createMockKeyboardEvent>[0], string][])(
+    "blocks shortcut (%s)",
+    (options) => {
+      expect(shouldBlockShortcut(createMockKeyboardEvent(options))).toBe(true);
+    },
+  );
 
-    it("blocks shortcuts when target is TEXTAREA element", () => {
-      const event = createMockKeyboardEvent({ targetTagName: "TEXTAREA" });
-      expect(shouldBlockShortcut(event)).toBe(true);
-    });
-
-    it("blocks shortcuts when target is SELECT element", () => {
-      const event = createMockKeyboardEvent({ targetTagName: "SELECT" });
-      expect(shouldBlockShortcut(event)).toBe(true);
-    });
+  it.each([["DIV"], ["TABLE"], ["BUTTON"], ["BODY"]])("allows shortcut for %s target", (tag) => {
+    expect(shouldBlockShortcut(createMockKeyboardEvent({ targetTagName: tag }))).toBe(false);
   });
 
-  describe("returns true for IME composition", () => {
-    it("blocks shortcuts when event.isComposing is true", () => {
-      const event = createMockKeyboardEvent({ isComposing: true });
-      expect(shouldBlockShortcut(event)).toBe(true);
-    });
-  });
-
-  describe("returns true for modifier keys", () => {
-    it("blocks shortcuts when ctrlKey is pressed", () => {
-      const event = createMockKeyboardEvent({ ctrlKey: true });
-      expect(shouldBlockShortcut(event)).toBe(true);
-    });
-
-    it("blocks shortcuts when altKey is pressed", () => {
-      const event = createMockKeyboardEvent({ altKey: true });
-      expect(shouldBlockShortcut(event)).toBe(true);
-    });
-
-    it("blocks shortcuts when metaKey is pressed", () => {
-      const event = createMockKeyboardEvent({ metaKey: true });
-      expect(shouldBlockShortcut(event)).toBe(true);
-    });
-
-    it("blocks shortcuts when multiple modifier keys are pressed", () => {
-      const event = createMockKeyboardEvent({ ctrlKey: true, altKey: true });
-      expect(shouldBlockShortcut(event)).toBe(true);
-    });
-  });
-
-  describe("returns false for regular elements without modifiers", () => {
-    it("allows shortcuts for regular DIV target", () => {
-      const event = createMockKeyboardEvent({ targetTagName: "DIV" });
-      expect(shouldBlockShortcut(event)).toBe(false);
-    });
-
-    it("allows shortcuts for TABLE target", () => {
-      const event = createMockKeyboardEvent({ targetTagName: "TABLE" });
-      expect(shouldBlockShortcut(event)).toBe(false);
-    });
-
-    it("allows shortcuts for BUTTON target", () => {
-      const event = createMockKeyboardEvent({ targetTagName: "BUTTON" });
-      expect(shouldBlockShortcut(event)).toBe(false);
-    });
-
-    it("allows shortcuts for BODY target", () => {
-      const event = createMockKeyboardEvent({ targetTagName: "BODY" });
-      expect(shouldBlockShortcut(event)).toBe(false);
-    });
-  });
-
-  describe("edge cases", () => {
-    it("handles null target gracefully", () => {
-      const event = {
-        target: null,
-        isComposing: false,
-        ctrlKey: false,
-        altKey: false,
-        metaKey: false,
-      } as unknown as KeyboardEvent;
-      expect(shouldBlockShortcut(event)).toBe(false);
-    });
+  it("handles null target gracefully", () => {
+    expect(shouldBlockShortcut(createMockKeyboardEvent({ targetTagName: null }))).toBe(false);
   });
 });
 
 describe("FORM_ELEMENTS", () => {
-  it("contains INPUT, TEXTAREA, and SELECT", () => {
-    expect(FORM_ELEMENTS).toContain("INPUT");
-    expect(FORM_ELEMENTS).toContain("TEXTAREA");
-    expect(FORM_ELEMENTS).toContain("SELECT");
-  });
-
-  it("has exactly 3 elements", () => {
-    expect(FORM_ELEMENTS).toHaveLength(3);
+  it("contains exactly INPUT, TEXTAREA, and SELECT", () => {
+    expect(FORM_ELEMENTS).toEqual(["INPUT", "TEXTAREA", "SELECT"]);
   });
 });
 
 describe("SHORTCUTS", () => {
-  it("is an array", () => {
-    expect(Array.isArray(SHORTCUTS)).toBe(true);
-  });
-
-  it("contains navigation shortcuts (j, k, Enter)", () => {
+  it("covers navigation, search, and other groups with required shape", () => {
     const keys = SHORTCUTS.map((s) => s.key);
-    expect(keys).toContain("j");
-    expect(keys).toContain("k");
-    expect(keys).toContain("Enter");
-  });
-
-  it("contains search shortcuts (/, Esc)", () => {
-    const keys = SHORTCUTS.map((s) => s.key);
-    expect(keys).toContain("/");
-    expect(keys).toContain("Esc");
-  });
-
-  it("contains other shortcuts (l, ?)", () => {
-    const keys = SHORTCUTS.map((s) => s.key);
-    expect(keys).toContain("l");
-    expect(keys).toContain("?");
-  });
-
-  it("all shortcuts have required properties", () => {
+    for (const key of ["j", "k", "Enter", "/", "Esc", "l", "?"]) {
+      expect(keys).toContain(key);
+    }
     for (const shortcut of SHORTCUTS) {
-      expect(shortcut).toHaveProperty("key");
-      expect(shortcut).toHaveProperty("description");
-      expect(shortcut).toHaveProperty("group");
       expect(typeof shortcut.key).toBe("string");
       expect(typeof shortcut.description).toBe("string");
       expect(["navigation", "search", "other"]).toContain(shortcut.group);
     }
-  });
-
-  it("has shortcuts in expected groups", () => {
-    const navigationShortcuts = SHORTCUTS.filter((s) => s.group === "navigation");
-    const searchShortcuts = SHORTCUTS.filter((s) => s.group === "search");
-    const otherShortcuts = SHORTCUTS.filter((s) => s.group === "other");
-
-    expect(navigationShortcuts.length).toBeGreaterThan(0);
-    expect(searchShortcuts.length).toBeGreaterThan(0);
-    expect(otherShortcuts.length).toBeGreaterThan(0);
+    for (const group of ["navigation", "search", "other"]) {
+      expect(SHORTCUTS.some((s) => s.group === group)).toBe(true);
+    }
   });
 });

@@ -15,32 +15,19 @@ vi.mock("svelte-sonner", () => ({
 import { toastError, toastSuccess } from "./toast";
 
 describe("Toast Utility", () => {
-  describe("toastSuccess", () => {
-    it("calls toast.success with message", () => {
-      toastSuccess("Operation completed");
-      expect(sonner.toast.success).toHaveBeenCalledWith("Operation completed", undefined);
-    });
-
-    it("passes options to toast.success", () => {
-      toastSuccess("Done", { duration: 3000 });
-      expect(sonner.toast.success).toHaveBeenCalledWith("Done", { duration: 3000 });
-    });
+  it("toastSuccess forwards message and options", () => {
+    toastSuccess("Operation completed");
+    expect(sonner.toast.success).toHaveBeenCalledWith("Operation completed", undefined);
+    toastSuccess("Done", { duration: 3000 });
+    expect(sonner.toast.success).toHaveBeenCalledWith("Done", { duration: 3000 });
   });
 
-  describe("toastError", () => {
-    it("calls toast.error with message", () => {
-      toastError("Something went wrong");
-      expect(sonner.toast.error).toHaveBeenCalledWith("Something went wrong", undefined);
-    });
-
-    it("extracts message from Error object", () => {
-      toastError(new Error("Database connection failed"));
-      expect(sonner.toast.error).toHaveBeenCalledWith("Database connection failed", undefined);
-    });
-
-    it("uses fallback message for unknown error types", () => {
-      toastError({ foo: "bar" });
-      expect(sonner.toast.error).toHaveBeenCalledWith("An unexpected error occurred", undefined);
-    });
+  it.each([
+    ["Something went wrong", "Something went wrong", "plain message"],
+    [new Error("Database connection failed"), "Database connection failed", "Error object"],
+    [{ foo: "bar" }, "An unexpected error occurred", "unknown type fallback"],
+  ] as [unknown, string, string][])("toastError(%s) shows %s (%s)", (input, expected) => {
+    toastError(input as string);
+    expect(sonner.toast.error).toHaveBeenCalledWith(expected, undefined);
   });
 });

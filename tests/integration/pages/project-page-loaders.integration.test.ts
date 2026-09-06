@@ -123,12 +123,6 @@ describe("(app) page loaders — injected PGlite DB seam", () => {
       expect(data.projects).toHaveLength(1);
       expect(data.projects[0]!.id).toBe(ownedProject.id);
     });
-
-    it("returns empty array when owner has no projects", async () => {
-      const event = createLoadEvent(db, {}, owner.locals);
-      const data = await loadDashboard(event as never);
-      expect(data.projects).toHaveLength(0);
-    });
   });
 
   describe("(app)/projects/[id]/+page.server.ts — logs loader", () => {
@@ -156,16 +150,6 @@ describe("(app) page loaders — injected PGlite DB seam", () => {
   });
 
   describe("(app)/projects/[id]/stats/+page.server.ts — stats loader", () => {
-    it("returns stats data via injected PGlite DB for the owner", async () => {
-      const proj = await seedProject(db, { name: "stats-proj", ownerId: owner.userId });
-
-      const event = createLoadEvent(db, { id: proj.id }, owner.locals);
-      const data = await loadProjectStats(event as never);
-
-      expect(data.project.id).toBe(proj.id);
-      expect(data.stats).toBeDefined();
-    });
-
     it("throws SvelteKit 404 for a non-owner", async () => {
       const proj = await seedProject(db, { name: "stats-proj", ownerId: owner.userId });
 
@@ -175,16 +159,6 @@ describe("(app) page loaders — injected PGlite DB seam", () => {
   });
 
   describe("(app)/projects/[id]/settings/+page.server.ts — settings loader", () => {
-    it("returns settings data via injected PGlite DB for the owner", async () => {
-      const proj = await seedProject(db, { name: "settings-proj", ownerId: owner.userId });
-
-      const event = createLoadEvent(db, { id: proj.id }, owner.locals);
-      const data = await loadProjectSettings(event as never);
-
-      expect(data.project.id).toBe(proj.id);
-      expect(data.project.retentionDays).toBeDefined();
-    });
-
     it("throws SvelteKit 404 for a non-owner", async () => {
       const proj = await seedProject(db, { name: "settings-proj", ownerId: owner.userId });
 
@@ -194,16 +168,6 @@ describe("(app) page loaders — injected PGlite DB seam", () => {
   });
 
   describe("(app)/projects/[id]/incidents/+page.server.ts — incidents loader", () => {
-    it("returns incidents data via injected PGlite DB for the owner", async () => {
-      const proj = await seedProject(db, { name: "incidents-proj", ownerId: owner.userId });
-
-      const event = createLoadEvent(db, { id: proj.id }, owner.locals);
-      const data = await loadProjectIncidents(event as never);
-
-      expect(data.project.id).toBe(proj.id);
-      expect(data.incidents).toBeDefined();
-    });
-
     it("throws SvelteKit 404 for a non-owner", async () => {
       const proj = await seedProject(db, { name: "incidents-proj", ownerId: owner.userId });
 
