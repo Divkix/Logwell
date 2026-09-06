@@ -17,4 +17,3 @@ func clearTestLogs(ts *testServer) {
 	ts.logs = ts.logs[:0]
 	ts.mu.Unlock()
 }
-
