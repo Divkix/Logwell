@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
-import { beforeEach, describe, expect, it } from "vite-plus/test";
+import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
 import * as schema from "$lib/server/db/schema";
 import { setupTestDatabase } from "$lib/server/db/test-db";
 import {
@@ -273,5 +273,61 @@ describe("Incident upsert race condition", () => {
     expect(allIncidents[0]!.firstSeen.toISOString()).toBe("2026-03-01T12:00:00.000Z");
     expect(allIncidents[0]!.lastSeen.toISOString()).toBe("2026-03-02T12:00:00.000Z");
     expect(allIncidents[0]!.totalEvents).toBe(2);
+  });
+});
+
+describe("upsertIncidentsForPreparedLogs single-batch smoke", () => {
+  let db: PgliteDatabase<typeof schema>;
+  let cleanup: () => Promise<void>;
+
+  beforeEach(async () => {
+    const setup = await setupTestDatabase();
+    db = setup.db;
+    cleanup = setup.cleanup;
+  });
+
+  afterEach(async () => {
+    await cleanup();
+  });
+
+  it("updates incident lastSeen and totalEvents on matching log", async () => {
+    const project = await seedProject(db);
+
+    await db.insert(schema.incident).values({
+      id: "inc-existing",
+      projectId: project.id,
+      fingerprint: "fp-existing",
+      title: "Database timeout",
+      normalizedMessage: "database timeout",
+      serviceName: "api",
+      sourceFile: "src/db.ts",
+      lineNumber: 42,
+      highestLevel: "error",
+      firstSeen: new Date("2026-02-12T10:00:00.000Z"),
+      lastSeen: new Date("2026-02-12T10:00:00.000Z"),
+      totalEvents: 1,
+    });
+
+    const { touchedIncidents } = await upsertIncidentsForPreparedLogs(db, project.id, [
+      {
+        level: "error",
+        message: "Database timeout",
+        timestamp: new Date("2026-02-12T13:30:00.000Z"),
+        sourceFile: "src/db.ts",
+        lineNumber: 42,
+        resourceAttributes: { "service.name": "api" },
+        metadata: {},
+        serviceName: "api",
+        fingerprint: "fp-existing",
+        normalizedMessage: "database timeout",
+        incidentTitle: "Database timeout",
+        incidentId: null,
+      },
+    ]);
+
+    expect(touchedIncidents).toHaveLength(1);
+    expect(touchedIncidents[0]!.totalEvents).toBe(2);
+    expect(touchedIncidents[0]!.lastSeen).toEqual(new Date("2026-02-12T13:30:00.000Z"));
+    expect(touchedIncidents[0]!.firstSeen).toEqual(new Date("2026-02-12T10:00:00.000Z"));
   });
 });

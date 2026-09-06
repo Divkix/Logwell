@@ -11,7 +11,13 @@ describe("cursor utilities", () => {
       expect(cursor).toMatch(/^[A-Za-z0-9_-]+$/);
     });
 
-    it.each([["log_123"], ["log_with_underscores_123"], ["log_456"]])("roundtrips id %s", (id) => {
+    it.each([
+      ["log_123"],
+      ["log_with_underscores_123"],
+      ["log_456"],
+      ["log-with-dashes-789"],
+      ["Log_MixedCase_123"],
+    ])("roundtrips id %s", (id) => {
       const result = decodeCursor(encodeCursor(TS, id));
       expect(result.id).toBe(id);
       expect(result.timestamp.toISOString()).toBe(TS.toISOString());

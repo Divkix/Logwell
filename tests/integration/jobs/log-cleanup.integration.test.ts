@@ -1,11 +1,11 @@
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
-import { beforeEach, describe, expect, it } from "vite-plus/test";
+import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
 import type * as schema from "../../../src/lib/server/db/schema";
 import { log } from "../../../src/lib/server/db/schema";
 import { setupTestDatabase } from "../../../src/lib/server/db/test-db";
 import { cleanupOldLogs } from "../../../src/lib/server/jobs/log-cleanup";
-import { seedLogs, seedProject } from "../../fixtures/db";
+import { seedLog, seedLogs, seedProject } from "../../fixtures/db";
 
 describe("cleanupOldLogs", () => {
   let db: PgliteDatabase<typeof schema>;
@@ -215,5 +215,77 @@ describe("cleanupOldLogs", () => {
       expect(result.totalLogsDeleted).toBeGreaterThanOrEqual(2);
       expect(result.totalLogsDeleted).toBeLessThanOrEqual(4);
     });
+  });
+});
+
+describe("cleanupOldLogs batch selection", () => {
+  let db: PgliteDatabase<typeof schema>;
+  let cleanup: () => Promise<void>;
+
+  beforeEach(async () => {
+    const setup = await setupTestDatabase();
+    db = setup.db;
+    cleanup = setup.cleanup;
+  });
+
+  afterEach(async () => {
+    await cleanup();
+  });
+
+  it("deletes only logs older than retention, keeping the most recent", async () => {
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    const project1 = await seedProject(db, { retentionDays: 7 });
+
+    const now = new Date();
+    for (const days of [12, 10, 8, 5, 3, 1]) {
+      await seedLog(db, project1.id, {
+        message: `log-${days}d`,
+        timestamp: new Date(now.getTime() - days * DAY_MS),
+      });
+    }
+
+    const result = await cleanupOldLogs(db);
+
+    expect(result.errors).toEqual([]);
+    expect(result.totalLogsDeleted).toBe(3);
+
+    const remaining = await db
+      .select()
+      .from(log)
+      .where(eq(log.projectId, project1.id))
+      .orderBy(asc(log.timestamp));
+
+    expect(remaining.map((l) => l.message)).toEqual(["log-5d", "log-3d", "log-1d"]);
+
+    const cutoff = new Date(now.getTime() - 7 * DAY_MS);
+    for (const row of remaining) {
+      expect(row.timestamp.getTime()).toBeGreaterThanOrEqual(cutoff.getTime());
+    }
+  });
+
+  it("deletes the correct logs per project when retention differs", async () => {
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    const project1 = await seedProject(db, { retentionDays: 7 });
+    const project2 = await seedProject(db, { retentionDays: 30 });
+
+    const now = new Date();
+    const tenDaysAgo = new Date(now.getTime() - 10 * DAY_MS);
+    const fortyDaysAgo = new Date(now.getTime() - 40 * DAY_MS);
+
+    await seedLog(db, project1.id, { message: "p1-old", timestamp: tenDaysAgo });
+    await seedLog(db, project1.id, { message: "p1-fresh", timestamp: now });
+    await seedLog(db, project2.id, { message: "p2-recent", timestamp: tenDaysAgo });
+    await seedLog(db, project2.id, { message: "p2-old", timestamp: fortyDaysAgo });
+
+    const result = await cleanupOldLogs(db);
+
+    expect(result.errors).toEqual([]);
+    expect(result.totalLogsDeleted).toBe(2);
+
+    const p1Remaining = await db.select().from(log).where(eq(log.projectId, project1.id));
+    expect(p1Remaining.map((l) => l.message)).toEqual(["p1-fresh"]);
+
+    const p2Remaining = await db.select().from(log).where(eq(log.projectId, project2.id));
+    expect(p2Remaining.map((l) => l.message)).toEqual(["p2-recent"]);
   });
 });

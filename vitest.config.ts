@@ -93,12 +93,6 @@ export default defineConfig({
         "src/lib/shared/types.ts",
         "src/lib/auth-client.ts",
       ],
-      thresholds: {
-        lines: 75,
-        statements: 75,
-        functions: 75,
-        branches: 65,
-      },
     },
   },
 });

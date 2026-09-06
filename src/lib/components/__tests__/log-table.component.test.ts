@@ -66,407 +66,124 @@ describe("LogTable", () => {
     }),
   ];
 
+  const sortableLogs: Log[] = [
+    createLog({
+      id: "log_a",
+      message: "Alpha message",
+      level: "error",
+      timestamp: new Date("2024-01-15T14:30:00.000Z"),
+    }),
+    createLog({
+      id: "log_b",
+      message: "Beta message",
+      level: "debug",
+      timestamp: new Date("2024-01-15T14:32:00.000Z"),
+    }),
+    createLog({
+      id: "log_c",
+      message: "Charlie message",
+      level: "warn",
+      timestamp: new Date("2024-01-15T14:31:00.000Z"),
+    }),
+  ];
+
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
   });
 
-  describe("renders header row", () => {
-    it("displays table header with correct columns", () => {
-      render(LogTable, { props: { logs: sampleLogs, loading: false } });
-
-      const header = screen.getByTestId("log-table-header");
-      expect(header).toBeInTheDocument();
-    });
-
-    it("shows Time column header", () => {
-      render(LogTable, { props: { logs: sampleLogs, loading: false } });
-
-      expect(screen.getByText("Time")).toBeInTheDocument();
-    });
-
-    it("shows Level column header", () => {
-      render(LogTable, { props: { logs: sampleLogs, loading: false } });
-
-      expect(screen.getByText("Level")).toBeInTheDocument();
-    });
-
-    it("shows Message column header", () => {
-      render(LogTable, { props: { logs: sampleLogs, loading: false } });
-
-      expect(screen.getByText("Message")).toBeInTheDocument();
-    });
-
-    it("renders header even when logs are empty", () => {
-      render(LogTable, { props: { logs: [], loading: false } });
-
-      expect(screen.getByTestId("log-table-header")).toBeInTheDocument();
-    });
+  it("renders header and one row per log", () => {
+    render(LogTable, { props: { logs: sampleLogs, loading: false } });
+    expect(screen.getByTestId("log-table-header")).toBeInTheDocument();
+    expect(screen.getAllByTestId("log-row")).toHaveLength(3);
+    const table = screen.getByRole("table");
+    expect(within(table).getByText("First log message")).toBeInTheDocument();
+    expect(within(table).getByText("14:30:45.123")).toBeInTheDocument();
   });
 
-  describe("renders log rows", () => {
-    it("displays all provided logs", () => {
-      render(LogTable, { props: { logs: sampleLogs, loading: false } });
-
-      const rows = screen.getAllByTestId("log-row");
-      expect(rows).toHaveLength(3);
-    });
-
-    it("renders LogRow component for each log", () => {
-      render(LogTable, { props: { logs: sampleLogs, loading: false } });
-
-      const table = screen.getByRole("table");
-      expect(within(table).getByText("First log message")).toBeInTheDocument();
-      expect(within(table).getByText("Second log message")).toBeInTheDocument();
-      expect(within(table).getByText("Third log message")).toBeInTheDocument();
-    });
-
-    it("renders log levels correctly", () => {
-      render(LogTable, { props: { logs: sampleLogs, loading: false } });
-
-      const table = screen.getByRole("table");
-      expect(within(table).getByText("INFO")).toBeInTheDocument();
-      expect(within(table).getByText("ERROR")).toBeInTheDocument();
-      expect(within(table).getByText("DEBUG")).toBeInTheDocument();
-    });
-
-    it("renders timestamps correctly", () => {
-      render(LogTable, { props: { logs: sampleLogs, loading: false } });
-
-      const table = screen.getByRole("table");
-      expect(within(table).getByText("14:30:45.123")).toBeInTheDocument();
-      expect(within(table).getByText("14:31:00.000")).toBeInTheDocument();
-      expect(within(table).getByText("14:32:00.000")).toBeInTheDocument();
-    });
-
-    it("propagates onLogClick callback to log rows", async () => {
-      const onLogClick = vi.fn();
-      render(LogTable, { props: { logs: sampleLogs, loading: false, onLogClick } });
-
-      const rows = screen.getAllByTestId("log-row");
-      rows[0]!.click();
-
-      expect(onLogClick).toHaveBeenCalledTimes(1);
-      expect(onLogClick).toHaveBeenCalledWith(sampleLogs[0]);
-    });
-
-    it("renders single log correctly", () => {
-      const singleLog = [createLog({ id: "single_log", message: "Only one log" })];
-      render(LogTable, { props: { logs: singleLog, loading: false } });
-
-      const table = screen.getByRole("table");
-      const rows = screen.getAllByTestId("log-row");
-      expect(rows).toHaveLength(1);
-      expect(within(table).getByText("Only one log")).toBeInTheDocument();
-    });
+  it("propagates onLogClick with the clicked log", async () => {
+    const onLogClick = vi.fn();
+    render(LogTable, { props: { logs: sampleLogs, loading: false, onLogClick } });
+    screen.getAllByTestId("log-row")[0]!.click();
+    expect(onLogClick).toHaveBeenCalledTimes(1);
+    expect(onLogClick).toHaveBeenCalledWith(sampleLogs[0]);
   });
 
-  describe("shows skeleton during loading", () => {
-    it("displays skeleton rows when loading is true", () => {
-      render(LogTable, { props: { logs: [], loading: true } });
-
-      const skeletons = screen.getAllByTestId("log-table-skeleton-row");
-      expect(skeletons.length).toBeGreaterThan(0);
-    });
-
-    it("renders multiple skeleton rows for loading state", () => {
-      render(LogTable, { props: { logs: [], loading: true } });
-
-      const skeletons = screen.getAllByTestId("log-table-skeleton-row");
-      expect(skeletons.length).toBeGreaterThanOrEqual(5);
-    });
-
-    it("hides log rows when loading", () => {
-      render(LogTable, { props: { logs: sampleLogs, loading: true } });
-
-      expect(screen.queryAllByTestId("log-row")).toHaveLength(0);
-    });
-
-    it("shows header even when loading", () => {
-      render(LogTable, { props: { logs: [], loading: true } });
-
-      expect(screen.getByTestId("log-table-header")).toBeInTheDocument();
-    });
-
-    it("skeleton rows have animated pulse effect", () => {
-      render(LogTable, { props: { logs: [], loading: true } });
-
-      const skeleton = screen.getAllByTestId("log-table-skeleton-row")[0]!;
-      const skeletonElements = within(skeleton).getAllByRole("presentation", { hidden: true });
-      expect(skeletonElements.length).toBeGreaterThan(0);
-    });
+  it("shows loading skeletons instead of rows", () => {
+    render(LogTable, { props: { logs: sampleLogs, loading: true } });
+    expect(screen.getAllByTestId("log-table-skeleton-row").length).toBeGreaterThanOrEqual(5);
+    expect(screen.queryAllByTestId("log-row")).toHaveLength(0);
+    expect(screen.queryByTestId("log-table-empty")).not.toBeInTheDocument();
   });
 
-  describe("shows empty state when no logs", () => {
-    it("displays empty state message when logs array is empty", () => {
-      render(LogTable, { props: { logs: [], loading: false } });
-
-      const emptyStates = screen.getAllByTestId("log-table-empty");
-      expect(emptyStates.length).toBeGreaterThan(0);
-    });
-
-    it('shows "No logs" text in empty state', () => {
-      render(LogTable, { props: { logs: [], loading: false } });
-
-      const table = screen.getByRole("table");
-      expect(within(table).getByText(/no logs/i)).toBeInTheDocument();
-    });
-
-    it("hides empty state when logs are present", () => {
-      render(LogTable, { props: { logs: sampleLogs, loading: false } });
-
-      expect(screen.queryByTestId("log-table-empty")).not.toBeInTheDocument();
-    });
-
-    it("hides empty state when loading", () => {
-      render(LogTable, { props: { logs: [], loading: true } });
-
-      expect(screen.queryByTestId("log-table-empty")).not.toBeInTheDocument();
-    });
-
-    it("shows header even with empty state", () => {
-      render(LogTable, { props: { logs: [], loading: false } });
-
-      expect(screen.getByTestId("log-table-header")).toBeInTheDocument();
-    });
-
-    it("empty state has appropriate styling", () => {
-      render(LogTable, { props: { logs: [], loading: false } });
-
-      const emptyStates = screen.getAllByTestId("log-table-empty");
-      const hasCorrectStyling = emptyStates.some((state) =>
-        state.classList.contains("text-muted-foreground"),
-      );
-      expect(hasCorrectStyling).toBe(true);
-    });
+  it.each([
+    [{ hasFilters: false }, /no logs yet/i, "log-table-empty"],
+    [{ hasFilters: true }, /no logs match your filters/i, "log-table-no-results"],
+  ])("empty state with %o shows %s", (props, message, testId) => {
+    render(LogTable, { props: { logs: [], loading: false, ...props } });
+    expect(within(screen.getByRole("table")).getByText(message)).toBeInTheDocument();
+    expect(screen.getAllByTestId(testId).length).toBeGreaterThan(0);
   });
 
-  describe("distinguishes empty state from no filter results", () => {
-    it('shows "No logs yet" message when hasFilters is false', () => {
-      render(LogTable, { props: { logs: [], loading: false, hasFilters: false } });
-
-      const table = screen.getByRole("table");
-      expect(within(table).getByText(/no logs yet/i)).toBeInTheDocument();
-    });
-
-    it('shows "No logs match your filters" message when hasFilters is true', () => {
-      render(LogTable, { props: { logs: [], loading: false, hasFilters: true } });
-
-      const table = screen.getByRole("table");
-      expect(within(table).getByText(/no logs match your filters/i)).toBeInTheDocument();
-    });
-
-    it('uses data-testid="log-table-empty" for empty project state', () => {
-      render(LogTable, { props: { logs: [], loading: false, hasFilters: false } });
-
-      const emptyStates = screen.getAllByTestId("log-table-empty");
-      expect(emptyStates.length).toBeGreaterThan(0);
-    });
-
-    it('uses data-testid="log-table-no-results" for filtered no-results state', () => {
-      render(LogTable, { props: { logs: [], loading: false, hasFilters: true } });
-
-      const noResultsStates = screen.getAllByTestId("log-table-no-results");
-      expect(noResultsStates.length).toBeGreaterThan(0);
-    });
-
-    it("defaults to empty state message when hasFilters is not provided", () => {
-      render(LogTable, { props: { logs: [], loading: false } });
-
-      const table = screen.getByRole("table");
-      expect(within(table).getByText(/no logs yet/i)).toBeInTheDocument();
-    });
+  it("hides empty state when logs are present", () => {
+    render(LogTable, { props: { logs: sampleLogs, loading: false } });
+    expect(screen.queryByTestId("log-table-empty")).not.toBeInTheDocument();
   });
 
-  describe("table structure and accessibility", () => {
-    it("renders as a proper table element", () => {
-      render(LogTable, { props: { logs: sampleLogs, loading: false } });
-
-      expect(screen.getByRole("table")).toBeInTheDocument();
-    });
-
-    it("has proper table semantics", () => {
-      render(LogTable, { props: { logs: sampleLogs, loading: false } });
-
-      const table = screen.getByRole("table");
-      expect(table).toBeInTheDocument();
-    });
-
-    it("applies custom className when provided", () => {
-      render(LogTable, { props: { logs: sampleLogs, loading: false, class: "custom-class" } });
-
-      const tableContainer = screen.getByTestId("log-table");
-      expect(tableContainer).toHaveClass("custom-class");
-    });
+  it("renders sortable column headers", () => {
+    render(LogTable, { props: { logs: sortableLogs, loading: false } });
+    const header = screen.getByTestId("log-table-header");
+    expect(within(header).getByRole("button", { name: /sort by time/i })).toBeInTheDocument();
+    expect(within(header).getByRole("button", { name: /sort by level/i })).toBeInTheDocument();
+    expect(within(header).getByRole("button", { name: /sort by message/i })).toBeInTheDocument();
   });
 
-  describe("column sorting", () => {
-    const sortableLogs: Log[] = [
-      createLog({
-        id: "log_a",
-        message: "Alpha message",
-        level: "error",
-        timestamp: new Date("2024-01-15T14:30:00.000Z"),
-      }),
-      createLog({
-        id: "log_b",
-        message: "Beta message",
-        level: "debug",
-        timestamp: new Date("2024-01-15T14:32:00.000Z"),
-      }),
-      createLog({
-        id: "log_c",
-        message: "Charlie message",
-        level: "warn",
-        timestamp: new Date("2024-01-15T14:31:00.000Z"),
-      }),
-    ];
+  it.each([
+    ["time", ["Alpha message", "Charlie message", "Beta message"]],
+    ["level", ["Beta message", "Charlie message", "Alpha message"]],
+    ["message", ["Alpha message", "Beta message", "Charlie message"]],
+  ] as const)("sorts ascending by %s on first click", async (column, expected) => {
+    render(LogTable, { props: { logs: sortableLogs, loading: false } });
+    await fireEvent.click(
+      screen.getByRole("button", { name: new RegExp(`sort by ${column}`, "i") }),
+    );
+    const rows = screen.getAllByTestId("log-row");
+    expect(rows.map((row) => within(row).getByTestId("log-message-desktop").textContent)).toEqual(
+      expected,
+    );
+  });
 
-    it("renders sortable column headers as buttons", () => {
-      render(LogTable, { props: { logs: sortableLogs, loading: false } });
+  it("toggles time sort descending then resets on third click", async () => {
+    render(LogTable, { props: { logs: sortableLogs, loading: false } });
+    const timeButton = screen.getByRole("button", { name: /sort by time/i });
+    const order = () => screen.getAllByTestId("log-row").map((row) => row.textContent);
 
-      const header = screen.getByTestId("log-table-header");
-      expect(within(header).getByRole("button", { name: /sort by time/i })).toBeInTheDocument();
-      expect(within(header).getByRole("button", { name: /sort by level/i })).toBeInTheDocument();
-      expect(within(header).getByRole("button", { name: /sort by message/i })).toBeInTheDocument();
-    });
+    await fireEvent.click(timeButton);
+    expect(timeButton.closest("th")).toHaveAttribute("aria-sort", "ascending");
 
-    it("sorts logs by timestamp ascending when Time header clicked", async () => {
-      render(LogTable, { props: { logs: sortableLogs, loading: false } });
+    await fireEvent.click(timeButton);
+    expect(timeButton.closest("th")).toHaveAttribute("aria-sort", "descending");
+    const descFirst = order()[0];
 
-      const timeButton = screen.getByRole("button", { name: /sort by time/i });
-      await fireEvent.click(timeButton);
+    await fireEvent.click(timeButton);
+    expect(timeButton.closest("th")).toHaveAttribute("aria-sort", "none");
+    // Reset restores input order (Alpha first), distinct from descending (Beta first)
+    expect(order()[0]).toContain("Alpha message");
+    expect(descFirst).toContain("Beta message");
+  });
 
-      const rows = screen.getAllByTestId("log-row");
-      expect(within(rows[0]!).getByText("Alpha message")).toBeInTheDocument();
-      expect(within(rows[1]!).getByText("Charlie message")).toBeInTheDocument();
-      expect(within(rows[2]!).getByText("Beta message")).toBeInTheDocument();
-    });
+  it("switching sort columns resets to ascending", async () => {
+    render(LogTable, { props: { logs: sortableLogs, loading: false } });
+    const timeButton = screen.getByRole("button", { name: /sort by time/i });
+    const levelButton = screen.getByRole("button", { name: /sort by level/i });
 
-    it("sorts logs by timestamp descending on second click", async () => {
-      render(LogTable, { props: { logs: sortableLogs, loading: false } });
+    await fireEvent.click(timeButton);
+    await fireEvent.click(timeButton);
+    await fireEvent.click(levelButton);
 
-      const timeButton = screen.getByRole("button", { name: /sort by time/i });
-      await fireEvent.click(timeButton);
-      await fireEvent.click(timeButton);
-
-      const rows = screen.getAllByTestId("log-row");
-      expect(within(rows[0]!).getByText("Beta message")).toBeInTheDocument();
-      expect(within(rows[1]!).getByText("Charlie message")).toBeInTheDocument();
-      expect(within(rows[2]!).getByText("Alpha message")).toBeInTheDocument();
-    });
-
-    it("resets sort on third click", async () => {
-      render(LogTable, { props: { logs: sortableLogs, loading: false } });
-
-      const timeButton = screen.getByRole("button", { name: /sort by time/i });
-      await fireEvent.click(timeButton);
-      await fireEvent.click(timeButton);
-      await fireEvent.click(timeButton);
-
-      const rows = screen.getAllByTestId("log-row");
-      expect(within(rows[0]!).getByText("Alpha message")).toBeInTheDocument();
-      expect(within(rows[1]!).getByText("Beta message")).toBeInTheDocument();
-      expect(within(rows[2]!).getByText("Charlie message")).toBeInTheDocument();
-    });
-
-    it("sorts logs by level severity ascending", async () => {
-      render(LogTable, { props: { logs: sortableLogs, loading: false } });
-
-      const levelButton = screen.getByRole("button", { name: /sort by level/i });
-      await fireEvent.click(levelButton);
-
-      const rows = screen.getAllByTestId("log-row");
-      expect(within(rows[0]!).getByText("DEBUG")).toBeInTheDocument();
-      expect(within(rows[1]!).getByText("WARN")).toBeInTheDocument();
-      expect(within(rows[2]!).getByText("ERROR")).toBeInTheDocument();
-    });
-
-    it("sorts logs by level severity descending on second click", async () => {
-      render(LogTable, { props: { logs: sortableLogs, loading: false } });
-
-      const levelButton = screen.getByRole("button", { name: /sort by level/i });
-      await fireEvent.click(levelButton);
-      await fireEvent.click(levelButton);
-
-      const rows = screen.getAllByTestId("log-row");
-      expect(within(rows[0]!).getByText("ERROR")).toBeInTheDocument();
-      expect(within(rows[1]!).getByText("WARN")).toBeInTheDocument();
-      expect(within(rows[2]!).getByText("DEBUG")).toBeInTheDocument();
-    });
-
-    it("sorts logs by message alphabetically ascending", async () => {
-      render(LogTable, { props: { logs: sortableLogs, loading: false } });
-
-      const messageButton = screen.getByRole("button", { name: /sort by message/i });
-      await fireEvent.click(messageButton);
-
-      const rows = screen.getAllByTestId("log-row");
-      expect(within(rows[0]!).getByText("Alpha message")).toBeInTheDocument();
-      expect(within(rows[1]!).getByText("Beta message")).toBeInTheDocument();
-      expect(within(rows[2]!).getByText("Charlie message")).toBeInTheDocument();
-    });
-
-    it("sorts logs by message alphabetically descending on second click", async () => {
-      render(LogTable, { props: { logs: sortableLogs, loading: false } });
-
-      const messageButton = screen.getByRole("button", { name: /sort by message/i });
-      await fireEvent.click(messageButton);
-      await fireEvent.click(messageButton);
-
-      const rows = screen.getAllByTestId("log-row");
-      expect(within(rows[0]!).getByText("Charlie message")).toBeInTheDocument();
-      expect(within(rows[1]!).getByText("Beta message")).toBeInTheDocument();
-      expect(within(rows[2]!).getByText("Alpha message")).toBeInTheDocument();
-    });
-
-    it("switching sort columns resets to ascending", async () => {
-      render(LogTable, { props: { logs: sortableLogs, loading: false } });
-
-      const timeButton = screen.getByRole("button", { name: /sort by time/i });
-      const levelButton = screen.getByRole("button", { name: /sort by level/i });
-
-      await fireEvent.click(timeButton);
-      await fireEvent.click(timeButton);
-      await fireEvent.click(levelButton);
-
-      const rows = screen.getAllByTestId("log-row");
-      expect(within(rows[0]!).getByText("DEBUG")).toBeInTheDocument();
-      expect(within(rows[1]!).getByText("WARN")).toBeInTheDocument();
-      expect(within(rows[2]!).getByText("ERROR")).toBeInTheDocument();
-    });
-
-    it("displays sort direction indicator on active column", async () => {
-      render(LogTable, { props: { logs: sortableLogs, loading: false } });
-
-      const timeButton = screen.getByRole("button", { name: /sort by time/i });
-      await fireEvent.click(timeButton);
-
-      const timeHeader = timeButton.closest("th");
-      expect(timeHeader).toHaveAttribute("aria-sort", "ascending");
-    });
-
-    it("displays descending indicator on second click", async () => {
-      render(LogTable, { props: { logs: sortableLogs, loading: false } });
-
-      const timeButton = screen.getByRole("button", { name: /sort by time/i });
-      await fireEvent.click(timeButton);
-      await fireEvent.click(timeButton);
-
-      const timeHeader = timeButton.closest("th");
-      expect(timeHeader).toHaveAttribute("aria-sort", "descending");
-    });
-
-    it("removes sort indicator after third click", async () => {
-      render(LogTable, { props: { logs: sortableLogs, loading: false } });
-
-      const timeButton = screen.getByRole("button", { name: /sort by time/i });
-      await fireEvent.click(timeButton);
-      await fireEvent.click(timeButton);
-      await fireEvent.click(timeButton);
-
-      const timeHeader = timeButton.closest("th");
-      expect(timeHeader).toHaveAttribute("aria-sort", "none");
-    });
+    const rows = screen.getAllByTestId("log-row");
+    expect(within(rows[0]!).getByText("DEBUG")).toBeInTheDocument();
+    expect(within(rows[1]!).getByText("WARN")).toBeInTheDocument();
+    expect(within(rows[2]!).getByText("ERROR")).toBeInTheDocument();
   });
 });

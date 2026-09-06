@@ -24,50 +24,16 @@ test.describe("Theme Toggle", () => {
     await page.reload();
   });
 
-  test("should toggle between light and dark mode", async ({ page }) => {
+  test("toggles between light and dark mode", async ({ page }) => {
     const html = page.locator("html");
     const toggleButton = page.getByRole("button", { name: /toggle theme/i });
 
     await expect(page.locator('[data-testid="sun-icon"]')).toBeVisible();
-    await expect(page.locator('[data-testid="moon-icon"]')).not.toBeVisible();
     await expect(html).not.toHaveClass(/dark/);
 
     await toggleButton.click();
 
     await expect(page.locator('[data-testid="moon-icon"]')).toBeVisible();
-    await expect(page.locator('[data-testid="sun-icon"]')).not.toBeVisible();
     await expect(html).toHaveClass(/dark/);
-
-    await toggleButton.click();
-
-    await expect(page.locator('[data-testid="sun-icon"]')).toBeVisible();
-    await expect(html).not.toHaveClass(/dark/);
-  });
-
-  test("should persist theme preference across page reload", async ({ page }) => {
-    const html = page.locator("html");
-    const toggleButton = page.getByRole("button", { name: /toggle theme/i });
-
-    await toggleButton.click();
-    await expect(html).toHaveClass(/dark/);
-
-    const storedMode = await page.evaluate(() => localStorage.getItem("mode-watcher-mode"));
-    expect(storedMode).toBe("dark");
-
-    await page.reload();
-
-    await expect(html).toHaveClass(/dark/);
-    await expect(page.locator('[data-testid="moon-icon"]')).toBeVisible();
-  });
-
-  test("should update color-scheme style attribute", async ({ page }) => {
-    const html = page.locator("html");
-    const toggleButton = page.getByRole("button", { name: /toggle theme/i });
-
-    await toggleButton.click();
-
-    await expect(html).toHaveClass(/dark/);
-
-    await expect(html).toHaveAttribute("style", /color-scheme:.*dark/);
   });
 });

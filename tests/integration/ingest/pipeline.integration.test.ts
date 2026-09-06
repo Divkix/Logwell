@@ -78,6 +78,13 @@ describe("ingestLogs pipeline", () => {
       });
 
       it("returns 401 for unknown key and deleted projects", async () => {
+        const unknown = await ingestLogs(
+          post(validBody("x"), "lw_invalid_key_that_does_not_exist"),
+          db,
+          parse,
+        );
+        expect(unknown.status).toBe(401);
+
         const project = await seedProjectWithApiKey(db);
         const response = await ingestLogs(post(validBody("x"), project.apiKey), db, parse);
         expect(response.status).toBe(200);
@@ -109,18 +116,10 @@ describe("ingestLogs pipeline", () => {
         const projectB = await seedProjectWithApiKey(db);
         while (checkRateLimit(`ingest:${projectA.id}`, INGEST_RPM)) {}
 
-        const limited = await ingestLogs(
-          post(simpleBody("A limited"), projectA.apiKey),
-          db,
-          parseSimpleIngestBody,
-        );
+        const limited = await ingestLogs(post(validBody("A limited"), projectA.apiKey), db, parse);
         expect(limited.status).toBe(429);
 
-        const allowed = await ingestLogs(
-          post(simpleBody("B allowed"), projectB.apiKey),
-          db,
-          parseSimpleIngestBody,
-        );
+        const allowed = await ingestLogs(post(validBody("B allowed"), projectB.apiKey), db, parse);
         expect(allowed.status).toBe(200);
       });
 
@@ -176,6 +175,13 @@ describe("ingestLogs pipeline", () => {
 
     const rows = await db.select().from(log).where(eq(log.projectId, project.id));
     expect(rows).toHaveLength(0);
+  });
+
+  it("returns 400 validation_error for an empty simple-ingest array", async () => {
+    const project = await seedProjectWithApiKey(db);
+    const response = await ingestLogs(post([], project.apiKey), db, parseSimpleIngestBody);
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toBe("validation_error");
   });
 
   it("maps validation failures to 400 validation_error per parser", async () => {

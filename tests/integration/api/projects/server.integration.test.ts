@@ -9,7 +9,26 @@ import { setupTestDatabase } from "$lib/server/db/test-db";
 import { getSession } from "$lib/server/session";
 import { hashApiKey } from "$lib/server/utils/api-key";
 import { GET, POST } from "../../../../src/routes/api/projects/+server";
+import {
+  DELETE as DELETE_BY_ID,
+  GET as GET_BY_ID,
+  PATCH as PATCH_BY_ID,
+} from "../../../../src/routes/api/projects/[id]/+server";
 import { seedLogs, seedProject, seedProjects } from "../../../fixtures/db";
+
+function createIdRequestEvent(
+  request: Request,
+  db: PgliteDatabase<typeof schema>,
+  id: string,
+  locals: Partial<App.Locals> = {},
+) {
+  return {
+    request,
+    locals: { db, ...locals },
+    params: { id },
+    url: new URL(request.url),
+  } as unknown as Parameters<typeof GET_BY_ID>[0];
+}
 
 function createRequestEvent(
   request: Request,
@@ -527,5 +546,313 @@ describe("POST /api/projects", () => {
       const body = await response.json();
       expect(body.name).toBe("my-project_v2");
     });
+  });
+});
+
+describe("GET /api/projects/[id] (canonical detail home)", () => {
+  let db: PgliteDatabase<typeof schema>;
+  let cleanup: () => Promise<void>;
+  let authenticatedLocals: Partial<App.Locals>;
+  let userId: string;
+
+  beforeEach(async () => {
+    const setup = await setupTestDatabase();
+    db = setup.db;
+    cleanup = setup.cleanup;
+    const auth = createAuth(db);
+    const signUpResult = await auth.api.signUpEmail({
+      body: { email: "detail@example.com", password: "SecureP@ssw0rd123", name: "Detail User" },
+    });
+    const sessionData = await getSession(
+      new Request("http://localhost:5173", {
+        headers: { cookie: `better-auth.session_token=${signUpResult.token}` },
+      }).headers,
+      db,
+    );
+    if (!sessionData) throw new Error("Session data should not be null");
+    userId = sessionData.user.id;
+    authenticatedLocals = { user: sessionData.user, session: sessionData.session };
+  });
+
+  afterEach(async () => {
+    await cleanup();
+  });
+
+  it("returns the project with log stats and no API key", async () => {
+    const testProject = await seedProject(db, { name: "my-test-project", ownerId: userId });
+    await seedLogs(db, testProject.id, 3, { level: "info" });
+    await seedLogs(db, testProject.id, 2, { level: "error" });
+
+    const request = new Request(`http://localhost/api/projects/${testProject.id}`, {
+      method: "GET",
+    });
+    const response = await GET_BY_ID(
+      createIdRequestEvent(request, db, testProject.id, authenticatedLocals),
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({ id: testProject.id, name: "my-test-project" });
+    expect(body).not.toHaveProperty("apiKey");
+    expect(body.stats.totalLogs).toBe(5);
+    expect(body.stats.levelCounts).toMatchObject({ info: 3, error: 2 });
+  });
+
+  it("returns retentionDays as stored (null, 0, 365)", async () => {
+    for (const retentionDays of [null, 0, 365] as const) {
+      const testProject = await seedProject(db, { ownerId: userId, retentionDays });
+      const request = new Request(`http://localhost/api/projects/${testProject.id}`, {
+        method: "GET",
+      });
+      const response = await GET_BY_ID(
+        createIdRequestEvent(request, db, testProject.id, authenticatedLocals),
+      );
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ retentionDays });
+    }
+  });
+
+  it("removes the project and its logs on DELETE", async () => {
+    const testProject = await seedProject(db, { ownerId: userId });
+    await seedLogs(db, testProject.id, 5);
+
+    const request = new Request(`http://localhost/api/projects/${testProject.id}`, {
+      method: "DELETE",
+      headers: { Origin: "http://localhost" },
+    });
+    const response = await DELETE_BY_ID(
+      createIdRequestEvent(request, db, testProject.id, authenticatedLocals),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ success: true, id: testProject.id });
+
+    const retry = await GET_BY_ID(
+      createIdRequestEvent(
+        new Request(`http://localhost/api/projects/${testProject.id}`, { method: "GET" }),
+        db,
+        testProject.id,
+        authenticatedLocals,
+      ),
+    );
+    expect(retry.status).toBe(404);
+  });
+});
+
+describe("PATCH /api/projects/[id] (canonical patch home)", () => {
+  let db: PgliteDatabase<typeof schema>;
+  let cleanup: () => Promise<void>;
+  let authenticatedLocals: Partial<App.Locals>;
+  let userId: string;
+
+  beforeEach(async () => {
+    const setup = await setupTestDatabase();
+    db = setup.db;
+    cleanup = setup.cleanup;
+    const auth = createAuth(db);
+    const signUpResult = await auth.api.signUpEmail({
+      body: { email: "patch@example.com", password: "SecureP@ssw0rd123", name: "Patch User" },
+    });
+    const sessionData = await getSession(
+      new Request("http://localhost:5173", {
+        headers: { cookie: `better-auth.session_token=${signUpResult.token}` },
+      }).headers,
+      db,
+    );
+    if (!sessionData) throw new Error("Session data should not be null");
+    userId = sessionData.user.id;
+    authenticatedLocals = { user: sessionData.user, session: sessionData.session };
+  });
+
+  afterEach(async () => {
+    await cleanup();
+  });
+
+  function patchRequest(id: string, body: unknown) {
+    return new Request(`http://localhost/api/projects/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Origin: "http://localhost" },
+      body: JSON.stringify(body),
+    });
+  }
+
+  it("renames the project", async () => {
+    const testProject = await seedProject(db, { name: "old-name", ownerId: userId });
+
+    const response = await PATCH_BY_ID(
+      createIdRequestEvent(
+        patchRequest(testProject.id, { name: "new-name" }),
+        db,
+        testProject.id,
+        authenticatedLocals,
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ id: testProject.id, name: "new-name" });
+  });
+
+  it("rejects a duplicate name for the same owner", async () => {
+    await seedProject(db, { name: "existing-project", ownerId: userId });
+    const testProject = await seedProject(db, { name: "my-project", ownerId: userId });
+
+    const response = await PATCH_BY_ID(
+      createIdRequestEvent(
+        patchRequest(testProject.id, { name: "existing-project" }),
+        db,
+        testProject.id,
+        authenticatedLocals,
+      ),
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ code: "duplicate_name" });
+  });
+
+  it.each([
+    ["empty name", { name: "" }],
+    ["over-long name", { name: "a".repeat(51) }],
+    ["invalid characters", { name: "invalid name!" }],
+  ])("rejects rename with %s", async (_label, body) => {
+    const testProject = await seedProject(db, { name: "my-project", ownerId: userId });
+
+    const response = await PATCH_BY_ID(
+      createIdRequestEvent(
+        patchRequest(testProject.id, body),
+        db,
+        testProject.id,
+        authenticatedLocals,
+      ),
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ code: "validation_error" });
+  });
+
+  it("updates retentionDays", async () => {
+    const testProject = await seedProject(db, { ownerId: userId });
+
+    const response = await PATCH_BY_ID(
+      createIdRequestEvent(
+        patchRequest(testProject.id, { retentionDays: 90 }),
+        db,
+        testProject.id,
+        authenticatedLocals,
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ retentionDays: 90 });
+  });
+
+  it.each([
+    ["null (system default)", null],
+    ["0 (never delete)", 0],
+  ])("accepts retentionDays %s", async (_label, retentionDays) => {
+    const testProject = await seedProject(db, { ownerId: userId });
+
+    const response = await PATCH_BY_ID(
+      createIdRequestEvent(
+        patchRequest(testProject.id, { retentionDays }),
+        db,
+        testProject.id,
+        authenticatedLocals,
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ retentionDays });
+  });
+
+  it("updates name and retentionDays together", async () => {
+    const testProject = await seedProject(db, { name: "before", ownerId: userId });
+
+    const response = await PATCH_BY_ID(
+      createIdRequestEvent(
+        patchRequest(testProject.id, { name: "after", retentionDays: 30 }),
+        db,
+        testProject.id,
+        authenticatedLocals,
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ name: "after", retentionDays: 30 });
+  });
+
+  it("allows a name shared with another owner's project", async () => {
+    await seedProject(db, { name: "shared-name" });
+    const testProject = await seedProject(db, { name: "my-project", ownerId: userId });
+
+    const response = await PATCH_BY_ID(
+      createIdRequestEvent(
+        patchRequest(testProject.id, { name: "shared-name" }),
+        db,
+        testProject.id,
+        authenticatedLocals,
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ name: "shared-name" });
+  });
+
+  it("returns 404 for a missing project", async () => {
+    const response = await PATCH_BY_ID(
+      createIdRequestEvent(
+        patchRequest("no-such-project", { name: "x" }),
+        db,
+        "no-such-project",
+        authenticatedLocals,
+      ),
+    );
+
+    expect(response.status).toBe(404);
+  });
+
+  it("leaves retentionDays unchanged when omitted and keeps updatedAt on empty body", async () => {
+    const testProject = await seedProject(db, { name: "keep", ownerId: userId });
+
+    const renamed = await PATCH_BY_ID(
+      createIdRequestEvent(
+        patchRequest(testProject.id, { name: "kept" }),
+        db,
+        testProject.id,
+        authenticatedLocals,
+      ),
+    );
+    const renamedBody = await renamed.json();
+    expect(renamedBody).toMatchObject({ name: "kept", retentionDays: testProject.retentionDays });
+
+    const untouched = await PATCH_BY_ID(
+      createIdRequestEvent(
+        patchRequest(testProject.id, {}),
+        db,
+        testProject.id,
+        authenticatedLocals,
+      ),
+    );
+    expect(untouched.status).toBe(200);
+    expect((await untouched.json()).updatedAt).toBe(renamedBody.updatedAt);
+  });
+
+  it.each([
+    ["negative", { retentionDays: -1 }],
+    ["exceeds max", { retentionDays: 3651 }],
+    ["non-integer", { retentionDays: 30.5 }],
+  ])("rejects retentionDays %s", async (_label, body) => {
+    const testProject = await seedProject(db, { ownerId: userId });
+
+    const response = await PATCH_BY_ID(
+      createIdRequestEvent(
+        patchRequest(testProject.id, body),
+        db,
+        testProject.id,
+        authenticatedLocals,
+      ),
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ code: "validation_error" });
   });
 });

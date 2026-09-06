@@ -1,11 +1,15 @@
 import type { HttpError } from "@sveltejs/kit";
+import { eq, sql } from "drizzle-orm";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
+import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
 import { createAuth } from "$lib/server/auth";
 import type * as schema from "$lib/server/db/schema";
+import { log } from "$lib/server/db/schema";
 import { setupTestDatabase } from "$lib/server/db/test-db";
 import { getSession } from "$lib/server/session";
 import { clearApiKeyCache } from "$lib/server/utils/api-key";
+import { cappedLogCount } from "$lib/server/utils/capped-count";
 import { GET } from "../../../../../src/routes/api/projects/[id]/logs/+server";
 import { seedLog, seedLogs, seedProject } from "../../../../fixtures/db";
 
@@ -679,6 +683,118 @@ describe("GET /api/projects/[id]/logs", () => {
       expect(body2.logs).toHaveLength(100);
       expect(body2.has_more).toBe(false);
       expect(body2.nextCursor).toBeNull();
+    });
+  });
+
+  describe("Cursor Edge Cases", () => {
+    it("does not skip rows that share the cursor's millisecond", async () => {
+      const testProject = await seedProject(db, { ownerId: userId });
+
+      const baseEpoch = 1767225600.123456; // 2026-01-01T00:00:00.123456Z
+      const seededIds: string[] = [];
+      for (let i = 0; i < 25; i++) {
+        const id = nanoid();
+        seededIds.push(id);
+        await db.execute(sql`
+          INSERT INTO "log" ("id", "project_id", "level", "message", "timestamp")
+          VALUES (${id}, ${testProject.id}, 'info', ${`same-ms-${i}`}, to_timestamp(${baseEpoch + i * 0.000001}))
+        `);
+      }
+
+      const collectedIds: string[] = [];
+      let cursor: string | null = null;
+      for (let page = 0; page < 10; page++) {
+        const url = cursor
+          ? `http://localhost/api/projects/${testProject.id}/logs?limit=10&cursor=${encodeURIComponent(cursor)}`
+          : `http://localhost/api/projects/${testProject.id}/logs?limit=10`;
+        const request = new Request(url, { method: "GET" });
+        const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+        const response = await GET(event as never);
+        expect(response.status).toBe(200);
+        const body = await response.json();
+
+        collectedIds.push(...body.logs.map((l: { id: string }) => l.id));
+
+        if (!body.has_more) break;
+        cursor = body.nextCursor;
+      }
+
+      expect(collectedIds).toHaveLength(25);
+      expect(new Set(collectedIds).size).toBe(25);
+    });
+
+    it("reports a capped total once the count ceiling is reached", async () => {
+      const testProject = await seedProject(db, { ownerId: userId });
+      await seedLogs(db, testProject.id, 3);
+
+      const capped = await cappedLogCount(db, eq(log.projectId, testProject.id), 2);
+      expect(capped.total).toBe(2);
+      expect(capped.capped).toBe(true);
+
+      const exact = await cappedLogCount(db, eq(log.projectId, testProject.id));
+      expect(exact.total).toBe(3);
+      expect(exact.capped).toBe(false);
+
+      const zero = await cappedLogCount(db, eq(log.projectId, "no-such-project"), 2);
+      expect(zero).toEqual({ total: 0, capped: false });
+    });
+
+    it("returns 400 invalid_cursor for a malformed cursor", async () => {
+      const testProject = await seedProject(db, { ownerId: userId });
+      await seedLogs(db, testProject.id, 2);
+
+      const request = new Request(
+        `http://localhost/api/projects/${testProject.id}/logs?cursor=invalid-cursor-123`,
+        { method: "GET" },
+      );
+      const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+      const response = await GET(event as never);
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ error: "invalid_cursor" });
+    });
+
+    it("keeps the level filter when paginating with a cursor", async () => {
+      const testProject = await seedProject(db, { ownerId: userId });
+      await seedLogs(db, testProject.id, 3, { level: "info" });
+      await seedLogs(db, testProject.id, 3, { level: "error" });
+
+      const first = new Request(
+        `http://localhost/api/projects/${testProject.id}/logs?level=error&limit=2`,
+        { method: "GET" },
+      );
+      const firstEvent = createRequestEvent(first, db, { id: testProject.id }, authenticatedLocals);
+      const firstBody = await (await GET(firstEvent as never)).json();
+      expect(firstBody.logs).toHaveLength(2);
+      expect(firstBody.has_more).toBe(true);
+
+      const second = new Request(
+        `http://localhost/api/projects/${testProject.id}/logs?level=error&limit=2&cursor=${firstBody.nextCursor}`,
+        { method: "GET" },
+      );
+      const secondEvent = createRequestEvent(
+        second,
+        db,
+        { id: testProject.id },
+        authenticatedLocals,
+      );
+      const secondBody = await (await GET(secondEvent as never)).json();
+      expect(secondBody.logs).toHaveLength(1);
+      expect(secondBody.logs.every((l: { level: string }) => l.level === "error")).toBe(true);
+    });
+
+    it("returns the first page for an empty cursor", async () => {
+      const testProject = await seedProject(db, { ownerId: userId });
+      await seedLogs(db, testProject.id, 2);
+
+      const request = new Request(`http://localhost/api/projects/${testProject.id}/logs?cursor=`, {
+        method: "GET",
+      });
+      const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+      const response = await GET(event as never);
+
+      expect(response.status).toBe(200);
+      expect((await response.json()).logs).toHaveLength(2);
     });
   });
 

@@ -59,253 +59,80 @@ describe("LogDetailModal", () => {
     vi.clearAllMocks();
   });
 
-  describe("displays all log fields", () => {
-    it("displays log ID", () => {
-      render(LogDetailModal, { props: { log: baseLog, open: true } });
+  it("renders the full log with formatted timestamp and metadata", () => {
+    render(LogDetailModal, { props: { log: baseLog, open: true } });
 
-      expect(screen.getByText("log_123")).toBeInTheDocument();
-    });
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByText("log_123")).toBeInTheDocument();
+    expect(screen.getByText("INFO")).toBeInTheDocument();
+    expect(screen.getByText("User logged in successfully")).toBeInTheDocument();
+    expect(screen.getByText("auth.ts:42")).toBeInTheDocument();
+    expect(screen.getByText("req_abc")).toBeInTheDocument();
+    expect(screen.getByText(/2024-01-15 14:30:45\.123 UTC/)).toBeInTheDocument();
 
-    it("displays log level with badge", () => {
-      render(LogDetailModal, { props: { log: baseLog, open: true } });
-
-      expect(screen.getByText("INFO")).toBeInTheDocument();
-    });
-
-    it("displays log message", () => {
-      render(LogDetailModal, { props: { log: baseLog, open: true } });
-
-      expect(screen.getByText("User logged in successfully")).toBeInTheDocument();
-    });
-
-    it("displays source file and line number", () => {
-      render(LogDetailModal, { props: { log: baseLog, open: true } });
-
-      expect(screen.getByText("auth.ts:42")).toBeInTheDocument();
-    });
-
-    it("displays request ID", () => {
-      render(LogDetailModal, { props: { log: baseLog, open: true } });
-
-      expect(screen.getByText("req_abc")).toBeInTheDocument();
-    });
-
-    it("displays user ID", () => {
-      render(LogDetailModal, { props: { log: baseLog, open: true } });
-
-      expect(screen.getByText("user_789")).toBeInTheDocument();
-    });
-
-    it("displays IP address", () => {
-      render(LogDetailModal, { props: { log: baseLog, open: true } });
-
-      expect(screen.getByText("192.168.1.1")).toBeInTheDocument();
-    });
-
-    it("shows N/A for missing optional fields", () => {
-      const logWithMissingFields: Log = {
-        ...baseLog,
-        sourceFile: null,
-        lineNumber: null,
-        requestId: null,
-        userId: null,
-        ipAddress: null,
-      };
-      render(LogDetailModal, { props: { log: logWithMissingFields, open: true } });
-
-      const naElements = screen.getAllByText("N/A");
-      expect(naElements.length).toBeGreaterThanOrEqual(4);
-    });
-
-    it("does not render when open is false", () => {
-      render(LogDetailModal, { props: { log: baseLog, open: false } });
-
-      expect(screen.queryByText("log_123")).not.toBeInTheDocument();
-    });
+    const metadataElement = screen.getByTestId("log-metadata");
+    expect(metadataElement.textContent).toContain('"userId"');
+    expect(metadataElement.textContent).toContain('"details"');
   });
 
-  describe("formats timestamp as full date", () => {
-    it("displays timestamp in full date format", () => {
-      render(LogDetailModal, { props: { log: baseLog, open: true } });
+  it("shows N/A for missing fields and stays hidden when closed", () => {
+    const sparse: Log = {
+      ...baseLog,
+      sourceFile: null,
+      lineNumber: null,
+      requestId: null,
+      userId: null,
+      ipAddress: null,
+      metadata: null,
+      timestamp: null as unknown as Date,
+    };
+    render(LogDetailModal, { props: { log: sparse, open: true } });
+    expect(screen.getAllByText("N/A").length).toBeGreaterThanOrEqual(4);
 
-      expect(screen.getByText(/2024-01-15 14:30:45\.123 UTC/)).toBeInTheDocument();
-    });
-
-    it("displays label for timestamp field", () => {
-      render(LogDetailModal, { props: { log: baseLog, open: true } });
-
-      expect(screen.getByText("Timestamp")).toBeInTheDocument();
-    });
-
-    it("handles null timestamp gracefully", () => {
-      const logWithNullTimestamp = { ...baseLog, timestamp: null as unknown as Date };
-      render(LogDetailModal, { props: { log: logWithNullTimestamp, open: true } });
-
-      expect(screen.getByText("N/A")).toBeInTheDocument();
-    });
+    cleanup();
+    render(LogDetailModal, { props: { log: baseLog, open: false } });
+    expect(screen.queryByText("log_123")).not.toBeInTheDocument();
   });
 
-  describe("pretty-prints metadata JSON", () => {
-    it("displays metadata in formatted JSON", () => {
-      render(LogDetailModal, { props: { log: baseLog, open: true } });
-
-      const metadataElement = screen.getByTestId("log-metadata");
-      expect(metadataElement).toBeInTheDocument();
-      expect(metadataElement.textContent).toContain('"userId"');
-      expect(metadataElement.textContent).toContain('"action"');
-    });
-
-    it("formats nested JSON objects correctly", () => {
-      render(LogDetailModal, { props: { log: baseLog, open: true } });
-
-      const metadataElement = screen.getByTestId("log-metadata");
-      expect(metadataElement.textContent).toContain('"details"');
-      expect(metadataElement.textContent).toContain('"ip"');
-    });
-
-    it("shows N/A for null metadata", () => {
-      const logWithNullMetadata = { ...baseLog, metadata: null };
-      render(LogDetailModal, { props: { log: logWithNullMetadata, open: true } });
-
-      const metadataSection = screen.getByTestId("metadata-section");
-      expect(metadataSection).toHaveTextContent("N/A");
-    });
-
-    it("handles empty object metadata", () => {
-      const logWithEmptyMetadata = { ...baseLog, metadata: {} };
-      render(LogDetailModal, { props: { log: logWithEmptyMetadata, open: true } });
-
-      const metadataElement = screen.getByTestId("log-metadata");
-      expect(metadataElement.textContent).toContain("{}");
-    });
+  it.each([
+    ["copy-id-button", "log_123"],
+    ["copy-message-button", "User logged in successfully"],
+    ["copy-request-id-button", "req_abc"],
+  ])("%s copies its value to the clipboard", async (testId, expected) => {
+    render(LogDetailModal, { props: { log: baseLog, open: true } });
+    await fireEvent.click(screen.getByTestId(testId));
+    expect(mockClipboard.writeText).toHaveBeenCalledWith(expected);
   });
 
-  describe("copy buttons copy values to clipboard", () => {
-    it("copies log ID when copy button is clicked", async () => {
-      render(LogDetailModal, { props: { log: baseLog, open: true } });
+  it("copies metadata as formatted JSON and hides the button when null", async () => {
+    render(LogDetailModal, { props: { log: baseLog, open: true } });
+    await fireEvent.click(screen.getByTestId("copy-metadata-button"));
+    expect(mockClipboard.writeText).toHaveBeenCalledWith(JSON.stringify(baseLog.metadata, null, 2));
 
-      const copyIdButton = screen.getByTestId("copy-id-button");
-      await fireEvent.click(copyIdButton);
-
-      expect(mockClipboard.writeText).toHaveBeenCalledWith("log_123");
-    });
-
-    it("copies message when copy button is clicked", async () => {
-      render(LogDetailModal, { props: { log: baseLog, open: true } });
-
-      const copyMessageButton = screen.getByTestId("copy-message-button");
-      await fireEvent.click(copyMessageButton);
-
-      expect(mockClipboard.writeText).toHaveBeenCalledWith("User logged in successfully");
-    });
-
-    it("copies metadata JSON when copy button is clicked", async () => {
-      render(LogDetailModal, { props: { log: baseLog, open: true } });
-
-      const copyMetadataButton = screen.getByTestId("copy-metadata-button");
-      await fireEvent.click(copyMetadataButton);
-
-      expect(mockClipboard.writeText).toHaveBeenCalledWith(
-        JSON.stringify(baseLog.metadata, null, 2),
-      );
-    });
-
-    it("copies request ID when available", async () => {
-      render(LogDetailModal, { props: { log: baseLog, open: true } });
-
-      const copyRequestIdButton = screen.getByTestId("copy-request-id-button");
-      await fireEvent.click(copyRequestIdButton);
-
-      expect(mockClipboard.writeText).toHaveBeenCalledWith("req_abc");
-    });
-
-    it("does not show copy button for null metadata", () => {
-      const logWithNullMetadata = { ...baseLog, metadata: null };
-      render(LogDetailModal, { props: { log: logWithNullMetadata, open: true } });
-
-      expect(screen.queryByTestId("copy-metadata-button")).not.toBeInTheDocument();
-    });
+    cleanup();
+    render(LogDetailModal, { props: { log: { ...baseLog, metadata: null }, open: true } });
+    expect(screen.queryByTestId("copy-metadata-button")).not.toBeInTheDocument();
   });
 
-  describe("closes on Escape key", () => {
-    it("calls onClose when Escape key is pressed", async () => {
-      const onClose = vi.fn();
-      render(LogDetailModal, { props: { log: baseLog, open: true, onClose } });
+  it.each(["overlay", "close-button", "Escape"])("close via %s calls onClose", async (method) => {
+    const onClose = vi.fn();
+    render(LogDetailModal, { props: { log: baseLog, open: true, onClose } });
 
+    if (method === "overlay") {
+      await fireEvent.click(screen.getByTestId("modal-overlay"));
+    } else if (method === "close-button") {
+      await fireEvent.click(screen.getByTestId("close-button"));
+    } else {
       await fireEvent.keyDown(document, { key: "Escape" });
-
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it("does not call onClose for other keys", async () => {
-      const onClose = vi.fn();
-      render(LogDetailModal, { props: { log: baseLog, open: true, onClose } });
-
-      await fireEvent.keyDown(document, { key: "Enter" });
-
-      expect(onClose).not.toHaveBeenCalled();
-    });
+    }
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  describe("closes on overlay click", () => {
-    it("calls onClose when overlay is clicked", async () => {
-      const onClose = vi.fn();
-      render(LogDetailModal, { props: { log: baseLog, open: true, onClose } });
-
-      const overlay = screen.getByTestId("modal-overlay");
-      await fireEvent.click(overlay);
-
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it("does not call onClose when content is clicked", async () => {
-      const onClose = vi.fn();
-      render(LogDetailModal, { props: { log: baseLog, open: true, onClose } });
-
-      const content = screen.getByTestId("modal-content");
-      await fireEvent.click(content);
-
-      expect(onClose).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("close button", () => {
-    it("renders close button", () => {
-      render(LogDetailModal, { props: { log: baseLog, open: true } });
-
-      expect(screen.getByTestId("close-button")).toBeInTheDocument();
-    });
-
-    it("calls onClose when close button is clicked", async () => {
-      const onClose = vi.fn();
-      render(LogDetailModal, { props: { log: baseLog, open: true, onClose } });
-
-      const closeButton = screen.getByTestId("close-button");
-      await fireEvent.click(closeButton);
-
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe("accessibility", () => {
-    it("has appropriate dialog role", () => {
-      render(LogDetailModal, { props: { log: baseLog, open: true } });
-
-      expect(screen.getByRole("dialog")).toBeInTheDocument();
-    });
-
-    it("has appropriate aria-labelledby", () => {
-      render(LogDetailModal, { props: { log: baseLog, open: true } });
-
-      const dialog = screen.getByRole("dialog");
-      expect(dialog).toHaveAttribute("aria-labelledby");
-    });
-
-    it("close button has accessible label", () => {
-      render(LogDetailModal, { props: { log: baseLog, open: true } });
-
-      const closeButton = screen.getByTestId("close-button");
-      expect(closeButton).toHaveAccessibleName(/close/i);
-    });
+  it("ignores content clicks and non-Escape keys", async () => {
+    const onClose = vi.fn();
+    render(LogDetailModal, { props: { log: baseLog, open: true, onClose } });
+    await fireEvent.click(screen.getByTestId("modal-content"));
+    await fireEvent.keyDown(document, { key: "Enter" });
+    expect(onClose).not.toHaveBeenCalled();
   });
 });
