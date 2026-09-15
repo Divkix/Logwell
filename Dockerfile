@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.4
 
 # SECURITY: pinned to an exact version + digest for reproducible builds (matches CI's Bun 1.4.1)
-FROM oven/bun:1.4.1-alpine@sha256:2ef545220f7a886f22fcb3f2309bbd6bcf1c0aa04b7d79c31765c7aa4a13aac1 AS base
+FROM oven/bun:1.4.2-alpine@sha256:d888c0ae6c86d7866ff10c5aafdd9077b36aee6455b33dd270fb93c0dd5cef6f AS base
 WORKDIR /app
 
 # Install curl for healthcheck (alpine minimal doesn't include it)
