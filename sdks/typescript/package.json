@@ -79,13 +79,6 @@
       "limit": "10 KB"
     }
   ],
-  "devEngines": {
-    "packageManager": {
-      "name": "bun",
-      "version": "1.4.2",
-      "onFail": "download"
-    }
-  },
   "engines": {
     "node": ">=20.0.0"
   }
