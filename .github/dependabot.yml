@@ -18,6 +18,13 @@ updates:
     labels:
       - dependencies
       - bun
+    ignore:
+      # vite-plus toolchain moves in lockstep via `vp migrate` only — solo bumps desync it and break CI (coverage startup abort).
+      - dependency-name: "vite-plus"
+      - dependency-name: "vite"
+      - dependency-name: "vitest"
+      - dependency-name: "@vitest/*"
+      - dependency-name: "@voidzero-dev/vite-plus-core"
     groups:
       # Group all minor and patch updates together
       minor-and-patch:
@@ -93,6 +100,13 @@ updates:
     labels:
       - dependencies
       - sdk
+    ignore:
+      # SDK runs `vp test run --coverage`: toolchain moves via `vp migrate` only.
+      - dependency-name: "vite-plus"
+      - dependency-name: "vite"
+      - dependency-name: "vitest"
+      - dependency-name: "@vitest/*"
+      - dependency-name: "@voidzero-dev/vite-plus-core"
     groups:
       sdk-typescript:
         patterns:

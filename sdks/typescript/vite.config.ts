@@ -6,6 +6,7 @@ export default defineConfig({
     options: { typeAware: true, typeCheck: true },
   },
   pack: {
+    deps: { resolveDepSubpath: true },
     entry: ["src/index.ts"],
     format: ["esm", "cjs"],
     dts: true,
