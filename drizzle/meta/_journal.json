@@ -85,6 +85,13 @@
       "when": 1788563701468,
       "tag": "0011_account_issuer",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1789442132717,
+      "tag": "0012_hot_toro",
+      "breakpoints": true
     }
   ]
 }
