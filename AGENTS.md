@@ -81,12 +81,12 @@ Local build needs dummy env: `DATABASE_URL=postgres://… BETTER_AUTH_SECRET=<�
 
 Tier by **filename suffix** (Playwright excluded from Vitest). Import from `vite-plus/test`, not `vitest`.
 
-| Tier | Glob | DB | Command |
-|---|---|---|---|
-| Unit | `src/**/*.unit.test.ts` | mocked | `bun run test:unit` |
-| Component | `src/**/*.component.test.ts` (jsdom + Testing Library) | none | `bun run test:component` |
-| Integration | `tests/integration/**/*.integration.test.ts` + `scripts/**/*.test.ts` | PGlite | `bun run test:integration` |
-| E2E | `tests/e2e/**` | real Postgres | `bun run test:e2e` |
+| Tier        | Glob                                                                  | DB            | Command                    |
+| ----------- | --------------------------------------------------------------------- | ------------- | -------------------------- |
+| Unit        | `src/**/*.unit.test.ts`                                               | mocked        | `bun run test:unit`        |
+| Component   | `src/**/*.component.test.ts` (jsdom + Testing Library)                | none          | `bun run test:component`   |
+| Integration | `tests/integration/**/*.integration.test.ts` + `scripts/**/*.test.ts` | PGlite        | `bun run test:integration` |
+| E2E         | `tests/e2e/**`                                                        | real Postgres | `bun run test:e2e`         |
 
 - **Integration:** fresh PGlite per test via schema reflection (not `drizzle/*.sql`); new column types may need `test-db.ts` type map / `tableOrder` or table silently skipped. Seed via `tests/fixtures/db.ts` (`seedProject`, `seedLog`, `seedProjectWithApiKey` — plaintext once); add same-origin `Origin`; `clearApiKeyCache()` in `beforeEach`. Don't copy `health.integration.test.ts` inline `CREATE TABLE` (legacy `api_key` col).
 - **Conventions before refactor:** timeseries/incident-detail/timeline tests spy on `db.select` and throw on full-row pulls — aggregate in SQL. `hooks.server.test.ts` covers session population only, not rate-limit/fast-paths.
