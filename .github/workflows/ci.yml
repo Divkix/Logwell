@@ -42,7 +42,7 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
-          bun-version: "1.4.1"
+          bun-version: "1.4.2"
           no-cache: true
 
       - name: Get bun cache directory
@@ -90,7 +90,7 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
-          bun-version: "1.4.1"
+          bun-version: "1.4.2"
           no-cache: true
 
       - name: Get bun cache directory
@@ -132,7 +132,7 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
-          bun-version: "1.4.1"
+          bun-version: "1.4.2"
           no-cache: true
 
       - name: Get bun cache directory
@@ -171,7 +171,7 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
-          bun-version: "1.4.1"
+          bun-version: "1.4.2"
           no-cache: true
 
       - name: Get bun cache directory
@@ -213,7 +213,7 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
-          bun-version: "1.4.1"
+          bun-version: "1.4.2"
           no-cache: true
 
       - name: Get bun cache directory
@@ -272,7 +272,7 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
-          bun-version: "1.4.1"
+          bun-version: "1.4.2"
           no-cache: true
 
       - name: Get bun cache directory
@@ -314,7 +314,7 @@ jobs:
           timeout 30 bash -c 'until pg_isready -h localhost -p 5432 -U postgres; do sleep 1; done'
 
       - name: Run database migrations
-        run: bunx drizzle-kit push --force
+        run: bunx drizzle-kit migrate
 
       - name: Seed admin user
         run: bun run db:seed
@@ -354,7 +354,7 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
-          bun-version: "1.4.1"
+          bun-version: "1.4.2"
           no-cache: true
 
       - name: Get bun cache directory
@@ -383,9 +383,12 @@ jobs:
           retention-days: 7
 
   # =============================================================================
-  # Docker Build Verification
+  # Migration Application
   # =============================================================================
-  # Test that committed migration SQL files work against a real Postgres
+  # Applies the committed migration SQL in drizzle/ to an empty Postgres, the
+  # same way entrypoint.sh migrates production. Proves the committed SQL applies
+  # cleanly from scratch; it does not diff the result against schema.ts (the e2e
+  # tier runs against the migrated schema and catches that drift).
   # =============================================================================
   test-migrations:
     name: Test Production Migrations
@@ -413,13 +416,13 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
-          bun-version: "1.4.1"
+          bun-version: "1.4.2"
           no-cache: true
 
       - name: Install deps
         run: bun install --frozen-lockfile
 
-      - name: Test production migrations
+      - name: Apply committed migrations to a fresh database
         env:
           DATABASE_URL: postgresql://postgres:testpassword@localhost:5432/logwell_test
         run: bunx drizzle-kit migrate
