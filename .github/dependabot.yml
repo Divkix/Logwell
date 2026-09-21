@@ -86,7 +86,9 @@ updates:
       - docker
 
   # TypeScript SDK
-  - package-ecosystem: npm
+  # Bun ecosystem, not npm: the npm updater rewrites package.json but leaves
+  # sdks/typescript/bun.lock stale, so CI's `bun install --frozen-lockfile` fails.
+  - package-ecosystem: bun
     directory: /sdks/typescript
     schedule:
       interval: weekly
