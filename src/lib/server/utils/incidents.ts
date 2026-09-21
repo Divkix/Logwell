@@ -142,7 +142,13 @@ export function groupPreparedLogsByFingerprint(logs: PreparedIncidentLog[]): Inc
     existing.totalEvents += 1;
   }
 
-  return [...groups.values()];
+  // Sorted so the multi-row upsert that consumes these aggregates takes its row
+  // locks in a deterministic order. Postgres locks rows in VALUES order, so two
+  // concurrent batches sharing fingerprints would otherwise deadlock (40P01)
+  // and the losing batch would fail with a 500.
+  return [...groups.values()].sort((a, b) =>
+    a.fingerprint < b.fingerprint ? -1 : a.fingerprint > b.fingerprint ? 1 : 0,
+  );
 }
 
 export function getIncidentStatus(

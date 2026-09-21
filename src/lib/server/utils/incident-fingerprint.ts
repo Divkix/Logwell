@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 
-const UUID_REGEX = /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/gi;
+// Version nibble is deliberately permissive (RFC 9562 defines 1-8; nil uses 0) so that ids from
+// any generator collapse to one template. The variant nibble is the real discriminator.
+const UUID_REGEX = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/gi;
 
 const HEX_ID_REGEX = /\b0x[0-9a-f]+\b|\b(?=[0-9a-f]*[a-f])[0-9a-f]{12,}\b/gi;
 
