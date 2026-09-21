@@ -45,7 +45,7 @@ export async function cleanupOldLogs(dbClient?: DatabaseClient): Promise<Cleanup
 
         let deletedInProject = 0;
         while (true) {
-          // ISO string, not the Date: a raw Date param reaches postgres.js's string encoder and throws.
+          // Bind the cutoff as an ISO string: passing the Date object here is what broke cleanup.
           const raw = await db.execute(sql`
             WITH batch AS (
               SELECT id FROM "log"
