@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { goto } from '$app/navigation';
 import { navigating } from '$app/stores';
 import BottomNav from '$lib/components/bottom-nav.svelte';
+import ConnectionStatus from '$lib/components/connection-status.svelte';
 import IncidentTable from '$lib/components/incident-table.svelte';
 import IncidentTimelinePanel from '$lib/components/incident-timeline-panel.svelte';
 import Button from '$lib/components/ui/button/button.svelte';
@@ -76,9 +77,12 @@ let selectedIncidentId = $state<string | null>(data.filters.selectedIncidentId ?
 let detail = $state<IncidentDetail | null>(null);
 let timeline = $state<IncidentTimelineResponse | null>(null);
 let detailLoading = $state(false);
+let sseConnected = $state(false);
+let streamError = $state<Error | null>(null);
 let refreshTimeout: ReturnType<typeof setTimeout> | null = null;
 let pendingIncidentUpdates: ClientIncident[] = [];
 let detailRequestId = 0;
+let loadMoreEpoch = 0;
 
 let prevProjectId: string | null = null;
 let prevStatus: IncidentStatus | null = null;
@@ -137,23 +141,37 @@ const incidentStream = useIncidentStream({
   enabled: false,
   onIncidents: (updates) => {
     pendingIncidentUpdates = [...pendingIncidentUpdates, ...updates];
-    if (refreshTimeout) {
-      clearTimeout(refreshTimeout);
-    }
+    if (refreshTimeout) return;
     refreshTimeout = setTimeout(() => {
       mergeIncidentUpdates(pendingIncidentUpdates);
       pendingIncidentUpdates = [];
       refreshTimeout = null;
     }, 300);
   },
+  onConnectionChange: (connected) => {
+    sseConnected = connected;
+    if (connected) streamError = null;
+  },
+  onError: (error) => {
+    streamError = error;
+  },
 });
+
+function retryIncidentStream() {
+  streamError = null;
+  incidentStream.disconnect();
+  incidentStream.connect();
+}
 
 $effect(() => {
   incidentStream.setProjectId(data.project.id);
   incidentStream.connect();
   return () => {
     incidentStream.disconnect();
-    if (refreshTimeout) clearTimeout(refreshTimeout);
+    if (refreshTimeout) {
+      clearTimeout(refreshTimeout);
+      refreshTimeout = null;
+    }
     pendingIncidentUpdates = [];
   };
 });
@@ -174,6 +192,8 @@ $effect(() => {
     (nextProjectId !== prevProjectId || nextStatus !== prevStatus || nextRange !== prevRange);
 
   if (filtersChanged) {
+    loadMoreEpoch++;
+    isLoadingMore = false;
     incidents = [...data.incidents];
     loadedMore = [];
     nextCursor = data.pagination.nextCursor ?? null;
@@ -271,6 +291,7 @@ async function clearSelection() {
 
 async function loadMore() {
   if (!nextCursor || isLoadingMore) return;
+  const myEpoch = ++loadMoreEpoch;
   isLoadingMore = true;
   try {
     const params = new URLSearchParams();
@@ -278,18 +299,21 @@ async function loadMore() {
     params.set('status', selectedStatus);
     params.set('range', selectedRange);
     const response = await fetch(`/api/projects/${projectId}/incidents?${params.toString()}`);
+    if (myEpoch !== loadMoreEpoch) return;
     if (!response.ok) {
       toastError('Failed to load more incidents');
       return;
     }
 
     const result = await response.json();
+    if (myEpoch !== loadMoreEpoch) return;
+
     loadedMore = [...loadedMore, ...result.incidents];
     nextCursor = result.nextCursor;
   } catch {
-    toastError('Failed to load more incidents');
+    if (myEpoch === loadMoreEpoch) toastError('Failed to load more incidents');
   } finally {
-    isLoadingMore = false;
+    if (myEpoch === loadMoreEpoch) isLoadingMore = false;
   }
 }
 </script>
@@ -315,6 +339,22 @@ async function loadMore() {
         <h1 class="truncate text-lg font-bold sm:text-2xl">{data.project.name}</h1>
       </div>
     </div>
+
+    {#if !sseConnected}
+      <div class="flex flex-wrap items-center gap-2">
+        <ConnectionStatus isConnecting={!streamError} error={streamError} />
+        {#if streamError}
+          <Button
+            data-testid="incident-stream-retry"
+            variant="outline"
+            size="sm"
+            onclick={retryIncidentStream}
+          >
+            Reconnect
+          </Button>
+        {/if}
+      </div>
+    {/if}
 
     <div class="rounded-lg border p-3 sm:p-4">
       <div class="flex flex-wrap items-center gap-2 sm:gap-3">

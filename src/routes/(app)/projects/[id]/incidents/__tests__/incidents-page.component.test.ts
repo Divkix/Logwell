@@ -4,12 +4,20 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/svelte";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from "vite-plus/test";
+import type { ClientIncident } from "$lib/hooks/use-incident-stream.svelte";
 import type { IncidentListItem } from "$lib/shared/types";
 import type { PageData } from "../$types";
 
-const { mockGoto, mockToastError } = vi.hoisted(() => ({
+const { mockGoto, mockToastError, mockConnect, mockDisconnect, streamOptions } = vi.hoisted(() => ({
   mockGoto: vi.fn().mockResolvedValue(undefined),
   mockToastError: vi.fn(),
+  mockConnect: vi.fn(),
+  mockDisconnect: vi.fn(),
+  streamOptions: {} as {
+    onIncidents?: (updates: ClientIncident[]) => void;
+    onError?: (error: Error) => void;
+    onConnectionChange?: (connected: boolean) => void;
+  },
 }));
 
 vi.mock("$app/navigation", () => ({
@@ -30,14 +38,23 @@ vi.mock("$app/stores", async () => {
 });
 
 vi.mock("$lib/hooks/use-incident-stream.svelte", () => ({
-  useIncidentStream: () => ({
-    isConnected: false,
-    isConnecting: false,
-    error: null,
-    connect: vi.fn(),
-    disconnect: vi.fn(),
-    setProjectId: vi.fn(),
-  }),
+  useIncidentStream: (options: {
+    onIncidents?: (updates: ClientIncident[]) => void;
+    onError?: (error: Error) => void;
+    onConnectionChange?: (connected: boolean) => void;
+  }) => {
+    streamOptions.onIncidents = options.onIncidents;
+    streamOptions.onError = options.onError;
+    streamOptions.onConnectionChange = options.onConnectionChange;
+    return {
+      isConnected: false,
+      isConnecting: false,
+      error: null,
+      connect: mockConnect,
+      disconnect: mockDisconnect,
+      setProjectId: vi.fn(),
+    };
+  },
 }));
 
 import IncidentsPage from "../+page.svelte";
@@ -187,5 +204,84 @@ describe("IncidentsPage", () => {
     await waitFor(() => {
       expect(mockToastError).toHaveBeenCalledWith("Failed to load more incidents");
     });
+  });
+
+  it("surfaces the incident stream connection state and reconnects on demand", async () => {
+    render(IncidentsPage, { props: { data: makeData() } });
+
+    expect(streamOptions.onError).toBeTypeOf("function");
+    expect(streamOptions.onConnectionChange).toBeTypeOf("function");
+    expect(screen.queryByTestId("connection-error")).not.toBeInTheDocument();
+
+    streamOptions.onError?.(new Error("HTTP 500: Internal Server Error"));
+
+    const errorState = await screen.findByTestId("connection-error");
+    expect(errorState).toHaveAttribute("title", "HTTP 500: Internal Server Error");
+
+    const connectCallsBeforeRetry = mockConnect.mock.calls.length;
+    await user.click(screen.getByTestId("incident-stream-retry"));
+
+    expect(mockDisconnect).toHaveBeenCalled();
+    expect(mockConnect.mock.calls.length).toBeGreaterThan(connectCallsBeforeRetry);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("connection-error")).not.toBeInTheDocument();
+    });
+    expect(screen.getByTestId("connection-connecting")).toBeInTheDocument();
+
+    streamOptions.onConnectionChange?.(true);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("connection-connecting")).not.toBeInTheDocument();
+    });
+  });
+
+  it("discards a Load More response that a filter change superseded", async () => {
+    const { promise: fetchPromise, resolve: resolveFetch } = Promise.withResolvers<Response>();
+    let staleJsonCalls = 0;
+
+    // Plain stub so the promise the component awaits is exactly the one this test resolves.
+    globalThis.fetch = ((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      if (url.includes("/incidents?cursor=")) return fetchPromise;
+      return Promise.resolve(new Response(null, { status: 500 }));
+    }) as typeof fetch;
+
+    const { rerender } = render(IncidentsPage, { props: { data: makeData() } });
+
+    await user.click(screen.getByRole("button", { name: /load more/i }));
+
+    await rerender({
+      data: makeData({
+        incidents: [
+          makeIncident({
+            id: "inc_fresh",
+            title: "Fresh incident",
+            lastSeen: "2024-01-16T10:00:00.000Z",
+          }),
+        ],
+        filters: { status: "open", range: "7d", selectedIncidentId: null },
+      }),
+    });
+
+    const staleResponse = new Response(null, { status: 200 });
+    staleResponse.json = () => {
+      staleJsonCalls++;
+      return Promise.resolve({
+        incidents: [makeIncident({ id: "inc_stale", title: "Stale incident" })],
+        nextCursor: null,
+      });
+    };
+
+    resolveFetch(staleResponse);
+    await fetchPromise;
+    // The component resumes one microtask after its own fetch settles; give it that hop so the
+    // assertions below see the final state of a response the component actually consumed.
+    await Promise.resolve();
+
+    // The superseded page is never read, so neither its incidents nor its cursor can reach the view.
+    expect(staleJsonCalls).toBe(0);
+    expect(screen.queryAllByText("Stale incident")).toHaveLength(0);
+    expect(screen.queryAllByText("Fresh incident").length).toBeGreaterThan(0);
   });
 });
