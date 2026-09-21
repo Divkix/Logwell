@@ -1,6 +1,7 @@
 import { json } from "@sveltejs/kit";
 import { and, count, eq, ne } from "drizzle-orm";
-import { log, project } from "$lib/server/db/schema";
+import { log, project, type Project } from "$lib/server/db/schema";
+import { isUniqueViolation } from "$lib/server/utils/api-error";
 import { invalidateApiKeyCacheByHash } from "$lib/server/utils/api-key";
 import { requireJsonContentType } from "$lib/server/utils/content-type";
 import { requireOwnedProjectRoute } from "$lib/server/utils/owned-project";
@@ -168,11 +169,22 @@ export async function PATCH(event: RequestEvent): Promise<Response> {
     updateData.updatedAt = new Date();
   }
 
-  const [updated] = await db
-    .update(project)
-    .set(updateData)
-    .where(eq(project.id, projectId))
-    .returning();
+  let updated: Project | undefined;
+  try {
+    [updated] = await db
+      .update(project)
+      .set(updateData)
+      .where(eq(project.id, projectId))
+      .returning();
+  } catch (error) {
+    if (isUniqueViolation(error, "uq_project_name_owner")) {
+      return json(
+        { code: "duplicate_name", message: "A project with this name already exists" },
+        { status: 400 },
+      );
+    }
+    throw error;
+  }
 
   if (!updated) {
     return json({ code: "not_found", message: "Project not found" }, { status: 404 });
