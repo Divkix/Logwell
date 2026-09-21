@@ -332,3 +332,67 @@ class TestBatchQueueEdgeCases:
         assert len(captured_batches) == 2
         assert captured_batches[0][0]["message"] == "before"
         assert captured_batches[1][0]["message"] == "during"
+
+
+class TestNonRetryableBatches:
+    @pytest.mark.asyncio
+    async def test_permanently_rejected_batch_does_not_block_later_batches(self) -> None:
+        captured: list[list[LogEntry]] = []
+
+        async def send_batch(batch: list[LogEntry]) -> IngestResponse:
+            captured.append(batch)
+            if any(entry["message"] == "poison" for entry in batch):
+                raise LogwellError(
+                    "Invalid log data (400): bad payload",
+                    LogwellErrorCode.VALIDATION_ERROR,
+                    400,
+                    False,
+                )
+            return {"accepted": len(batch)}
+
+        on_error = MagicMock()
+        queue = BatchQueue(
+            MagicMock(side_effect=send_batch),
+            QueueConfig(batch_size=1, max_queue_size=100, on_error=on_error),
+        )
+
+        queue.add(make_log_entry("poison"))
+        queue.add(make_log_entry("good"))
+
+        await queue.shutdown()
+
+        assert [[entry["message"] for entry in batch] for batch in captured] == [
+            ["poison"],
+            ["good"],
+        ]
+        assert queue.size == 0
+        on_error.assert_called_once()
+        assert on_error.call_args[0][0].code == LogwellErrorCode.VALIDATION_ERROR
+
+    @pytest.mark.asyncio
+    async def test_partial_rejection_is_reported_and_counted_honestly(self) -> None:
+        on_error = MagicMock()
+        on_flush = MagicMock()
+        send_batch, _ = make_send_batch_mock(
+            response={
+                "accepted": 1,
+                "rejected": 1,
+                "errors": ["message must not be blank"],
+            }
+        )
+        queue = BatchQueue(
+            send_batch,
+            QueueConfig(batch_size=100, on_error=on_error, on_flush=on_flush),
+        )
+
+        queue.add(make_log_entry("ok"))
+        queue.add(make_log_entry("   "))
+
+        await queue.flush()
+
+        on_flush.assert_called_once_with(1)
+        on_error.assert_called_once()
+        error = on_error.call_args[0][0]
+        assert isinstance(error, LogwellError)
+        assert error.code == LogwellErrorCode.VALIDATION_ERROR
+        assert "message must not be blank" in error.message

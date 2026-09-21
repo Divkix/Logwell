@@ -24,7 +24,8 @@ export interface QueueConfig {
  * - Automatic flush on batch size threshold
  * - Automatic flush on time interval
  * - Queue overflow protection (drops oldest)
- * - Re-queue on send failure
+ * - Re-queue on retryable send failure; non-retryable batches are reported
+ *   through onError and dropped so they cannot block the queue
  * - Graceful shutdown
  */
 export class BatchQueue {
@@ -106,6 +107,13 @@ export class BatchQueue {
           try {
             response = await this.sendBatch(batch);
           } catch (error) {
+            if (error instanceof LogwellError && !error.retryable) {
+              // The batch can never be accepted (invalid data, rejected API
+              // key), so re-queuing it would block every later batch forever.
+              // Drop it after surfacing the failure.
+              this.config.onError?.(error);
+              continue;
+            }
             const requeued = [...batch, ...this.queue];
             this.queue.length = 0;
             this.queue.push(...requeued.slice(0, this.config.maxQueueSize));
@@ -121,8 +129,19 @@ export class BatchQueue {
             break; // stop flushing on error
           }
           lastResponse = response;
+          if (response.rejected) {
+            // A 200 can still reject individual logs; the server already
+            // parsed them, so surface the loss and count only what it kept.
+            const details = response.errors?.length ? `: ${response.errors.join("; ")}` : "";
+            this.config.onError?.(
+              new LogwellError(
+                `${response.rejected} of ${response.accepted + response.rejected} logs rejected by the server${details}`,
+                "VALIDATION_ERROR",
+              ),
+            );
+          }
           try {
-            this.config.onFlush?.(batch.length);
+            this.config.onFlush?.(response.accepted);
           } catch (error) {
             this.config.onError?.(error as Error);
           }

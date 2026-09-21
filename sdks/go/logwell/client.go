@@ -3,6 +3,8 @@ package logwell
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 	"sync"
 	"time"
 )
@@ -78,7 +80,7 @@ func New(endpoint, apiKey string, opts ...Option) (*Client, error) {
 		transport: transport,
 	}
 
-	c.queue = newBatchQueue(cfg.FlushInterval, c.flush, cfg.MaxQueueSize, cfg.OnError)
+	c.queue = newBatchQueue(cfg.FlushInterval, c.flush, cfg.MaxQueueSize)
 
 	return c, nil
 }
@@ -220,12 +222,19 @@ func (c *Client) enqueue(entry LogEntry) {
 		root.mu.Unlock()
 		return
 	}
-	c.queue.add(entry)
+	overflowErr := c.queue.add(entry)
 	shouldFlush := c.queue.size() >= c.config.BatchSize
 	if shouldFlush {
 		root.flushWG.Add(1)
 	}
 	root.mu.Unlock()
+
+	// User callbacks must never run while the client lock is held: a callback
+	// that logs, flushes, or shuts down through this client would deadlock on
+	// the non-reentrant mutex.
+	if overflowErr != nil {
+		c.reportError(overflowErr)
+	}
 
 	if shouldFlush {
 		go func() {
@@ -247,19 +256,27 @@ func (c *Client) flush() {
 	sent, err := c.flushChunks(ctx, entries)
 
 	if err != nil {
-		if c.config.OnError != nil {
-			var logwellErr *Error
-			if errors.As(err, &logwellErr) {
-				c.config.OnError(logwellErr)
-			} else {
-				c.config.OnError(NewErrorWithCause(ErrNetworkError, "flush failed", err))
-			}
-		}
+		c.reportError(err)
 		return
 	}
 
 	if c.config.OnFlush != nil {
 		c.config.OnFlush(sent)
+	}
+}
+
+// reportError passes err to the configured OnError callback, wrapping
+// non-Logwell errors the same way the flush paths always have.
+func (c *Client) reportError(err error) {
+	if c.config.OnError == nil {
+		return
+	}
+
+	var logwellErr *Error
+	if errors.As(err, &logwellErr) {
+		c.config.OnError(logwellErr)
+	} else {
+		c.config.OnError(NewErrorWithCause(ErrNetworkError, "flush failed", err))
 	}
 }
 
@@ -277,13 +294,43 @@ func (c *Client) flushChunks(ctx context.Context, entries []LogEntry) (int, erro
 		}
 		chunk := entries[i:end]
 
-		if _, err := c.transport.sendWithRetry(ctx, chunk); err != nil {
-			c.queue.prepend(entries[i:])
+		resp, err := c.transport.sendWithRetry(ctx, chunk)
+		if err != nil {
+			if !c.transport.isRetryableError(err) {
+				// The chunk can never be accepted (invalid data, rejected API
+				// key), so retrying it would block every later entry forever.
+				// Drop it and keep draining.
+				c.reportError(err)
+				continue
+			}
+
+			if overflowErr := c.queue.prepend(entries[i:]); overflowErr != nil {
+				c.reportError(overflowErr)
+			}
 			return sent, err
 		}
-		sent += len(chunk)
+
+		// A 200 can still reject individual logs; those are gone, so report
+		// them and count only what the server actually accepted.
+		if resp.Rejected > 0 {
+			c.reportError(rejectionError(resp))
+		}
+		sent += resp.Accepted
 	}
 	return sent, nil
+}
+
+// rejectionError describes logs the server accepted the request for but
+// rejected individually. They are not retried: the server already parsed them.
+func rejectionError(resp *IngestResponse) *Error {
+	message := fmt.Sprintf(
+		"%d of %d logs rejected by the server",
+		resp.Rejected, resp.Accepted+resp.Rejected,
+	)
+	if len(resp.Errors) > 0 {
+		message += ": " + strings.Join(resp.Errors, "; ")
+	}
+	return NewError(ErrValidationError, message)
 }
 
 // Flush sends all queued log entries immediately.
@@ -299,14 +346,7 @@ func (c *Client) Flush(ctx context.Context) error {
 	sent, err := c.flushChunks(ctx, entries)
 
 	if err != nil {
-		if c.config.OnError != nil {
-			var logwellErr *Error
-			if errors.As(err, &logwellErr) {
-				c.config.OnError(logwellErr)
-			} else {
-				c.config.OnError(NewErrorWithCause(ErrNetworkError, "flush failed", err))
-			}
-		}
+		c.reportError(err)
 		return err
 	}
 

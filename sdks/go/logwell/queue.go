@@ -17,76 +17,73 @@ type batchQueue struct {
 	generation    int64
 
 	maxQueueSize int
-	onError      func(*Error)
 }
 
-func newBatchQueue(flushInterval time.Duration, flushFn func(), maxQueueSize int, onError func(*Error)) *batchQueue {
+func newBatchQueue(flushInterval time.Duration, flushFn func(), maxQueueSize int) *batchQueue {
 	return &batchQueue{
 		entries:       make([]LogEntry, 0),
 		flushInterval: flushInterval,
 		flushFn:       flushFn,
 		maxQueueSize:  maxQueueSize,
-		onError:       onError,
 	}
 }
 
-func (q *batchQueue) add(entry LogEntry) {
+// add appends entry, dropping the oldest entry when the queue is full.
+// A non-nil return means an entry was dropped; the caller reports it, so
+// user callbacks never run while the queue or client lock is held.
+func (q *batchQueue) add(entry LogEntry) *Error {
 	q.mu.Lock()
+	defer q.mu.Unlock()
 
+	var overflowErr *Error
 	if q.maxQueueSize > 0 && len(q.entries) >= q.maxQueueSize {
 		q.entries = q.entries[1:]
-
-		if q.onError != nil {
-			onError := q.onError
-			q.mu.Unlock()
-			onError(NewError(ErrQueueOverflow, "queue overflow: dropping oldest entry"))
-			q.mu.Lock()
-		}
+		overflowErr = NewError(ErrQueueOverflow, "queue overflow: dropping oldest entry")
 	}
 
 	q.entries = append(q.entries, entry)
 
 	q.startTimerLocked()
 
-	q.mu.Unlock()
+	return overflowErr
 }
 
-func (q *batchQueue) prepend(entries []LogEntry) {
+// prepend puts entries back at the head of the queue, dropping the oldest
+// entries when the queue is full. A non-nil return means entries were dropped.
+func (q *batchQueue) prepend(entries []LogEntry) *Error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
 	if len(entries) == 0 {
-		return
+		return nil
 	}
 
 	combined := make([]LogEntry, 0, len(entries)+len(q.entries))
 	combined = append(combined, entries...)
 	combined = append(combined, q.entries...)
+	var overflowErr *Error
 	if q.maxQueueSize > 0 && len(combined) > q.maxQueueSize {
 		dropped := len(combined) - q.maxQueueSize
 		combined = combined[:q.maxQueueSize]
-
-		if q.onError != nil {
-			onError := q.onError
-			q.mu.Unlock()
-			onError(NewError(ErrQueueOverflow, fmt.Sprintf("queue overflow: dropping %d oldest entries", dropped)))
-			q.mu.Lock()
-		}
+		overflowErr = NewError(ErrQueueOverflow, fmt.Sprintf("queue overflow: dropping %d oldest entries", dropped))
 	}
 	q.entries = combined
 
 	q.startTimerLocked()
+
+	return overflowErr
 }
 
+// startTimerLocked arms the auto-flush timer if it is not already running.
+// The interval is a maximum wait, so entries added while a timer is pending
+// must not push the deadline back.
 func (q *batchQueue) startTimerLocked() {
 	if q.flushInterval <= 0 || q.flushFn == nil {
 		return
 	}
 
 	if q.timer != nil {
-		atomic.AddInt64(&q.generation, 1)
-		q.timer.Stop()
-		q.timer = nil
+		return
 	}
 
 	gen := atomic.LoadInt64(&q.generation)

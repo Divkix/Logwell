@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { LogwellError } from "../../src/errors";
 import { BatchQueue, type QueueConfig, type SendBatchFn } from "../../src/queue";
+import type { LogEntry } from "../../src/types";
 import { createLogBatch, createLogFixture } from "../fixtures/logs";
 
 describe("BatchQueue", () => {
@@ -218,6 +220,7 @@ describe("BatchQueue", () => {
   describe("callbacks", () => {
     it("calls onFlush after successful flush", async () => {
       const onFlush = vi.fn();
+      mockSendBatch = vi.fn().mockResolvedValue({ accepted: 2 });
       const config = { ...defaultConfig, onFlush };
       const queue = new BatchQueue(mockSendBatch, config);
 
@@ -253,6 +256,60 @@ describe("BatchQueue", () => {
       await queue.flush();
 
       expect(queue.size).toBe(1);
+    });
+
+    it("drops permanently rejected batches so later logs still send", async () => {
+      const onError = vi.fn();
+      const captured: LogEntry[][] = [];
+      const sendBatch = vi.fn(async (logs: LogEntry[]) => {
+        captured.push(logs);
+        if (logs.some((log) => log.message === "poison")) {
+          throw new LogwellError("Validation error: poison", "VALIDATION_ERROR", 400, false);
+        }
+        return { accepted: logs.length };
+      });
+      const queue = new BatchQueue(sendBatch, {
+        batchSize: 1,
+        flushInterval: 60_000,
+        maxQueueSize: 100,
+        onError,
+      });
+
+      queue.add(createLogFixture({ message: "poison" }));
+      queue.add(createLogFixture({ message: "good" }));
+
+      const response = await queue.shutdown();
+
+      expect(captured.map((batch) => batch.map((log) => log.message))).toEqual([
+        ["poison"],
+        ["good"],
+      ]);
+      expect(response).toEqual({ accepted: 1 });
+      expect(queue.size).toBe(0);
+      expect(onError).toHaveBeenCalledWith(expect.objectContaining({ code: "VALIDATION_ERROR" }));
+    });
+
+    it("surfaces per-log rejections and reports the accepted count", async () => {
+      const onError = vi.fn();
+      const onFlush = vi.fn();
+      mockSendBatch = vi.fn().mockResolvedValue({
+        accepted: 1,
+        rejected: 1,
+        errors: ["message must not be blank"],
+      });
+      const config = { ...defaultConfig, onError, onFlush };
+      const queue = new BatchQueue(mockSendBatch, config);
+
+      queue.add(createLogFixture({ message: "ok" }));
+      queue.add(createLogFixture({ message: "   " }));
+
+      await queue.flush();
+
+      expect(onFlush).toHaveBeenCalledWith(1);
+      expect(onError).toHaveBeenCalledTimes(1);
+      const error = onError.mock.calls[0][0] as LogwellError;
+      expect(error.code).toBe("VALIDATION_ERROR");
+      expect(error.message).toContain("message must not be blank");
     });
 
     it("reports onFlush errors via onError without re-queuing delivered logs", async () => {

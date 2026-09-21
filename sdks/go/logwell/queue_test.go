@@ -13,7 +13,7 @@ func TestQueue_TimerFlush(t *testing.T) {
 		atomic.AddInt32(&flushed, 1)
 	}
 
-	q := newBatchQueue(50*time.Millisecond, flushFn, 0, nil)
+	q := newBatchQueue(50*time.Millisecond, flushFn, 0)
 
 	q.add(LogEntry{Level: LevelInfo, Message: "test"})
 
@@ -24,8 +24,38 @@ func TestQueue_TimerFlush(t *testing.T) {
 	}
 }
 
+// TestQueue_FlushIntervalIsDeadlineNotDebounce verifies that adding an entry
+// while a flush timer is pending does not push the deadline back: the interval
+// is the maximum time a log may sit in the queue.
+func TestQueue_FlushIntervalIsDeadlineNotDebounce(t *testing.T) {
+	flushed := make(chan struct{}, 1)
+
+	q := newBatchQueue(200*time.Millisecond, func() {
+		select {
+		case flushed <- struct{}{}:
+		default:
+		}
+	}, 0)
+
+	start := time.Now()
+	q.add(LogEntry{Level: LevelInfo, Message: "first"})
+
+	time.Sleep(150 * time.Millisecond)
+	q.add(LogEntry{Level: LevelInfo, Message: "second"})
+
+	select {
+	case <-flushed:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timer flush never fired")
+	}
+
+	if elapsed := time.Since(start); elapsed >= 300*time.Millisecond {
+		t.Errorf("flush fired after %v, want < 300ms: an add reset the flush interval", elapsed)
+	}
+}
+
 func TestQueue_OverflowDropsOldest(t *testing.T) {
-	q := newBatchQueue(0, nil, 3, nil)
+	q := newBatchQueue(0, nil, 3)
 
 	q.add(LogEntry{Level: LevelInfo, Message: "first"})
 	q.add(LogEntry{Level: LevelInfo, Message: "second"})
@@ -59,7 +89,7 @@ func TestQueue_OverflowDropsOldest(t *testing.T) {
 }
 
 func TestQueue_Concurrency(t *testing.T) {
-	q := newBatchQueue(0, nil, 0, nil)
+	q := newBatchQueue(0, nil, 0)
 
 	var wg sync.WaitGroup
 	numGoroutines := 10
@@ -89,7 +119,7 @@ func TestQueue_Concurrency(t *testing.T) {
 }
 
 func TestQueue_ConcurrentAddAndFlush(t *testing.T) {
-	q := newBatchQueue(0, nil, 0, nil)
+	q := newBatchQueue(0, nil, 0)
 
 	var wg sync.WaitGroup
 	var totalFlushed int32

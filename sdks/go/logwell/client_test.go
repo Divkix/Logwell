@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -262,6 +264,153 @@ func TestClientRequeueOrderOnFailure(t *testing.T) {
 // entries. This guards against the server-400 regression: the ingest endpoint
 // rejects batches over its limit with a 400 batch_too_large, so a single
 // oversized request would lose the whole flush.
+
+// TestClientOnErrorReentrancyDoesNotDeadlock guards the documented use of
+// OnError: a callback that logs through the same client must not self-deadlock
+// on the client mutex, which would wedge every later log and Shutdown.
+func TestClientOnErrorReentrancyDoesNotDeadlock(t *testing.T) {
+	ts := newTestServer()
+	defer ts.Close()
+
+	var calls int32
+	var reentered atomic.Bool
+
+	var client *Client
+	var err error
+	client, err = New(
+		ts.URL,
+		validAPIKey(),
+		WithMaxQueueSize(1),
+		WithBatchSize(100),
+		WithFlushInterval(time.Minute),
+		WithOnError(func(e *Error) {
+			atomic.AddInt32(&calls, 1)
+			if e.Code != ErrQueueOverflow {
+				t.Errorf("OnError code = %q, want %q", e.Code, ErrQueueOverflow)
+			}
+			if reentered.CompareAndSwap(false, true) {
+				client.Info("logged from the OnError callback")
+			}
+		}),
+	)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		client.Info("first")
+		client.Info("second") // overflow → OnError → callback logs through the client
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Info() deadlocked: the OnError callback re-entered the client while its mutex was held")
+	}
+
+	if got := atomic.LoadInt32(&calls); got != 2 {
+		t.Errorf("OnError calls = %d, want 2 (overflow, then overflow from the callback)", got)
+	}
+}
+
+// TestClientDropsNonRetryableBatch verifies that a chunk that can never be
+// accepted (here: entries that fail to marshal) is dropped after OnError
+// instead of being re-queued ahead of every later chunk forever.
+func TestClientDropsNonRetryableBatch(t *testing.T) {
+	ts := newTestServer()
+	defer ts.Close()
+
+	var errs []*Error
+	var mu sync.Mutex
+
+	client, err := New(
+		ts.URL,
+		validAPIKey(),
+		WithBatchSize(1),
+		WithFlushInterval(time.Minute),
+		WithMaxRetries(0),
+		WithOnError(func(e *Error) {
+			mu.Lock()
+			errs = append(errs, e)
+			mu.Unlock()
+		}),
+	)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	defer client.Shutdown(context.Background())
+
+	// Queued directly so the batch-size trigger cannot race the explicit flush.
+	client.queue.add(LogEntry{Level: LevelInfo, Message: "poison", Metadata: M{"bad": make(chan int)}})
+	client.queue.add(LogEntry{Level: LevelInfo, Message: "good"})
+
+	if err := client.Flush(context.Background()); err != nil {
+		t.Fatalf("Flush() error = %v, want nil (the undeliverable chunk must be dropped, not block the queue)", err)
+	}
+
+	logs := ts.getLogs()
+	if len(logs) != 1 || logs[0].Message != "good" {
+		t.Fatalf("delivered logs = %v, want only %q", logs, "good")
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(errs) != 1 || errs[0].Code != ErrValidationError {
+		t.Fatalf("OnError errors = %v, want one %s for the dropped chunk", errs, ErrValidationError)
+	}
+}
+
+// TestClientPartialRejection verifies that per-log rejections in a 200
+// response are surfaced, and that OnFlush reports what the server accepted
+// rather than what was submitted.
+func TestClientPartialRejection(t *testing.T) {
+	ts := newTestServer()
+	defer ts.Close()
+
+	ts.setHandler(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(IngestResponse{
+			Accepted: 1,
+			Rejected: 1,
+			Errors:   []string{"message must not be blank"},
+		})
+	})
+
+	var errs []*Error
+	flushed := -1
+
+	client, err := New(
+		ts.URL,
+		validAPIKey(),
+		WithBatchSize(100),
+		WithFlushInterval(time.Minute),
+		WithOnError(func(e *Error) { errs = append(errs, e) }),
+		WithOnFlush(func(count int) { flushed = count }),
+	)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	defer client.Shutdown(context.Background())
+
+	client.Info("ok")
+	client.Info("   ")
+
+	if err := client.Flush(context.Background()); err != nil {
+		t.Fatalf("Flush() error = %v", err)
+	}
+
+	if flushed != 1 {
+		t.Errorf("OnFlush count = %d, want 1 (accepted, not submitted)", flushed)
+	}
+	if len(errs) != 1 || errs[0].Code != ErrValidationError {
+		t.Fatalf("OnError errors = %v, want one %s for the rejected log", errs, ErrValidationError)
+	}
+	if !strings.Contains(errs[0].Message, "message must not be blank") {
+		t.Errorf("OnError message = %q, want the server's error detail", errs[0].Message)
+	}
+}
 
 func TestClientConcurrency(t *testing.T) {
 	ts := newTestServer()
