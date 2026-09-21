@@ -95,30 +95,30 @@ async function collectSSEEvents(
   const events: Array<{ event: string; data: string }> = [];
   const stream = parseSSEStream(response);
 
-  let timeoutId: ReturnType<typeof setTimeout> | null = null;
   let timedOut = false;
+  let cancelTimeout = () => {};
 
+  // Failure bound only: the batch window that produces events is a real server-side timer.
   const timeoutPromise = new Promise<void>((resolve) => {
-    timeoutId = setTimeout(() => {
+    const id = setTimeout(() => {
       timedOut = true;
       resolve();
     }, timeoutMs);
+    cancelTimeout = () => clearTimeout(id);
   });
 
   const collectPromise = (async () => {
-    try {
-      for await (const event of stream) {
-        if (timedOut) break;
-        events.push(event);
-        if (events.length >= count) break;
-      }
-    } catch {}
+    for await (const event of stream) {
+      if (timedOut) break;
+      events.push(event);
+      if (events.length >= count) break;
+    }
   })();
 
-  await Promise.race([collectPromise, timeoutPromise]);
-
-  if (timeoutId) {
-    clearTimeout(timeoutId);
+  try {
+    await Promise.race([collectPromise, timeoutPromise]);
+  } finally {
+    cancelTimeout();
   }
 
   return events;
@@ -333,8 +333,6 @@ describe("POST /api/projects/[id]/incidents/stream", () => {
         await import("../../../../../../../src/routes/api/projects/[id]/incidents/stream/+server");
       const response = await POST(event as never);
 
-      await new Promise((resolve) => setTimeout(resolve, 50));
-
       const otherIncident = createMockIncident(project2.id, { title: "Other project incident" });
       logEventBus.emitIncident(otherIncident);
 
@@ -346,16 +344,15 @@ describe("POST /api/projects/[id]/incidents/stream", () => {
       const events = await collectSSEEvents(response, 1, 3000);
 
       const incidentsEvent = events.find((e) => e.event === "incidents");
-      if (incidentsEvent) {
-        const incidents = JSON.parse(incidentsEvent.data);
-        expect(incidents.every((inc: Incident) => inc.projectId === project1.id)).toBe(true);
-        expect(incidents.some((inc: Incident) => inc.title === "Subscribed project incident")).toBe(
-          true,
-        );
-        expect(incidents.some((inc: Incident) => inc.title === "Other project incident")).toBe(
-          false,
-        );
-      }
+      expect(incidentsEvent).toBeDefined();
+      if (!incidentsEvent) throw new Error("Expected 'incidents' event for the subscribed project");
+
+      const incidents = JSON.parse(incidentsEvent.data);
+      expect(incidents.every((inc: Incident) => inc.projectId === project1.id)).toBe(true);
+      expect(incidents.some((inc: Incident) => inc.title === "Subscribed project incident")).toBe(
+        true,
+      );
+      expect(incidents.some((inc: Incident) => inc.title === "Other project incident")).toBe(false);
     });
   });
 

@@ -1,5 +1,6 @@
 import type { PgliteDatabase } from "drizzle-orm/pglite";
-import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { SSE_CONFIG } from "../../../../../../../src/lib/server/config/performance";
 import type * as schema from "../../../../../../../src/lib/server/db/schema";
 import { type Log, user } from "../../../../../../../src/lib/server/db/schema";
 import { setupTestDatabase } from "../../../../../../../src/lib/server/db/test-db";
@@ -95,30 +96,30 @@ async function collectSSEEvents(
   const events: Array<{ event: string; data: string }> = [];
   const stream = parseSSEStream(response);
 
-  let timeoutId: ReturnType<typeof setTimeout> | null = null;
   let timedOut = false;
+  let cancelTimeout = () => {};
 
+  // Failure bound only: the batch window that produces events is a real server-side timer.
   const timeoutPromise = new Promise<void>((resolve) => {
-    timeoutId = setTimeout(() => {
+    const id = setTimeout(() => {
       timedOut = true;
       resolve();
     }, timeoutMs);
+    cancelTimeout = () => clearTimeout(id);
   });
 
   const collectPromise = (async () => {
-    try {
-      for await (const event of stream) {
-        if (timedOut) break;
-        events.push(event);
-        if (events.length >= count) break;
-      }
-    } catch {}
+    for await (const event of stream) {
+      if (timedOut) break;
+      events.push(event);
+      if (events.length >= count) break;
+    }
   })();
 
-  await Promise.race([collectPromise, timeoutPromise]);
-
-  if (timeoutId) {
-    clearTimeout(timeoutId);
+  try {
+    await Promise.race([collectPromise, timeoutPromise]);
+  } finally {
+    cancelTimeout();
   }
 
   return events;
@@ -292,8 +293,6 @@ describe("POST /api/projects/[id]/logs/stream", () => {
         await import("../../../../../../../src/routes/api/projects/[id]/logs/stream/+server");
       const response = await POST(event as never);
 
-      await new Promise((resolve) => setTimeout(resolve, 50));
-
       const otherProjectLog = createMockLog(project2.id, { message: "Other project log" });
       logEventBus.emitLog(otherProjectLog);
 
@@ -303,12 +302,13 @@ describe("POST /api/projects/[id]/logs/stream", () => {
       const events = await collectSSEEvents(response, 1, 3000);
 
       const logsEvent = events.find((e) => e.event === "logs");
-      if (logsEvent) {
-        const logs = JSON.parse(logsEvent.data);
-        expect(logs.every((l: Log) => l.projectId === project1.id)).toBe(true);
-        expect(logs.some((l: Log) => l.message === "Subscribed project log")).toBe(true);
-        expect(logs.some((l: Log) => l.message === "Other project log")).toBe(false);
-      }
+      expect(logsEvent).toBeDefined();
+      if (!logsEvent) throw new Error("Expected 'logs' event for the subscribed project");
+
+      const logs = JSON.parse(logsEvent.data);
+      expect(logs.every((l: Log) => l.projectId === project1.id)).toBe(true);
+      expect(logs.some((l: Log) => l.message === "Subscribed project log")).toBe(true);
+      expect(logs.some((l: Log) => l.message === "Other project log")).toBe(false);
     });
   });
 
@@ -408,8 +408,8 @@ describe("POST /api/projects/[id]/logs/stream", () => {
     });
   });
 
-  describe("Heartbeat", () => {
-    it("sends heartbeat events periodically", async () => {
+  describe("Backpressure", () => {
+    it("closes the stream and unsubscribes a consumer that never reads", async () => {
       const project = await seedProject(db, { ownerId: userId });
 
       const request = new Request(`http://localhost/api/projects/${project.id}/logs/stream`, {
@@ -422,8 +422,56 @@ describe("POST /api/projects/[id]/logs/stream", () => {
         await import("../../../../../../../src/routes/api/projects/[id]/logs/stream/+server");
       const response = await POST(event as never);
 
-      expect(response.body).toBeDefined();
-      expect(response.headers.get("Content-Type")).toBe("text/event-stream");
+      expect(logEventBus.getListenerCount(project.id)).toBe(1);
+
+      // Nothing reads the body, so queued frames pile up until the byte budget is exceeded
+      // and the stream gives up on the consumer instead of buffering it forever.
+      let emitted = 0;
+      while (logEventBus.getListenerCount(project.id) > 0 && emitted < 5000) {
+        logEventBus.emitLog(createMockLog(project.id, { message: "x".repeat(1024) }));
+        emitted += 1;
+      }
+
+      expect(logEventBus.getListenerCount(project.id)).toBe(0);
+
+      // The stream ends so a stalled queue cannot pin it open; a stream that never
+      // closes leaves this read pending and fails the test by timing out.
+      const frames: Array<{ event: string; data: string }> = [];
+      for await (const frame of parseSSEStream(response)) frames.push(frame);
+
+      const delivered = frames
+        .filter((frame) => frame.event === "logs")
+        .flatMap((frame) => JSON.parse(frame.data) as Log[]);
+
+      expect(delivered.length).toBeGreaterThan(0);
+      // Rows past the budget were dropped, not buffered for the stalled consumer.
+      expect(delivered.length).toBeLessThan(emitted);
+    });
+  });
+
+  describe("Heartbeat", () => {
+    it("emits a heartbeat frame on the configured interval", async () => {
+      vi.useFakeTimers();
+      try {
+        const { createLogStreamResponse } =
+          await import("../../../../../../../src/lib/server/live-stream");
+        const response = createLogStreamResponse("heartbeat-project");
+
+        expect(response.headers.get("Content-Type")).toBe("text/event-stream");
+        const reader = response.body?.getReader();
+        expect(reader).toBeDefined();
+
+        const interval = SSE_CONFIG.HEARTBEAT_INTERVAL_MS;
+        const read = reader!.read();
+        await vi.advanceTimersByTimeAsync(interval + 1);
+        const frame = new TextDecoder().decode((await read).value);
+
+        expect(frame).toContain("event: heartbeat");
+
+        await reader!.cancel();
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 

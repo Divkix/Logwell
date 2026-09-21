@@ -74,6 +74,8 @@ test.describe("Log Stream Page", () => {
     await page.goto(`/projects/${testProject.id}`);
 
     await expect(page.locator('[data-testid="log-table"]')).toBeVisible();
+    // The ingest must land after the SSE subscription exists, else the broadcast is missed.
+    await expect(page.getByTestId("connection-connecting")).toBeHidden();
 
     await ingestLog(page, testProject.apiKey, {
       level: "info",
@@ -87,6 +89,8 @@ test.describe("Log Stream Page", () => {
 
   test("stops receiving logs when live is paused", async ({ page }) => {
     await page.goto(`/projects/${testProject.id}`);
+
+    await expect(page.getByTestId("connection-connecting")).toBeHidden();
 
     const liveSwitch = page.getByRole("switch", { name: /toggle live streaming/i });
     await liveSwitch.click();
