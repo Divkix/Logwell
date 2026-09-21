@@ -1,7 +1,8 @@
-import { and, count, eq, gte, inArray, lte, type SQL, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, lte, type SQL, sql } from "drizzle-orm";
 import { EXPORT_CONFIG } from "$lib/server/config/performance";
 import { log } from "$lib/server/db/schema";
 import { apiError } from "$lib/server/utils/api-error";
+import { cappedLogCount } from "$lib/server/utils/capped-count";
 import { escapeCSVField } from "$lib/server/utils/csv-serializer";
 import { queryLogs } from "$lib/server/utils/log-query";
 import { requireOwnedProjectRoute } from "$lib/server/utils/owned-project";
@@ -111,8 +112,8 @@ export async function GET(event: RequestEvent): Promise<Response> {
 
   const whereClause = and(...conditions);
 
-  const [countResult] = await db.select({ count: count() }).from(log).where(whereClause);
-  const total = countResult?.count ?? 0;
+  // Bounded: stops counting one row past the limit instead of scanning the whole match set.
+  const { total } = await cappedLogCount(db, whereClause, EXPORT_CONFIG.MAX_LOGS + 1);
 
   if (total > EXPORT_CONFIG.MAX_LOGS) {
     return apiError(

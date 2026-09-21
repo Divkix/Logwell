@@ -60,7 +60,7 @@ export async function queryLogs(
   const conditions: SQL[] = [eq(log.projectId, filter.projectId)];
 
   if (filter.cursor) {
-    let cursorMicros: number;
+    let cursorMicros: string;
     let cursorId: string;
     try {
       ({ micros: cursorMicros, id: cursorId } = decodeCursor(filter.cursor));
@@ -119,7 +119,7 @@ export async function queryLogs(
   const hasMore = rows.length > filter.limit;
   const page = hasMore ? rows.slice(0, filter.limit) : rows;
   const last = page.at(-1);
-  const nextCursor = hasMore && last ? encodeCursor(Math.round(last.micros), last.id) : null;
+  const nextCursor = hasMore && last ? encodeCursor(last.micros, last.id) : null;
   const logsToReturn = page.map(
     // oxlint-disable-next-line no-unused-vars
     ({ micros, ...queried }) => queried,

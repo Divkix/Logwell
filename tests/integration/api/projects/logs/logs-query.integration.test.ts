@@ -723,6 +723,45 @@ describe("GET /api/projects/[id]/logs", () => {
       expect(new Set(collectedIds).size).toBe(25);
     });
 
+    it("paginates past a log dated far in the future", async () => {
+      const testProject = await seedProject(db, { ownerId: userId });
+      await seedLog(db, testProject.id, {
+        id: "log-far-future",
+        message: "year 3000 log",
+        timestamp: new Date("3000-01-01T00:00:00.000Z"),
+      });
+      await seedLog(db, testProject.id, { id: "log-present", message: "current log" });
+
+      const first = new Request(`http://localhost/api/projects/${testProject.id}/logs?limit=1`, {
+        method: "GET",
+      });
+      const firstEvent = createRequestEvent(first, db, { id: testProject.id }, authenticatedLocals);
+      const firstResponse = await GET(firstEvent as never);
+      expect(firstResponse.status).toBe(200);
+      const firstBody = await firstResponse.json();
+
+      expect(firstBody.logs.map((l: { id: string }) => l.id)).toEqual(["log-far-future"]);
+      expect(firstBody.has_more).toBe(true);
+      expect(firstBody.nextCursor).toBeTruthy();
+
+      const second = new Request(
+        `http://localhost/api/projects/${testProject.id}/logs?limit=1&cursor=${firstBody.nextCursor}`,
+        { method: "GET" },
+      );
+      const secondEvent = createRequestEvent(
+        second,
+        db,
+        { id: testProject.id },
+        authenticatedLocals,
+      );
+      const secondResponse = await GET(secondEvent as never);
+
+      expect(secondResponse.status).toBe(200);
+      const secondBody = await secondResponse.json();
+      expect(secondBody.logs.map((l: { id: string }) => l.id)).toEqual(["log-present"]);
+      expect(secondBody.has_more).toBe(false);
+    });
+
     it("reports a capped total once the count ceiling is reached", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
       await seedLogs(db, testProject.id, 3);

@@ -1,8 +1,8 @@
-import { and, count, eq, gte, type SQL } from "drizzle-orm";
+import { and, count, eq, gte } from "drizzle-orm";
 import { log } from "$lib/server/db/schema";
 import { requireOwnedProjectPage } from "$lib/server/utils/owned-project";
 import { getTimeRangeStart } from "$lib/utils/format";
-import { parseTimeRange } from "$lib/utils/time-range";
+import { parseTimeRange, type TimeRange } from "$lib/utils/time-range";
 import type { PageServerLoad } from "./$types";
 
 export const load: PageServerLoad = async (event) => {
@@ -10,18 +10,10 @@ export const load: PageServerLoad = async (event) => {
   const { project: projectData, db } = await requireOwnedProjectPage(event, projectId);
 
   const url = event.url;
-  const rangeParam = url.searchParams.get("range") || "24h";
+  const range: TimeRange = parseTimeRange(url.searchParams.get("range")) ?? "24h";
+  const fromDate = getTimeRangeStart(range);
 
-  const range = parseTimeRange(rangeParam);
-  const fromDate = range ? getTimeRangeStart(range) : null;
-
-  const conditions: SQL[] = [eq(log.projectId, projectId)];
-
-  if (fromDate) {
-    conditions.push(gte(log.timestamp, fromDate));
-  }
-
-  const whereClause = and(...conditions);
+  const whereClause = and(eq(log.projectId, projectId), gte(log.timestamp, fromDate));
 
   const levelCounts = await db
     .select({
@@ -63,8 +55,8 @@ export const load: PageServerLoad = async (event) => {
       levelPercentages: levelPercentagesObj,
     },
     filters: {
-      range: rangeParam,
-      from: fromDate?.toISOString() ?? null,
+      range,
+      from: fromDate.toISOString(),
     },
   };
 };

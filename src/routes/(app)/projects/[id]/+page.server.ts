@@ -3,7 +3,7 @@ import { requireOwnedProjectPage } from "$lib/server/utils/owned-project";
 import { parseLevelFilter } from "$lib/shared/schemas/log";
 import { env } from "$lib/server/config/env";
 import { getTimeRangeStart } from "$lib/utils/format";
-import { parseTimeRange } from "$lib/utils/time-range";
+import { parseTimeRange, type TimeRange } from "$lib/utils/time-range";
 import type { PageServerLoad } from "./$types";
 
 const DEFAULT_LIMIT = 100;
@@ -24,7 +24,7 @@ export const load: PageServerLoad = async (event) => {
   const cursorParam = url.searchParams.get("cursor");
   const levelParam = url.searchParams.get("level");
   const searchParam = url.searchParams.get("search");
-  const rangeParam = url.searchParams.get("range") || "1h";
+  const range: TimeRange = parseTimeRange(url.searchParams.get("range")) ?? "1h";
 
   const limit = clamp(
     limitParam ? Number.parseInt(limitParam, 10) || DEFAULT_LIMIT : DEFAULT_LIMIT,
@@ -34,8 +34,7 @@ export const load: PageServerLoad = async (event) => {
   const offset = offsetParam ? Math.max(0, Number.parseInt(offsetParam, 10) || 0) : 0;
 
   const levels = parseLevelFilter(levelParam);
-  const range = parseTimeRange(rangeParam);
-  const fromDate = range ? getTimeRangeStart(range) : null;
+  const fromDate = getTimeRangeStart(range);
 
   const filter = {
     projectId,
@@ -63,7 +62,6 @@ export const load: PageServerLoad = async (event) => {
     project: {
       id: projectData.id,
       name: projectData.name,
-      apiKeyHash: projectData.apiKeyHash,
       retentionDays: projectData.retentionDays,
       createdAt: projectData.createdAt?.toISOString() ?? null,
       updatedAt: projectData.updatedAt?.toISOString() ?? null,
@@ -83,7 +81,8 @@ export const load: PageServerLoad = async (event) => {
     filters: {
       levels: levels ?? [],
       search: searchParam ?? "",
-      range: rangeParam,
+      range,
+      from: fromDate.toISOString(),
     },
     appUrl: env.ORIGIN || event.url.origin,
   };
