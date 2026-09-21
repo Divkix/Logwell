@@ -24,7 +24,7 @@ describe("Retention Configuration", () => {
   it.each([
     [undefined, 30, "default 30"],
     ["0", 0, "0 disables"],
-    ["-10", 0, "negative clamps to 0"],
+    ["-10", 30, "negative falls back to the default, never to 0 = never delete"],
     ["5000", 3650, "above max clamps to 3650"],
     ["90", 90, "in range"],
     ["invalid", 30, "non-numeric ignored"],

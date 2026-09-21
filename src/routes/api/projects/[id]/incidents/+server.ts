@@ -104,7 +104,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
 
   const nextCursor =
     hasMore && incidentsToReturn.length > 0
-      ? encodeCursor(Math.round(incidentsToReturn.at(-1)!.micros), incidentsToReturn.at(-1)!.id)
+      ? encodeCursor(incidentsToReturn.at(-1)!.micros, incidentsToReturn.at(-1)!.id)
       : null;
 
   return json({
