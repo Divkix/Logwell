@@ -28,15 +28,18 @@
     "test:e2e": "playwright test",
     "test:coverage": "vp test run --coverage",
     "test:ui": "vp test --ui",
-    "sdk:test": "bun run --cwd sdks/typescript test",
-    "sdk:build": "bun run --cwd sdks/typescript build",
-    "sdk:lint": "bun run --cwd sdks/typescript lint",
-    "sdk:version": "bun run --cwd sdks/typescript npm version"
+    "sdk:test": "pnpm --dir sdks/typescript run test",
+    "sdk:build": "pnpm --dir sdks/typescript run build",
+    "sdk:lint": "pnpm --dir sdks/typescript run lint",
+    "sdk:version": "pnpm --dir sdks/typescript exec npm version"
   },
   "dependencies": {
     "@lucide/svelte": "^1.46.0",
     "better-auth": "^1.7.5",
     "clsx": "^2.1.1",
+    "d3-scale": "^4.0.2",
+    "drizzle-kit": "^0.31.10",
+    "drizzle-orm": "^0.45.2",
     "layerchart": "^2.5.0",
     "nanoid": "^6.0.1",
     "postgres": "^3.4.9",
@@ -61,8 +64,6 @@
     "@vitest/coverage-v8": "4.1.11",
     "@vitest/ui": "4.1.11",
     "bits-ui": "^2.19.2",
-    "drizzle-kit": "^0.31.10",
-    "drizzle-orm": "^0.45.2",
     "husky": "^9.1.7",
     "jsdom": "^30.0.1",
     "knip": "^6.35.1",
@@ -89,7 +90,8 @@
     "vitest": "4.1.11"
   },
   "engines": {
-    "bun": ">=1.2.0"
+    "bun": ">=1.2.0",
+    "node": ">=22.18.0"
   },
-  "packageManager": "bun@1.4.2"
+  "packageManager": "pnpm@12.5.1"
 }

@@ -21,7 +21,8 @@
   <img src="https://img.shields.io/badge/TypeScript-5.9-blue?logo=typescript&logoColor=white" alt="TypeScript">
   <img src="https://img.shields.io/badge/Python-3.9+-3776AB?logo=python&logoColor=white" alt="Python">
   <img src="https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go&logoColor=white" alt="Go">
-  <img src="https://img.shields.io/badge/Bun-1.0+-black?logo=bun&logoColor=white" alt="Bun">
+  <img src="https://img.shields.io/badge/Bun-runtime-black?logo=bun&logoColor=white" alt="Bun">
+  <img src="https://img.shields.io/badge/pnpm-12+-F69220?logo=pnpm&logoColor=white" alt="pnpm">
 </p>
 
 <p align="center">
@@ -115,7 +116,9 @@ Logwell is a lightweight, self-hosted log aggregation platform for developers wh
 
 ## Prerequisites
 
-- [Bun](https://bun.sh) >= 1.0
+- [Node.js](https://nodejs.org) >= 22.18 (build, tests, tooling)
+- [pnpm](https://pnpm.io) 12 (`packageManager` pins the exact version)
+- [Bun](https://bun.sh) >= 1.2 (runtime for the built server and `scripts/*.ts`)
 - [Docker](https://docker.com) (for PostgreSQL)
 
 ## Quick Start
@@ -126,7 +129,7 @@ git clone https://github.com/divkix/logwell.git
 cd logwell
 
 # Install dependencies
-bun install
+pnpm install
 
 # Set up environment
 cp .env.example .env
@@ -136,13 +139,13 @@ cp .env.example .env
 docker compose up -d
 
 # Run database migrations
-bun run db:migrate
+pnpm run db:migrate
 
 # Create admin user
-bun run db:seed
+pnpm run db:seed
 
 # Start development server
-bun run dev
+pnpm run dev
 ```
 
 Open http://localhost:5173 and sign in with:
@@ -527,37 +530,37 @@ Logwell derives some UI fields from common OTLP log attributes (if present):
 
 ## Commands
 
-| Command            | Description              |
-| ------------------ | ------------------------ |
-| `bun run dev`      | Start development server |
-| `bun run build`    | Build for production     |
-| `bun run preview`  | Preview production build |
-| `bun run check`    | Run TypeScript checks    |
-| `bun run lint`     | Run linter               |
-| `bun run lint:fix` | Fix lint issues          |
+| Command             | Description              |
+| ------------------- | ------------------------ |
+| `pnpm run dev`      | Start development server |
+| `pnpm run build`    | Build for production     |
+| `pnpm run preview`  | Preview production build |
+| `pnpm run check`    | Run TypeScript checks    |
+| `pnpm run lint`     | Run linter               |
+| `pnpm run lint:fix` | Fix lint issues          |
 
 ### Database
 
-| Command               | Description                                             |
-| --------------------- | ------------------------------------------------------- |
-| `bun run db:start`    | Start PostgreSQL via Docker                             |
-| `bun run db:push`     | Push schema to database (dev only; prefer `db:migrate`) |
-| `bun run db:generate` | Generate migration files                                |
-| `bun run db:migrate`  | Run migrations                                          |
-| `bun run db:studio`   | Open Drizzle Studio                                     |
-| `bun run db:seed`     | Create admin user                                       |
+| Command                | Description                                             |
+| ---------------------- | ------------------------------------------------------- |
+| `pnpm run db:start`    | Start PostgreSQL via Docker                             |
+| `pnpm run db:push`     | Push schema to database (dev only; prefer `db:migrate`) |
+| `pnpm run db:generate` | Generate migration files                                |
+| `pnpm run db:migrate`  | Run migrations                                          |
+| `pnpm run db:studio`   | Open Drizzle Studio                                     |
+| `pnpm run db:seed`     | Create admin user                                       |
 
 ### Testing
 
-| Command                    | Description                |
-| -------------------------- | -------------------------- |
-| `bun run test`             | Run all tests              |
-| `bun run test:unit`        | Run unit tests             |
-| `bun run test:integration` | Run integration tests      |
-| `bun run test:component`   | Run component tests        |
-| `bun run test:e2e`         | Run E2E tests (Playwright) |
-| `bun run test:coverage`    | Run tests with coverage    |
-| `bun run test:ui`          | Open Vitest UI             |
+| Command                     | Description                |
+| --------------------------- | -------------------------- |
+| `pnpm run test`             | Run all tests              |
+| `pnpm run test:unit`        | Run unit tests             |
+| `pnpm run test:integration` | Run integration tests      |
+| `pnpm run test:component`   | Run component tests        |
+| `pnpm run test:e2e`         | Run E2E tests (Playwright) |
+| `pnpm run test:coverage`    | Run tests with coverage    |
+| `pnpm run test:ui`          | Open Vitest UI             |
 
 ## Production Deployment
 
@@ -652,7 +655,7 @@ Response:
 ### Manual
 
 ```bash
-bun run build
+pnpm run build
 bun ./build/index.js
 ```
 
@@ -735,19 +738,19 @@ git clone https://github.com/YOUR_USERNAME/logwell.git
 cd logwell
 
 # Install dependencies
-bun install
+pnpm install
 
 # Start dev environment
 docker compose up -d
-bun run db:migrate
-bun run dev
+pnpm run db:migrate
+pnpm run dev
 ```
 
 **Before submitting a PR:**
 
-- Run `bun run check` (TypeScript)
+- Run `pnpm run check` (TypeScript)
 - Run `vp check` (lint + format + typecheck)
-- Run `bun run test` (Vitest)
+- Run `pnpm run test` (Vitest)
 - Use conventional commits (`feat:`, `fix:`, `docs:`, etc.)
 
 **Report bugs:** [GitHub Issues](https://github.com/divkix/logwell/issues)

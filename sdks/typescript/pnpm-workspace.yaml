@@ -1,0 +1,14 @@
+# The SDK is published on its own, so it keeps its own project root and lockfile.
+# The SvelteKit app at the repo root has its own pnpm-workspace.yaml.
+#
+# A dependency's install scripts run only when listed below: pnpm's strictDepBuilds
+# default fails the install on any build script nobody has reviewed.
+allowBuilds:
+  # Best-effort postinstall (errors are swallowed); it was running before the pnpm switch.
+  msw: true
+
+peerDependencyRules:
+  allowAny:
+    # "vite" resolves to the vite-plus core fork, which carries its own 0.3.1
+    # version that no consumer's vite peer range can match.
+    - vite

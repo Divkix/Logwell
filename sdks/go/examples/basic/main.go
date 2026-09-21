@@ -64,5 +64,5 @@ func main() {
 
 	fmt.Println()
 	fmt.Println("Example completed. Check your Logwell server for the logs!")
-	fmt.Println("If running locally, start the server with: bun run dev")
+	fmt.Println("If running locally, start the server with: pnpm run dev")
 }

@@ -54,7 +54,7 @@
     "test:integration": "vp test run tests/integration/",
     "test:coverage": "vp test run --coverage",
     "test:watch": "vp test",
-    "prepublishOnly": "bun run build",
+    "prepublishOnly": "pnpm run build",
     "size": "size-limit",
     "attw": "attw --pack ."
   },
@@ -81,5 +81,6 @@
   ],
   "engines": {
     "node": ">=20.0.0"
-  }
+  },
+  "packageManager": "pnpm@12.5.1"
 }

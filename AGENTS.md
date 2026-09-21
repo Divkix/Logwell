@@ -27,24 +27,24 @@ Self-hosted, single-tenant logging + incident-intelligence platform. Services sh
 
 ## Development Commands
 
-Always `bun run …` (`bun.lock`, `packageManager bun@1.4.2`). Ports: dev **5173**, preview **4173**, prod **3000**.
+Always `pnpm run …` (`pnpm-lock.yaml`, `packageManager pnpm@12.5.1`). Bun 1.4.2 stays the runtime: it serves `build/index.js` and executes `scripts/*.ts`. Ports: dev **5173**, preview **4173**, prod **3000**.
 
 ```bash
-bun run dev / build / preview        # vp dev/build (svelte-adapter-bun → build/index.js, prod :3000)
-bun run lint                         # vp check (= format+lint+typecheck); --fix to fix
-bun run check                        # svelte-kit sync + svelte-check --tsgo
-bun run knip                         # dead code — run pre-commit with vp check
-bun run test:unit / :component / :integration  # vp test run --project <tier>
-bun run test:coverage                # v8, signal-only (no gate)
-bun run test:e2e                     # Playwright; needs real Postgres + seeded admin
-bun run db:start / db:stop           # docker compose up -d / down -v (postgres:18-alpine)
-bun run db:generate / db:migrate     # after schema edit commit SQL; migrate in prod/CI, never push
-bun run db:push                      # dev/ephemeral only
-bun run db:seed / incidents:backfill # seed needs ADMIN_PASSWORD (≥8 chars)
-bun run sdk:test / sdk:build / sdk:lint  # delegates to sdks/typescript
+pnpm run dev / build / preview        # vp dev/build (svelte-adapter-bun → build/index.js, prod :3000)
+pnpm run lint                         # vp check (= format+lint+typecheck); --fix to fix
+pnpm run check                        # svelte-kit sync + svelte-check --tsgo
+pnpm run knip                         # dead code — run pre-commit with vp check
+pnpm run test:unit / :component / :integration  # vp test run --project <tier>
+pnpm run test:coverage                # v8, signal-only (no gate)
+pnpm run test:e2e                     # Playwright; needs real Postgres + seeded admin
+pnpm run db:start / db:stop           # docker compose up -d / down -v (postgres:18-alpine)
+pnpm run db:generate / db:migrate     # after schema edit commit SQL; migrate in prod/CI, never push
+pnpm run db:push                      # dev/ephemeral only
+pnpm run db:seed / incidents:backfill # seed needs ADMIN_PASSWORD (≥8 chars); the script itself runs under bun
+pnpm run sdk:test / sdk:build / sdk:lint  # delegates to sdks/typescript
 ```
 
-Local build needs dummy env: `DATABASE_URL=postgres://… BETTER_AUTH_SECRET=<≥32 chars> bun run build`.
+Local build needs dummy env: `DATABASE_URL=postgres://… BETTER_AUTH_SECRET=<≥32 chars> pnpm run build`.
 
 ## Code Conventions & Common Patterns
 
@@ -67,11 +67,11 @@ Local build needs dummy env: `DATABASE_URL=postgres://… BETTER_AUTH_SECRET=<�
 - `src/lib/shared/schemas/project.ts` (name `^[a-zA-Z0-9_-]+$` 1–50, `retentionDays` null/0/1–3650), `log.ts`, `incident.ts`
 - `src/routes/v1/logs/+server.ts`, `v1/ingest/+server.ts`, `api/projects/[id]/logs/+server.ts`, `logs/stream/+server.ts`, `incidents/stream/+server.ts`
 - `drizzle/` SQL + `compose.yaml` + `Dockerfile` + `entrypoint.sh` (migrate → seed if `ADMIN_PASSWORD` → `bun ./build/index.js`)
-- `vite.config.ts` (vp: staged `vp check --fix`, lint ignores `sdks/**`), `knip.json`, `.husky/pre-commit` (`vp check && bun run knip`)
+- `vite.config.ts` (vp: staged `vp check --fix`, lint ignores `sdks/**`), `knip.json`, `pnpm-workspace.yaml` (pnpm settings + `allowBuilds`), `.husky/pre-commit` (`vp check && pnpm run knip`)
 
 ## Runtime/Tooling Preferences
 
-- **Bun only** (`engines >=1.2.0`, pinned `1.4.2` in CI + Docker `oven/bun:1.4.2-alpine`); `pnpm`/`npm` last resort. One-off CLIs: `bunx → pnpm dlx → npx`.
+- **pnpm 12 + Bun.** pnpm manages dependencies (`packageManager pnpm@12.5.1`; the app and `sdks/typescript` each own a `pnpm-lock.yaml`). Settings live in `pnpm-workspace.yaml`, not `.npmrc`, and install scripts are denied unless listed under `allowBuilds` — an unreviewed one fails `pnpm install`, as does a `package.json` change (`pnpm install` is frozen by default; regenerate with `pnpm install --lockfile-only` first). Bun (`engines.bun >=1.2.0`, pinned 1.4.2 in the CI e2e jobs + Docker `oven/bun:1.4.2-alpine`) stays the runtime: it serves the built output and runs `scripts/*.ts`, which rely on bun's extensionless TS resolution. One-off CLIs: `pnpm dlx → bunx → npx`.
 - **Vite+ (`vp`) 0.3.1**, **vitest 4.1.11** via `overrides`, `@vitest/coverage-v8` must match runner (hard-fail otherwise). Root TS 6 + `@typescript/native` 7 for `--tsgo` (svelte-check 4.x rejects TS7 main). `vite`/`vitest`/`@vitest/*` bumps via `vp migrate` only.
 - **Postgres 18-alpine** everywhere (PG19 beta — don't bump). `db:push` dev-only; prod/CI `db:migrate`. `db:generate` needs TTY; if it replays old migrations (meta snapshots cover 0000–0005+0011), hand-write SQL.
 - Env: `DATABASE_URL` (must start `postgres`, required), `BETTER_AUTH_SECRET` (≥32, required unless dev/test), `ORIGIN` (prod proxies), `RATE_LIMIT_*_RPM`, `SSE_*`, `LOG_*`, `IDLE_TIMEOUT` (Bun.serve idle timeout in seconds; image ships 120, heartbeat clamped to half), `INCIDENT_AUTO_RESOLVE_MINUTES=30`. Behind proxy set `ADDRESS_HEADER` + `XFF_DEPTH` or IP limiting sees socket IP.
@@ -81,14 +81,14 @@ Local build needs dummy env: `DATABASE_URL=postgres://… BETTER_AUTH_SECRET=<�
 
 Tier by **filename suffix** (Playwright excluded from Vitest). Import from `vite-plus/test`, not `vitest`.
 
-| Tier        | Glob                                                                  | DB            | Command                    |
-| ----------- | --------------------------------------------------------------------- | ------------- | -------------------------- |
-| Unit        | `src/**/*.unit.test.ts`                                               | mocked        | `bun run test:unit`        |
-| Component   | `src/**/*.component.test.ts` (jsdom + Testing Library)                | none          | `bun run test:component`   |
-| Integration | `tests/integration/**/*.integration.test.ts` + `scripts/**/*.test.ts` | PGlite        | `bun run test:integration` |
-| E2E         | `tests/e2e/**`                                                        | real Postgres | `bun run test:e2e`         |
+| Tier        | Glob                                                                  | DB            | Command                     |
+| ----------- | --------------------------------------------------------------------- | ------------- | --------------------------- |
+| Unit        | `src/**/*.unit.test.ts`                                               | mocked        | `pnpm run test:unit`        |
+| Component   | `src/**/*.component.test.ts` (jsdom + Testing Library)                | none          | `pnpm run test:component`   |
+| Integration | `tests/integration/**/*.integration.test.ts` + `scripts/**/*.test.ts` | PGlite        | `pnpm run test:integration` |
+| E2E         | `tests/e2e/**`                                                        | real Postgres | `pnpm run test:e2e`         |
 
 - **Integration:** fresh PGlite per test via schema reflection (not `drizzle/*.sql`); new column types may need `test-db.ts` type map / `tableOrder` or table silently skipped. Seed via `tests/fixtures/db.ts` (`seedProject`, `seedLog`, `seedProjectWithApiKey` — plaintext once); add same-origin `Origin`; `clearApiKeyCache()` in `beforeEach`. Don't copy `health.integration.test.ts` inline `CREATE TABLE` (legacy `api_key` col).
 - **Conventions before refactor:** timeseries/incident-detail/timeline tests spy on `db.select` and throw on full-row pulls — aggregate in SQL. `hooks.server.unit.test.ts` drives the real `handle` (session population, `/v1` + `/api/health` fast paths, login + `/v1` rate limits, signup kill-switch, CSRF).
 - **E2E:** CI preview `:4173`, local dev `:5173`, `workers:1 retries:2`, `extraHTTPHeaders` Origin, admin `admin/adminpass`, `RATE_LIMIT_LOGIN_RPM=10000`, login specs wrap in `expect(…).toPass({timeout:45000})`. Helpers: `helpers/otlp.ts`, `helpers/log-selectors.ts`. Chromium+firefox local, chromium-only CI.
-- Pre-commit: `vp check && bun run knip` (+ `bun run check` for Svelte/TS). Run nearest tier for touched code. Coverage signal-only.
+- Pre-commit: `vp check && pnpm run knip` (+ `pnpm run check` for Svelte/TS). Run nearest tier for touched code. Coverage signal-only.

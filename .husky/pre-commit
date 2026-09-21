@@ -1,10 +1,10 @@
 set -e
 
 vp check
-bun run knip
+pnpm run knip
 
 # sdks/typescript is excluded from the root vp check (its own tsconfig + vp check + CI).
 # Lint it here only when its files are staged, so unrelated commits aren't slowed.
 if git diff --cached --name-only --diff-filter=ACMR | grep -q '^sdks/typescript/'; then
-  bun run --cwd sdks/typescript check
+  pnpm --dir sdks/typescript run check
 fi

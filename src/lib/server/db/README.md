@@ -159,10 +159,10 @@ For production migrations, use Drizzle Kit:
 
 ```bash
 # Generate migration files
-bun run db:generate
+pnpm run db:generate
 
 # Apply migrations
-bun run db:migrate
+pnpm run db:migrate
 ```
 
 For tests, use the dynamic schema application from `test-db.ts` - no migrations needed.

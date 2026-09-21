@@ -3,8 +3,10 @@
 
 version: 2
 updates:
-  # Bun/npm dependencies
-  - package-ecosystem: bun
+  # pnpm workspace dependencies
+  # npm ecosystem: the npm updater understands pnpm workspaces/lockfiles and keeps
+  # pnpm-lock.yaml in sync, so CI's `pnpm install --frozen-lockfile` passes.
+  - package-ecosystem: npm
     directory: /
     schedule:
       interval: weekly
@@ -17,7 +19,7 @@ updates:
       include: scope
     labels:
       - dependencies
-      - bun
+      - pnpm
     ignore:
       # vite-plus toolchain moves in lockstep via `vp migrate` only — solo bumps desync it and break CI (coverage startup abort).
       - dependency-name: "vite-plus"
@@ -86,9 +88,10 @@ updates:
       - docker
 
   # TypeScript SDK
-  # Bun ecosystem, not npm: the npm updater rewrites package.json but leaves
-  # sdks/typescript/bun.lock stale, so CI's `bun install --frozen-lockfile` fails.
-  - package-ecosystem: bun
+  # npm ecosystem: the npm updater understands pnpm lockfiles and keeps
+  # sdks/typescript/pnpm-lock.yaml in sync, so CI's
+  # `pnpm install --frozen-lockfile` passes.
+  - package-ecosystem: npm
     directory: /sdks/typescript
     schedule:
       interval: weekly
