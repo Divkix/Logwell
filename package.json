@@ -78,6 +78,7 @@
     "vitest": "4.1.11"
   },
   "overrides": {
+    "@esbuild-kit/core-utils>esbuild": "^0.25.12",
     "cookie": "^0.7.2",
     "defu": "^6.1.7",
     "kysely": "^0.29.5",
