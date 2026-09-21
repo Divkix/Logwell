@@ -1,6 +1,6 @@
 import { PGlite } from "@electric-sql/pglite";
-import { is, sql } from "drizzle-orm";
-import { getTableConfig, PgTable } from "drizzle-orm/pg-core";
+import { is, sql, SQL } from "drizzle-orm";
+import { getTableConfig, PgDialect, PgTable } from "drizzle-orm/pg-core";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import * as schema from "./schema";
@@ -17,22 +17,16 @@ function generateCreateTableSQL(table: PgTable): string {
     const columnType = column.columnType;
     const isCustomType = columnType === "PgCustomColumn";
     const isEnumType = columnType === "PgEnumColumn";
-    const isGeneratedColumn = (column as { generated?: unknown }).generated !== undefined;
+    const generated = (column as { generated?: { as: SQL | string | (() => SQL) } }).generated;
 
-    if (isCustomType) {
-      const customColumn = column as unknown as { getSQLType?: () => string };
-      if (customColumn.getSQLType) {
-        parts.push(customColumn.getSQLType());
-      } else {
-        parts.push("TSVECTOR");
-      }
-    } else if (isEnumType) {
-      const enumColumn = column as unknown as { enumName?: string };
-      if (enumColumn.enumName) {
-        parts.push(enumColumn.enumName);
-      } else {
-        parts.push("TEXT");
-      }
+    if (isCustomType || isEnumType) {
+      // Both column classes expose their real Postgres type through getSQLType():
+      // custom columns return their dataType() (e.g. tsvector), PgEnumColumn
+      // returns the enum factory's name (e.g. log_level). The name is NOT a
+      // property of the column (reading `enumName` off it yields undefined and
+      // silently degrades the column to TEXT).
+      const typedColumn = column as unknown as { getSQLType: () => string };
+      parts.push(typedColumn.getSQLType());
     } else if (column.dataType === "number") {
       if (column.columnType === "PgSerial") {
         parts.push("SERIAL");
@@ -66,11 +60,12 @@ function generateCreateTableSQL(table: PgTable): string {
       parts.push("TEXT");
     }
 
-    if (isGeneratedColumn) {
-      const generated = (column as { generated?: { as: unknown; type?: string } }).generated;
-      if (generated && generated.type === "stored") {
-        continue;
-      }
+    if (generated) {
+      // `as` is the SQL expression, a thunk returning it, or a raw column-type
+      // string; PgDialect renders the SQL form with the columns qualified.
+      const as = typeof generated.as === "function" ? generated.as() : generated.as;
+      const expression = is(as, SQL) ? new PgDialect().sqlToQuery(as).sql : String(as);
+      parts.push(`GENERATED ALWAYS AS (${expression}) STORED`);
     }
 
     if (column.notNull) {
@@ -81,7 +76,7 @@ function generateCreateTableSQL(table: PgTable): string {
       parts.push("PRIMARY KEY");
     }
 
-    if (column.hasDefault && !isGeneratedColumn) {
+    if (column.hasDefault && !generated) {
       if (column.dataType === "date") {
         const defaultFn = (column as unknown as { default?: unknown }).default;
         if (defaultFn) {
@@ -116,7 +111,10 @@ function generateCreateTableSQL(table: PgTable): string {
     }
 
     if (column.isUnique) {
-      uniqueConstraints.push(`UNIQUE("${column.name}")`);
+      // drizzle-kit names column-level uniques "<table>_<column>_unique"; the test
+      // DB must match, since error handling keys off constraint names.
+      const uniqueName = column.uniqueName ?? `${tableName}_${column.name}_unique`;
+      uniqueConstraints.push(`CONSTRAINT "${uniqueName}" UNIQUE("${column.name}")`);
     }
 
     columns.push(parts.join(" "));
@@ -157,26 +155,6 @@ function generateCreateTableSQL(table: PgTable): string {
     }
   }
 
-  if (config.indexes) {
-    for (const [_, index] of Object.entries(config.indexes)) {
-      const indexConfig = (
-        index as unknown as { config?: { unique?: boolean; columns?: unknown[] } }
-      ).config;
-      if (indexConfig?.unique && indexConfig.columns && indexConfig.columns.length > 0) {
-        const columnNames = indexConfig.columns
-          .map((col) => {
-            const colName = (col as { name: string }).name;
-            return colName ? `"${colName}"` : null;
-          })
-          .filter((name): name is string => name !== null)
-          .join(", ");
-        if (columnNames) {
-          uniqueConstraints.push(`UNIQUE(${columnNames})`);
-        }
-      }
-    }
-  }
-
   const allConstraints = [...columns, ...uniqueConstraints, ...foreignKeys];
 
   const createTableSQL = `CREATE TABLE IF NOT EXISTS "${tableName}" (${allConstraints.join(", ")})`;
@@ -189,29 +167,23 @@ function generateIndexSQL(table: PgTable): string[] {
   const tableName = config.name;
   const indexSQLs: string[] = [];
 
-  if (config.indexes) {
-    for (const [indexName, index] of Object.entries(config.indexes)) {
-      const columns = (index as unknown as { config?: { columns?: unknown[] } }).config?.columns;
-      if (columns && columns.length > 0) {
-        const columnNames = columns
-          .map((col) => {
-            const colName = (col as { name: string }).name;
-            if (colName === "search") {
-              return null;
-            }
-            return `"${colName}"`;
-          })
-          .filter((name) => name !== null)
-          .join(", ");
-
-        if (columnNames) {
-          const isUnique = (index as unknown as { config?: { unique?: boolean } }).config?.unique;
-          if (isUnique) continue;
-          const indexSQL = `CREATE INDEX IF NOT EXISTS "${indexName}" ON "${tableName}" (${columnNames})`;
-          indexSQLs.push(indexSQL);
-        }
+  for (const index of config.indexes ?? []) {
+    const indexConfig = (
+      index as unknown as {
+        config?: { name?: string; method?: string; unique?: boolean; columns?: unknown[] };
       }
-    }
+    ).config;
+
+    if (!indexConfig?.name || !indexConfig.columns?.length) continue;
+
+    const columnNames = indexConfig.columns
+      .map((col) => `"${(col as { name: string }).name}"`)
+      .join(", ");
+
+    const unique = indexConfig.unique ? "UNIQUE " : "";
+    indexSQLs.push(
+      `CREATE ${unique}INDEX IF NOT EXISTS "${indexConfig.name}" ON "${tableName}" USING ${indexConfig.method ?? "btree"} (${columnNames})`,
+    );
   }
 
   return indexSQLs;
@@ -230,40 +202,6 @@ async function createEnumTypes(db: PgliteDatabase<typeof schema>): Promise<void>
     );
   } catch (error) {
     console.warn("Could not create log_level enum:", error);
-  }
-}
-
-async function createTriggers(db: PgliteDatabase<typeof schema>): Promise<void> {
-  try {
-    await db.execute(
-      sql.raw(`
-      CREATE OR REPLACE FUNCTION log_search_trigger() RETURNS trigger AS $$
-      BEGIN
-        -- NOTE: keep this expression in sync with the generatedAlwaysAs in schema.ts
-        -- and the migration that recreates the column (drizzle/0010_*.sql).
-        -- Uses || + COALESCE (not concat_ws) to match the IMMUTABLE expression
-        -- required by the Postgres STORED generated column.
-        NEW.search := to_tsvector('english',
-          COALESCE(NEW.message, '') || ' ' ||
-          COALESCE(NEW.body::text, '') || ' ' ||
-          COALESCE(NEW.metadata::text, '') || ' ' ||
-          COALESCE(NEW.resource_attributes::text, '') || ' ' ||
-          COALESCE(NEW.scope_attributes::text, ''));
-        RETURN NEW;
-      END
-      $$ LANGUAGE plpgsql;
-    `),
-    );
-
-    await db.execute(
-      sql.raw(`
-      CREATE TRIGGER log_search_update
-      BEFORE INSERT OR UPDATE ON log
-      FOR EACH ROW EXECUTE FUNCTION log_search_trigger();
-    `),
-    );
-  } catch (error) {
-    console.warn("Could not create log search trigger:", error);
   }
 }
 
@@ -293,8 +231,6 @@ export async function createTestDatabase(): Promise<PgliteDatabase<typeof schema
       }
     }
   }
-
-  await createTriggers(db);
 
   return db;
 }
