@@ -1,7 +1,7 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { username } from "better-auth/plugins";
-import { env } from "./config/env";
+import { env, isProduction } from "./config/env";
 import type { DatabaseClient } from "./db/db";
 
 export function createAuth(database: DatabaseClient) {
@@ -20,6 +20,12 @@ export function createAuth(database: DatabaseClient) {
     },
     secret: env.BETTER_AUTH_SECRET,
     trustedOrigins: [process.env.ORIGIN].filter(Boolean) as string[],
+    advanced: {
+      // better-auth infers Secure (and the __Secure- name prefix) from NODE_ENV === "production",
+      // but this app treats an unset NODE_ENV as production (see config/env.ts). Without this,
+      // such a deployment would enforce production secret rules yet issue non-Secure session cookies.
+      useSecureCookies: isProduction(),
+    },
   });
 }
 

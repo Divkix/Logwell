@@ -12,8 +12,11 @@
  * Optional Variables:
  * - ADMIN_PASSWORD: Password for seeding admin user
  * - ORIGIN: Base URL for production (CORS/trusted origins)
+ * - RATE_LIMIT_INGEST_IP_RPM: Pre-auth /v1 requests per minute per client IP (default 60000)
  * - NODE_ENV: Environment mode (development/production)
  */
+
+import { parseEnvInt } from "./performance";
 
 /**
  * Environment variable validation error
@@ -28,8 +31,11 @@ export class EnvValidationError extends Error {
   }
 }
 
-// Get NODE_ENV first for conditional validation
-const nodeEnv = process.env.NODE_ENV ?? "production";
+// Get NODE_ENV first for conditional validation. Read through `globalThis` on purpose:
+// bundlers statically replace `process.env.NODE_ENV` with the build-time mode ("development"
+// for the SSR bundle), which would make a production server report development - skipping
+// secret validation and issuing non-Secure session cookies.
+const nodeEnv = globalThis.process?.env?.NODE_ENV ?? "production";
 const isDevExplicit = nodeEnv === "development" || nodeEnv === "test";
 
 // Collect validation errors
@@ -83,6 +89,12 @@ if (validationErrors.length > 0) {
   );
 }
 
+// Pre-auth per-IP throttle for /v1 (see hooks.server.ts). parseEnvInt already falls back to
+// the default for unparsable values; the extra guard keeps an explicit 0 from becoming a
+// hard block for every client behind one NAT.
+const DEFAULT_INGEST_IP_RPM = 60000;
+const ingestIpRpm = parseEnvInt("RATE_LIMIT_INGEST_IP_RPM", DEFAULT_INGEST_IP_RPM);
+
 /**
  * Validated environment configuration
  */
@@ -96,8 +108,11 @@ export const env = {
   /** Password for seeding admin user (optional) */
   ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
 
-  /** Base URL for production deployment (optional) */
+  /** Base URL for production deployment (optional; the CSRF check falls back to the request Host when unset) */
   ORIGIN: process.env.ORIGIN,
+
+  /** Pre-auth /v1 requests per minute per client IP, checked before API-key validation */
+  RATE_LIMIT_INGEST_IP_RPM: ingestIpRpm > 0 ? ingestIpRpm : DEFAULT_INGEST_IP_RPM,
 
   /** Current environment mode */
   NODE_ENV: nodeEnv,
