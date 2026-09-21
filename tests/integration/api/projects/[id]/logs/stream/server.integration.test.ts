@@ -462,11 +462,15 @@ describe("POST /api/projects/[id]/logs/stream", () => {
         expect(reader).toBeDefined();
 
         const interval = SSE_CONFIG.HEARTBEAT_INTERVAL_MS;
-        const read = reader!.read();
+        // The stream opens with a ready comment frame (flushes the response to the client);
+        // the heartbeat follows on the first interval tick.
+        const readyFrame = reader!.read();
+        const heartbeatFrame = reader!.read();
         await vi.advanceTimersByTimeAsync(interval + 1);
-        const frame = new TextDecoder().decode((await read).value);
 
-        expect(frame).toContain("event: heartbeat");
+        const decoder = new TextDecoder();
+        expect(decoder.decode((await readyFrame).value)).toContain(": connected");
+        expect(decoder.decode((await heartbeatFrame).value)).toContain("event: heartbeat");
 
         await reader!.cancel();
       } finally {
