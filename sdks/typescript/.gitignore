@@ -20,8 +20,5 @@ coverage/
 .DS_Store
 Thumbs.db
 
-# Lock files (use root lockfile)
-bun.lockb
-
 # Test artifacts
 *.tsbuildinfo

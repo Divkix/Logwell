@@ -3,18 +3,18 @@
 # These overrides suppress advisories for transitive dependencies that exist
 # ONLY in build / dev / test tooling and never run in the production runtime
 # that ships to users. Each entry records the dependency path (verified with
-# `bun pm why <pkg>`) and why it is not production-reachable.
+# `pnpm why <pkg>`) and why it is not production-reachable.
 #
 # Production-reachable advisories are FIXED, not suppressed: see the "overrides"
 # block in package.json (cookie, kysely, defu, lodash, lodash-es pinned to
 # patched versions). Do not add production packages here.
 #
-# ecosystem = "npm" scopes every override to the JS lockfile (bun.lock) so the
+# ecosystem = "npm" scopes every override to the JS lockfile (pnpm-lock.yaml) so the
 # Go and Python SDK manifests are unaffected.
 
 # --- Prisma toolchain: optional peer of better-auth's prisma-adapter ----------
 # Logwell authenticates with the better-auth *drizzle* adapter
-# (src/lib/server/auth.ts) and never imports Prisma. bun still resolves
+# (src/lib/server/auth.ts) and never imports Prisma. pnpm still resolves
 # `prisma` -> `@prisma/dev` as an optional peer, dragging in hono and effect.
 # None of this is imported or executed by the app.
 [[PackageOverrides]]

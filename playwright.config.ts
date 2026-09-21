@@ -33,7 +33,7 @@ const config: PlaywrightTestConfig = {
     },
   ],
   webServer: {
-    command: isCI ? "bun run build && bun run preview" : "bun run dev",
+    command: isCI ? "pnpm run build && pnpm run preview" : "pnpm run dev",
     url: `http://localhost:${port}`,
     reuseExistingServer: !isCI,
     timeout: 180000,

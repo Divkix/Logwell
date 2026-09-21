@@ -9,7 +9,7 @@ This project follows the Testing Trophy methodology, prioritizing integration te
 Located alongside source files in `src/`. Tests pure functions and utilities in isolation.
 
 ```bash
-bun run test:unit
+pnpm run test:unit
 ```
 
 ### Integration Tests (`.integration.test.ts`)
@@ -17,7 +17,7 @@ bun run test:unit
 Located in `tests/integration/`. Tests server-side code with database interactions using PGlite.
 
 ```bash
-bun run test:integration
+pnpm run test:integration
 ```
 
 ### Component Tests (`.component.test.ts`)
@@ -25,7 +25,7 @@ bun run test:integration
 Located alongside source files in `src/`. Tests Svelte components in jsdom using `@testing-library/svelte`.
 
 ```bash
-bun run test:component
+pnpm run test:component
 ```
 
 ### E2E Tests
@@ -33,29 +33,29 @@ bun run test:component
 Located in `tests/e2e/`. Full end-to-end tests using Playwright across multiple browsers.
 
 ```bash
-bun run test:e2e
+pnpm run test:e2e
 ```
 
 ## Running Tests
 
 ```bash
 # Run all tests (unit + integration)
-bun run test
+pnpm run test
 
 # Run tests in watch mode
-bun run test
+pnpm run test
 
 # Run specific test types
-bun run test:unit
-bun run test:component
-bun run test:integration
-bun run test:e2e
+pnpm run test:unit
+pnpm run test:component
+pnpm run test:integration
+pnpm run test:e2e
 
 # Generate coverage report
-bun run test:coverage
+pnpm run test:coverage
 
 # Open test UI
-bun run test:ui
+pnpm run test:ui
 ```
 
 ## Test Database

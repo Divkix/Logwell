@@ -1,0 +1,16 @@
+# pnpm settings live here — pnpm 12 reads only auth/registry settings from .npmrc.
+# A dependency's install scripts run only when listed below: pnpm's strictDepBuilds
+# default fails the install on any build script nobody has reviewed.
+allowBuilds:
+  # Links esbuild's platform binary for vite and drizzle-kit.
+  esbuild: true
+
+# Accepted peer mismatches, recorded so installs stay quiet:
+peerDependencyRules:
+  allowedVersions:
+    # svelte-adapter-bun declares typescript ^5; the repo builds with TypeScript 6.
+    typescript: "6"
+  allowAny:
+    # "vite" resolves to the vite-plus core fork, which carries its own 0.3.1
+    # version that no consumer's vite peer range can match.
+    - vite
