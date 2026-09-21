@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.4
 
-# SECURITY: pinned to an exact version + digest for reproducible builds (Bun 1.4.2; CI uses 1.4.1)
+# SECURITY: pinned to an exact version + digest for reproducible builds (Bun 1.4.2; matches CI + packageManager)
 FROM oven/bun:1.4.2-alpine@sha256:d888c0ae6c86d7866ff10c5aafdd9077b36aee6455b33dd270fb93c0dd5cef6f AS base
 WORKDIR /app
 
@@ -66,6 +66,7 @@ COPY --from=build --chown=logwell:logwell /app/drizzle ./drizzle
 COPY --from=build --chown=logwell:logwell /app/drizzle.config.ts ./
 COPY --from=build --chown=logwell:logwell /app/scripts ./scripts
 COPY --from=build --chown=logwell:logwell /app/src/lib/server ./src/lib/server
+COPY --from=build --chown=logwell:logwell /app/src/lib/shared ./src/lib/shared
 
 COPY --chown=logwell:logwell entrypoint.sh ./
 RUN chmod +x entrypoint.sh
@@ -77,6 +78,10 @@ EXPOSE 3000
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
 ENV PORT=3000
+# Bun.serve idle timeout (s) — MUST stay above the SSE heartbeat (capped at half this value)
+ENV IDLE_TIMEOUT=120
+# Max request body (adapter default 512K) — bounds ingest batches, which can exceed 512K
+ENV BODY_SIZE_LIMIT=1M
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:3000/api/health || exit 1

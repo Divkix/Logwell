@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, eq, gt, gte, inArray, or, type SQL, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { INCIDENT_GROUPED_LEVELS } from "../../shared/schemas/incident";
 import type { DatabaseClient } from "../db/db";
@@ -16,49 +16,104 @@ export interface BackfillProjectResult {
   touchedIncidents: number;
 }
 
+// Logs are paged by keyset and written one batch per transaction, so a large window neither
+// materializes in memory nor holds row locks for the whole run. Every list handed to a
+// statement is derived from a single batch, which keeps bind parameters far below the
+// 65535-parameter protocol limit (13 per incident row, 4 per log update).
+const LOG_BATCH_SIZE = 1000;
+
+interface BackfillLog {
+  id: string;
+  level: LogLevel;
+  message: string;
+  timestamp: Date;
+  sourceFile: string | null;
+  lineNumber: number | null;
+  resourceAttributes: unknown;
+  metadata: unknown;
+  incidentId: string | null;
+  fingerprint: string | null;
+  serviceName: string | null;
+}
+
 export async function backfillProjectIncidents(
   db: DatabaseClient,
   projectId: string,
   since: Date,
 ): Promise<BackfillProjectResult> {
-  const logs = await db
-    .select({
-      id: log.id,
-      level: log.level,
-      message: log.message,
-      timestamp: log.timestamp,
-      sourceFile: log.sourceFile,
-      lineNumber: log.lineNumber,
-      resourceAttributes: log.resourceAttributes,
-      metadata: log.metadata,
-      incidentId: log.incidentId,
-      fingerprint: log.fingerprint,
-      serviceName: log.serviceName,
-    })
-    .from(log)
-    .where(
-      and(
-        eq(log.projectId, projectId),
-        gte(log.timestamp, since),
-        inArray(log.level, [...INCIDENT_GROUPED_LEVELS]),
-      ),
-    )
-    .orderBy(log.timestamp);
+  const touchedIncidentIds = new Set<string>();
+  let processedLogs = 0;
+  let updatedLogs = 0;
+  let cursor: { timestamp: Date; id: string } | null = null;
 
-  if (logs.length === 0) {
-    return {
-      processedLogs: 0,
-      updatedLogs: 0,
-      touchedIncidents: 0,
-    };
+  for (;;) {
+    const batch = await db
+      .select({
+        id: log.id,
+        level: log.level,
+        message: log.message,
+        timestamp: log.timestamp,
+        sourceFile: log.sourceFile,
+        lineNumber: log.lineNumber,
+        resourceAttributes: log.resourceAttributes,
+        metadata: log.metadata,
+        incidentId: log.incidentId,
+        fingerprint: log.fingerprint,
+        serviceName: log.serviceName,
+      })
+      .from(log)
+      .where(
+        and(
+          eq(log.projectId, projectId),
+          gte(log.timestamp, since),
+          inArray(log.level, [...INCIDENT_GROUPED_LEVELS]),
+          cursor
+            ? or(
+                gt(log.timestamp, cursor.timestamp),
+                and(eq(log.timestamp, cursor.timestamp), gt(log.id, cursor.id)),
+              )
+            : undefined,
+        ),
+      )
+      .orderBy(log.timestamp, log.id)
+      .limit(LOG_BATCH_SIZE);
+
+    const last = batch.at(-1);
+    if (!last) break;
+
+    cursor = { timestamp: last.timestamp, id: last.id };
+    processedLogs += batch.length;
+
+    const result = await backfillBatch(db, projectId, batch);
+    updatedLogs += result.updatedLogs;
+    for (const id of result.touchedIncidentIds) {
+      touchedIncidentIds.add(id);
+    }
   }
 
+  return {
+    processedLogs,
+    updatedLogs,
+    touchedIncidents: touchedIncidentIds.size,
+  };
+}
+
+async function backfillBatch(
+  db: DatabaseClient,
+  projectId: string,
+  logs: BackfillLog[],
+): Promise<{ updatedLogs: number; touchedIncidentIds: string[] }> {
   return await db.transaction(async (tx) => {
+    // Concurrent backfill runs touch the same incident and log rows; without serializing them
+    // per project they interleave their lock acquisition (incident locks, then log locks, then
+    // incident locks again) and Postgres kills one with a 40P01 deadlock.
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${projectId}))`);
+
     const prepared = prepareLogsForIncidents(
       logs.map((entry) => ({
         level: entry.level,
         message: entry.message,
-        timestamp: entry.timestamp as Date,
+        timestamp: entry.timestamp,
         sourceFile: entry.sourceFile,
         lineNumber: entry.lineNumber,
         resourceAttributes: entry.resourceAttributes,
@@ -83,39 +138,51 @@ export async function backfillProjectIncidents(
     );
     const touchedIncidents: Incident[] = [...existingIncidents];
 
-    for (const aggregate of aggregates) {
-      if (incidentByFingerprint.has(aggregate.fingerprint)) continue;
+    const missing = aggregates.filter(
+      (aggregate) => !incidentByFingerprint.has(aggregate.fingerprint),
+    );
 
+    if (missing.length > 0) {
       const now = new Date();
-      const [created] = await tx
+      const created = await tx
         .insert(incident)
-        .values({
-          id: nanoid(),
-          projectId,
-          fingerprint: aggregate.fingerprint,
-          title: aggregate.title || buildIncidentTitle(aggregate.normalizedMessage),
-          normalizedMessage: aggregate.normalizedMessage,
-          serviceName: aggregate.serviceName,
-          sourceFile: aggregate.sourceFile,
-          lineNumber: aggregate.lineNumber,
-          highestLevel: aggregate.highestLevel,
-          firstSeen: aggregate.firstSeen,
-          lastSeen: aggregate.lastSeen,
-          totalEvents: aggregate.totalEvents,
-          createdAt: now,
-          updatedAt: now,
+        .values(
+          missing.map((aggregate) => ({
+            id: nanoid(),
+            projectId,
+            fingerprint: aggregate.fingerprint,
+            title: aggregate.title || buildIncidentTitle(aggregate.normalizedMessage),
+            normalizedMessage: aggregate.normalizedMessage,
+            serviceName: aggregate.serviceName,
+            sourceFile: aggregate.sourceFile,
+            lineNumber: aggregate.lineNumber,
+            highestLevel: aggregate.highestLevel,
+            firstSeen: aggregate.firstSeen,
+            lastSeen: aggregate.lastSeen,
+            totalEvents: aggregate.totalEvents,
+            createdAt: now,
+            updatedAt: now,
+          })),
+        )
+        // A concurrent ingest or a second backfill can create the same fingerprint between the
+        // read above and this insert. Adopt that row rather than aborting the transaction; the
+        // no-op assignment only exists so the conflicting row is returned, and every counter is
+        // recomputed from the log rows below.
+        .onConflictDoUpdate({
+          target: [incident.projectId, incident.fingerprint],
+          set: { fingerprint: sql`excluded.fingerprint` },
         })
         .returning();
 
-      if (!created) {
-        throw new Error(`Failed to create incident for fingerprint: ${aggregate.fingerprint}`);
+      for (const row of created) {
+        incidentByFingerprint.set(row.fingerprint, row);
+        touchedIncidents.push(row);
       }
-      incidentByFingerprint.set(aggregate.fingerprint, created);
-      touchedIncidents.push(created);
     }
+
     const assigned = assignIncidentIds(prepared, incidentByFingerprint);
 
-    let updatedLogs = 0;
+    const updates: SQL[] = [];
     for (let i = 0; i < logs.length; i++) {
       const original = logs[i]!;
       const enriched = assigned[i]!;
@@ -128,58 +195,66 @@ export async function backfillProjectIncidents(
         continue;
       }
 
-      await tx
-        .update(log)
-        .set({
-          incidentId: enriched.incidentId,
-          fingerprint: enriched.fingerprint,
-          serviceName: enriched.serviceName,
-        })
-        .where(eq(log.id, original.id));
-      updatedLogs++;
+      updates.push(
+        sql`(${original.id}, ${enriched.incidentId}, ${enriched.fingerprint}, ${enriched.serviceName})`,
+      );
     }
 
-    const touchedIncidentIds = touchedIncidents.map((i) => i.id);
-    if (touchedIncidentIds.length > 0) {
-      for (const incidentId of touchedIncidentIds) {
-        const [stats] = await tx
-          .select({
-            firstSeen: sql<string>`MIN(${log.timestamp})`,
-            lastSeen: sql<string>`MAX(${log.timestamp})`,
-            totalEvents: sql<number>`COUNT(*)`,
-            highestLevel: sql<LogLevel>`(ARRAY['debug','info','warn','error','fatal'])[MAX(
-              CASE ${log.level}
-                WHEN 'debug' THEN 1
-                WHEN 'info' THEN 2
-                WHEN 'warn' THEN 3
-                WHEN 'error' THEN 4
-                WHEN 'fatal' THEN 5
-                ELSE 0
-              END
-            )]`,
-          })
-          .from(log)
-          .where(eq(log.incidentId, incidentId));
+    if (updates.length > 0) {
+      await tx.execute(sql`
+        UPDATE ${log} AS target
+        SET incident_id = source.incident_id,
+            fingerprint = source.fingerprint,
+            service_name = source.service_name
+        FROM (VALUES ${sql.join(updates, sql`, `)})
+          AS source(id, incident_id, fingerprint, service_name)
+        WHERE target.id = source.id
+      `);
+    }
 
-        if (stats && stats.firstSeen && stats.lastSeen) {
-          await tx
-            .update(incident)
-            .set({
-              firstSeen: new Date(stats.firstSeen),
-              lastSeen: new Date(stats.lastSeen),
-              totalEvents: Number(stats.totalEvents),
-              highestLevel: stats.highestLevel,
-              updatedAt: new Date(),
-            })
-            .where(eq(incident.id, incidentId));
-        }
+    // Sorted by fingerprint so the recompute takes its row locks in the same order as the
+    // upsert above and as the ingest path, which is what keeps concurrent writers from
+    // deadlocking on the incident rows.
+    const touchedIncidentIds = [...touchedIncidents]
+      .sort((a, b) => (a.fingerprint < b.fingerprint ? -1 : a.fingerprint > b.fingerprint ? 1 : 0))
+      .map((entry) => entry.id);
+    for (const incidentId of touchedIncidentIds) {
+      const [stats] = await tx
+        .select({
+          firstSeen: sql<string>`MIN(${log.timestamp})`,
+          lastSeen: sql<string>`MAX(${log.timestamp})`,
+          totalEvents: sql<number>`COUNT(*)`,
+          highestLevel: sql<LogLevel>`(ARRAY['debug','info','warn','error','fatal'])[MAX(
+            CASE ${log.level}
+              WHEN 'debug' THEN 1
+              WHEN 'info' THEN 2
+              WHEN 'warn' THEN 3
+              WHEN 'error' THEN 4
+              WHEN 'fatal' THEN 5
+              ELSE 0
+            END
+          )]`,
+        })
+        .from(log)
+        .where(eq(log.incidentId, incidentId));
+
+      if (stats && stats.firstSeen && stats.lastSeen) {
+        await tx
+          .update(incident)
+          .set({
+            firstSeen: new Date(stats.firstSeen),
+            lastSeen: new Date(stats.lastSeen),
+            totalEvents: Number(stats.totalEvents),
+            highestLevel: stats.highestLevel,
+            updatedAt: new Date(),
+          })
+          .where(eq(incident.id, incidentId));
       }
     }
 
     return {
-      processedLogs: logs.length,
-      updatedLogs,
-      touchedIncidents: touchedIncidents.length,
+      updatedLogs: updates.length,
+      touchedIncidentIds,
     };
   });
 }

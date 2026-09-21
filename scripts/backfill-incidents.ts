@@ -39,24 +39,40 @@ async function runBackfill() {
     let totalProcessed = 0;
     let totalUpdated = 0;
     let totalTouchedIncidents = 0;
+    let failedProjects = 0;
 
     console.log(`Starting incident backfill for last ${days} day(s) since ${since.toISOString()}`);
 
     for (const proj of projects) {
-      const result = await backfillProjectIncidents(db, proj.id, since);
-      totalProcessed += result.processedLogs;
-      totalUpdated += result.updatedLogs;
-      totalTouchedIncidents += result.touchedIncidents;
+      try {
+        const result = await backfillProjectIncidents(db, proj.id, since);
+        totalProcessed += result.processedLogs;
+        totalUpdated += result.updatedLogs;
+        totalTouchedIncidents += result.touchedIncidents;
 
-      console.log(
-        `- ${proj.name} (${proj.id}): processed=${result.processedLogs}, updated=${result.updatedLogs}, incidents=${result.touchedIncidents}`,
-      );
+        console.log(
+          `- ${proj.name} (${proj.id}): processed=${result.processedLogs}, updated=${result.updatedLogs}, incidents=${result.touchedIncidents}`,
+        );
+      } catch (error) {
+        failedProjects++;
+        // Drizzle wraps driver errors, and its own message is the whole query text; the
+        // Postgres reason (duplicate key, deadlock, ...) lives on `cause`.
+        const cause = error instanceof Error && error.cause instanceof Error ? error.cause : error;
+        console.error(
+          `- ${proj.name} (${proj.id}): failed (${cause instanceof Error ? cause.message : String(cause)})`,
+        );
+      }
     }
 
     console.log("Incident backfill complete");
     console.log(`Processed logs: ${totalProcessed}`);
     console.log(`Updated logs: ${totalUpdated}`);
     console.log(`Touched incidents: ${totalTouchedIncidents}`);
+
+    if (failedProjects > 0) {
+      console.error(`Failed projects: ${failedProjects}`);
+      process.exitCode = 1;
+    }
   } finally {
     await client.end();
   }
