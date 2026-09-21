@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
@@ -131,5 +131,27 @@ describe("backfillProjectIncidents batching", () => {
     expect(updated?.totalEvents).toBe(2);
     expect(updated?.firstSeen.getTime()).toBe(older.getTime());
     expect(updated?.lastSeen.getTime()).toBe(now.getTime());
+  });
+
+  it("terminates the keyset pager on logs that carry sub-millisecond timestamps", async () => {
+    const project = await seedProject(db);
+    const baseEpoch = Date.parse("2026-01-01T00:00:00.000Z") / 1000 + 0.123456;
+    const since = new Date(Date.parse("2025-12-31T23:59:00.000Z"));
+
+    // A millisecond-truncated cursor compares below its own row, so the pager re-reads the batch
+    // it just took and never advances. Three rows one microsecond apart inside one millisecond.
+    for (let i = 0; i < 3; i++) {
+      await db.execute(sql`
+        INSERT INTO "log"
+          ("id", "project_id", "level", "message", "timestamp")
+        VALUES (${nanoid()}, ${project.id}, 'error', 'Sub-millisecond failure', to_timestamp(${baseEpoch + i * 0.000001}))
+      `);
+    }
+
+    const result = await backfillProjectIncidents(db, project.id, since);
+
+    expect(result.processedLogs).toBe(3);
+    expect(result.updatedLogs).toBe(3);
+    expect(result.touchedIncidents).toBe(1);
   });
 });

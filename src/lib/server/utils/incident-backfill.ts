@@ -1,8 +1,9 @@
-import { and, eq, gt, gte, inArray, or, type SQL, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, sql, type SQL } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { INCIDENT_GROUPED_LEVELS } from "../../shared/schemas/incident";
 import type { DatabaseClient } from "../db/db";
 import { type Incident, incident, type LogLevel, log } from "../db/schema";
+import { cursorRowGreaterThan, microsColumn } from "./cursor";
 import {
   assignIncidentIds,
   buildIncidentTitle,
@@ -44,7 +45,9 @@ export async function backfillProjectIncidents(
   const touchedIncidentIds = new Set<string>();
   let processedLogs = 0;
   let updatedLogs = 0;
-  let cursor: { timestamp: Date; id: string } | null = null;
+  // Exact microseconds, not the driver's millisecond Date: a truncated cursor stays inside the
+  // millisecond it came from, so the rows after it are re-read forever and the loop never ends.
+  let cursor: { micros: string; id: string } | null = null;
 
   for (;;) {
     const batch = await db
@@ -60,6 +63,7 @@ export async function backfillProjectIncidents(
         incidentId: log.incidentId,
         fingerprint: log.fingerprint,
         serviceName: log.serviceName,
+        micros: microsColumn(log.timestamp),
       })
       .from(log)
       .where(
@@ -68,10 +72,7 @@ export async function backfillProjectIncidents(
           gte(log.timestamp, since),
           inArray(log.level, [...INCIDENT_GROUPED_LEVELS]),
           cursor
-            ? or(
-                gt(log.timestamp, cursor.timestamp),
-                and(eq(log.timestamp, cursor.timestamp), gt(log.id, cursor.id)),
-              )
+            ? cursorRowGreaterThan(log.timestamp, log.id, cursor.micros, cursor.id)
             : undefined,
         ),
       )
@@ -81,7 +82,7 @@ export async function backfillProjectIncidents(
     const last = batch.at(-1);
     if (!last) break;
 
-    cursor = { timestamp: last.timestamp, id: last.id };
+    cursor = { micros: last.micros, id: last.id };
     processedLogs += batch.length;
 
     const result = await backfillBatch(db, projectId, batch);
