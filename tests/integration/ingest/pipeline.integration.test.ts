@@ -184,6 +184,198 @@ describe("ingestLogs pipeline", () => {
     expect((await response.json()).error).toBe("validation_error");
   });
 
+  it("counts rejected entries toward the insert limit from either parser", async () => {
+    const project = await seedProjectWithApiKey(db);
+    const valid = Array.from({ length: API_CONFIG.BATCH_INSERT_LIMIT - 1 }, (_, i) => `log ${i}`);
+
+    const bodies: Array<[IngestBodyParser, unknown]> = [
+      [
+        parseSimpleIngestBody,
+        [
+          ...valid.map((message) => ({ level: "info", message })),
+          { level: "bogus", message: "rejected" },
+          { level: "info", message: "one over" },
+        ],
+      ],
+      [
+        parseOtlpIngestBody,
+        {
+          resourceLogs: [
+            {
+              scopeLogs: [
+                {
+                  logRecords: [
+                    ...valid.map((message) => ({ body: { stringValue: message } })),
+                    {},
+                    { body: { stringValue: "one over" } },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    ];
+
+    for (const [parse, body] of bodies) {
+      const response = await ingestLogs(post(body, project.apiKey), db, parse);
+      expect(response.status).toBe(400);
+      expect((await response.json()).error).toBe("batch_too_large");
+    }
+
+    const rows = await db.select().from(log).where(eq(log.projectId, project.id));
+    expect(rows).toHaveLength(0);
+  });
+
+  it("fails junk-flooded batches as batch_too_large without echoing entry errors", async () => {
+    const project = await seedProjectWithApiKey(db);
+    const flood = Array.from({ length: 20000 }, () => null);
+    const expectedBody = {
+      error: "batch_too_large",
+      message: `Batch exceeds maximum limit of ${API_CONFIG.BATCH_INSERT_LIMIT} logs.`,
+    };
+
+    const bodies: Array<[IngestBodyParser, unknown]> = [
+      [parseSimpleIngestBody, flood],
+      [parseOtlpIngestBody, { resourceLogs: [{ scopeLogs: [{ logRecords: flood }] }] }],
+      [parseOtlpIngestBody, { resourceLogs: flood }],
+    ];
+
+    for (const [parse, body] of bodies) {
+      const response = await ingestLogs(post(body, project.apiKey), db, parse);
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual(expectedBody);
+    }
+
+    const rows = await db.select().from(log).where(eq(log.projectId, project.id));
+    expect(rows).toHaveLength(0);
+  });
+
+  it("rejects records whose message contains a NUL character", async () => {
+    const project = await seedProjectWithApiKey(db);
+
+    const simpleResponse = await ingestLogs(
+      post({ level: "info", message: "before\u0000after" }, project.apiKey),
+      db,
+      parseSimpleIngestBody,
+    );
+    expect(simpleResponse.status).toBe(200);
+    expect(await simpleResponse.json()).toEqual({
+      accepted: 0,
+      rejected: 1,
+      errors: ["Entry at index 0: message cannot contain NUL characters"],
+    });
+
+    const otlpResponse = await ingestLogs(
+      post(
+        {
+          resourceLogs: [
+            {
+              scopeLogs: [{ logRecords: [{ body: { stringValue: "before\u0000after" } }] }],
+            },
+          ],
+        },
+        project.apiKey,
+      ),
+      db,
+      parseOtlpIngestBody,
+    );
+    expect(otlpResponse.status).toBe(200);
+    expect(await otlpResponse.json()).toEqual({
+      accepted: 0,
+      rejected: 1,
+      errors: ["Log record rejected: message cannot contain NUL characters"],
+    });
+
+    const rows = await db.select().from(log).where(eq(log.projectId, project.id));
+    expect(rows).toHaveLength(0);
+  });
+
+  it("strips NUL characters from stored payloads instead of failing the batch", async () => {
+    const project = await seedProjectWithApiKey(db);
+
+    const simpleResponse = await ingestLogs(
+      post(
+        {
+          level: "info",
+          message: "nul-simple",
+          service: "we\u0000b",
+          sourceFile: "src/a\u0000b.ts",
+          metadata: { "k\u0000ey": "v\u0000al", nested: { list: ["a\u0000b"] } },
+        },
+        project.apiKey,
+      ),
+      db,
+      parseSimpleIngestBody,
+    );
+    expect(simpleResponse.status).toBe(200);
+    expect(await simpleResponse.json()).toEqual({ accepted: 1 });
+
+    const otlpResponse = await ingestLogs(
+      post(
+        {
+          resourceLogs: [
+            {
+              resource: {
+                attributes: [{ key: "service.name", value: { stringValue: "we\u0000b" } }],
+              },
+              scopeLogs: [
+                {
+                  scope: {
+                    name: "sc\u0000ope",
+                    attributes: [{ key: "s\u0000k", value: { stringValue: "s\u0000v" } }],
+                  },
+                  logRecords: [
+                    {
+                      severityText: "ERR\u0000OR",
+                      body: {
+                        kvlistValue: {
+                          values: [{ key: "b\u0000k", value: { stringValue: "b\u0000v" } }],
+                        },
+                      },
+                      attributes: [{ key: "k\u0000ey", value: { stringValue: "v\u0000al" } }],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+        project.apiKey,
+      ),
+      db,
+      parseOtlpIngestBody,
+    );
+    expect(otlpResponse.status).toBe(200);
+    expect(await otlpResponse.json()).toEqual({ accepted: 1 });
+
+    const rows = await db.select().from(log).where(eq(log.projectId, project.id));
+    expect(rows).toHaveLength(2);
+
+    const simple = rows.find((row) => row.message === "nul-simple")!;
+    expect(simple.metadata).toEqual({ key: "val", nested: { list: ["ab"] } });
+    expect(simple.resourceAttributes).toEqual({ "service.name": "web" });
+    expect(simple.sourceFile).toBe("src/ab.ts");
+
+    const otlp = rows.find((row) => row.message !== "nul-simple")!;
+    expect(otlp.metadata).toEqual({ key: "val" });
+    expect(otlp.body).toEqual({ bk: "bv" });
+    expect(otlp.resourceAttributes).toEqual({ "service.name": "web" });
+    expect(otlp.scopeAttributes).toEqual({ sk: "sv" });
+    expect(otlp.scopeName).toBe("scope");
+    expect(otlp.severityText).toBe("ERROR");
+
+    const jsonbColumns = JSON.stringify([
+      simple.metadata,
+      simple.resourceAttributes,
+      otlp.metadata,
+      otlp.body,
+      otlp.resourceAttributes,
+      otlp.scopeAttributes,
+    ]);
+    expect(jsonbColumns).not.toContain("\\u0000");
+  });
+
   it("maps validation failures to 400 validation_error per parser", async () => {
     const project = await seedProjectWithApiKey(db);
 

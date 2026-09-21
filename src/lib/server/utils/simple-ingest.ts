@@ -1,6 +1,7 @@
 import { LOG_LEVELS, type LogLevel } from "../../shared/schemas/log";
+import { API_CONFIG } from "../config/performance";
 import type { ParsedIngest } from "./ingest";
-import { mapOtlpAttributesToLogColumns } from "./otlp";
+import { BatchTooLargeError, mapOtlpAttributesToLogColumns } from "./otlp";
 
 export interface SimpleLogInput {
   level: string;
@@ -85,6 +86,12 @@ function validateLogEntry(
   if (entry.message.trim() === "") {
     return { log: null, error: `Entry at index ${index}: message cannot be empty` };
   }
+  if (entry.message.includes("\u0000")) {
+    return {
+      log: null,
+      error: `Entry at index ${index}: message cannot contain NUL characters`,
+    };
+  }
 
   const timestamp = parseTimestamp(entry.timestamp);
   const service = typeof entry.service === "string" ? entry.service : null;
@@ -130,6 +137,12 @@ export function parseSimpleIngestRequest(body: unknown): SimpleIngestResult {
 
   if (entries.length === 0) {
     throw new SimpleIngestError("Request body cannot be an empty array");
+  }
+
+  // Entries are counted whether or not they validate, so a junk-flooded body
+  // fails as a batch error instead of materializing an error string per entry.
+  if (entries.length > API_CONFIG.BATCH_INSERT_LIMIT) {
+    throw new BatchTooLargeError(API_CONFIG.BATCH_INSERT_LIMIT);
   }
 
   const records: NormalizedSimpleLog[] = [];

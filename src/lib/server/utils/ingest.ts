@@ -12,7 +12,7 @@ import {
   prepareLogsForIncidents,
   upsertIncidentsForPreparedLogs,
 } from "$lib/server/utils/incidents";
-import { OtlpBatchTooLargeError, OtlpValidationError } from "$lib/server/utils/otlp";
+import { BatchTooLargeError, OtlpValidationError } from "$lib/server/utils/otlp";
 import { checkRateLimit, INGEST_RPM } from "$lib/server/utils/rate-limit";
 import { SimpleIngestError } from "$lib/server/utils/simple-ingest";
 
@@ -65,6 +65,42 @@ export interface ParsedIngest {
 }
 
 export type IngestBodyParser = (body: unknown) => ParsedIngest;
+
+// Postgres rejects U+0000 in both text and jsonb columns, so NUL characters are
+// stripped from every string bound for a column. The walk is depth-bounded
+// because the payload is attacker-controlled; deeper levels are dropped.
+const MAX_NUL_STRIP_DEPTH = 32;
+
+function stripNulStrings(value: unknown, depth = 0): unknown {
+  if (typeof value === "string") return value.replaceAll("\u0000", "");
+  if (value === null || typeof value !== "object") return value;
+  if (depth >= MAX_NUL_STRIP_DEPTH) return null;
+
+  if (Array.isArray(value)) {
+    return value.map((entry) => stripNulStrings(entry, depth + 1));
+  }
+
+  // Only plain JSON containers are walked; class instances (e.g. Date) pass through.
+  const prototype: unknown = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) return value;
+
+  return Object.fromEntries(
+    Object.entries(value).map(([key, entry]) => [
+      key.replaceAll("\u0000", ""),
+      stripNulStrings(entry, depth + 1),
+    ]),
+  );
+}
+
+function sanitizeIngestInput(input: IngestInputRow): IngestInputRow {
+  const sanitized: Record<string, unknown> = { ...input };
+  for (const [key, value] of Object.entries(sanitized)) {
+    // A NUL in `message` is a per-record rejection in both parsers, never a strip.
+    if (key === "message") continue;
+    sanitized[key] = stripNulStrings(value);
+  }
+  return sanitized as IngestInputRow;
+}
 
 export function buildIngestResponse(accepted: number, rejected: number, errors: string[]) {
   const response: { accepted: number; rejected?: number; errors?: string[] } = { accepted };
@@ -122,7 +158,7 @@ export async function ingestLogs(
   try {
     parsed = parse(body);
   } catch (err) {
-    if (err instanceof OtlpBatchTooLargeError) {
+    if (err instanceof BatchTooLargeError) {
       return json({ error: "batch_too_large", message: err.message }, { status: 400 });
     }
     if (err instanceof OtlpValidationError || err instanceof SimpleIngestError) {
@@ -141,8 +177,10 @@ export async function ingestLogs(
     );
   }
 
+  const inputs = parsed.inputs.map(sanitizeIngestInput);
+
   const preparedLogs = prepareLogsForIncidents(
-    parsed.inputs.map((input) => ({
+    inputs.map((input) => ({
       level: input.level,
       message: input.message,
       timestamp: input.timestamp,
@@ -164,7 +202,7 @@ export async function ingestLogs(
           const assigned = assignIncidentIds(preparedLogs, incidentByFingerprint);
 
           const logEntries = assigned.map((prepared, index) => ({
-            ...parsed.inputs[index]!,
+            ...inputs[index]!,
             id: nanoid(),
             projectId,
             incidentId: prepared.incidentId,

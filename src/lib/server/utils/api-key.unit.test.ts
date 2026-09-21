@@ -1,5 +1,14 @@
-import { describe, expect, it } from "vite-plus/test";
-import { generateApiKey, validateApiKeyFormat } from "./api-key";
+import { beforeEach, describe, expect, it } from "vite-plus/test";
+import type { DatabaseClient } from "$lib/server/db/db";
+import {
+  ApiKeyError,
+  clearApiKeyCache,
+  generateApiKey,
+  hashApiKey,
+  invalidateApiKeyCacheByHash,
+  validateApiKey,
+  validateApiKeyFormat,
+} from "./api-key";
 
 describe("API Key Generation", () => {
   it("generateApiKey returns lw_ prefixed 32-char unique strings", () => {
@@ -35,5 +44,57 @@ describe("API Key Format Validation", () => {
 
   it.each([[null], [undefined]])("validateApiKeyFormat rejects %s", (key) => {
     expect(validateApiKeyFormat(key as unknown as string)).toBe(false);
+  });
+});
+
+describe("API key cache invalidation races", () => {
+  const key = `lw_${"a".repeat(32)}`;
+
+  function request(apiKey: string): Request {
+    return new Request("http://localhost/v1/logs", {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+  }
+
+  /** Minimal stand-in for the drizzle chain validateApiKey awaits. */
+  function stubDb(read: () => Promise<Array<{ id: string }>>): DatabaseClient {
+    return {
+      select: () => ({ from: () => ({ where: () => read() }) }),
+    } as unknown as DatabaseClient;
+  }
+
+  beforeEach(() => {
+    clearApiKeyCache();
+  });
+
+  it("does not resurrect a key rotated while its lookup was in flight", async () => {
+    const { promise, resolve } = Promise.withResolvers<Array<{ id: string }>>();
+    const inFlight = validateApiKey(
+      request(key),
+      stubDb(() => promise),
+    );
+
+    invalidateApiKeyCacheByHash(hashApiKey(key));
+    resolve([{ id: "project-1" }]);
+
+    await expect(inFlight).resolves.toBe("project-1");
+
+    const afterRotation = validateApiKey(
+      request(key),
+      stubDb(async () => []),
+    );
+    await expect(afterRotation).rejects.toBeInstanceOf(ApiKeyError);
+  });
+
+  it("caches successful lookups so a second request skips the database", async () => {
+    let reads = 0;
+    const db = stubDb(async () => {
+      reads++;
+      return [{ id: "project-2" }];
+    });
+
+    await expect(validateApiKey(request(key), db)).resolves.toBe("project-2");
+    await expect(validateApiKey(request(key), db)).resolves.toBe("project-2");
+    expect(reads).toBe(1);
   });
 });

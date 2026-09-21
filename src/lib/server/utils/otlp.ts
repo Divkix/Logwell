@@ -9,10 +9,12 @@ export class OtlpValidationError extends Error {
   }
 }
 
-export class OtlpBatchTooLargeError extends OtlpValidationError {
+// Shared by both ingest adapters: the batch cap counts every entry in the body
+// (accepted and rejected alike), so the simple parser throws it too.
+export class BatchTooLargeError extends OtlpValidationError {
   constructor(limit: number) {
     super(`Batch exceeds maximum limit of ${limit} logs.`);
-    this.name = "OtlpBatchTooLargeError";
+    this.name = "BatchTooLargeError";
   }
 }
 
@@ -353,8 +355,16 @@ export function normalizeOtlpLogsRequest(body: unknown): NormalizedOtlpLogsResul
 
   let recordCount = 0;
 
+  const countEntry = () => {
+    recordCount += 1;
+    if (recordCount > API_CONFIG.BATCH_INSERT_LIMIT) {
+      throw new BatchTooLargeError(API_CONFIG.BATCH_INSERT_LIMIT);
+    }
+  };
+
   for (const [resourceIndex, resourceLog] of resourceLogs.entries()) {
     if (!isRecord(resourceLog)) {
+      countEntry();
       rejectedLogRecords += 1;
       errors.push(`Malformed resourceLog at index ${resourceIndex}`);
       continue;
@@ -370,6 +380,7 @@ export function normalizeOtlpLogsRequest(body: unknown): NormalizedOtlpLogsResul
 
     for (const [scopeIndex, scopeLog] of scopeLogs.entries()) {
       if (!isRecord(scopeLog)) {
+        countEntry();
         rejectedLogRecords += 1;
         errors.push(`Malformed scopeLog at index ${scopeIndex}`);
         continue;
@@ -385,6 +396,8 @@ export function normalizeOtlpLogsRequest(body: unknown): NormalizedOtlpLogsResul
       const logRecords = Array.isArray(scopeLog.logRecords) ? scopeLog.logRecords : [];
 
       for (const logRecord of logRecords) {
+        countEntry();
+
         if (!isRecord(logRecord)) {
           rejectedLogRecords += 1;
           errors.push("Log record rejected: must be an object.");
@@ -407,15 +420,16 @@ export function normalizeOtlpLogsRequest(body: unknown): NormalizedOtlpLogsResul
         const level = deriveLevel(severityNumber, severityText);
         const message = deriveMessage(bodyValue, attributes);
 
+        if (message.includes("\u0000")) {
+          rejectedLogRecords += 1;
+          errors.push("Log record rejected: message cannot contain NUL characters");
+          continue;
+        }
+
         if (!message.trim()) {
           rejectedLogRecords += 1;
           errors.push(`Log record rejected: message cannot be empty`);
           continue;
-        }
-
-        recordCount += 1;
-        if (recordCount > API_CONFIG.BATCH_INSERT_LIMIT) {
-          throw new OtlpBatchTooLargeError(API_CONFIG.BATCH_INSERT_LIMIT);
         }
 
         records.push({

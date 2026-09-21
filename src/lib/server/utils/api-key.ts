@@ -40,6 +40,14 @@ const MAX_NEGATIVE_CACHE_SIZE = 5000;
 
 const API_KEY_REGEX = /^lw_[A-Za-z0-9_-]{32}$/;
 
+/**
+ * Bumped whenever a cached entry is invalidated. `validateApiKey` reads the DB
+ * before writing the cache; without this guard a concurrent invalidation
+ * (key rotation, project deletion) that lands inside that window would be
+ * undone by the late cache write, keeping a revoked key valid until TTL.
+ */
+let cacheGeneration = 0;
+
 export function hashApiKey(key: string): string {
   return createHash("sha256").update(key).digest("hex");
 }
@@ -110,6 +118,8 @@ export async function validateApiKey(request: Request, dbClient?: DatabaseClient
 
   const db = dbClient ?? (await import("$lib/server/db")).db;
 
+  const generationOnRead = cacheGeneration;
+
   const [result] = await db
     .select({ id: project.id })
     .from(project)
@@ -120,15 +130,20 @@ export async function validateApiKey(request: Request, dbClient?: DatabaseClient
     throw new ApiKeyError(401, "Invalid API key");
   }
 
-  if (API_KEY_CACHE.size >= MAX_CACHE_SIZE) {
-    evictCacheEntry();
-  }
+  // A rotation/deletion that committed while this read was in flight already
+  // invalidated the cache; re-adding the entry here would resurrect a revoked
+  // key, so serve the row we read but leave the cache alone.
+  if (generationOnRead === cacheGeneration) {
+    if (API_KEY_CACHE.size >= MAX_CACHE_SIZE) {
+      evictCacheEntry();
+    }
 
-  API_KEY_CACHE.set(keyHash, {
-    projectId: result.id,
-    keyHash,
-    expiresAt: Date.now() + CACHE_TTL_MS,
-  });
+    API_KEY_CACHE.set(keyHash, {
+      projectId: result.id,
+      keyHash,
+      expiresAt: Date.now() + CACHE_TTL_MS,
+    });
+  }
 
   NEGATIVE_CACHE.delete(keyHash);
 
@@ -136,11 +151,13 @@ export async function validateApiKey(request: Request, dbClient?: DatabaseClient
 }
 
 export function invalidateApiKeyCacheByHash(keyHash: string): void {
+  cacheGeneration++;
   API_KEY_CACHE.delete(keyHash);
   NEGATIVE_CACHE.delete(keyHash);
 }
 
 export function clearApiKeyCache(): void {
+  cacheGeneration++;
   API_KEY_CACHE.clear();
   NEGATIVE_CACHE.clear();
 }
