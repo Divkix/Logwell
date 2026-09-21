@@ -10,12 +10,17 @@ export function microsColumn(col: Column): SQL<string> {
 
 // NOTE: split seconds and microseconds because to_timestamp() takes a double precision
 // argument, which cannot represent microsecond precision beyond ~year 2100.
+function microsTimestamp(micros: string): SQL {
+  return sql`to_timestamp(trunc(${micros}::numeric / 1000000)::float8)
+      + ((${micros}::numeric % 1000000) * interval '1 microsecond')`;
+}
+
 export function cursorRowLessThan(col: Column, idCol: Column, micros: string, id: string): SQL {
-  return sql`(${col}, ${idCol}) < (
-    to_timestamp(trunc(${micros}::numeric / 1000000)::float8)
-      + ((${micros}::numeric % 1000000) * interval '1 microsecond'),
-    ${id}
-  )`;
+  return sql`(${col}, ${idCol}) < (${microsTimestamp(micros)}, ${id})`;
+}
+
+export function cursorRowGreaterThan(col: Column, idCol: Column, micros: string, id: string): SQL {
+  return sql`(${col}, ${idCol}) > (${microsTimestamp(micros)}, ${id})`;
 }
 
 export function encodeCursor(micros: string | number, id: string): string;
