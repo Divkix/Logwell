@@ -2,8 +2,8 @@ import { json } from "@sveltejs/kit";
 import { and, count, desc, eq, inArray } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { getDbClient } from "$lib/server/db/db";
-import { log, project } from "$lib/server/db/schema";
-import { apiError } from "$lib/server/utils/api-error";
+import { log, project, type Project } from "$lib/server/db/schema";
+import { apiError, isUniqueViolation } from "$lib/server/utils/api-error";
 import { generateApiKey, hashApiKey } from "$lib/server/utils/api-key";
 import { requireAuth } from "$lib/server/utils/owned-project";
 import { requireJsonContentType } from "$lib/server/utils/content-type";
@@ -140,7 +140,16 @@ export async function POST(event: RequestEvent): Promise<Response> {
     ownerId: user.id,
   };
 
-  const [created] = await db.insert(project).values(newProject).returning();
+  let created: Project | undefined;
+  try {
+    [created] = await db.insert(project).values(newProject).returning();
+  } catch (error) {
+    if (isUniqueViolation(error, "uq_project_name_owner")) {
+      return apiError(400, "duplicate_name", "A project with this name already exists");
+    }
+    throw error;
+  }
+
   if (!created) return apiError(500, "internal_error", "Failed to create project");
 
   return json(
