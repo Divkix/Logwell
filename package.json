@@ -67,7 +67,7 @@
     "jsdom": "^30.0.1",
     "knip": "^6.35.1",
     "mode-watcher": "^1.1.0",
-    "svelte": "^5.57.0",
+    "svelte": "^5.57.1",
     "svelte-adapter-bun": "^1.0.1",
     "svelte-check": "^4.7.6",
     "svelte-sonner": "^1.2.1",
@@ -90,5 +90,5 @@
   "engines": {
     "bun": ">=1.2.0"
   },
-  "packageManager": "bun@1.4.1"
+  "packageManager": "bun@1.4.2"
 }

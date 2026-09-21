@@ -12,7 +12,7 @@ Self-hosted, single-tenant logging + incident-intelligence platform. Services sh
   - `/v1/**`: API-key auth, per-project rate limit (`INGEST_RPM=600/min`, 429 + `Retry-After: 60`), CSRF-exempt.
 - **Ingest pipeline** (`src/lib/server/utils/ingest.ts:ingestLogs`): Content-Type guard → key validation (SHA-256 → project, re-verify row exists) → rate-limit → parse/normalize → fingerprint + incident upsert in one tx → `insert` with `incidentId` → SSE broadcast. `/v1` routes are thin adapters (`parseOtlpIngestBody` / `parseSimpleIngestBody`).
 - **Incidents:** error/fatal only; fingerprint = `SHA-256(service|sourceFile|lineNumber|normalizedMessage)[:32]`, normalize = lowercase/trim, mask UUIDs/hex/IPs/numbers, collapse whitespace (order load-bearing). Upsert on `(projectId, fingerprint)` bumps `lastSeen`/`totalEvents`/`highestLevel` (`LEVEL_RANK`: debug 10 … fatal 50). Status is time-derived (`getIncidentStatus(lastSeen)` vs `INCIDENT_AUTO_RESOLVE_MINUTES`), never stored.
-- **SSE bus** (`src/lib/server/events.ts`): in-process singleton, project-scoped listeners. `POST …/logs/stream`, `POST …/incidents/stream` (POST for CSRF). Batched `event: logs/incidents` + heartbeats; slow consumers drop batch, keep connection. Single-process — no cross-replica fan-out (same for rate limiter).
+- **SSE bus** (`src/lib/server/events.ts`): in-process singleton, project-scoped listeners. `POST …/logs/stream`, `POST …/incidents/stream` (POST for CSRF). Batched `event: logs/incidents` + heartbeats; slow consumers drop batch, keep connection. Heartbeat is capped at half the server idle timeout (`IDLE_TIMEOUT`, the env `build/index.js` gives `Bun.serve`) — a longer heartbeat would be killed before it fires. Single-process — no cross-replica fan-out (same for rate limiter).
 - **Auth:** better-auth `username()` plugin, 7d sessions, lazy `createAuth(db)` proxy (throws before `initAuth()`). Prod code MUST use `auth.api.getSession()`; `src/lib/server/session.ts` is test-only (unsigned cookie, forgeable).
 
 ## Key Directories
@@ -27,7 +27,7 @@ Self-hosted, single-tenant logging + incident-intelligence platform. Services sh
 
 ## Development Commands
 
-Always `bun run …` (`bun.lock`, `packageManager bun@1.4.1`). Ports: dev **5173**, preview **4173**, prod **3000**.
+Always `bun run …` (`bun.lock`, `packageManager bun@1.4.2`). Ports: dev **5173**, preview **4173**, prod **3000**.
 
 ```bash
 bun run dev / build / preview        # vp dev/build (svelte-adapter-bun → build/index.js, prod :3000)
@@ -53,7 +53,7 @@ Local build needs dummy env: `DATABASE_URL=postgres://… BETTER_AUTH_SECRET=<�
 - **CSRF:** `/api` non-GET without `Origin`/`Referer` → 403. Test `Request`s must set same-origin `Origin`. `/v1` exempt.
 - **Ingest contract:** `/v1/ingest` per-log failures ≠ request failure → **200** `{accepted, rejected, errors[]}`. Only batch-level → 4xx (`unauthorized`, `rate_limited`, `invalid_json`, `batch_too_large` at 100, `validation_error`). Both 429s carry `Retry-After: 60`.
 - **Query:** cursor-preferred keyset `(timestamp DESC, id DESC)`, base64url opaque; malformed → 400 `invalid_cursor`. `limit` 1–500 (default 100), `limit+1` for `has_more`. `offset` back-compat deprecated. `total` via bounded `cappedLogCount` first page only. Filters: `level` CSV (`parseLevelFilter`), `from`/`to` ISO, `search` → `to_tsquery('english',…)` on `search` tsvector/GIN.
-- **Schema sync:** `search` STORED generated column uses `||` + `COALESCE`, not `concat_ws` (STABLE, illegal in STORED). Keep in sync: `schema.ts` + recreating migration `drizzle/0010_*.sql` + `log_search_trigger` in `test-db.ts`.
+- **Schema sync:** `search` STORED generated column uses `||` + `COALESCE`, not `concat_ws` (STABLE, illegal in STORED). Keep in sync: `schema.ts` + recreating migration `drizzle/0010_*.sql` (the PGlite tier generates its DDL from `schema.ts` via drizzle's dialect).
 - **Svelte 5:** never make hooks' `_isConnected`/`_isConnecting` `$state` — `$effect` read+write self-triggers `effect_update_depth_exceeded`. UI gets connection only via `onConnectionChange`. Live list capped client-side (`MAX_STREAMED_LOGS=10000`).
 - **Naming:** `requireOwnedProject*`, `parse*IngestBody`, `*Error` (`InvalidCursorError`), `*.unit.test.ts` colocated / `*.integration.test.ts` / `*.component.test.ts`. `// oxlint-disable-next-line <rule>` for inline suppress.
 - **Errors:** server logs full context, client gets sanitized message + error ID (`error-handler.ts`).
@@ -71,10 +71,10 @@ Local build needs dummy env: `DATABASE_URL=postgres://… BETTER_AUTH_SECRET=<�
 
 ## Runtime/Tooling Preferences
 
-- **Bun only** (`engines >=1.2.0`, pinned `1.4.1` in CI + Docker `oven/bun:1.4.1-alpine`); `pnpm`/`npm` last resort. One-off CLIs: `bunx → pnpm dlx → npx`.
+- **Bun only** (`engines >=1.2.0`, pinned `1.4.2` in CI + Docker `oven/bun:1.4.2-alpine`); `pnpm`/`npm` last resort. One-off CLIs: `bunx → pnpm dlx → npx`.
 - **Vite+ (`vp`) 0.3.1**, **vitest 4.1.11** via `overrides`, `@vitest/coverage-v8` must match runner (hard-fail otherwise). Root TS 6 + `@typescript/native` 7 for `--tsgo` (svelte-check 4.x rejects TS7 main). `vite`/`vitest`/`@vitest/*` bumps via `vp migrate` only.
 - **Postgres 18-alpine** everywhere (PG19 beta — don't bump). `db:push` dev-only; prod/CI `db:migrate`. `db:generate` needs TTY; if it replays old migrations (meta snapshots cover 0000–0005+0011), hand-write SQL.
-- Env: `DATABASE_URL` (must start `postgres`, required), `BETTER_AUTH_SECRET` (≥32, required unless dev/test), `ORIGIN` (prod proxies), `RATE_LIMIT_*_RPM`, `SSE_*`, `LOG_*`, `INCIDENT_AUTO_RESOLVE_MINUTES=30`. Behind proxy set `ADDRESS_HEADER` + `XFF_DEPTH` or IP limiting sees socket IP.
+- Env: `DATABASE_URL` (must start `postgres`, required), `BETTER_AUTH_SECRET` (≥32, required unless dev/test), `ORIGIN` (prod proxies), `RATE_LIMIT_*_RPM`, `SSE_*`, `LOG_*`, `IDLE_TIMEOUT` (Bun.serve idle timeout in seconds; image ships 120, heartbeat clamped to half), `INCIDENT_AUTO_RESOLVE_MINUTES=30`. Behind proxy set `ADDRESS_HEADER` + `XFF_DEPTH` or IP limiting sees socket IP.
 - Never commit/push/rebase unless asked; never `reset --hard`, `clean -fd`, print secrets.
 
 ## Testing & QA
@@ -89,6 +89,6 @@ Tier by **filename suffix** (Playwright excluded from Vitest). Import from `vite
 | E2E         | `tests/e2e/**`                                                        | real Postgres | `bun run test:e2e`         |
 
 - **Integration:** fresh PGlite per test via schema reflection (not `drizzle/*.sql`); new column types may need `test-db.ts` type map / `tableOrder` or table silently skipped. Seed via `tests/fixtures/db.ts` (`seedProject`, `seedLog`, `seedProjectWithApiKey` — plaintext once); add same-origin `Origin`; `clearApiKeyCache()` in `beforeEach`. Don't copy `health.integration.test.ts` inline `CREATE TABLE` (legacy `api_key` col).
-- **Conventions before refactor:** timeseries/incident-detail/timeline tests spy on `db.select` and throw on full-row pulls — aggregate in SQL. `hooks.server.test.ts` covers session population only, not rate-limit/fast-paths.
+- **Conventions before refactor:** timeseries/incident-detail/timeline tests spy on `db.select` and throw on full-row pulls — aggregate in SQL. `hooks.server.unit.test.ts` drives the real `handle` (session population, `/v1` + `/api/health` fast paths, login + `/v1` rate limits, signup kill-switch, CSRF).
 - **E2E:** CI preview `:4173`, local dev `:5173`, `workers:1 retries:2`, `extraHTTPHeaders` Origin, admin `admin/adminpass`, `RATE_LIMIT_LOGIN_RPM=10000`, login specs wrap in `expect(…).toPass({timeout:45000})`. Helpers: `helpers/otlp.ts`, `helpers/log-selectors.ts`. Chromium+firefox local, chromium-only CI.
 - Pre-commit: `vp check && bun run knip` (+ `bun run check` for Svelte/TS). Run nearest tier for touched code. Coverage signal-only.
