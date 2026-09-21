@@ -59,6 +59,14 @@ const SSE_BOUNDS = {
 // MUST land inside it — the heartbeat below is capped at half this value (jitter headroom).
 const SERVER_IDLE_TIMEOUT_MS = parseEnvInt("IDLE_TIMEOUT", 10) * 1000;
 
+// The cap must also lower the heartbeat floor: for IDLE_TIMEOUT <= 10s the floor (5s) would
+// otherwise win the clamp and leave a heartbeat that arrives no earlier than the idle timeout.
+// Never below 1000ms so an idle timeout of 0 (Bun: disabled) cannot become a 0ms hot loop.
+const HEARTBEAT_MAX_MS = Math.max(
+  1000,
+  Math.min(SSE_BOUNDS.HEARTBEAT_INTERVAL_MS.max, Math.floor(SERVER_IDLE_TIMEOUT_MS / 2)),
+);
+
 /**
  * SSE (Server-Sent Events) streaming configuration.
  *
@@ -79,8 +87,8 @@ export const SSE_CONFIG = {
   ),
   HEARTBEAT_INTERVAL_MS: clamp(
     parseEnvInt("SSE_HEARTBEAT_INTERVAL_MS", SSE_DEFAULTS.HEARTBEAT_INTERVAL_MS),
-    SSE_BOUNDS.HEARTBEAT_INTERVAL_MS.min,
-    Math.min(SSE_BOUNDS.HEARTBEAT_INTERVAL_MS.max, SERVER_IDLE_TIMEOUT_MS / 2),
+    Math.min(SSE_BOUNDS.HEARTBEAT_INTERVAL_MS.min, HEARTBEAT_MAX_MS),
+    HEARTBEAT_MAX_MS,
   ),
 } as const;
 

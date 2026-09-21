@@ -80,6 +80,8 @@ describe("Performance Configuration", () => {
       ["10", 5000, 10_000, "explicit 10s"],
       ["20", 10000, 20_000, "half of 20s"],
       ["120", 30000, 120_000, "shipped image: documented default survives"],
+      ["5", 2500, 5000, "idle timeout below the heartbeat floor lowers the floor too"],
+      ["0", 1000, 0, "idle timeout 0 (disabled) never becomes a 0ms hot loop"],
     ] as [string | undefined, number, number, string][])(
       "IDLE_TIMEOUT=%s → heartbeat %dms (%s)",
       async (idleTimeout, expected, idleMs) => {
@@ -88,7 +90,9 @@ describe("Performance Configuration", () => {
         else process.env.IDLE_TIMEOUT = idleTimeout;
         const { SSE_CONFIG } = await import("./performance");
         expect(SSE_CONFIG.HEARTBEAT_INTERVAL_MS).toBe(expected);
-        expect(SSE_CONFIG.HEARTBEAT_INTERVAL_MS).toBeLessThan(idleMs);
+        if (idleMs > 0) {
+          expect(SSE_CONFIG.HEARTBEAT_INTERVAL_MS).toBeLessThan(idleMs);
+        }
       },
     );
 
