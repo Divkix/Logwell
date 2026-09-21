@@ -5,7 +5,7 @@ import { createAuth } from "$lib/server/auth";
 import type * as schema from "$lib/server/db/schema";
 import { setupTestDatabase } from "$lib/server/db/test-db";
 import { getSession } from "$lib/server/session";
-import { seedProject } from "../../fixtures/db";
+import { seedLog, seedProject } from "../../fixtures/db";
 
 // Import load functions as any to avoid the void | PageData union type issues
 // from SvelteKit's generated types in test contexts
@@ -134,6 +134,32 @@ describe("(app) page loaders — injected PGlite DB seam", () => {
 
       expect(data.project.id).toBe(proj.id);
       expect(data.project.name).toBe("test-proj");
+      expect(data.project.apiKeyHash).toBeUndefined();
+    });
+
+    it("normalizes an unknown range to the default window and bounds the query", async () => {
+      const proj = await seedProject(db, { name: "range-proj", ownerId: owner.userId });
+      await seedLog(db, proj.id, {
+        message: "outside-window",
+        timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
+      });
+      await seedLog(db, proj.id, { message: "inside-window" });
+
+      const event = createLoadEvent(
+        db,
+        { id: proj.id },
+        owner.locals,
+        `http://localhost:5173/projects/${proj.id}?range=30d`,
+      );
+      const data = await loadProjectLogs(event as never);
+
+      expect(data.filters.range).toBe("1h");
+      expect(new Date(data.filters.from).getTime()).toBeGreaterThan(
+        Date.now() - 60 * 60 * 1000 - 5000,
+      );
+      expect(data.logs.map((entry: { message: string }) => entry.message)).toEqual([
+        "inside-window",
+      ]);
     });
 
     it("throws SvelteKit 404 for a non-owner (existence hidden)", async () => {
@@ -155,6 +181,29 @@ describe("(app) page loaders — injected PGlite DB seam", () => {
 
       const event = createLoadEvent(db, { id: proj.id }, nonOwner.locals);
       await expectSvelteKit404(loadProjectStats(event as never));
+    });
+
+    it("normalizes an unknown range to the default window and bounds the count", async () => {
+      const proj = await seedProject(db, { name: "stats-range-proj", ownerId: owner.userId });
+      await seedLog(db, proj.id, {
+        message: "outside-window",
+        timestamp: new Date(Date.now() - 30 * 60 * 60 * 1000),
+      });
+      await seedLog(db, proj.id, { message: "inside-window" });
+
+      const event = createLoadEvent(
+        db,
+        { id: proj.id },
+        owner.locals,
+        `http://localhost:5173/projects/${proj.id}/stats?range=30d`,
+      );
+      const data = await loadProjectStats(event as never);
+
+      expect(data.filters.range).toBe("24h");
+      expect(new Date(data.filters.from).getTime()).toBeGreaterThan(
+        Date.now() - 24 * 60 * 60 * 1000 - 5000,
+      );
+      expect(data.stats.totalLogs).toBe(1);
     });
   });
 

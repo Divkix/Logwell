@@ -1,39 +1,56 @@
 import { sql, type Column, type SQL } from "drizzle-orm";
 
-export function microsColumn(col: Column): SQL<number> {
-  return sql<number>`(extract(epoch from ${col}) * 1000000)::float8`;
+const DECIMAL_INTEGER = /^-?\d+$/;
+
+const MISSING_TIMESTAMP_ERROR = "Cannot encode cursor for log without timestamp";
+
+export function microsColumn(col: Column): SQL<string> {
+  return sql<string>`(extract(epoch from ${col}) * 1000000)::bigint::text`;
 }
 
-export function cursorRowLessThan(col: Column, idCol: Column, micros: number, id: string): SQL {
-  return sql`(${col}, ${idCol}) < (to_timestamp(${micros} / 1000000.0), ${id})`;
+// NOTE: split seconds and microseconds because to_timestamp() takes a double precision
+// argument, which cannot represent microsecond precision beyond ~year 2100.
+export function cursorRowLessThan(col: Column, idCol: Column, micros: string, id: string): SQL {
+  return sql`(${col}, ${idCol}) < (
+    to_timestamp(trunc(${micros}::numeric / 1000000)::float8)
+      + ((${micros}::numeric % 1000000) * interval '1 microsecond'),
+    ${id}
+  )`;
 }
 
-export function encodeCursor(micros: number, id: string): string;
+export function encodeCursor(micros: string | number, id: string): string;
 
 export function encodeCursor(timestamp: Date | null | undefined, id: string): string;
 
 export function encodeCursor(
-  microsOrTimestamp: number | Date | null | undefined,
+  microsOrTimestamp: string | number | Date | null | undefined,
   id: string,
 ): string {
-  let micros: number | null;
-  if (typeof microsOrTimestamp === "number") {
-    micros = Number.isFinite(microsOrTimestamp) ? Math.round(microsOrTimestamp) : null;
-  } else if (microsOrTimestamp instanceof Date) {
-    micros = Number.isNaN(microsOrTimestamp.getTime()) ? null : microsOrTimestamp.getTime() * 1000;
+  let micros: string;
+  if (microsOrTimestamp instanceof Date) {
+    const time = microsOrTimestamp.getTime();
+    if (Number.isNaN(time)) throw new Error(MISSING_TIMESTAMP_ERROR);
+    micros = String(time * 1000);
+  } else if (typeof microsOrTimestamp === "string") {
+    micros = microsOrTimestamp;
+  } else if (typeof microsOrTimestamp === "number" && !Number.isNaN(microsOrTimestamp)) {
+    micros = String(microsOrTimestamp);
   } else {
-    micros = null;
+    throw new Error(MISSING_TIMESTAMP_ERROR);
   }
 
-  if (micros === null) {
-    throw new Error("Cannot encode cursor for log without timestamp");
+  if (!DECIMAL_INTEGER.test(micros)) {
+    throw new Error(`Cannot encode cursor: micros must be a decimal integer, got "${micros}"`);
   }
+
   return Buffer.from(`${micros}_${id}`).toString("base64url");
 }
 
 export interface DecodedCursor {
-  micros: number;
+  /** Exact epoch microseconds, as an integer string — Postgres timestamptz precision. */
+  micros: string;
   id: string;
+  /** Convenience value, millisecond-truncated; best-effort beyond the JS Date range. */
   timestamp: Date;
 }
 
@@ -47,19 +64,18 @@ export function decodeCursor(cursor: string): DecodedCursor {
       throw new Error("Invalid cursor format: missing separator");
     }
 
-    const microsStr = decoded.substring(0, separatorIndex);
+    const micros = decoded.substring(0, separatorIndex);
     const id = decoded.substring(separatorIndex + 1);
 
-    if (!microsStr || !id) {
+    if (!micros || !id) {
       throw new Error("Invalid cursor format: empty micros or id");
     }
 
-    const micros = Number(microsStr);
-    if (!Number.isSafeInteger(micros)) {
+    if (!DECIMAL_INTEGER.test(micros)) {
       throw new Error("Invalid cursor format: invalid micros");
     }
 
-    return { micros, id, timestamp: new Date(Math.floor(micros / 1000)) };
+    return { micros, id, timestamp: new Date(Math.floor(Number(micros) / 1000)) };
   } catch (error) {
     if (error instanceof Error && error.message.startsWith("Invalid cursor")) {
       throw error;
