@@ -57,7 +57,9 @@ const SSE_BOUNDS = {
 // svelte-adapter-bun reads this straight into Bun.serve's idleTimeout (seconds), defaulting to 10
 // exactly as build/index.js does. Bun closes a connection idle for that long, so the SSE heartbeat
 // MUST land inside it — the heartbeat below is capped at half this value (jitter headroom).
-const SERVER_IDLE_TIMEOUT_MS = parseEnvInt("IDLE_TIMEOUT", 10) * 1000;
+// Bun's documented maximum is 255s; a larger IDLE_TIMEOUT is silently clamped by Bun, so clamp it
+// here too or the heartbeat would be sized against an idle window the server never had.
+const SERVER_IDLE_TIMEOUT_MS = Math.min(parseEnvInt("IDLE_TIMEOUT", 10), 255) * 1000;
 
 // The cap must also lower the heartbeat floor: for IDLE_TIMEOUT <= 10s the floor (5s) would
 // otherwise win the clamp and leave a heartbeat that arrives no earlier than the idle timeout.
