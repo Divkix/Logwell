@@ -51,6 +51,7 @@
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
     "@internationalized/date": "^3.12.4",
+    "@oxlint/plugins": "1.81.0",
     "@playwright/test": "^1.63.0",
     "@sveltejs/kit": "^2.70.3",
     "@sveltejs/vite-plugin-svelte": "^7.3.0",
