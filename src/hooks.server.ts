@@ -2,6 +2,7 @@ import { json, type Handle, type HandleServerError } from "@sveltejs/kit";
 import { svelteKitHandler } from "better-auth/svelte-kit";
 import { building } from "$app/environment";
 import { auth, initAuth } from "$lib/server/auth";
+import { env } from "$lib/server/config/env";
 import { db } from "$lib/server/db";
 import { handleError as buildErrorResponse } from "$lib/server/error-handler";
 import { startCleanupScheduler, stopCleanupScheduler } from "$lib/server/jobs/cleanup-scheduler";
@@ -57,11 +58,19 @@ export const handle: Handle = async ({ event, resolve }) => {
     }
   }
 
-  if (
-    pathname.startsWith("/v1/") ||
-    pathname === "/api/health" ||
-    pathname.startsWith("/static/")
-  ) {
+  if (pathname.startsWith("/v1/")) {
+    // Pre-auth throttle: every request with a fresh random key costs a DB lookup in
+    // validateApiKey, so the per-IP bucket drains before the per-project one (ingest.ts).
+    if (!checkRateLimit(`ingest-ip:${event.getClientAddress()}`, env.RATE_LIMIT_INGEST_IP_RPM)) {
+      return json(
+        { error: "rate_limited", message: "Rate limit exceeded. Retry in 60 seconds." },
+        { status: 429, headers: { "Retry-After": "60" } },
+      );
+    }
+    return resolve(event);
+  }
+
+  if (pathname === "/api/health" || pathname.startsWith("/static/")) {
     return resolve(event);
   }
 

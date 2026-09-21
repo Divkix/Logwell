@@ -8,7 +8,7 @@
  * Configuration can be overridden via environment variables:
  * - SSE_BATCH_WINDOW_MS: Time window for batching SSE events (default: 1500ms)
  * - SSE_MAX_BATCH_SIZE: Maximum logs per batch before flush (default: 50)
- * - SSE_HEARTBEAT_INTERVAL_MS: Heartbeat interval (default: 30000ms)
+ * - SSE_HEARTBEAT_INTERVAL_MS: Heartbeat interval (default: 30000ms, capped at half IDLE_TIMEOUT)
  * - LOG_STREAM_MAX_LOGS: Maximum logs in memory per client (default: 1000)
  * - LOG_RETENTION_DAYS: System default retention in days (default: 30, 0 = disabled)
  * - LOG_CLEANUP_INTERVAL_MS: Cleanup job interval in ms (default: 3600000 = 1 hour)
@@ -16,16 +16,22 @@
  */
 
 /**
- * Safely parses an environment variable as a number.
- * Returns defaultValue if the env var is not set or not a valid number.
+ * Parses an environment variable as an exact integer.
+ *
+ * Strict by design: `Number.parseInt` accepts a numeric prefix, so "6 months" would silently
+ * become 6 and "30s" 30 — a different unit than the operator wrote. Anything that is not a whole
+ * number falls back to defaultValue, logging the value used instead.
  */
-function parseEnvInt(key: string, defaultValue: number): number {
-  const value = process.env[key];
-  if (value === undefined || value === "") {
+export function parseEnvInt(key: string, defaultValue: number): number {
+  const value = process.env[key]?.trim();
+  if (!value) {
     return defaultValue;
   }
-  const parsed = Number.parseInt(value, 10);
-  return Number.isNaN(parsed) ? defaultValue : parsed;
+  if (!/^\d+$/.test(value)) {
+    console.warn(`[config] invalid ${key}="${value}", using default ${defaultValue}`);
+    return defaultValue;
+  }
+  return Number(value);
 }
 
 /**
@@ -48,6 +54,11 @@ const SSE_BOUNDS = {
   HEARTBEAT_INTERVAL_MS: { min: 5000, max: 300000 },
 } as const;
 
+// svelte-adapter-bun reads this straight into Bun.serve's idleTimeout (seconds), defaulting to 10
+// exactly as build/index.js does. Bun closes a connection idle for that long, so the SSE heartbeat
+// MUST land inside it — the heartbeat below is capped at half this value (jitter headroom).
+const SERVER_IDLE_TIMEOUT_MS = parseEnvInt("IDLE_TIMEOUT", 10) * 1000;
+
 /**
  * SSE (Server-Sent Events) streaming configuration.
  *
@@ -69,7 +80,7 @@ export const SSE_CONFIG = {
   HEARTBEAT_INTERVAL_MS: clamp(
     parseEnvInt("SSE_HEARTBEAT_INTERVAL_MS", SSE_DEFAULTS.HEARTBEAT_INTERVAL_MS),
     SSE_BOUNDS.HEARTBEAT_INTERVAL_MS.min,
-    SSE_BOUNDS.HEARTBEAT_INTERVAL_MS.max,
+    Math.min(SSE_BOUNDS.HEARTBEAT_INTERVAL_MS.max, SERVER_IDLE_TIMEOUT_MS / 2),
   ),
 } as const;
 
@@ -106,17 +117,31 @@ const RETENTION_BOUNDS = {
 } as const;
 
 /**
+ * Resolves LOG_RETENTION_DAYS, the one knob where a wrong value either deletes logs early or
+ * disables deletion entirely, so it is resolved explicitly instead of clamped — clamping an
+ * out-of-range value can only land on a bound, and the lower bound (0) means "never delete".
+ * Unparsable and negative values already fall back to the documented default inside parseEnvInt;
+ * only an explicit 0 disables cleanup.
+ */
+function parseRetentionDays(): number {
+  const max = RETENTION_BOUNDS.LOG_RETENTION_DAYS.max;
+  const days = parseEnvInt("LOG_RETENTION_DAYS", RETENTION_DEFAULTS.LOG_RETENTION_DAYS);
+  if (days <= max) {
+    return days;
+  }
+  // Above the documented maximum: clamp towards keeping logs, never towards deleting them.
+  console.warn(`[config] LOG_RETENTION_DAYS=${days} exceeds ${max}, using ${max}`);
+  return max;
+}
+
+/**
  * Log retention and cleanup configuration.
  *
  * - LOG_RETENTION_DAYS: System default retention period in days (0 = disabled)
  * - LOG_CLEANUP_INTERVAL_MS: Cleanup job interval in milliseconds
  */
 export const RETENTION_CONFIG = {
-  LOG_RETENTION_DAYS: clamp(
-    parseEnvInt("LOG_RETENTION_DAYS", RETENTION_DEFAULTS.LOG_RETENTION_DAYS),
-    RETENTION_BOUNDS.LOG_RETENTION_DAYS.min,
-    RETENTION_BOUNDS.LOG_RETENTION_DAYS.max,
-  ),
+  LOG_RETENTION_DAYS: parseRetentionDays(),
   LOG_CLEANUP_INTERVAL_MS: clamp(
     parseEnvInt("LOG_CLEANUP_INTERVAL_MS", RETENTION_DEFAULTS.LOG_CLEANUP_INTERVAL_MS),
     RETENTION_BOUNDS.LOG_CLEANUP_INTERVAL_MS.min,
