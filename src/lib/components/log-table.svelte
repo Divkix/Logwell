@@ -16,7 +16,7 @@ interface Props {
   onLogClick?: (log: Log) => void;
   class?: string;
   newLogIds?: Set<string>;
-  project?: { apiKeyHash: string };
+  project?: { id: string; name: string };
   appUrl?: string;
   selectedIndex?: number;
   selectedId?: string | null;

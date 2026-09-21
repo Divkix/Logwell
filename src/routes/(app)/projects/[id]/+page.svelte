@@ -34,14 +34,16 @@ const { data }: { data: PageData } = $props();
 
 const MAX_STREAMED_LOGS = 10000;
 
-const navTo = $navigating?.to?.url.pathname;
-const isNavigating = $derived(
-  !!navTo &&
+const isNavigating = $derived.by(() => {
+  const navTo = $navigating?.to?.url.pathname;
+  return (
+    !!navTo &&
     navTo.includes('/projects/') &&
     !navTo.endsWith('/stats') &&
     !navTo.endsWith('/incidents') &&
-    !navTo.endsWith('/settings'),
-);
+    !navTo.endsWith('/settings')
+  );
+});
 
 function parseLogTimestamp(log: PageData['logs'][number]): Log {
   return {
@@ -57,10 +59,9 @@ function parseClientLog(log: ClientLog): Log {
   } as Log;
 }
 
-const projectData = $derived<Omit<Project, 'ownerId'>>({
+const projectData = $derived<Omit<Project, 'ownerId' | 'apiKeyHash'>>({
   id: data.project.id,
   name: data.project.name,
-  apiKeyHash: data.project.apiKeyHash,
   retentionDays: data.project.retentionDays ?? null,
   createdAt: data.project.createdAt ? new Date(data.project.createdAt) : null,
   updatedAt: data.project.updatedAt ? new Date(data.project.updatedAt) : null,
@@ -72,7 +73,7 @@ let searchValue = $state(data.filters.search);
 // svelte-ignore state_referenced_locally
 let selectedLevels = $state<LogLevel[]>(data.filters.levels);
 // svelte-ignore state_referenced_locally
-let selectedRange = $state<TimeRange>((data.filters.range as TimeRange) || '1h');
+let selectedRange = $state<TimeRange>(data.filters.range);
 let selectedLog = $state<Log | null>(null);
 let showDetailModal = $state(false);
 let showHelpModal = $state(false);
@@ -104,7 +105,15 @@ const isLivePaused = $derived(Boolean(data.filters.search));
 let streamedLogs = $state<Log[]>([]);
 
 function handleIncomingLogs(logs: ClientLog[]) {
-  const parsedLogs = logs.map(parseClientLog);
+  const fromMs = Date.parse(data.filters.from);
+  const incoming = logs.filter((log) => {
+    if (selectedLevels.length > 0 && !selectedLevels.includes(log.level)) return false;
+    const timestamp = log.timestamp ? Date.parse(log.timestamp) : Number.NaN;
+    return Number.isNaN(timestamp) || Number.isNaN(fromMs) || timestamp >= fromMs;
+  });
+  if (incoming.length === 0) return;
+
+  const parsedLogs = incoming.map(parseClientLog);
   const ids = parsedLogs.map((l) => l.id);
   newLogIds = new Set([...ids, ...newLogIds]);
 
@@ -154,9 +163,23 @@ $effect(() => {
   };
 });
 
+let prevFilterKey: string | null = null;
+let loadMoreEpoch = 0;
+
 $effect(() => {
+  const filterKey = `${data.project.id}|${data.filters.levels.join(',')}|${data.filters.range}|${data.filters.search}`;
+  if (prevFilterKey !== null && filterKey !== prevFilterKey) {
+    searchValue = data.filters.search;
+    selectedLevels = data.filters.levels;
+    selectedRange = data.filters.range;
+  }
+  prevFilterKey = filterKey;
+
+  loadMoreEpoch++;
+  isLoadingMore = false;
   loadedMoreLogs = [];
   nextCursor = data.pagination.nextCursor ?? null;
+  streamedLogs = [];
 });
 
 const allLogs = $derived.by(() => {
@@ -243,6 +266,7 @@ async function handleViewIncident(incidentId: string) {
 
 async function loadMore() {
   if (!nextCursor || isLoadingMore) return;
+  const myEpoch = ++loadMoreEpoch;
   isLoadingMore = true;
 
   try {
@@ -250,21 +274,23 @@ async function loadMore() {
     params.set('cursor', nextCursor);
     if (searchValue) params.set('search', searchValue);
     if (selectedLevels.length > 0) params.set('level', selectedLevels.join(','));
-    params.set('range', selectedRange);
+    params.set('from', data.filters.from);
 
     const response = await fetch(`/api/projects/${data.project.id}/logs?${params}`);
+    if (myEpoch !== loadMoreEpoch) return;
     if (!response.ok) {
       toastError('Failed to load more logs');
       return;
     }
     const result = await response.json();
+    if (myEpoch !== loadMoreEpoch) return;
 
     loadedMoreLogs = [...loadedMoreLogs, ...result.logs.map(parseLogTimestamp)];
     nextCursor = result.nextCursor;
   } catch (error) {
-    toastError('Failed to load more logs');
+    if (myEpoch === loadMoreEpoch) toastError('Failed to load more logs');
   } finally {
-    isLoadingMore = false;
+    if (myEpoch === loadMoreEpoch) isLoadingMore = false;
   }
 }
 
