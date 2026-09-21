@@ -11,6 +11,7 @@
 #
 # Optional Environment Variables:
 #   PORT               - App port (default: 3000)
+#   IDLE_TIMEOUT       - Bun idle timeout in seconds (default: 120, must exceed SSE heartbeat)
 #
 # Usage:
 #   export BETTER_AUTH_SECRET=$(openssl rand -base64 32)
@@ -31,6 +32,10 @@ services:
       - NODE_ENV=production
       - HOST=0.0.0.0
       - PORT=3000
+      # Bun idle timeout (s) — must stay above the SSE heartbeat (capped at half this value)
+      - IDLE_TIMEOUT=120
+      # Max request body (adapter default 512K) — bounds ingest batches, which can exceed 512K
+      - BODY_SIZE_LIMIT=1M
       - DATABASE_URL=postgresql://logwell:${DB_PASSWORD:?DB_PASSWORD must be set}@db:5432/logwell
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET is required}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:?ADMIN_PASSWORD is required}
