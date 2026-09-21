@@ -82,6 +82,7 @@ describe("Performance Configuration", () => {
       ["120", 30000, 120_000, "shipped image: documented default survives"],
       ["5", 2500, 5000, "idle timeout below the heartbeat floor lowers the floor too"],
       ["0", 1000, 0, "idle timeout 0 (disabled) never becomes a 0ms hot loop"],
+      ["600", 30000, 255_000, "above Bun's 255s cap: heartbeat sized against the real window"],
     ] as [string | undefined, number, number, string][])(
       "IDLE_TIMEOUT=%s → heartbeat %dms (%s)",
       async (idleTimeout, expected, idleMs) => {
