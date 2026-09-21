@@ -45,11 +45,12 @@ export async function cleanupOldLogs(dbClient?: DatabaseClient): Promise<Cleanup
 
         let deletedInProject = 0;
         while (true) {
+          // ISO string, not the Date: a raw Date param reaches postgres.js's string encoder and throws.
           const raw = await db.execute(sql`
             WITH batch AS (
               SELECT id FROM "log"
               WHERE project_id = ${proj.id}
-                AND timestamp < ${cutoffDate}
+                AND timestamp < ${cutoffDate.toISOString()}
               ORDER BY timestamp ASC
               LIMIT ${BATCH_SIZE}
             )
