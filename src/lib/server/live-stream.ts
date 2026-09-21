@@ -90,6 +90,10 @@ function createProjectStreamResponse<T>(
 
         const unsubscribe = subscribe(projectId, handleItem);
 
+        // Flush an immediate comment frame: without a first byte the client's fetch stays
+        // pending (the UI keeps showing "Connecting...") until the first event or the heartbeat.
+        controller.enqueue(encoder.encode(": connected\n\n"));
+
         const heartbeatInterval = setInterval(() => {
           if (sendEvent("heartbeat", JSON.stringify({ ts: Date.now() })) === "closed") cleanup();
         }, HEARTBEAT_INTERVAL_MS);
