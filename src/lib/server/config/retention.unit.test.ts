@@ -14,10 +14,12 @@ describe("Retention Configuration", () => {
 
   async function loadRetention(overrides: Record<string, string | undefined>) {
     vi.resetModules();
+
     for (const [key, value] of Object.entries(overrides)) {
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;
     }
+
     return import("./performance");
   }
 
@@ -34,6 +36,7 @@ describe("Retention Configuration", () => {
       const { RETENTION_CONFIG } = await loadRetention({
         LOG_RETENTION_DAYS: value as string | undefined,
       });
+
       expect(RETENTION_CONFIG.LOG_RETENTION_DAYS).toBe(expected);
     },
   );
@@ -50,6 +53,7 @@ describe("Retention Configuration", () => {
       const { RETENTION_CONFIG } = await loadRetention({
         LOG_CLEANUP_INTERVAL_MS: value as string | undefined,
       });
+
       expect(RETENTION_CONFIG.LOG_CLEANUP_INTERVAL_MS).toBe(expected);
     },
   );

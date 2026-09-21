@@ -80,6 +80,7 @@ describe("Project Table Schema", () => {
     });
 
     const apiKey3 = generateApiKey();
+
     const [otherProject] = await db
       .insert(project)
       .values({

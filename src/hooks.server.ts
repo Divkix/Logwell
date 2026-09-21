@@ -26,7 +26,9 @@ function gracefulShutdown(signal: string) {
   stopCleanupScheduler();
   setTimeout(() => process.exit(0), 5000);
 }
+
 process.once("SIGTERM", () => gracefulShutdown("SIGTERM"));
+
 process.once("SIGINT", () => gracefulShutdown("SIGINT"));
 
 export const handle: Handle = async ({ event, resolve }) => {
@@ -42,6 +44,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 
   if (event.request.method === "POST" && pathname.startsWith("/api/auth/sign-in")) {
     const csrfError = checkCsrfOrigin(event);
+
     if (csrfError) return csrfError;
 
     if (!checkRateLimit(`login:${event.getClientAddress()}`, LOGIN_RPM)) {
@@ -67,6 +70,7 @@ export const handle: Handle = async ({ event, resolve }) => {
         { status: 429, headers: { "Retry-After": "60" } },
       );
     }
+
     return resolve(event);
   }
 
@@ -95,6 +99,7 @@ export const handle: Handle = async ({ event, resolve }) => {
     !["GET", "HEAD", "OPTIONS"].includes(event.request.method)
   ) {
     const csrfError = checkCsrfOrigin(event);
+
     if (csrfError) return csrfError;
   }
 

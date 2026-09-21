@@ -8,5 +8,6 @@ export function getLogMessage(
   if (viewport === "mobile") {
     return page.locator('[data-testid="log-card"]').getByText(text);
   }
+
   return page.locator('[data-testid="log-table"] table').getByText(text);
 }

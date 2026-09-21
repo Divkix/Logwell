@@ -38,6 +38,7 @@ describe("projectUpdatePayloadSchema with retentionDays", () => {
   it("allows omitting retentionDays (optional field)", () => {
     const result = projectUpdatePayloadSchema.safeParse({ name: "updated-project" });
     expect(result.success).toBe(true);
+
     if (result.success) expect(result.data.retentionDays).toBeUndefined();
   });
 
@@ -46,7 +47,9 @@ describe("projectUpdatePayloadSchema with retentionDays", () => {
       name: "updated-project",
       retentionDays: 30,
     });
+
     expect(result.success).toBe(true);
+
     if (result.success) {
       expect(result.data.name).toBe("updated-project");
       expect(result.data.retentionDays).toBe(30);

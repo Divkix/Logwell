@@ -7,6 +7,7 @@ import LogDetailModal from "../log-detail-modal.svelte";
 const mockClipboard = {
   writeText: vi.fn().mockResolvedValue(undefined),
 };
+
 Object.assign(navigator, { clipboard: mockClipboard });
 
 vi.mock("$lib/utils/toast", () => ({
@@ -72,9 +73,11 @@ describe("Modal accessibility", () => {
     render(component as typeof LogDetailModal, { props: props as never });
 
     const modal = screen.getByRole("dialog");
+
     const focusableElements = modal.querySelectorAll(
       'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
     );
+
     expect(focusableElements.length).toBeGreaterThan(0);
 
     const lastFocusable = focusableElements[focusableElements.length - 1] as HTMLElement;
@@ -95,6 +98,7 @@ describe("Modal accessibility", () => {
     const { rerender } = render(LogDetailModal, {
       props: { log: baseLog, open: true, triggerElement: triggerButton },
     });
+
     await new Promise((resolve) => setTimeout(resolve, 50));
     await rerender({ log: baseLog, open: false, triggerElement: triggerButton });
 

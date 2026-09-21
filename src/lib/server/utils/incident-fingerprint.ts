@@ -52,12 +52,14 @@ export function buildIncidentFingerprint(params: {
   lineNumber: number | null;
 }): { fingerprint: string; normalizedMessage: string; seed: string } {
   const normalizedMessage = normalizeIncidentMessage(params.message);
+
   const seed = buildIncidentFingerprintSeed({
     serviceName: params.serviceName,
     sourceFile: params.sourceFile,
     lineNumber: params.lineNumber,
     normalizedMessage,
   });
+
   const fingerprint = hashIncidentFingerprint(seed);
 
   return { fingerprint, normalizedMessage, seed };

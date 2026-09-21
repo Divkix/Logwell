@@ -36,6 +36,7 @@ const MAX_STREAMED_LOGS = 10000;
 
 const isNavigating = $derived.by(() => {
   const navTo = $navigating?.to?.url.pathname;
+
   return (
     !!navTo &&
     navTo.includes('/projects/') &&
@@ -68,28 +69,41 @@ const projectData = $derived<Omit<Project, 'ownerId' | 'apiKeyHash'>>({
 });
 
 let liveEnabled = $state(true);
+
 // svelte-ignore state_referenced_locally
 let searchValue = $state(data.filters.search);
+
 // svelte-ignore state_referenced_locally
 let selectedLevels = $state<LogLevel[]>(data.filters.levels);
+
 // svelte-ignore state_referenced_locally
 let selectedRange = $state<TimeRange>(data.filters.range);
+
 let selectedLog = $state<Log | null>(null);
+
 let showDetailModal = $state(false);
+
 let showHelpModal = $state(false);
+
 let selectedLogId = $state<string | null>(null);
+
 let loading = $state(false);
+
 let searchInputRef = $state<HTMLInputElement | null>(null);
 
 let newLogIds = $state<Set<string>>(new Set());
+
 const highlightTimers: ReturnType<typeof setTimeout>[] = [];
 
 let loadedMoreLogs = $state<Log[]>([]);
+
 // svelte-ignore state_referenced_locally
 let nextCursor = $state<string | null>(data.pagination.nextCursor ?? null);
+
 let isLoadingMore = $state(false);
 
 let sortKey = $state<SortField | null>(null);
+
 let sortDirection = $state<SortDirection>(null);
 
 const activeFilterCount = $derived(
@@ -106,11 +120,14 @@ let streamedLogs = $state<Log[]>([]);
 
 function handleIncomingLogs(logs: ClientLog[]) {
   const fromMs = Date.parse(data.filters.from);
+
   const incoming = logs.filter((log) => {
     if (selectedLevels.length > 0 && !selectedLevels.includes(log.level)) return false;
     const timestamp = log.timestamp ? Date.parse(log.timestamp) : Number.NaN;
+
     return Number.isNaN(timestamp) || Number.isNaN(fromMs) || timestamp >= fromMs;
   });
+
   if (incoming.length === 0) return;
 
   const parsedLogs = incoming.map(parseClientLog);
@@ -121,12 +138,14 @@ function handleIncomingLogs(logs: ClientLog[]) {
     newLogIds = new Set([...newLogIds].filter((id) => !ids.includes(id)));
     highlightTimers.splice(highlightTimers.indexOf(timer), 1);
   }, 3000);
+
   highlightTimers.push(timer);
 
   streamedLogs = [...parsedLogs, ...streamedLogs].slice(0, MAX_STREAMED_LOGS);
 }
 
 let sseConnected = $state(false);
+
 let streamError = $state<Error | null>(null);
 
 // svelte-ignore state_referenced_locally
@@ -136,6 +155,7 @@ const logStream = useLogStream({
   onLogs: handleIncomingLogs,
   onConnectionChange: (connected) => {
     sseConnected = connected;
+
     if (connected) streamError = null;
   },
   onError: (e) => {
@@ -145,6 +165,7 @@ const logStream = useLogStream({
 
 $effect(() => {
   logStream.setProjectId(data.project.id);
+
   if (liveEnabled && !isLivePaused) {
     logStream.connect();
   } else {
@@ -164,15 +185,18 @@ $effect(() => {
 });
 
 let prevFilterKey: string | null = null;
+
 let loadMoreEpoch = 0;
 
 $effect(() => {
   const filterKey = `${data.project.id}|${data.filters.levels.join(',')}|${data.filters.range}|${data.filters.search}`;
+
   if (prevFilterKey !== null && filterKey !== prevFilterKey) {
     searchValue = data.filters.search;
     selectedLevels = data.filters.levels;
     selectedRange = data.filters.range;
   }
+
   prevFilterKey = filterKey;
 
   loadMoreEpoch++;
@@ -232,14 +256,18 @@ function handleTimeRangeChange(range: TimeRange) {
 
 async function updateFilters() {
   loading = true;
+
   try {
     streamedLogs = [];
     const params = new URLSearchParams();
+
     if (searchValue) params.set('search', searchValue);
+
     if (selectedLevels.length > 0) params.set('level', selectedLevels.join(','));
     params.set('range', selectedRange);
 
     const queryString = params.toString();
+
     const url = queryString
       ? `/projects/${data.project.id}?${queryString}`
       : `/projects/${data.project.id}`;
@@ -272,17 +300,24 @@ async function loadMore() {
   try {
     const params = new URLSearchParams();
     params.set('cursor', nextCursor);
+
     if (searchValue) params.set('search', searchValue);
+
     if (selectedLevels.length > 0) params.set('level', selectedLevels.join(','));
     params.set('from', data.filters.from);
 
     const response = await fetch(`/api/projects/${data.project.id}/logs?${params}`);
+
     if (myEpoch !== loadMoreEpoch) return;
+
     if (!response.ok) {
       toastError('Failed to load more logs');
+
       return;
     }
+
     const result = await response.json();
+
     if (myEpoch !== loadMoreEpoch) return;
 
     loadedMoreLogs = [...loadedMoreLogs, ...result.logs.map(parseLogTimestamp)];
@@ -321,6 +356,7 @@ function scrollSelectedIntoView() {
   const element =
     document.querySelector('table [data-selected="true"]') ??
     document.querySelector('[data-selected="true"]');
+
   element?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
 
@@ -334,38 +370,48 @@ function handleKeyboardShortcut(event: KeyboardEvent) {
   }
 
   const isLoading = loading || isLoadingMore;
+
   switch (event.key) {
     case 'j': {
       if (isLoading || sortedAllLogs.length === 0) return;
       const currentIdxJ = selectedLogId ? sortedAllLogs.findIndex((l) => l.id === selectedLogId) : -1;
       const nextIdxJ = currentIdxJ < sortedAllLogs.length - 1 ? currentIdxJ + 1 : currentIdxJ;
+
       if (nextIdxJ !== currentIdxJ || currentIdxJ === -1) {
         const newIdx = currentIdxJ === -1 ? 0 : nextIdxJ;
         selectedLogId = sortedAllLogs[newIdx]?.id ?? null;
         scrollSelectedIntoView();
         announceToScreenReader(`Log ${newIdx + 1} of ${sortedAllLogs.length}`);
       }
+
       break;
     }
+
     case 'k': {
       if (isLoading || sortedAllLogs.length === 0) return;
       const currentIdxK = selectedLogId ? sortedAllLogs.findIndex((l) => l.id === selectedLogId) : -1;
+
       if (currentIdxK > 0) {
         selectedLogId = sortedAllLogs[currentIdxK - 1]?.id ?? null;
         scrollSelectedIntoView();
         announceToScreenReader(`Log ${currentIdxK} of ${sortedAllLogs.length}`);
       }
+
       break;
     }
+
     case 'Enter': {
       const selectedForEnter = selectedLogId ? sortedAllLogs.find((l) => l.id === selectedLogId) : null;
+
       if (selectedForEnter) {
         selectedLog = selectedForEnter;
         showDetailModal = true;
         event.preventDefault();
       }
+
       break;
     }
+
     case '/':
       event.preventDefault();
       searchInputRef?.focus();

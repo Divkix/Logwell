@@ -9,4 +9,5 @@ export {
   isIncidentGroupedLevel,
   maxIncidentLevel,
 } from "./schemas/incident";
+
 export { LOG_LEVELS, type LogLevel } from "./schemas/log";

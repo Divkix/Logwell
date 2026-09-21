@@ -14,12 +14,14 @@ function createRequestEvent(
 ) {
   const safeMethod = ["GET", "HEAD", "OPTIONS"].includes(request.method);
   const hasOrigin = request.headers.has("Origin");
+
   const effectiveRequest =
     !safeMethod && !hasOrigin
       ? new Request(request, {
           headers: { ...Object.fromEntries(request.headers), Origin: new URL(request.url).origin },
         })
       : request;
+
   return {
     request: effectiveRequest,
     locals: {
@@ -52,6 +54,7 @@ async function* parseSSEStream(
   response: Response,
 ): AsyncGenerator<{ event: string; data: string }> {
   const reader = response.body?.getReader();
+
   if (!reader) throw new Error("No response body");
 
   const decoder = new TextDecoder();
@@ -60,6 +63,7 @@ async function* parseSSEStream(
   try {
     while (true) {
       const { done, value } = await reader.read();
+
       if (done) break;
 
       buffer += decoder.decode(value, { stream: true });
@@ -104,6 +108,7 @@ async function collectSSEEvents(
       timedOut = true;
       resolve();
     }, timeoutMs);
+
     cancelTimeout = () => clearTimeout(id);
   });
 
@@ -111,6 +116,7 @@ async function collectSSEEvents(
     for await (const event of stream) {
       if (timedOut) break;
       events.push(event);
+
       if (events.length >= count) break;
     }
   })();
@@ -210,6 +216,7 @@ describe("POST /api/projects/[id]/incidents/stream", () => {
 
       const { POST } =
         await import("../../../../../../../src/routes/api/projects/[id]/incidents/stream/+server");
+
       const response = await POST(event as never);
 
       expect(response.status).toBe(404);
@@ -258,6 +265,7 @@ describe("POST /api/projects/[id]/incidents/stream", () => {
 
       const { POST } =
         await import("../../../../../../../src/routes/api/projects/[id]/incidents/stream/+server");
+
       const response = await POST(event as never);
 
       expect(response.status).toBe(403);
@@ -278,6 +286,7 @@ describe("POST /api/projects/[id]/incidents/stream", () => {
 
       const { POST } =
         await import("../../../../../../../src/routes/api/projects/[id]/incidents/stream/+server");
+
       const response = await POST(event as never);
 
       expect(response.status).toBe(200);
@@ -299,6 +308,7 @@ describe("POST /api/projects/[id]/incidents/stream", () => {
 
       const { POST } =
         await import("../../../../../../../src/routes/api/projects/[id]/incidents/stream/+server");
+
       const response = await POST(event as never);
 
       await new Promise((resolve) => setTimeout(resolve, 50));
@@ -312,6 +322,7 @@ describe("POST /api/projects/[id]/incidents/stream", () => {
 
       const incidentsEvent = events.find((e) => e.event === "incidents");
       expect(incidentsEvent).toBeDefined();
+
       if (!incidentsEvent) throw new Error("Expected incidentsEvent to be defined");
 
       const incidents = JSON.parse(incidentsEvent.data);
@@ -331,6 +342,7 @@ describe("POST /api/projects/[id]/incidents/stream", () => {
 
       const { POST } =
         await import("../../../../../../../src/routes/api/projects/[id]/incidents/stream/+server");
+
       const response = await POST(event as never);
 
       const otherIncident = createMockIncident(project2.id, { title: "Other project incident" });
@@ -339,12 +351,14 @@ describe("POST /api/projects/[id]/incidents/stream", () => {
       const subscribedIncident = createMockIncident(project1.id, {
         title: "Subscribed project incident",
       });
+
       logEventBus.emitIncident(subscribedIncident);
 
       const events = await collectSSEEvents(response, 1, 3000);
 
       const incidentsEvent = events.find((e) => e.event === "incidents");
       expect(incidentsEvent).toBeDefined();
+
       if (!incidentsEvent) throw new Error("Expected 'incidents' event for the subscribed project");
 
       const incidents = JSON.parse(incidentsEvent.data);

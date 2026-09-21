@@ -31,16 +31,19 @@ describe("backfill-incidents", () => {
       message: "Database timeout after 1000ms",
       timestamp: new Date(now - 24 * 60 * 60 * 1000),
     });
+
     const inWindowFatal = await seedLog(db, project.id, {
       level: "fatal",
       message: "Panic in worker 42",
       timestamp: new Date(now - 2 * 60 * 60 * 1000),
     });
+
     const inWindowInfo = await seedLog(db, project.id, {
       level: "info",
       message: "Regular info log",
       timestamp: new Date(now - 2 * 60 * 60 * 1000),
     });
+
     const outOfWindowError = await seedLog(db, project.id, {
       level: "error",
       message: "Old error should be skipped",
@@ -90,6 +93,7 @@ describe("backfill-incidents", () => {
       .select()
       .from(incident)
       .where(and(eq(incident.projectId, project.id), gte(incident.lastSeen, since)));
+
     expect(incidents).toHaveLength(1);
 
     const incidentLogs = await db

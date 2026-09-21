@@ -19,6 +19,8 @@ export async function getDbClient(locals: App.Locals): Promise<DatabaseClient> {
   if (locals.db) {
     return locals.db as DatabaseClient;
   }
+
   const { db } = await import("./index");
+
   return db;
 }

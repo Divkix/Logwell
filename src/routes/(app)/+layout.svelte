@@ -13,6 +13,7 @@ let isLoggingOut = $state(false);
 
 async function handleLogout() {
   isLoggingOut = true;
+
   try {
     await authClient.signOut();
     await goto('/login');

@@ -44,6 +44,7 @@ export async function cleanupOldLogs(dbClient?: DatabaseClient): Promise<Cleanup
         cutoffDate.setDate(cutoffDate.getDate() - effectiveRetention);
 
         let deletedInProject = 0;
+
         while (true) {
           // Bind the cutoff as an ISO string: passing the Date object here is what broke cleanup.
           const raw = await db.execute(sql`
@@ -57,7 +58,9 @@ export async function cleanupOldLogs(dbClient?: DatabaseClient): Promise<Cleanup
             DELETE FROM "log" WHERE id IN (SELECT id FROM batch)
             RETURNING id
           `);
+
           const rows = getQueryRows(raw as Parameters<typeof getQueryRows>[0]);
+
           if (rows.length === 0) break;
           deletedInProject += rows.length;
         }
@@ -76,6 +79,7 @@ export async function cleanupOldLogs(dbClient?: DatabaseClient): Promise<Cleanup
   } catch (error) {
     const errorMessage = `Fatal error during log cleanup: ${error instanceof Error ? error.message : String(error)}`;
     result.errors.push(errorMessage);
+
     return result;
   }
 }

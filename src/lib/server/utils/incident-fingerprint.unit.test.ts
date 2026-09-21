@@ -11,6 +11,7 @@ describe("incident-fingerprint", () => {
   it("normalizes message in deterministic order", () => {
     const message =
       " ERROR User 123 from 192.168.10.20 hit tx 0xdeadbeefcafebabe and request 550e8400-e29b-41d4-a716-446655440000 ";
+
     const normalized = normalizeIncidentMessage(message);
 
     expect(normalized).toBe("error user {num} from {ip} hit tx {hex} and request {uuid}");
@@ -23,6 +24,7 @@ describe("incident-fingerprint", () => {
       lineNumber: 42,
       normalizedMessage: "database timeout after {num}ms",
     });
+
     const fingerprint = hashIncidentFingerprint(seed);
 
     expect(fingerprint).toHaveLength(INCIDENT_FINGERPRINT_LENGTH);

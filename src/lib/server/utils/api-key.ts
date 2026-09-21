@@ -60,18 +60,23 @@ export function validateApiKeyFormat(key: string): boolean {
   if (!key || typeof key !== "string") {
     return false;
   }
+
   return API_KEY_REGEX.test(key);
 }
 
 function evictCacheEntry(): void {
   const now = Date.now();
+
   for (const [key, entry] of API_KEY_CACHE) {
     if (entry.expiresAt <= now) {
       API_KEY_CACHE.delete(key);
+
       return;
     }
   }
+
   const firstKey = API_KEY_CACHE.keys().next().value;
+
   if (firstKey !== undefined) {
     API_KEY_CACHE.delete(firstKey);
   }
@@ -79,18 +84,23 @@ function evictCacheEntry(): void {
 
 function setNegativeCache(keyHash: string): void {
   const now = Date.now();
+
   for (const [k, v] of NEGATIVE_CACHE) {
     if (v.expiresAt <= now) NEGATIVE_CACHE.delete(k);
   }
+
   if (NEGATIVE_CACHE.size >= MAX_NEGATIVE_CACHE_SIZE) {
     const oldest = NEGATIVE_CACHE.keys().next().value;
+
     if (oldest !== undefined) NEGATIVE_CACHE.delete(oldest);
   }
+
   NEGATIVE_CACHE.set(keyHash, { expiresAt: now + NEGATIVE_CACHE_TTL_MS });
 }
 
 export async function validateApiKey(request: Request, dbClient?: DatabaseClient): Promise<string> {
   const authHeader = request.headers.get("Authorization");
+
   if (!authHeader?.startsWith("Bearer ")) {
     throw new ApiKeyError(401, "Missing or invalid authorization header");
   }
@@ -104,14 +114,17 @@ export async function validateApiKey(request: Request, dbClient?: DatabaseClient
   const keyHash = hashApiKey(apiKey);
 
   const negCached = NEGATIVE_CACHE.get(keyHash);
+
   if (negCached) {
     if (negCached.expiresAt > Date.now()) {
       throw new ApiKeyError(401, "Invalid API key");
     }
+
     NEGATIVE_CACHE.delete(keyHash);
   }
 
   const cached = API_KEY_CACHE.get(keyHash);
+
   if (cached && cached.expiresAt > Date.now() && cached.keyHash === keyHash) {
     return cached.projectId;
   }

@@ -137,6 +137,7 @@ describe("parseSimpleIngestRequest", () => {
           sourceFile: "/app/utils.ts",
           lineNumber: 100,
         });
+
         expect(result.records[0]!.sourceFile).toBe("/app/utils.ts");
         expect(result.records[0]!.lineNumber).toBe(100);
       });
@@ -171,6 +172,7 @@ describe("parseSimpleIngestRequest", () => {
         ...validEntry,
         metadata: {},
       });
+
       expect(result.records[0]!.requestId).toBeNull();
       expect(result.records[0]!.userId).toBeNull();
       expect(result.records[0]!.ipAddress).toBeNull();
@@ -185,6 +187,7 @@ describe("parseSimpleIngestRequest", () => {
         { level: "debug", message: "good" },
         { message: "missing level" },
       ];
+
       const result = parseSimpleIngestRequest(entries);
       expect(result.accepted).toBe(2);
       expect(result.rejected).toBe(2);
@@ -197,6 +200,7 @@ describe("parseSimpleIngestRequest", () => {
         { message: "missing level" },
         { level: "info" },
       ];
+
       const result = parseSimpleIngestRequest(entries);
       expect(result.errors).toHaveLength(3);
     });
@@ -207,6 +211,7 @@ describe("parseSimpleIngestRequest", () => {
         { level: "invalid", message: "bad" },
         { level: "debug", message: "good" },
       ];
+
       const result = parseSimpleIngestRequest(entries);
       expect(result.records).toHaveLength(2);
       expect(result.records[0]!.message).toBe("test message");

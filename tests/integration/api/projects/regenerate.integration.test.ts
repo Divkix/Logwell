@@ -19,12 +19,14 @@ function createRequestEvent(
 ) {
   const safeMethod = ["GET", "HEAD", "OPTIONS"].includes(request.method);
   const hasOrigin = request.headers.has("Origin");
+
   const effectiveRequest =
     !safeMethod && !hasOrigin
       ? new Request(request, {
           headers: { ...Object.fromEntries(request.headers), Origin: new URL(request.url).origin },
         })
       : request;
+
   return {
     request: effectiveRequest,
     locals: { db, ...locals },
@@ -85,6 +87,7 @@ describe("POST /api/projects/[id]/regenerate", () => {
     });
 
     const sessionData = await getSession(mockRequest.headers, db);
+
     if (!sessionData) throw new Error("Session data should not be null");
     userId = sessionData.user.id;
     authenticatedLocals = {
@@ -99,10 +102,12 @@ describe("POST /api/projects/[id]/regenerate", () => {
 
   it("returns 401 for unauthenticated request", async () => {
     const testProject = await seedProject(db, { ownerId: userId });
+
     const request = new Request(`http://localhost/api/projects/${testProject.id}/regenerate`, {
       method: "POST",
       headers: { Origin: "http://localhost" },
     });
+
     const event = createRequestEvent(request, db, { id: testProject.id });
     await expectHttpError(POST_REGENERATE(event as never), 401);
   });
@@ -115,10 +120,13 @@ describe("POST /api/projects/[id]/regenerate", () => {
         name: "Other",
       },
     });
+
     const otherRequest = new Request("http://localhost:5173", {
       headers: { cookie: `better-auth.session_token=${otherUser.token}` },
     });
+
     const otherSession = await getSession(otherRequest.headers, db);
+
     if (!otherSession) throw new Error("Missing other session");
 
     const otherProject = await seedProject(db, { ownerId: otherSession.user.id });
@@ -127,6 +135,7 @@ describe("POST /api/projects/[id]/regenerate", () => {
       method: "POST",
       headers: { Origin: "http://localhost" },
     });
+
     const event = createRequestEvent(request, db, { id: otherProject.id }, authenticatedLocals);
     const response = await POST_REGENERATE(event as never);
     expect(response.status).toBe(404);
@@ -140,6 +149,7 @@ describe("POST /api/projects/[id]/regenerate", () => {
       method: "POST",
       headers: { Origin: "http://localhost" },
     });
+
     const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
     const response = await POST_REGENERATE(event as never);
 
@@ -157,6 +167,7 @@ describe("POST /api/projects/[id]/regenerate", () => {
       method: "POST",
       headers: { Origin: "http://localhost" },
     });
+
     const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
     const response = await POST_REGENERATE(event as never);
 
@@ -175,10 +186,12 @@ describe("POST /api/projects/[id]/regenerate", () => {
 
   it("rejects cross-origin request (CSRF)", async () => {
     const testProject = await seedProject(db, { ownerId: userId });
+
     const request = new Request(`http://localhost/api/projects/${testProject.id}/regenerate`, {
       method: "POST",
       headers: { Origin: "https://evil.com" },
     });
+
     const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
     const response = await POST_REGENERATE(event as never);
 

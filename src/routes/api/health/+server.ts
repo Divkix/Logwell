@@ -11,11 +11,14 @@ async function checkDatabase(
   if (!db) {
     return { connected: false, error: "Database client not available" };
   }
+
   try {
     await db.execute(sql`SELECT 1`);
+
     return { connected: true };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown database error";
+
     return { connected: false, error: message };
   }
 }
@@ -51,9 +54,11 @@ interface HealthResponse {
  */
 export async function GET(event: RequestEvent): Promise<Response> {
   let db: DatabaseClient | null = null;
+
   try {
     db = await getDbClient(event.locals);
   } catch {}
+
   const dbStatus = await checkDatabase(db);
 
   const isHealthy = dbStatus.connected;

@@ -50,6 +50,7 @@ function parseTimestamp(timestamp: unknown): Date {
   }
 
   const parsed = new Date(timestamp);
+
   if (Number.isNaN(parsed.getTime())) {
     return new Date();
   }
@@ -70,6 +71,7 @@ function validateLogEntry(
   if (!("level" in entry)) {
     return { log: null, error: `Entry at index ${index}: missing required field 'level'` };
   }
+
   if (!isValidLevel(entry.level)) {
     return {
       log: null,
@@ -80,12 +82,15 @@ function validateLogEntry(
   if (!("message" in entry)) {
     return { log: null, error: `Entry at index ${index}: missing required field 'message'` };
   }
+
   if (typeof entry.message !== "string") {
     return { log: null, error: `Entry at index ${index}: message must be a string` };
   }
+
   if (entry.message.trim() === "") {
     return { log: null, error: `Entry at index ${index}: message cannot be empty` };
   }
+
   if (entry.message.includes("\u0000")) {
     return {
       log: null,
@@ -95,12 +100,15 @@ function validateLogEntry(
 
   const timestamp = parseTimestamp(entry.timestamp);
   const service = typeof entry.service === "string" ? entry.service : null;
+
   const rawMetadata =
     entry.metadata && typeof entry.metadata === "object" && !Array.isArray(entry.metadata)
       ? (entry.metadata as Record<string, unknown>)
       : null;
+
   const metadata = rawMetadata && Object.keys(rawMetadata).length > 0 ? rawMetadata : null;
   const sourceFile = typeof entry.sourceFile === "string" ? entry.sourceFile : null;
+
   const lineNumber =
     typeof entry.lineNumber === "number" &&
     Number.isInteger(entry.lineNumber) &&
@@ -150,6 +158,7 @@ export function parseSimpleIngestRequest(body: unknown): SimpleIngestResult {
 
   for (let i = 0; i < entries.length; i++) {
     const result = validateLogEntry(entries[i], i);
+
     if (result.log) {
       records.push(result.log);
     } else {
@@ -167,6 +176,7 @@ export function parseSimpleIngestRequest(body: unknown): SimpleIngestResult {
 
 export function parseSimpleIngestBody(body: unknown): ParsedIngest {
   const result = parseSimpleIngestRequest(body);
+
   return {
     inputs: result.records.map((record) => ({
       level: record.level,

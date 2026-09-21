@@ -18,9 +18,11 @@ const isLoading = $derived(
 
 // svelte-ignore state_referenced_locally
 let projects = $state([...data.projects]);
+
 let isCreateModalOpen = $state(false);
 
 let revealedApiKey = $state('');
+
 let isKeyRevealOpen = $state(false);
 
 function openCreateModal() {

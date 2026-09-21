@@ -256,6 +256,7 @@ describe("zero timeUnixNano handling", () => {
 
   it('treats timeUnixNano "0" and missing observedTimeUnixNano as ~now (not epoch)', () => {
     const before = Date.now();
+
     const payload = {
       resourceLogs: [
         {

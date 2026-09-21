@@ -20,7 +20,9 @@ function createRequestEvent(request: Request, db: PgliteDatabase<typeof schema>)
 
 function post(body: unknown, apiKey?: string) {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
+
   if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+
   return new Request("http://localhost/v1/ingest", {
     method: "POST",
     headers,
@@ -94,6 +96,7 @@ describe("POST /v1/ingest (simple mapping)", () => {
         db,
       ),
     );
+
     expect(response.status).toBe(200);
 
     const empty = await POST(
@@ -102,6 +105,7 @@ describe("POST /v1/ingest (simple mapping)", () => {
         db,
       ),
     );
+
     expect(empty.status).toBe(200);
 
     const rows = await db.select().from(log).where(eq(log.projectId, project.id));

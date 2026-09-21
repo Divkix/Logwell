@@ -30,8 +30,10 @@ function handleKeydown(event: KeyboardEvent) {
 $effect(() => {
   if (isOpen && typeof window !== 'undefined') {
     window.addEventListener('keydown', handleKeydown);
+
     return () => window.removeEventListener('keydown', handleKeydown);
   }
+
   return undefined;
 });
 </script>

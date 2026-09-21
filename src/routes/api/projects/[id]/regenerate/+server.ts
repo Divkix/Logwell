@@ -22,6 +22,7 @@ import type { RequestEvent } from "./$types";
  */
 export async function POST(event: RequestEvent): Promise<Response> {
   const authResult = await requireOwnedProjectRoute(event, event.params.id);
+
   if (authResult instanceof Response) return authResult;
 
   const { project: projectData, db } = authResult;

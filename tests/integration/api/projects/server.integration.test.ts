@@ -37,12 +37,14 @@ function createRequestEvent(
 ) {
   const safeMethod = ["GET", "HEAD", "OPTIONS"].includes(request.method);
   const hasOrigin = request.headers.has("Origin");
+
   const effectiveRequest =
     !safeMethod && !hasOrigin
       ? new Request(request, {
           headers: { ...Object.fromEntries(request.headers), Origin: new URL(request.url).origin },
         })
       : request;
+
   return {
     request: effectiveRequest,
     locals: { db, ...locals },
@@ -78,6 +80,7 @@ async function expectHttpError(
   } catch (error) {
     const httpError = error as HttpError;
     expect(httpError.status).toBe(expectedStatus);
+
     if (expectedBody) {
       expect(httpError.body).toEqual(expectedBody);
     }
@@ -112,6 +115,7 @@ describe("GET /api/projects", () => {
     });
 
     const sessionData = await getSession(mockRequest.headers, db);
+
     if (!sessionData) throw new Error("Session data should not be null");
     userId = sessionData.user.id;
 
@@ -209,6 +213,7 @@ describe("GET /api/projects", () => {
         if (fields && typeof fields === "object" && "count" in fields && !("projectId" in fields)) {
           throw new Error("project list must aggregate log counts in SQL");
         }
+
         return originalSelect(fields as never);
       }) as typeof db.select);
 
@@ -274,6 +279,7 @@ describe("POST /api/projects", () => {
     });
 
     const sessionData = await getSession(mockRequest.headers, db);
+
     if (!sessionData) throw new Error("Session data should not be null");
     userId = sessionData.user.id;
 
@@ -371,6 +377,7 @@ describe("POST /api/projects", () => {
       });
 
       const sessionData2 = await getSession(mockRequest2.headers, db);
+
       if (!sessionData2) throw new Error("Session data should not be null");
 
       const otherUserLocals = {
@@ -560,15 +567,18 @@ describe("GET /api/projects/[id] (canonical detail home)", () => {
     db = setup.db;
     cleanup = setup.cleanup;
     const auth = createAuth(db);
+
     const signUpResult = await auth.api.signUpEmail({
       body: { email: "detail@example.com", password: "SecureP@ssw0rd123", name: "Detail User" },
     });
+
     const sessionData = await getSession(
       new Request("http://localhost:5173", {
         headers: { cookie: `better-auth.session_token=${signUpResult.token}` },
       }).headers,
       db,
     );
+
     if (!sessionData) throw new Error("Session data should not be null");
     userId = sessionData.user.id;
     authenticatedLocals = { user: sessionData.user, session: sessionData.session };
@@ -586,6 +596,7 @@ describe("GET /api/projects/[id] (canonical detail home)", () => {
     const request = new Request(`http://localhost/api/projects/${testProject.id}`, {
       method: "GET",
     });
+
     const response = await GET_BY_ID(
       createIdRequestEvent(request, db, testProject.id, authenticatedLocals),
     );
@@ -601,12 +612,15 @@ describe("GET /api/projects/[id] (canonical detail home)", () => {
   it("returns retentionDays as stored (null, 0, 365)", async () => {
     for (const retentionDays of [null, 0, 365] as const) {
       const testProject = await seedProject(db, { ownerId: userId, retentionDays });
+
       const request = new Request(`http://localhost/api/projects/${testProject.id}`, {
         method: "GET",
       });
+
       const response = await GET_BY_ID(
         createIdRequestEvent(request, db, testProject.id, authenticatedLocals),
       );
+
       expect(response.status).toBe(200);
       expect(await response.json()).toMatchObject({ retentionDays });
     }
@@ -620,6 +634,7 @@ describe("GET /api/projects/[id] (canonical detail home)", () => {
       method: "DELETE",
       headers: { Origin: "http://localhost" },
     });
+
     const response = await DELETE_BY_ID(
       createIdRequestEvent(request, db, testProject.id, authenticatedLocals),
     );
@@ -635,6 +650,7 @@ describe("GET /api/projects/[id] (canonical detail home)", () => {
         authenticatedLocals,
       ),
     );
+
     expect(retry.status).toBe(404);
   });
 });
@@ -650,15 +666,18 @@ describe("PATCH /api/projects/[id] (canonical patch home)", () => {
     db = setup.db;
     cleanup = setup.cleanup;
     const auth = createAuth(db);
+
     const signUpResult = await auth.api.signUpEmail({
       body: { email: "patch@example.com", password: "SecureP@ssw0rd123", name: "Patch User" },
     });
+
     const sessionData = await getSession(
       new Request("http://localhost:5173", {
         headers: { cookie: `better-auth.session_token=${signUpResult.token}` },
       }).headers,
       db,
     );
+
     if (!sessionData) throw new Error("Session data should not be null");
     userId = sessionData.user.id;
     authenticatedLocals = { user: sessionData.user, session: sessionData.session };
@@ -821,6 +840,7 @@ describe("PATCH /api/projects/[id] (canonical patch home)", () => {
         authenticatedLocals,
       ),
     );
+
     const renamedBody = await renamed.json();
     expect(renamedBody).toMatchObject({ name: "kept", retentionDays: testProject.retentionDays });
 
@@ -832,6 +852,7 @@ describe("PATCH /api/projects/[id] (canonical patch home)", () => {
         authenticatedLocals,
       ),
     );
+
     expect(untouched.status).toBe(200);
     expect((await untouched.json()).updatedAt).toBe(renamedBody.updatedAt);
   });

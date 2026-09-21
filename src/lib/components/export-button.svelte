@@ -29,6 +29,7 @@ function buildExportUrl(format: 'csv' | 'json'): string {
   }
 
   const fromDate = range ? getTimeRangeStart(range) : null;
+
   if (fromDate) {
     params.set('from', fromDate.toISOString());
   }
@@ -42,12 +43,16 @@ async function handleExport(format: 'csv' | 'json') {
 
     if (!response.ok) {
       let message = `Export failed: ${response.status} ${response.statusText}`;
+
       try {
         const data = (await response.json()) as { message?: string };
+
         if (data.message) message = data.message;
       } catch {
       }
+
       toastError(message);
+
       return;
     }
 
@@ -56,8 +61,10 @@ async function handleExport(format: 'csv' | 'json') {
 
     const contentDisposition = response.headers.get('content-disposition');
     let filename = `logs-export.${format}`;
+
     if (contentDisposition) {
       const match = contentDisposition.match(/filename="([^"]+)"/);
+
       if (match?.[1]) filename = match[1];
     }
 

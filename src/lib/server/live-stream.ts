@@ -43,20 +43,28 @@ function createProjectStreamResponse<T>(
 
         const sendEvent = (name: string, data: string): "sent" | "backpressure" | "closed" => {
           if (isClosed) return "closed";
+
           try {
             const size = (controller as ReadableStreamDefaultController).desiredSize;
+
             if (size !== null && size < 0) {
               consecutiveDrops += 1;
+
               if (consecutiveDrops >= MAX_CONSECUTIVE_DROPS) {
                 console.debug(`[${debugTag}] consumer stalled past buffer budget, closing stream`);
                 cleanup();
+
                 return "closed";
               }
+
               console.debug(`[${debugTag}] backpressure detected, dropping batch`);
+
               return "backpressure";
             }
+
             consecutiveDrops = 0;
             controller.enqueue(encoder.encode(formatSSEEvent(name, data)));
+
             return "sent";
           } catch {
             return "closed";
@@ -68,6 +76,7 @@ function createProjectStreamResponse<T>(
             if (sendEvent(eventName, JSON.stringify(batch)) === "closed") cleanup();
             batch = [];
           }
+
           flushTimeout = null;
         };
 
@@ -84,6 +93,7 @@ function createProjectStreamResponse<T>(
               clearTimeout(flushTimeout);
               flushTimeout = null;
             }
+
             flushBatch();
           }
         };
@@ -103,7 +113,9 @@ function createProjectStreamResponse<T>(
           isClosed = true;
           unsubscribe();
           clearInterval(heartbeatInterval);
+
           if (flushTimeout) clearTimeout(flushTimeout);
+
           try {
             controller.close();
           } catch {}

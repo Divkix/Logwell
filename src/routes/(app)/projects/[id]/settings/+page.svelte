@@ -34,18 +34,26 @@ const { data }: Props = $props();
 
 // svelte-ignore state_referenced_locally
 let projectName = $state(data.project.name);
+
 let projectApiKey = $state('');
+
 // svelte-ignore state_referenced_locally
 let projectRetentionDays = $state(data.project.retentionDays);
 
 let showRegenerateConfirm = $state(false);
+
 let showDeleteConfirm = $state(false);
+
 let deleteConfirmInput = $state('');
+
 let selectedExample = $state<string>('curl');
 
 let isEditingName = $state(false);
+
 let editedName = $state('');
+
 let nameError = $state('');
+
 let isSaving = $state(false);
 
 let isUpdatingRetention = $state(false);
@@ -96,6 +104,7 @@ const logger = new Logwell({
 logger.info('Hello from my app');`;
 
 const typescriptExample = $derived(sdkExample('logwell'));
+
 const jsrExample = $derived(sdkExample('@divkix/logwell'));
 
 const currentExampleCode = $derived(
@@ -105,6 +114,7 @@ const currentExampleCode = $derived(
       ? jsrExample
       : typescriptExample,
 );
+
 const currentExampleInstall = $derived(
   selectedExample === 'typescript'
     ? 'npm install logwell'
@@ -128,12 +138,15 @@ async function handleSaveName() {
   const trimmedName = editedName.trim();
 
   const validation = projectUpdatePayloadSchema.safeParse({ name: trimmedName });
+
   if (!validation.success) {
     nameError = validation.error.issues?.[0]?.message ?? 'Project name cannot be empty';
+
     return;
   }
 
   isSaving = true;
+
   try {
     const response = await fetch(`/api/projects/${data.project.id}`, {
       method: 'PATCH',
@@ -167,9 +180,11 @@ async function handleRetentionChange(value: string | undefined) {
   if (!value) return;
 
   const newRetention = value === 'system' ? null : Number(value);
+
   if (newRetention === projectRetentionDays) return;
 
   isUpdatingRetention = true;
+
   try {
     const response = await fetch(`/api/projects/${data.project.id}`, {
       method: 'PATCH',
@@ -235,6 +250,7 @@ async function handleDeleteProject() {
 
 function formatDate(isoDate: string | null): string {
   if (!isoDate) return 'N/A';
+
   return new Date(isoDate).toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'short',

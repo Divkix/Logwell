@@ -243,6 +243,7 @@ describe("Incident upsert race condition", () => {
   it("updates firstSeen when a later batch contains older logs", async () => {
     const project = await seedProject(db);
     const fingerprint = "fp-out-of-order";
+
     const base = {
       level: "error",
       message: "Database timeout",

@@ -35,6 +35,7 @@ import type { RequestEvent } from "./$types";
  */
 export async function GET(event: RequestEvent): Promise<Response> {
   const authResult = await requireOwnedProjectRoute(event, event.params.id);
+
   if (authResult instanceof Response) return authResult;
 
   const { db } = authResult;
@@ -45,12 +46,15 @@ export async function GET(event: RequestEvent): Promise<Response> {
   const fromParam = event.url.searchParams.get("from");
 
   const rangeEnd = new Date();
+
   const rangeStart = fromParam
     ? (() => {
         const d = new Date(fromParam);
+
         return Number.isNaN(d.getTime()) ? getTimeRangeStart(range, rangeEnd) : d;
       })()
     : getTimeRangeStart(range, rangeEnd);
+
   const config = getTimeBucketConfig(range);
 
   const conditions: SQL[] = [
@@ -77,9 +81,11 @@ export async function GET(event: RequestEvent): Promise<Response> {
 
   const bucketCounts: Record<number, number> = {};
   let totalCount = 0;
+
   for (const row of getQueryRows(bucketResult)) {
     const bucketIndex = Number(row.bucketIndex);
     const count = Number(row.count);
+
     if (bucketIndex >= 0 && bucketIndex < config.expectedBuckets) {
       bucketCounts[bucketIndex] = count;
       totalCount += count;

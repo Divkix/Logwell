@@ -7,7 +7,9 @@ import { parseTimeRange, type TimeRange } from "$lib/utils/time-range";
 import type { PageServerLoad } from "./$types";
 
 const DEFAULT_LIMIT = 100;
+
 const MIN_LIMIT = 1;
+
 const MAX_LIMIT = 500;
 
 function clamp(value: number, min: number, max: number): number {
@@ -31,6 +33,7 @@ export const load: PageServerLoad = async (event) => {
     MIN_LIMIT,
     MAX_LIMIT,
   );
+
   const offset = offsetParam ? Math.max(0, Number.parseInt(offsetParam, 10) || 0) : 0;
 
   const levels = parseLevelFilter(levelParam);
@@ -48,6 +51,7 @@ export const load: PageServerLoad = async (event) => {
   };
 
   let result: Awaited<ReturnType<typeof queryLogs>>;
+
   try {
     result = await queryLogs(db, filter);
   } catch (err) {

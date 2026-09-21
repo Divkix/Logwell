@@ -11,5 +11,6 @@ import { parseOtlpIngestBody } from "$lib/server/utils/otlp";
  */
 export const POST: RequestHandler = async ({ request, locals }) => {
   const db = await getDbClient(locals);
+
   return ingestLogs(request, db, parseOtlpIngestBody);
 };

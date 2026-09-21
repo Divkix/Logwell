@@ -20,9 +20,11 @@ const formattedTimestamp = $derived(
 
 const sourceInfo = $derived.by(() => {
   if (!log.sourceFile) return null;
+
   if (log.lineNumber === null || log.lineNumber === undefined) {
     return log.sourceFile;
   }
+
   return `${log.sourceFile}:${log.lineNumber}`;
 });
 

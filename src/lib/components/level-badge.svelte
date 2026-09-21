@@ -11,6 +11,7 @@ interface Props {
 const { level, class: className }: Props = $props();
 
 const bgClass = $derived(getLevelBgClass(level));
+
 const textColor = $derived(getLevelColor(level));
 </script>
 

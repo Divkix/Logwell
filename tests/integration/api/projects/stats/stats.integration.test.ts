@@ -50,6 +50,7 @@ async function expectHttpError(
   } catch (error) {
     const httpError = error as HttpError;
     expect(httpError.status).toBe(expectedStatus);
+
     if (expectedBody) {
       expect(httpError.body).toEqual(expectedBody);
     }
@@ -85,6 +86,7 @@ describe("GET /api/projects/[id]/stats", () => {
     });
 
     const sessionData = await getSession(mockRequest.headers, db);
+
     if (!sessionData) throw new Error("Session data should not be null");
     userId = sessionData.user.id;
 
@@ -101,6 +103,7 @@ describe("GET /api/projects/[id]/stats", () => {
   describe("Authentication", () => {
     it("returns 401 for unauthenticated request", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
+
       const request = new Request(`http://localhost/api/projects/${testProject.id}/stats`, {
         method: "GET",
       });
@@ -237,6 +240,7 @@ describe("GET /api/projects/[id]/stats", () => {
         (sum, pct) => sum + pct,
         0,
       );
+
       expect(totalPercentage).toBeCloseTo(100, 0);
     });
   });
@@ -256,6 +260,7 @@ describe("GET /api/projects/[id]/stats", () => {
       });
 
       const fromTime = new Date(now.getTime() - 3600000).toISOString();
+
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/stats?from=${fromTime}`,
         { method: "GET" },
@@ -285,6 +290,7 @@ describe("GET /api/projects/[id]/stats", () => {
       });
 
       const toTime = new Date(now.getTime() - 3600000).toISOString();
+
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/stats?to=${toTime}`,
         { method: "GET" },
@@ -323,6 +329,7 @@ describe("GET /api/projects/[id]/stats", () => {
 
       const fromTime = new Date(now.getTime() - 7200000).toISOString();
       const toTime = new Date(now.getTime() - 3600000).toISOString();
+
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/stats?from=${fromTime}&to=${toTime}`,
         { method: "GET" },
@@ -384,6 +391,7 @@ describe("GET /api/projects/[id]/stats", () => {
       });
 
       const fromTime = new Date(now.getTime() - 1800000).toISOString();
+
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/stats?from=${fromTime}`,
         { method: "GET" },

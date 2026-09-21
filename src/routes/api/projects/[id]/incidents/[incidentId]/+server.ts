@@ -28,6 +28,7 @@ type TraceFrequencyRow = {
  */
 export async function GET(event: RequestEvent): Promise<Response> {
   const authResult = await requireOwnedProjectRoute(event, event.params.id);
+
   if (authResult instanceof Response) return authResult;
 
   const { db } = authResult;
@@ -84,10 +85,12 @@ export async function GET(event: RequestEvent): Promise<Response> {
     lineNumber: row.lineNumber,
     count: Number(row.count),
   }));
+
   const topRequestIds = getQueryRows(requestResult).map((row) => ({
     requestId: row.requestId,
     count: Number(row.count),
   }));
+
   const topTraceIds = getQueryRows(traceResult).map((row) => ({
     traceId: row.traceId,
     count: Number(row.count),

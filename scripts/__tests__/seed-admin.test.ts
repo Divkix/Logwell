@@ -38,6 +38,7 @@ async function seedAdmin(
   });
 
   const resultError = (result as { error?: { message: string } }).error;
+
   if (resultError) {
     throw new Error(`Failed to create admin user: ${resultError.message}`);
   }
@@ -121,6 +122,7 @@ describe("seed-admin", () => {
     await expect(duplicateSignup).rejects.toThrow();
     await duplicateSignup.catch((e: unknown) => {
       const msg = (e instanceof Error ? e.message : String(e)).toLowerCase();
+
       // These are the substrings seed-admin.ts recognizes as "already exists".
       const idempotent =
         msg.includes("unique") ||
@@ -128,6 +130,7 @@ describe("seed-admin", () => {
         msg.includes("already taken") ||
         msg.includes("23505") ||
         msg.includes("username_is_already_taken");
+
       expect(idempotent).toBe(true);
     });
   });

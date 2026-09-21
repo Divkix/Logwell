@@ -15,6 +15,7 @@ import type { RequestEvent } from "./$types";
  */
 export async function GET(event: RequestEvent): Promise<Response> {
   const authResult = await requireOwnedProjectRoute(event, event.params.id);
+
   if (authResult instanceof Response) return authResult;
 
   const { db } = authResult;
@@ -46,6 +47,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
     gte(log.timestamp, rangeStart),
     lte(log.timestamp, rangeEnd),
   ];
+
   const whereClause = and(...conditions);
   const intervalSeconds = config.intervalMs / 1000;
   const rangeStartEpochSeconds = rangeStart.getTime() / 1000;
@@ -63,17 +65,21 @@ export async function GET(event: RequestEvent): Promise<Response> {
   `);
 
   const bucketCounts: Record<number, number> = {};
+
   for (const row of getQueryRows(bucketResult)) {
     const bucketIndex = Number(row.bucketIndex);
     const count = Number(row.count);
+
     if (bucketIndex >= 0 && bucketIndex < config.expectedBuckets) {
       bucketCounts[bucketIndex] = count;
     }
   }
 
   const buckets = fillMissingBuckets(bucketCounts, config, rangeStart, rangeEnd);
+
   const peakBucket = buckets.reduce<{ timestamp: string; count: number } | null>((peak, bucket) => {
     if (!peak) return bucket;
+
     return bucket.count > peak.count ? bucket : peak;
   }, null);
 

@@ -29,12 +29,14 @@ function createRequestEvent(
 ) {
   const safeMethod = ["GET", "HEAD", "OPTIONS"].includes(request.method);
   const hasOrigin = request.headers.has("Origin");
+
   const effectiveRequest =
     !safeMethod && !hasOrigin
       ? new Request(request, {
           headers: { ...Object.fromEntries(request.headers), Origin: new URL(request.url).origin },
         })
       : request;
+
   return {
     request: effectiveRequest,
     locals: { db, ...locals },
@@ -80,6 +82,7 @@ async function createAuthenticatedUser(
   });
 
   const sessionData = await getSession(mockRequest.headers, db);
+
   if (!sessionData) throw new Error("Session data should not be null");
 
   return {
@@ -274,6 +277,7 @@ describe("Project Authorization - Ownership Isolation", () => {
         name: "project-b",
         ownerId: userB.userId,
       });
+
       const originalApiKey = projectB.apiKey;
 
       const request = new Request(`http://localhost/api/projects/${projectB.id}/regenerate`, {
@@ -294,6 +298,7 @@ describe("Project Authorization - Ownership Isolation", () => {
         name: "project-a",
         ownerId: userA.userId,
       });
+
       const originalApiKey = projectA.apiKey;
 
       const request = new Request(`http://localhost/api/projects/${projectA.id}/regenerate`, {

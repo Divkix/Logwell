@@ -59,6 +59,7 @@ export interface UseIncidentStreamOptions {
 }
 
 const DEFAULT_MAX_RECONNECT_ATTEMPTS = 5;
+
 const DEFAULT_RECONNECT_BASE_DELAY = 3000;
 
 export function useLiveStream<T>(options: LiveStreamOptions<T>): LiveStreamReturn {
@@ -98,6 +99,7 @@ export function useLiveStream<T>(options: LiveStreamOptions<T>): LiveStreamRetur
 
   function processSSEBuffer(buffer: string): string {
     let frameEnd = buffer.indexOf("\n\n");
+
     while (frameEnd !== -1) {
       const frame = buffer.slice(0, frameEnd);
       let event = "";
@@ -105,6 +107,7 @@ export function useLiveStream<T>(options: LiveStreamOptions<T>): LiveStreamRetur
 
       for (const line of frame.split("\n")) {
         const normalizedLine = line.endsWith("\r") ? line.slice(0, -1) : line;
+
         if (normalizedLine.startsWith("event: ")) {
           event = normalizedLine.slice(7);
         } else if (normalizedLine.startsWith("data: ")) {
@@ -122,11 +125,13 @@ export function useLiveStream<T>(options: LiveStreamOptions<T>): LiveStreamRetur
       buffer = buffer.slice(frameEnd + 2);
       frameEnd = buffer.indexOf("\n\n");
     }
+
     return buffer;
   }
 
   function scheduleReconnect(): void {
     if (_isDisconnected) return;
+
     if (_reconnectAttempts >= maxReconnectAttempts) return;
 
     const delay = reconnectBaseDelay * 2 ** _reconnectAttempts;
@@ -155,6 +160,7 @@ export function useLiveStream<T>(options: LiveStreamOptions<T>): LiveStreamRetur
     })
       .then(async (response) => {
         if (myEpoch !== _epoch) return;
+
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
@@ -174,7 +180,9 @@ export function useLiveStream<T>(options: LiveStreamOptions<T>): LiveStreamRetur
         try {
           while (true) {
             const { done, value } = await reader.read();
+
             if (done) break;
+
             if (myEpoch !== _epoch) return;
 
             buffer += decoder.decode(value, { stream: true });
@@ -234,6 +242,7 @@ export function useLiveStream<T>(options: LiveStreamOptions<T>): LiveStreamRetur
   function setProjectId(id: string): void {
     if (id === _projectId) return;
     _projectId = id;
+
     if (!_isDisconnected) {
       disconnect();
       connect();
@@ -264,6 +273,7 @@ export function useLiveStream<T>(options: LiveStreamOptions<T>): LiveStreamRetur
 
 export function useLogStream(options: UseLogStreamOptions): LiveStreamReturn {
   const { onLogs, ...rest } = options;
+
   return useLiveStream<ClientLog>({
     ...rest,
     streamPath: "logs/stream",
@@ -274,6 +284,7 @@ export function useLogStream(options: UseLogStreamOptions): LiveStreamReturn {
 
 export function useIncidentStream(options: UseIncidentStreamOptions): LiveStreamReturn {
   const { onIncidents, ...rest } = options;
+
   return useLiveStream<ClientIncident>({
     ...rest,
     streamPath: "incidents/stream",

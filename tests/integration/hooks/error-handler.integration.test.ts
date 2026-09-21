@@ -60,6 +60,7 @@ describe("Global Error Handler", () => {
   describe("error message sanitization", () => {
     it("returns sanitized error message for 500 errors", () => {
       const sensitiveError = new Error("Database password: secret123");
+
       const context = createErrorContext({
         error: sensitiveError,
         status: 500,

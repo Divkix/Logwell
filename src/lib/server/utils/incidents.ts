@@ -46,17 +46,21 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
   }
+
   return value as Record<string, unknown>;
 }
 
 function stringField(record: Record<string, unknown> | null, keys: string[]): string | null {
   if (!record) return null;
+
   for (const key of keys) {
     const value = record[key];
+
     if (typeof value === "string" && value.trim()) {
       return value.trim();
     }
   }
+
   return null;
 }
 
@@ -73,7 +77,9 @@ export function extractServiceName(resourceAttributes: unknown, metadata: unknow
 
 export function buildIncidentTitle(message: string): string {
   const trimmed = message.trim();
+
   if (!trimmed) return "Unknown error";
+
   return trimmed.length > 160 ? `${trimmed.slice(0, 157)}...` : trimmed;
 }
 
@@ -91,6 +97,7 @@ export function prepareLogsForIncidents(logs: IncidentLogInput[]): PreparedIncid
     }
 
     const serviceName = extractServiceName(log.resourceAttributes, log.metadata);
+
     const { fingerprint, normalizedMessage } = buildIncidentFingerprint({
       message: log.message,
       serviceName,
@@ -116,6 +123,7 @@ export function groupPreparedLogsByFingerprint(logs: PreparedIncidentLog[]): Inc
     if (!log.fingerprint || !log.normalizedMessage) continue;
 
     const existing = groups.get(log.fingerprint);
+
     if (!existing) {
       groups.set(log.fingerprint, {
         fingerprint: log.fingerprint,
@@ -133,12 +141,15 @@ export function groupPreparedLogsByFingerprint(logs: PreparedIncidentLog[]): Inc
     }
 
     existing.highestLevel = maxIncidentLevel(existing.highestLevel, log.level);
+
     if (log.timestamp < existing.firstSeen) {
       existing.firstSeen = log.timestamp;
     }
+
     if (log.timestamp > existing.lastSeen) {
       existing.lastSeen = log.timestamp;
     }
+
     existing.totalEvents += 1;
   }
 
@@ -157,6 +168,7 @@ export function getIncidentStatus(
   autoResolveMinutes: number = INCIDENT_CONFIG.AUTO_RESOLVE_MINUTES,
 ): IncidentStatus {
   const thresholdMs = autoResolveMinutes * 60 * 1000;
+
   return now.getTime() - lastSeen.getTime() <= thresholdMs ? "open" : "resolved";
 }
 
@@ -166,6 +178,7 @@ export async function upsertIncidentsForPreparedLogs(
   logs: PreparedIncidentLog[],
 ): Promise<IncidentUpsertResult> {
   const aggregates = groupPreparedLogsByFingerprint(logs);
+
   if (aggregates.length === 0) {
     return {
       incidentByFingerprint: new Map(),
@@ -177,6 +190,7 @@ export async function upsertIncidentsForPreparedLogs(
   const touchedIncidents: Incident[] = [];
 
   const now = new Date();
+
   const rows = await db
     .insert(incident)
     .values(
@@ -230,7 +244,9 @@ export function assignIncidentIds(
   return logs.map((log) => {
     if (!log.fingerprint) return log;
     const matched = incidentByFingerprint.get(log.fingerprint);
+
     if (!matched) return log;
+
     return {
       ...log,
       incidentId: matched.id,

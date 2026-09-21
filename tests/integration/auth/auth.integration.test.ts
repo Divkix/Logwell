@@ -162,6 +162,7 @@ describe("better-auth Integration", () => {
         .select()
         .from(session)
         .where(eq(session.userId, signUpResult.user.id));
+
       expect(sessions.length).toBeGreaterThan(0);
       expect(sessions[0]!.token).toBeDefined();
       expect(sessions[0]!.userId).toBe(signUpResult.user.id);
@@ -259,6 +260,7 @@ describe("better-auth Integration", () => {
         .select()
         .from(session)
         .where(eq(session.userId, result.user.id));
+
       expect(sessionsAfterDelete.length).toBe(0);
     });
   });

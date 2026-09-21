@@ -19,8 +19,10 @@ async function login(page: Page) {
 
 async function cleanupProjects(page: Page) {
   const response = await page.request.get("/api/projects");
+
   if (response.ok()) {
     const { projects } = await response.json();
+
     for (const project of projects) {
       await page.request.delete(`/api/projects/${project.id}`);
     }
@@ -60,6 +62,7 @@ test.describe("Dashboard - Create Project", () => {
     const response = await page.request.get("/api/projects");
     const { projects } = await response.json();
     const newProject = projects.find((p: { name: string }) => p.name === "my-new-project");
+
     if (newProject) {
       await page.request.delete(`/api/projects/${newProject.id}`);
     }

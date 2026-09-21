@@ -14,14 +14,17 @@ describe("rate-limit env parsing", () => {
     for (const key of Object.keys(process.env)) {
       if (!(key in originalEnv)) delete process.env[key];
     }
+
     Object.assign(process.env, originalEnv);
     vi.resetModules();
   });
 
   async function loadLimit(key: string, value: string | undefined) {
     vi.resetModules();
+
     if (value === undefined) delete process.env[key];
     else process.env[key] = value;
+
     return import("./rate-limit");
   }
 
@@ -60,6 +63,7 @@ describe("rate-limit env parsing", () => {
 
   it("warns with the variable name and the value actually used", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
     try {
       const { LOGIN_RPM } = await loadLimit("RATE_LIMIT_LOGIN_RPM", "600rpm");
       expect(LOGIN_RPM).toBe(10);
@@ -108,6 +112,7 @@ describe("checkRateLimit token bucket", () => {
     // flood with unique keys, then observe the cap: the primed key was evicted (fresh capacity,
     // rpm 1 would otherwise still deny it) while a recent key survives with its spent bucket.
     expect(checkRateLimit("cap:oldest", 1)).toBe(true);
+
     for (let i = 0; i < 25_000; i++) checkRateLimit(`cap:${i}`, 1);
 
     expect(checkRateLimit("cap:oldest", 1)).toBe(true);

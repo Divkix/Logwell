@@ -38,6 +38,7 @@ import type { RequestEvent } from "./$types";
  */
 export async function GET(event: RequestEvent): Promise<Response> {
   const result = await requireOwnedProjectRoute(event, event.params.id);
+
   if (result instanceof Response) return result;
 
   const { project: projectData, db } = result;
@@ -58,6 +59,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
     .groupBy(log.level);
 
   const levelCountsObj: Record<string, number> = {};
+
   for (const { level, count: levelCount } of levelCounts) {
     if (level) {
       levelCountsObj[level] = levelCount;
@@ -105,15 +107,18 @@ export async function GET(event: RequestEvent): Promise<Response> {
  */
 export async function PATCH(event: RequestEvent): Promise<Response> {
   const contentTypeError = requireJsonContentType(event.request);
+
   if (contentTypeError) return contentTypeError;
 
   const authResult = await requireOwnedProjectRoute(event, event.params.id);
+
   if (authResult instanceof Response) return authResult;
 
   const { db } = authResult;
   const projectId = event.params.id;
 
   let body: unknown;
+
   try {
     body = await event.request.json();
   } catch {
@@ -121,8 +126,10 @@ export async function PATCH(event: RequestEvent): Promise<Response> {
   }
 
   const result = projectUpdatePayloadSchema.safeParse(body);
+
   if (!result.success) {
     const errorMessage = result.error.issues?.[0]?.message || "Validation failed";
+
     return json({ code: "validation_error", message: errorMessage }, { status: 400 });
   }
 
@@ -137,6 +144,7 @@ export async function PATCH(event: RequestEvent): Promise<Response> {
         eq(project.ownerId, currentProject.ownerId),
       ),
     });
+
     if (existing) {
       return json(
         { code: "duplicate_name", message: "A project with this name already exists" },
@@ -170,6 +178,7 @@ export async function PATCH(event: RequestEvent): Promise<Response> {
   }
 
   let updated: Project | undefined;
+
   try {
     [updated] = await db
       .update(project)
@@ -183,6 +192,7 @@ export async function PATCH(event: RequestEvent): Promise<Response> {
         { status: 400 },
       );
     }
+
     throw error;
   }
 
@@ -217,6 +227,7 @@ export async function PATCH(event: RequestEvent): Promise<Response> {
  */
 export async function DELETE(event: RequestEvent): Promise<Response> {
   const authResult = await requireOwnedProjectRoute(event, event.params.id);
+
   if (authResult instanceof Response) return authResult;
 
   const { project: projectData, db } = authResult;

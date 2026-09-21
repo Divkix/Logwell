@@ -15,7 +15,9 @@ import { parseTimeRange } from "$lib/utils/time-range";
 import type { PageServerLoad } from "./$types";
 
 const DEFAULT_LIMIT = 50;
+
 const MIN_LIMIT = 20;
+
 const MAX_LIMIT = 200;
 
 function clamp(value: number, min: number, max: number): number {
@@ -27,6 +29,7 @@ export const load: PageServerLoad = async (event) => {
   const { project: projectData, db } = await requireOwnedProjectPage(event, projectId);
 
   const params = event.url.searchParams;
+
   const limit = clamp(
     params.get("limit")
       ? Number.parseInt(params.get("limit") || "", 10) || DEFAULT_LIMIT
@@ -34,11 +37,14 @@ export const load: PageServerLoad = async (event) => {
     MIN_LIMIT,
     MAX_LIMIT,
   );
+
   const cursorParam = params.get("cursor");
   const statusParam = params.get("status") || "open";
+
   const status: IncidentStatus = INCIDENT_STATUSES.includes(statusParam as IncidentStatus)
     ? (statusParam as IncidentStatus)
     : "open";
+
   const range: IncidentRange = parseTimeRange(params.get("range")) ?? "24h";
 
   const rangeStart = getTimeRangeStart(range);
@@ -77,6 +83,7 @@ export const load: PageServerLoad = async (event) => {
   const incidentsToReturn = hasMore ? incidents.slice(0, limit) : incidents;
 
   const lastIncident = incidentsToReturn.at(-1);
+
   const nextCursor =
     hasMore && lastIncident ? encodeCursor(lastIncident.micros, lastIncident.id) : null;
 

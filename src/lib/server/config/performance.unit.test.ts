@@ -15,6 +15,7 @@ describe("Performance Configuration", () => {
     for (const key of Object.keys(process.env)) {
       if (!(key in originalEnv)) delete process.env[key];
     }
+
     Object.assign(process.env, originalEnv);
     vi.resetModules();
   });
@@ -87,10 +88,12 @@ describe("Performance Configuration", () => {
       "IDLE_TIMEOUT=%s → heartbeat %dms (%s)",
       async (idleTimeout, expected, idleMs) => {
         vi.resetModules();
+
         if (idleTimeout === undefined) delete process.env.IDLE_TIMEOUT;
         else process.env.IDLE_TIMEOUT = idleTimeout;
         const { SSE_CONFIG } = await import("./performance");
         expect(SSE_CONFIG.HEARTBEAT_INTERVAL_MS).toBe(expected);
+
         if (idleMs > 0) {
           expect(SSE_CONFIG.HEARTBEAT_INTERVAL_MS).toBeLessThan(idleMs);
         }
@@ -117,6 +120,7 @@ describe("Performance Configuration", () => {
       "LOG_STREAM_MAX_LOGS=%s → %s (%s)",
       async (value, expected) => {
         vi.resetModules();
+
         if (value === undefined) delete process.env.LOG_STREAM_MAX_LOGS;
         else process.env.LOG_STREAM_MAX_LOGS = value as string;
         const { LOG_STREAM_CONFIG } = await import("./performance");
@@ -145,6 +149,7 @@ describe("Performance Configuration", () => {
       "LOG_RETENTION_DAYS=%s → %s (%s)",
       async (value, expected) => {
         vi.resetModules();
+
         if (value === undefined) delete process.env.LOG_RETENTION_DAYS;
         else process.env.LOG_RETENTION_DAYS = value as string;
         const { RETENTION_CONFIG } = await import("./performance");
@@ -162,6 +167,7 @@ describe("Performance Configuration", () => {
       "LOG_CLEANUP_INTERVAL_MS=%s → %s (%s)",
       async (value, expected) => {
         vi.resetModules();
+
         if (value === undefined) delete process.env.LOG_CLEANUP_INTERVAL_MS;
         else process.env.LOG_CLEANUP_INTERVAL_MS = value as string;
         const { RETENTION_CONFIG } = await import("./performance");
@@ -191,6 +197,7 @@ describe("Performance Configuration", () => {
       "INCIDENT_AUTO_RESOLVE_MINUTES=%s → %s (%s)",
       async (value, expected) => {
         vi.resetModules();
+
         if (value === undefined) delete process.env.INCIDENT_AUTO_RESOLVE_MINUTES;
         else process.env.INCIDENT_AUTO_RESOLVE_MINUTES = value as string;
         const { INCIDENT_CONFIG } = await import("./performance");

@@ -60,14 +60,17 @@ describe("FORM_ELEMENTS", () => {
 describe("SHORTCUTS", () => {
   it("covers navigation, search, and other groups with required shape", () => {
     const keys = SHORTCUTS.map((s) => s.key);
+
     for (const key of ["j", "k", "Enter", "/", "Esc", "l", "?"]) {
       expect(keys).toContain(key);
     }
+
     for (const shortcut of SHORTCUTS) {
       expect(typeof shortcut.key).toBe("string");
       expect(typeof shortcut.description).toBe("string");
       expect(["navigation", "search", "other"]).toContain(shortcut.group);
     }
+
     for (const group of ["navigation", "search", "other"]) {
       expect(SHORTCUTS.some((s) => s.group === group)).toBe(true);
     }

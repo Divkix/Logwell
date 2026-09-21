@@ -13,8 +13,11 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("$app/environment", () => ({ building: false }));
+
 vi.mock("$lib/server/db", () => ({ db: mocks.db }));
+
 vi.mock("$lib/server/config/env", () => ({ env: mocks.env }));
+
 vi.mock("$lib/server/auth", () => ({
   initAuth: vi.fn(),
   auth: {
@@ -23,14 +26,18 @@ vi.mock("$lib/server/auth", () => ({
     handler: mocks.authHandler,
   },
 }));
+
 vi.mock("$lib/server/error-handler", () => ({ handleError: vi.fn() }));
+
 vi.mock("$lib/server/jobs/cleanup-scheduler", () => ({
   startCleanupScheduler: vi.fn(),
   stopCleanupScheduler: vi.fn(),
 }));
+
 // The unit project resolves no `$lib` runtime specifiers, so re-export the real modules
 // under the specifiers the hook imports — the CSRF and rate-limit logic must run for real.
 vi.mock("$lib/server/utils/csrf", async () => await import("./lib/server/utils/csrf"));
+
 vi.mock("$lib/server/utils/rate-limit", async () => await import("./lib/server/utils/rate-limit"));
 
 const ORIGIN = "http://localhost";
@@ -101,6 +108,7 @@ describe("hooks.server handle", () => {
   describe("login rate limiting", () => {
     it("returns 429 with Retry-After: 60 once the limiter is exhausted", async () => {
       const address = "198.51.100.23";
+
       const signIn = () =>
         createEvent(
           `${ORIGIN}/api/auth/sign-in/username`,
@@ -111,6 +119,7 @@ describe("hooks.server handle", () => {
       for (let i = 0; i < LOGIN_RPM; i++) {
         expect((await handle({ event: signIn(), resolve })).status).toBe(200);
       }
+
       expect(mocks.authHandler).toHaveBeenCalledTimes(LOGIN_RPM);
 
       const blocked = await handle({ event: signIn(), resolve });
@@ -127,6 +136,7 @@ describe("hooks.server handle", () => {
         method: "POST",
         headers: { Origin: ORIGIN },
       });
+
       const response = await handle({ event, resolve });
 
       expect(response.status).toBe(403);
@@ -141,6 +151,7 @@ describe("hooks.server handle", () => {
         method: "POST",
         headers: { Origin: "https://evil.example" },
       });
+
       const response = await handle({ event, resolve });
 
       expect(response.status).toBe(403);
@@ -160,6 +171,7 @@ describe("hooks.server handle", () => {
       const event = createEvent(`${ORIGIN}/api/auth/get-session`, {
         headers: { Origin: ORIGIN },
       });
+
       const response = await handle({ event, resolve });
 
       expect(await response.text()).toBe("auth-handler");
@@ -192,6 +204,7 @@ describe("hooks.server handle", () => {
 
     it("does not share the login bucket for the same address", async () => {
       const address = "198.51.100.32";
+
       const signIn = () =>
         createEvent(
           `${ORIGIN}/api/auth/sign-in/username`,
@@ -202,12 +215,14 @@ describe("hooks.server handle", () => {
       for (let i = 0; i < LOGIN_RPM; i++) {
         await handle({ event: signIn(), resolve });
       }
+
       expect((await handle({ event: signIn(), resolve })).status).toBe(429);
 
       const ingest = await handle({
         event: createEvent(`${ORIGIN}/v1/ingest`, { method: "POST" }, address),
         resolve,
       });
+
       expect(ingest.status).toBe(200);
     });
   });
@@ -218,6 +233,7 @@ describe("hooks.server handle", () => {
     it("accepts a same-host http Origin although the adapter synthesizes https", async () => {
       const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
       mocks.env.ORIGIN = undefined;
+
       const event = createEvent("https://localhost:3000/api/auth/sign-out", {
         method: "POST",
         headers: { Origin: "http://localhost:3000" },

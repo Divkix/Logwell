@@ -15,12 +15,14 @@ function createRequestEvent(
 ) {
   const safeMethod = ["GET", "HEAD", "OPTIONS"].includes(request.method);
   const hasOrigin = request.headers.has("Origin");
+
   const effectiveRequest =
     !safeMethod && !hasOrigin
       ? new Request(request, {
           headers: { ...Object.fromEntries(request.headers), Origin: new URL(request.url).origin },
         })
       : request;
+
   return {
     request: effectiveRequest,
     locals: {
@@ -53,6 +55,7 @@ async function* parseSSEStream(
   response: Response,
 ): AsyncGenerator<{ event: string; data: string }> {
   const reader = response.body?.getReader();
+
   if (!reader) throw new Error("No response body");
 
   const decoder = new TextDecoder();
@@ -61,6 +64,7 @@ async function* parseSSEStream(
   try {
     while (true) {
       const { done, value } = await reader.read();
+
       if (done) break;
 
       buffer += decoder.decode(value, { stream: true });
@@ -105,6 +109,7 @@ async function collectSSEEvents(
       timedOut = true;
       resolve();
     }, timeoutMs);
+
     cancelTimeout = () => clearTimeout(id);
   });
 
@@ -112,6 +117,7 @@ async function collectSSEEvents(
     for await (const event of stream) {
       if (timedOut) break;
       events.push(event);
+
       if (events.length >= count) break;
     }
   })();
@@ -218,6 +224,7 @@ describe("POST /api/projects/[id]/logs/stream", () => {
 
       const { POST } =
         await import("../../../../../../../src/routes/api/projects/[id]/logs/stream/+server");
+
       const response = await POST(event as never);
 
       expect(response.status).toBe(404);
@@ -238,6 +245,7 @@ describe("POST /api/projects/[id]/logs/stream", () => {
 
       const { POST } =
         await import("../../../../../../../src/routes/api/projects/[id]/logs/stream/+server");
+
       const response = await POST(event as never);
 
       expect(response.status).toBe(200);
@@ -259,6 +267,7 @@ describe("POST /api/projects/[id]/logs/stream", () => {
 
       const { POST } =
         await import("../../../../../../../src/routes/api/projects/[id]/logs/stream/+server");
+
       const response = await POST(event as never);
 
       await new Promise((resolve) => setTimeout(resolve, 50));
@@ -272,6 +281,7 @@ describe("POST /api/projects/[id]/logs/stream", () => {
 
       const logsEvent = events.find((e) => e.event === "logs");
       expect(logsEvent).toBeDefined();
+
       if (!logsEvent) throw new Error("Expected logsEvent to be defined");
 
       const logs = JSON.parse(logsEvent.data);
@@ -291,6 +301,7 @@ describe("POST /api/projects/[id]/logs/stream", () => {
 
       const { POST } =
         await import("../../../../../../../src/routes/api/projects/[id]/logs/stream/+server");
+
       const response = await POST(event as never);
 
       const otherProjectLog = createMockLog(project2.id, { message: "Other project log" });
@@ -303,6 +314,7 @@ describe("POST /api/projects/[id]/logs/stream", () => {
 
       const logsEvent = events.find((e) => e.event === "logs");
       expect(logsEvent).toBeDefined();
+
       if (!logsEvent) throw new Error("Expected 'logs' event for the subscribed project");
 
       const logs = JSON.parse(logsEvent.data);
@@ -324,6 +336,7 @@ describe("POST /api/projects/[id]/logs/stream", () => {
 
       const { POST } =
         await import("../../../../../../../src/routes/api/projects/[id]/logs/stream/+server");
+
       const response = await POST(event as never);
 
       await new Promise((resolve) => setTimeout(resolve, 50));
@@ -344,6 +357,7 @@ describe("POST /api/projects/[id]/logs/stream", () => {
 
       const logsEvent = events.find((e) => e.event === "logs");
       expect(logsEvent).toBeDefined();
+
       if (!logsEvent) throw new Error("Expected logsEvent to be defined");
 
       const logs = JSON.parse(logsEvent.data);
@@ -355,22 +369,28 @@ describe("POST /api/projects/[id]/logs/stream", () => {
 
     it("delivers all logs when a burst exceeds the batch size", async () => {
       const project = await seedProject(db, { ownerId: userId });
+
       const request = new Request(`http://localhost/api/projects/${project.id}/logs/stream`, {
         method: "POST",
       });
+
       const event = createRequestEvent(request, db, { id: project.id }, true);
+
       const { POST } =
         await import("../../../../../../../src/routes/api/projects/[id]/logs/stream/+server");
+
       const response = await POST(event as never);
 
       await new Promise((r) => setTimeout(r, 50)); // let subscription set up
 
       const TOTAL = 100;
+
       for (let i = 0; i < TOTAL; i++) {
         logEventBus.emitLog(createMockLog(project.id, { message: `burst ${i}` }));
       }
 
       const events = await collectSSEEvents(response, 5, 3000);
+
       const received = events
         .filter((e) => e.event === "logs")
         .flatMap((e) => JSON.parse(e.data) as Log[]);
@@ -389,6 +409,7 @@ describe("POST /api/projects/[id]/logs/stream", () => {
 
       const { POST } =
         await import("../../../../../../../src/routes/api/projects/[id]/logs/stream/+server");
+
       const response = await POST(event as never);
 
       await new Promise((resolve) => setTimeout(resolve, 50));
@@ -401,6 +422,7 @@ describe("POST /api/projects/[id]/logs/stream", () => {
 
       const logsEvent = events.find((e) => e.event === "logs");
       expect(logsEvent).toBeDefined();
+
       if (!logsEvent) throw new Error("Expected logsEvent to be defined");
 
       const logs = JSON.parse(logsEvent.data);
@@ -420,6 +442,7 @@ describe("POST /api/projects/[id]/logs/stream", () => {
 
       const { POST } =
         await import("../../../../../../../src/routes/api/projects/[id]/logs/stream/+server");
+
       const response = await POST(event as never);
 
       expect(logEventBus.getListenerCount(project.id)).toBe(1);
@@ -427,6 +450,7 @@ describe("POST /api/projects/[id]/logs/stream", () => {
       // Nothing reads the body, so queued frames pile up until the byte budget is exceeded
       // and the stream gives up on the consumer instead of buffering it forever.
       let emitted = 0;
+
       while (logEventBus.getListenerCount(project.id) > 0 && emitted < 5000) {
         logEventBus.emitLog(createMockLog(project.id, { message: "x".repeat(1024) }));
         emitted += 1;
@@ -437,6 +461,7 @@ describe("POST /api/projects/[id]/logs/stream", () => {
       // The stream ends so a stalled queue cannot pin it open; a stream that never
       // closes leaves this read pending and fails the test by timing out.
       const frames: Array<{ event: string; data: string }> = [];
+
       for await (const frame of parseSSEStream(response)) frames.push(frame);
 
       const delivered = frames
@@ -452,9 +477,11 @@ describe("POST /api/projects/[id]/logs/stream", () => {
   describe("Heartbeat", () => {
     it("emits a heartbeat frame on the configured interval", async () => {
       vi.useFakeTimers();
+
       try {
         const { createLogStreamResponse } =
           await import("../../../../../../../src/lib/server/live-stream");
+
         const response = createLogStreamResponse("heartbeat-project");
 
         expect(response.headers.get("Content-Type")).toBe("text/event-stream");

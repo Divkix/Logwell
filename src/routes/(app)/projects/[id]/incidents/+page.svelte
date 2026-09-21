@@ -55,6 +55,7 @@ const incidentTimelineSchema = z
   .passthrough();
 
 const { data }: { data: PageData } = $props();
+
 // svelte-ignore state_referenced_locally
 const projectId = data.project.id;
 
@@ -67,37 +68,57 @@ let loadedMore = $state<IncidentListItem[]>([]);
 
 // svelte-ignore state_referenced_locally
 let nextCursor = $state<string | null>(data.pagination.nextCursor ?? null);
+
 let isLoadingMore = $state(false);
+
 // svelte-ignore state_referenced_locally
 let selectedStatus = $state<IncidentStatus>(data.filters.status as IncidentStatus);
+
 // svelte-ignore state_referenced_locally
 let selectedRange = $state<IncidentRange>(data.filters.range as IncidentRange);
+
 // svelte-ignore state_referenced_locally
 let selectedIncidentId = $state<string | null>(data.filters.selectedIncidentId ?? null);
+
 let detail = $state<IncidentDetail | null>(null);
+
 let timeline = $state<IncidentTimelineResponse | null>(null);
+
 let detailLoading = $state(false);
+
 let sseConnected = $state(false);
+
 let streamError = $state<Error | null>(null);
+
 let refreshTimeout: ReturnType<typeof setTimeout> | null = null;
+
 let pendingIncidentUpdates: ClientIncident[] = [];
+
 let detailRequestId = 0;
+
 let loadMoreEpoch = 0;
 
 let prevProjectId: string | null = null;
+
 let prevStatus: IncidentStatus | null = null;
+
 let prevRange: IncidentRange | null = null;
 
 const displayedIncidents = $derived.by(() => {
   const byId = new Map<string, IncidentListItem>();
+
   for (const item of incidents) byId.set(item.id, item);
+
   for (const item of loadedMore) {
     if (!byId.has(item.id)) byId.set(item.id, item);
   }
+
   return [...byId.values()]
     .filter((item) => {
       if (selectedStatus === 'open') return item.status === 'open';
+
       if (selectedStatus === 'resolved') return item.status === 'resolved';
+
       return true;
     })
     .sort((a, b) => new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime());
@@ -106,6 +127,7 @@ const displayedIncidents = $derived.by(() => {
 function computeStatus(lastSeenIso: string): IncidentStatus {
   const thresholdMs = data.autoResolveMinutes * 60 * 1000;
   const diff = Date.now() - new Date(lastSeenIso).getTime();
+
   return diff <= thresholdMs ? 'open' : 'resolved';
 }
 
@@ -130,9 +152,11 @@ function normalizeClientIncident(incident: ClientIncident): IncidentListItem {
 function mergeIncidentUpdates(updates: ClientIncident[]) {
   const normalized = updates.map(normalizeClientIncident);
   const byId = new Map(incidents.map((item) => [item.id, item]));
+
   for (const item of normalized) {
     byId.set(item.id, item);
   }
+
   incidents = [...byId.values()];
 }
 
@@ -141,6 +165,7 @@ const incidentStream = useIncidentStream({
   enabled: false,
   onIncidents: (updates) => {
     pendingIncidentUpdates = [...pendingIncidentUpdates, ...updates];
+
     if (refreshTimeout) return;
     refreshTimeout = setTimeout(() => {
       mergeIncidentUpdates(pendingIncidentUpdates);
@@ -150,6 +175,7 @@ const incidentStream = useIncidentStream({
   },
   onConnectionChange: (connected) => {
     sseConnected = connected;
+
     if (connected) streamError = null;
   },
   onError: (error) => {
@@ -166,12 +192,15 @@ function retryIncidentStream() {
 $effect(() => {
   incidentStream.setProjectId(data.project.id);
   incidentStream.connect();
+
   return () => {
     incidentStream.disconnect();
+
     if (refreshTimeout) {
       clearTimeout(refreshTimeout);
       refreshTimeout = null;
     }
+
     pendingIncidentUpdates = [];
   };
 });
@@ -213,6 +242,7 @@ $effect(() => {
 async function fetchIncidentDetail(incidentId: string) {
   const myId = ++detailRequestId;
   detailLoading = true;
+
   try {
     const [detailRes, timelineRes] = await Promise.all([
       fetch(`/api/projects/${projectId}/incidents/${incidentId}`),
@@ -224,6 +254,7 @@ async function fetchIncidentDetail(incidentId: string) {
     if (!detailRes.ok || !timelineRes.ok) {
       detail = null;
       timeline = null;
+
       return;
     }
 
@@ -293,19 +324,24 @@ async function loadMore() {
   if (!nextCursor || isLoadingMore) return;
   const myEpoch = ++loadMoreEpoch;
   isLoadingMore = true;
+
   try {
     const params = new URLSearchParams();
     params.set('cursor', nextCursor);
     params.set('status', selectedStatus);
     params.set('range', selectedRange);
     const response = await fetch(`/api/projects/${projectId}/incidents?${params.toString()}`);
+
     if (myEpoch !== loadMoreEpoch) return;
+
     if (!response.ok) {
       toastError('Failed to load more incidents');
+
       return;
     }
 
     const result = await response.json();
+
     if (myEpoch !== loadMoreEpoch) return;
 
     loadedMore = [...loadedMore, ...result.incidents];

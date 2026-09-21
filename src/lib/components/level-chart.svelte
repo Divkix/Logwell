@@ -18,8 +18,11 @@ const { data, class: className }: Props = $props();
 const LOG_LEVELS: LogLevel[] = ['debug', 'info', 'warn', 'error', 'fatal'];
 
 const SIZE = 200;
+
 const CENTER = SIZE / 2;
+
 const OUTER_RADIUS = 80;
+
 const INNER_RADIUS = 50;
 
 const activeLevels = $derived(LOG_LEVELS.filter((level) => (data.levelCounts[level] ?? 0) > 0));
@@ -30,6 +33,7 @@ const totalCount = $derived(
 
 function polarToCartesian(radius: number, angleInDegrees: number): { x: number; y: number } {
   const angleInRadians = ((angleInDegrees - 90) * Math.PI) / 180;
+
   return {
     x: CENTER + radius * Math.cos(angleInRadians),
     y: CENTER + radius * Math.sin(angleInRadians),
@@ -108,6 +112,7 @@ const segments = $derived.by(() => {
 
 function formatPercentage(value: number): string {
   const formatted = value.toFixed(1);
+
   return formatted.endsWith('.0') ? Math.round(value).toString() : formatted;
 }
 </script>

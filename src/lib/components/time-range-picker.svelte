@@ -1,5 +1,6 @@
 <script lang="ts" module>
 export type { TimeRange } from '$lib/utils/time-range';
+
 export { TIME_RANGES, TIME_RANGE_LABELS } from '$lib/utils/time-range';
 </script>
 

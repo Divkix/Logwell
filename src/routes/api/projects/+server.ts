@@ -47,6 +47,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
     .orderBy(desc(project.createdAt));
 
   const projectIds = projects.map((p) => p.id);
+
   const logCounts =
     projectIds.length > 0
       ? await db
@@ -55,6 +56,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
           .where(inArray(log.projectId, projectIds))
           .groupBy(log.projectId)
       : [];
+
   const logCountByProject = new Map(logCounts.map((c) => [c.projectId, c.count]));
 
   const projectsWithCounts = projects.map((p) => ({
@@ -95,9 +97,11 @@ export async function GET(event: RequestEvent): Promise<Response> {
  */
 export async function POST(event: RequestEvent): Promise<Response> {
   const csrfError = checkCsrfOrigin(event);
+
   if (csrfError) return csrfError;
 
   const contentTypeError = requireJsonContentType(event.request);
+
   if (contentTypeError) return contentTypeError;
 
   const { user } = await requireAuth(event);
@@ -105,6 +109,7 @@ export async function POST(event: RequestEvent): Promise<Response> {
   const db = await getDbClient(event.locals);
 
   let body: unknown;
+
   try {
     body = await event.request.json();
   } catch {
@@ -112,6 +117,7 @@ export async function POST(event: RequestEvent): Promise<Response> {
   }
 
   const validation = projectCreatePayloadSchema.safeParse(body);
+
   if (!validation.success) {
     const issues = validation.error.issues ?? [];
     const firstError = issues[0];
@@ -133,6 +139,7 @@ export async function POST(event: RequestEvent): Promise<Response> {
   }
 
   const generatedApiKey = generateApiKey();
+
   const newProject = {
     id: nanoid(),
     name,
@@ -141,12 +148,14 @@ export async function POST(event: RequestEvent): Promise<Response> {
   };
 
   let created: Project | undefined;
+
   try {
     [created] = await db.insert(project).values(newProject).returning();
   } catch (error) {
     if (isUniqueViolation(error, "uq_project_name_owner")) {
       return apiError(400, "duplicate_name", "A project with this name already exists");
     }
+
     throw error;
   }
 

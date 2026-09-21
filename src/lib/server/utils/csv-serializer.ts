@@ -14,6 +14,7 @@ export function escapeCSVField(field: unknown): string {
 
   if (value.includes(",") || value.includes('"') || value.includes("\n") || value.includes("\r")) {
     const escaped = value.replace(/"/g, '""');
+
     return `"${escaped}"`;
   }
 

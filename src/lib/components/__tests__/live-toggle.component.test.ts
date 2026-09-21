@@ -15,6 +15,7 @@ describe("LiveToggle", () => {
     render(LiveToggle, { props: { enabled } });
     const pulse = screen.getByTestId("live-pulse");
     expect(pulse).toHaveClass(expectedClass);
+
     if (pulseClass) {
       expect(pulse).toHaveClass(pulseClass);
     } else {

@@ -89,6 +89,7 @@ export type NormalizedOtlpLogsResult = {
 };
 
 const TRACE_ID_REGEX = /^[0-9a-f]{32}$/i;
+
 const SPAN_ID_REGEX = /^[0-9a-f]{16}$/i;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -98,17 +99,23 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function clampInt32(value: number): number | null {
   if (!Number.isFinite(value)) return null;
   const t = Math.trunc(value);
+
   if (t < -2147483648 || t > 2147483647) return null;
+
   return t;
 }
 
 export function parseUint64String(value: unknown): string | null {
   if (typeof value === "string") {
     const trimmed = value.trim();
+
     if (!trimmed) return null;
+
     if (!/^\d+$/.test(trimmed)) return null;
+
     return trimmed;
   }
+
   if (
     typeof value === "number" &&
     Number.isFinite(value) &&
@@ -117,6 +124,7 @@ export function parseUint64String(value: unknown): string | null {
   ) {
     return Math.trunc(value).toString();
   }
+
   return null;
 }
 
@@ -124,10 +132,13 @@ function parseOptionalNumber(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) {
     return clampInt32(value);
   }
+
   if (typeof value === "string" && value.trim()) {
     const parsed = Number(value);
+
     return Number.isFinite(parsed) ? clampInt32(parsed) : null;
   }
+
   return null;
 }
 
@@ -135,35 +146,45 @@ function parseIntValue(value: unknown): number | string | null {
   if (typeof value === "number" && Number.isFinite(value)) {
     return Number.isSafeInteger(value) ? value : Math.trunc(value);
   }
+
   if (typeof value === "string") {
     const trimmed = value.trim();
+
     if (!/^-?\d+$/.test(trimmed)) return null;
     const parsed = Number(trimmed);
+
     if (Number.isSafeInteger(parsed)) {
       return parsed;
     }
+
     return trimmed;
   }
+
   return null;
 }
 
 function nonZeroNano(value: string | null): string | null {
   if (value === null) return null;
+
   return /^0+$/.test(value) ? null : value;
 }
 
 function parseTimestamp(timeUnixNano: string | null, observedTimeUnixNano: string | null): Date {
   const candidate = nonZeroNano(timeUnixNano) ?? nonZeroNano(observedTimeUnixNano);
+
   if (!candidate) {
     return new Date();
   }
+
   try {
     const nanos = BigInt(candidate);
     const millis = Number(nanos / 1000000n);
     const date = new Date(millis);
+
     if (Number.isNaN(date.getTime())) {
       return new Date();
     }
+
     return date;
   } catch {
     return new Date();
@@ -172,21 +193,31 @@ function parseTimestamp(timeUnixNano: string | null, observedTimeUnixNano: strin
 
 function parseSeverityNumber(value: unknown): number | null {
   const numberValue = parseOptionalNumber(value);
+
   if (numberValue === null) return null;
   const rounded = clampInt32(numberValue);
+
   if (rounded === null) return null;
+
   if (rounded < 0) return null;
+
   return rounded;
 }
 
 function severityTextToLogLevel(value: string | null): LogLevel | null {
   if (!value) return null;
   const normalized = value.toLowerCase();
+
   if (normalized.includes("fatal") || normalized.includes("critical")) return "fatal";
+
   if (normalized.includes("error")) return "error";
+
   if (normalized.includes("warn")) return "warn";
+
   if (normalized.includes("info")) return "info";
+
   if (normalized.includes("debug") || normalized.includes("trace")) return "debug";
+
   return null;
 }
 
@@ -194,18 +225,23 @@ export function severityNumberToLogLevel(value: number | null | undefined): LogL
   if (!value || value <= 0) {
     return "info";
   }
+
   if (value <= 8) {
     return "debug";
   }
+
   if (value <= 12) {
     return "info";
   }
+
   if (value <= 16) {
     return "warn";
   }
+
   if (value <= 20) {
     return "error";
   }
+
   return "fatal";
 }
 
@@ -214,29 +250,37 @@ function attributeString(
   keys: string[],
 ): string | null {
   if (!attributes) return null;
+
   for (const key of keys) {
     const value = attributes[key];
+
     if (typeof value === "string" && value.trim()) {
       return value;
     }
   }
+
   return null;
 }
 
 function attributeInt(attributes: Record<string, unknown> | null, keys: string[]): number | null {
   if (!attributes) return null;
+
   for (const key of keys) {
     const value = attributes[key];
+
     if (typeof value === "number" && Number.isSafeInteger(value)) {
       return value > 0 ? clampInt32(value) : null;
     }
+
     if (typeof value === "string" && value.trim()) {
       const parsed = Number.parseInt(value, 10);
+
       if (Number.isSafeInteger(parsed)) {
         return parsed > 0 ? clampInt32(parsed) : null;
       }
     }
   }
+
   return null;
 }
 
@@ -245,6 +289,7 @@ export function mapOtlpAttributesToLogColumns(attributes: Record<string, unknown
   const lineNumber = attributeInt(attributes, ["code.lineno", "source.line", "line_number"]);
   const requestId = attributeString(attributes, ["request.id", "request_id", "http.request_id"]);
   const userId = attributeString(attributes, ["enduser.id", "user.id", "user_id"]);
+
   const ipAddress = attributeString(attributes, [
     "client.address",
     "ip",
@@ -259,22 +304,28 @@ export function mapOtlpAttributesToLogColumns(attributes: Record<string, unknown
 export function normalizeTraceId(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
+
   if (!TRACE_ID_REGEX.test(trimmed)) return null;
+
   return trimmed.toLowerCase();
 }
 
 export function normalizeSpanId(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
+
   if (!SPAN_ID_REGEX.test(trimmed)) return null;
+
   return trimmed.toLowerCase();
 }
 
 export function parseOtlpAnyValue(value: OtlpAnyValue, depth = 0): unknown {
   if (depth > 32) return null;
+
   if (!isRecord(value)) return null;
 
   if (value.stringValue !== undefined) return value.stringValue;
+
   if (value.boolValue !== undefined) return value.boolValue;
 
   if (value.intValue !== undefined) {
@@ -287,6 +338,7 @@ export function parseOtlpAnyValue(value: OtlpAnyValue, depth = 0): unknown {
 
   if (value.arrayValue !== undefined) {
     const values = Array.isArray(value.arrayValue?.values) ? (value.arrayValue?.values ?? []) : [];
+
     return values.map((entry) => parseOtlpAnyValue(entry, depth + 1));
   }
 
@@ -303,28 +355,36 @@ export function parseOtlpAnyValue(value: OtlpAnyValue, depth = 0): unknown {
 
 function parseKeyValueList(values?: OtlpKeyValue[], depth = 0): Record<string, unknown> {
   if (depth > 32) return {};
+
   if (!Array.isArray(values)) return {};
   const record: Record<string, unknown> = {};
+
   for (const entry of values) {
     if (!isRecord(entry)) continue;
     const key = typeof entry.key === "string" ? entry.key : null;
+
     if (!key) continue;
     const parsedValue = entry.value ? parseOtlpAnyValue(entry.value, depth + 1) : null;
     record[key] = parsedValue;
   }
+
   return record;
 }
 
 function parseAttributes(values?: OtlpKeyValue[]): Record<string, unknown> | null {
   const record = parseKeyValueList(values);
+
   return Object.keys(record).length > 0 ? record : null;
 }
 
 function deriveMessage(body: unknown, attributes: Record<string, unknown> | null): string {
   if (typeof body === "string") return body;
   const attrMessage = attributes?.message ?? attributes?.["log.message"];
+
   if (typeof attrMessage === "string") return attrMessage;
+
   if (body === null || body === undefined) return "";
+
   try {
     return JSON.stringify(body);
   } catch {
@@ -336,6 +396,7 @@ function deriveLevel(severityNumber: number | null, severityText: string | null)
   if (severityNumber && severityNumber > 0) {
     return severityNumberToLogLevel(severityNumber);
   }
+
   return severityTextToLogLevel(severityText) ?? "info";
 }
 
@@ -345,6 +406,7 @@ export function normalizeOtlpLogsRequest(body: unknown): NormalizedOtlpLogsResul
   }
 
   const resourceLogs = body.resourceLogs;
+
   if (!Array.isArray(resourceLogs)) {
     throw new OtlpValidationError("resourceLogs must be an array.");
   }
@@ -357,6 +419,7 @@ export function normalizeOtlpLogsRequest(body: unknown): NormalizedOtlpLogsResul
 
   const countEntry = () => {
     recordCount += 1;
+
     if (recordCount > API_CONFIG.BATCH_INSERT_LIMIT) {
       throw new BatchTooLargeError(API_CONFIG.BATCH_INSERT_LIMIT);
     }
@@ -373,6 +436,7 @@ export function normalizeOtlpLogsRequest(body: unknown): NormalizedOtlpLogsResul
     const resource = isRecord(resourceLog.resource) ? (resourceLog.resource as OtlpResource) : null;
     const resourceAttributes = parseAttributes(resource?.attributes);
     const resourceDroppedAttributesCount = parseOptionalNumber(resource?.droppedAttributesCount);
+
     const resourceSchemaUrl =
       typeof resourceLog.schemaUrl === "string" ? resourceLog.schemaUrl : null;
 
@@ -464,9 +528,11 @@ export function normalizeOtlpLogsRequest(body: unknown): NormalizedOtlpLogsResul
 
 export function parseOtlpIngestBody(body: unknown): ParsedIngest {
   const normalized = normalizeOtlpLogsRequest(body);
+
   return {
     inputs: normalized.records.map((record) => {
       const mapped = mapOtlpAttributesToLogColumns(record.attributes);
+
       return {
         ...mapped,
         level: record.level,

@@ -62,7 +62,9 @@ describe("GET /api/projects/[id]/incidents/[incidentId]", () => {
     const mockRequest = new Request("http://localhost:5173", {
       headers: { cookie: `better-auth.session_token=${signUpResult.token}` },
     });
+
     const sessionData = await getSession(mockRequest.headers, db);
+
     if (!sessionData) throw new Error("Session data should not be null");
 
     userId = sessionData.user.id;
@@ -78,6 +80,7 @@ describe("GET /api/projects/[id]/incidents/[incidentId]", () => {
 
   it("returns 200 with incident data for existing incident", async () => {
     const testProject = await seedProject(db, { ownerId: userId });
+
     const [createdIncident] = await db
       .insert(incident)
       .values({
@@ -99,12 +102,14 @@ describe("GET /api/projects/[id]/incidents/[incidentId]", () => {
     const request = new Request(
       `http://localhost/api/projects/${testProject.id}/incidents/${createdIncident!.id}`,
     );
+
     const event = createRequestEvent(
       request,
       db,
       { id: testProject.id, incidentId: createdIncident!.id },
       authenticatedLocals,
     );
+
     const response = await GET_DETAIL(event as never);
 
     expect(response.status).toBe(200);
@@ -121,12 +126,14 @@ describe("GET /api/projects/[id]/incidents/[incidentId]", () => {
     const request = new Request(
       `http://localhost/api/projects/${testProject.id}/incidents/nonexistent-id`,
     );
+
     const event = createRequestEvent(
       request,
       db,
       { id: testProject.id, incidentId: "nonexistent-id" },
       authenticatedLocals,
     );
+
     const response = await GET_DETAIL(event as never);
 
     expect(response.status).toBe(404);
@@ -144,13 +151,17 @@ describe("GET /api/projects/[id]/incidents/[incidentId]", () => {
         name: "Other",
       },
     });
+
     const otherRequest = new Request("http://localhost:5173", {
       headers: { cookie: `better-auth.session_token=${otherUser.token}` },
     });
+
     const otherSession = await getSession(otherRequest.headers, db);
+
     if (!otherSession) throw new Error("Missing other session");
 
     const otherProject = await seedProject(db, { ownerId: otherSession.user.id });
+
     const [otherIncident] = await db
       .insert(incident)
       .values({
@@ -172,12 +183,14 @@ describe("GET /api/projects/[id]/incidents/[incidentId]", () => {
     const request = new Request(
       `http://localhost/api/projects/${ownerProject.id}/incidents/${otherIncident!.id}`,
     );
+
     const event = createRequestEvent(
       request,
       db,
       { id: ownerProject.id, incidentId: otherIncident!.id },
       authenticatedLocals,
     );
+
     const response = await GET_DETAIL(event as never);
 
     expect(response.status).toBe(404);
@@ -187,6 +200,7 @@ describe("GET /api/projects/[id]/incidents/[incidentId]", () => {
 
   it("returns 401 for unauthenticated request", async () => {
     const testProject = await seedProject(db, { ownerId: userId });
+
     const [createdIncident] = await db
       .insert(incident)
       .values({
@@ -208,6 +222,7 @@ describe("GET /api/projects/[id]/incidents/[incidentId]", () => {
     const request = new Request(
       `http://localhost/api/projects/${testProject.id}/incidents/${createdIncident!.id}`,
     );
+
     const event = createRequestEvent(request, db, {
       id: testProject.id,
       incidentId: createdIncident!.id,

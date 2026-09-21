@@ -14,27 +14,36 @@ const { data }: { data: PageData } = $props();
 
 // svelte-ignore state_referenced_locally
 let selectedRange = $state<TimeRange>((data.filters.range as TimeRange) || '24h');
+
 let loading = $state(false);
 
 let timeseriesData = $state<TimeSeriesBucket[]>([]);
+
 let timeseriesLoading = $state(true);
+
 let timeseriesError = $state<string | undefined>();
+
 let fetchController: AbortController | null = null;
 
 async function fetchTimeseries(range: TimeRange, from: string | null, signal: AbortSignal) {
   timeseriesLoading = true;
   timeseriesError = undefined;
+
   try {
     const params = new URLSearchParams({ range });
+
     if (from) {
       params.set('from', from);
     }
+
     const res = await fetch(`/api/projects/${data.project.id}/stats/timeseries?${params}`, {
       signal,
     });
+
     if (!res.ok) {
       throw new Error('Failed to load timeseries data');
     }
+
     const json = await res.json();
     timeseriesData = json.buckets;
   } catch (e) {

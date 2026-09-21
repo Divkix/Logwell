@@ -24,13 +24,17 @@
  */
 export function parseEnvInt(key: string, defaultValue: number): number {
   const value = process.env[key]?.trim();
+
   if (!value) {
     return defaultValue;
   }
+
   if (!/^\d+$/.test(value)) {
     console.warn(`[config] invalid ${key}="${value}", using default ${defaultValue}`);
+
     return defaultValue;
   }
+
   return Number(value);
 }
 
@@ -136,11 +140,14 @@ const RETENTION_BOUNDS = {
 function parseRetentionDays(): number {
   const max = RETENTION_BOUNDS.LOG_RETENTION_DAYS.max;
   const days = parseEnvInt("LOG_RETENTION_DAYS", RETENTION_DEFAULTS.LOG_RETENTION_DAYS);
+
   if (days <= max) {
     return days;
   }
+
   // Above the documented maximum: clamp towards keeping logs, never towards deleting them.
   console.warn(`[config] LOG_RETENTION_DAYS=${days} exceeds ${max}, using ${max}`);
+
   return max;
 }
 

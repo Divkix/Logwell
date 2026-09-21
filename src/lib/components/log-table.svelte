@@ -44,6 +44,7 @@ const showQuickstartEmptyState = $derived(!hasFilters && project && appUrl);
 const SKELETON_ROW_COUNT = 8;
 
 const emptyStateMessage = $derived(hasFilters ? 'No logs match your filters' : 'No logs yet');
+
 const emptyStateTestId = $derived(hasFilters ? 'log-table-no-results' : 'log-table-empty');
 
 function handleSort(field: SortField) {
@@ -64,8 +65,11 @@ function handleSort(field: SortField) {
 
 function getAriaSort(field: SortField): 'ascending' | 'descending' | 'none' {
   if (sortKey !== field) return 'none';
+
   if (sortDirection === 'asc') return 'ascending';
+
   if (sortDirection === 'desc') return 'descending';
+
   return 'none';
 }
 

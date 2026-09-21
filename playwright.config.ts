@@ -2,6 +2,7 @@ import type { PlaywrightTestConfig } from "@playwright/test";
 
 // Use preview mode in CI for stability (avoids Vite dev server HMR issues)
 const isCI = !!process.env.CI;
+
 const port = isCI ? 4173 : 5173;
 
 const config: PlaywrightTestConfig = {
