@@ -212,6 +212,9 @@ importers:
       '@internationalized/date':
         specifier: ^3.12.4
         version: 3.12.4
+      '@oxlint/plugins':
+        specifier: 1.81.0
+        version: 1.81.0
       '@playwright/test':
         specifier: ^1.63.0
         version: 1.63.0
@@ -1512,6 +1515,10 @@ packages:
 
   '@oxlint/plugins@1.79.0':
     resolution: {integrity: sha512-S0uyoxakDINJ4DPgqxGlEEvrdSMeQb7Z2lKVjxoY2gwsbZbfg2Xr8Klfeo5ZeraHmmdBCELFUHkSe6KEmBpMvg==}
+    engines: {node: ^12.22.0 || ^14.17.0 || >=16.0.0}
+
+  '@oxlint/plugins@1.81.0':
+    resolution: {integrity: sha512-HhD8kd3r6XpelZkhxhRty/po8V6yK1VV63Eq4kSsOS2IoHUywG3DV2EX+z/ZHw46aLI74Y6aA604NRiAqLKW9w==}
     engines: {node: ^12.22.0 || ^14.17.0 || >=16.0.0}
 
   '@playwright/test@1.63.0':
@@ -4218,6 +4225,8 @@ snapshots:
     optional: true
 
   '@oxlint/plugins@1.79.0': {}
+
+  '@oxlint/plugins@1.81.0': {}
 
   '@playwright/test@1.63.0':
     dependencies:
