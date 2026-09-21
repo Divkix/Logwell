@@ -1,4 +1,5 @@
 import type { HttpError } from "@sveltejs/kit";
+import { sql } from "drizzle-orm";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
 import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
 import { createAuth } from "$lib/server/auth";
@@ -222,6 +223,47 @@ describe("(app) page loaders — injected PGlite DB seam", () => {
 
       const event = createLoadEvent(db, { id: proj.id }, nonOwner.locals);
       await expectSvelteKit404(loadProjectIncidents(event as never));
+    });
+
+    it("does not skip incidents that share the cursor's millisecond", async () => {
+      const proj = await seedProject(db, { name: "incidents-page-cursor", ownerId: owner.userId });
+
+      // 25 incidents one microsecond apart inside the same millisecond: the default page
+      // holds 20, so the next cursor points into a millisecond that still has rows after it.
+      const baseEpoch = Math.floor(Date.now() / 1000) + 0.123456;
+      const seededIds: string[] = [];
+      for (let i = 0; i < 25; i++) {
+        const id = `inc-page-same-ms-${i}`;
+        seededIds.push(id);
+        await db.execute(sql`
+          INSERT INTO "incident"
+            ("id", "project_id", "fingerprint", "title", "normalized_message", "highest_level", "first_seen", "last_seen", "total_events")
+          VALUES (${id}, ${proj.id}, ${`fp-page-same-ms-${i}`}, ${`Incident ${i}`}, ${`incident ${i}`}, 'error', to_timestamp(${baseEpoch + i * 0.000001}), to_timestamp(${baseEpoch + i * 0.000001}), 1)
+        `);
+      }
+
+      const collectedIds: string[] = [];
+      let cursor: string | null = null;
+      for (let page = 0; page < 10; page++) {
+        // limit=20 keeps the page below the 25 seeded rows (the loader defaults to 50).
+        const url = cursor
+          ? `http://localhost:5173/projects/${proj.id}/incidents?limit=20&cursor=${encodeURIComponent(cursor)}`
+          : `http://localhost:5173/projects/${proj.id}/incidents?limit=20`;
+        const data = await loadProjectIncidents(
+          createLoadEvent(db, { id: proj.id }, owner.locals, url) as never,
+        );
+
+        collectedIds.push(...data.incidents.map((i: { id: string }) => i.id));
+
+        if (!data.pagination.hasMore) break;
+        cursor = data.pagination.nextCursor;
+      }
+
+      expect(collectedIds).toHaveLength(25);
+      expect(new Set(collectedIds).size).toBe(25);
+      for (const id of seededIds) {
+        expect(collectedIds.filter((c) => c === id)).toHaveLength(1);
+      }
     });
   });
 });
