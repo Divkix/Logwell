@@ -65,6 +65,11 @@ services:
     volumes:
       # PostgreSQL 18+ resolves PGDATA under a version-specific subdirectory
       # (/var/lib/postgresql/18/docker), so the volume targets the parent path.
+      #
+      # Upgrading an existing volume that was created by postgres 17 or older? Its data sits in
+      # <volume>/data, which this mount no longer reaches and PostgreSQL would silently initdb a
+      # fresh cluster. Migrate the data (dump/restore, or pg_upgrade into the 18 layout) before
+      # switching, or keep the old image and set PGDATA=/var/lib/postgresql/data here.
       - postgres-data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U logwell -d logwell"]
