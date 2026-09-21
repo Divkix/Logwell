@@ -47,4 +47,32 @@ describe("incident-fingerprint", () => {
     expect(first.normalizedMessage).toBe(second.normalizedMessage);
     expect(first.fingerprint).toBe(second.fingerprint);
   });
+
+  it("masks every UUID version, so ids from any generator share one fingerprint", () => {
+    const ids = {
+      v1: "f47ac10b-58cc-1372-a567-0e02b2c3d479",
+      v4: "550e8400-e29b-41d4-a716-446655440000",
+      v6: "1e0d3b1f-9f2a-6b3c-8f4d-5a6b7c8d9e0f",
+      v7: "01890a5d-ac96-774b-bcce-b302099a8057",
+      v8: "a1b2c3d4-e5f6-8a7b-9c8d-7e6f5a4b3c2d",
+    };
+
+    for (const [version, id] of Object.entries(ids)) {
+      expect(normalizeIncidentMessage(`Failed to load order ${id}`), version).toBe(
+        "failed to load order {uuid}",
+      );
+    }
+
+    const fingerprints = Object.values(ids).map(
+      (id) =>
+        buildIncidentFingerprint({
+          message: `Failed to load order ${id}`,
+          serviceName: "orders",
+          sourceFile: "orders.ts",
+          lineNumber: 12,
+        }).fingerprint,
+    );
+
+    expect(new Set(fingerprints).size).toBe(1);
+  });
 });
