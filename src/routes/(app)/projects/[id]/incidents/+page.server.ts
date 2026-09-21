@@ -1,7 +1,12 @@
-import { and, count, desc, eq, gte, lt, or, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, getTableColumns, gte, lt, type SQL } from "drizzle-orm";
 import { INCIDENT_CONFIG } from "$lib/server/config/performance";
 import { incident } from "$lib/server/db/schema";
-import { decodeCursor, encodeCursor } from "$lib/server/utils/cursor";
+import {
+  cursorRowLessThan,
+  decodeCursor,
+  encodeCursor,
+  microsColumn,
+} from "$lib/server/utils/cursor";
 import { requireOwnedProjectPage } from "$lib/server/utils/owned-project";
 import { getIncidentStatus } from "$lib/server/utils/incidents";
 import { INCIDENT_STATUSES, type IncidentRange, type IncidentStatus } from "$lib/shared/types";
@@ -48,13 +53,10 @@ export const load: PageServerLoad = async (event) => {
 
   if (cursorParam) {
     try {
-      const { timestamp: cursorTimestamp, id: cursorId } = decodeCursor(cursorParam);
-      conditions.push(
-        or(
-          lt(incident.lastSeen, cursorTimestamp),
-          and(eq(incident.lastSeen, cursorTimestamp), lt(incident.id, cursorId)),
-        ) as SQL,
-      );
+      const { micros: cursorMicros, id: cursorId } = decodeCursor(cursorParam);
+      // `lastSeen` carries microseconds, so the keyset comparison must use them:
+      // the millisecond-truncated Date would drop rows inside the cursor's millisecond.
+      conditions.push(cursorRowLessThan(incident.lastSeen, incident.id, cursorMicros, cursorId));
     } catch (err) {
       console.error("[page/incidents] invalid cursor, falling back to first page:", err);
     }
@@ -65,7 +67,7 @@ export const load: PageServerLoad = async (event) => {
   const total = countResult?.count ?? 0;
 
   const incidents = await db
-    .select()
+    .select({ ...getTableColumns(incident), micros: microsColumn(incident.lastSeen) })
     .from(incident)
     .where(whereClause)
     .orderBy(desc(incident.lastSeen), desc(incident.id))
@@ -74,10 +76,9 @@ export const load: PageServerLoad = async (event) => {
   const hasMore = incidents.length > limit;
   const incidentsToReturn = hasMore ? incidents.slice(0, limit) : incidents;
 
+  const lastIncident = incidentsToReturn.at(-1);
   const nextCursor =
-    hasMore && incidentsToReturn.length > 0
-      ? encodeCursor(incidentsToReturn.at(-1)!.lastSeen as Date, incidentsToReturn.at(-1)!.id)
-      : null;
+    hasMore && lastIncident ? encodeCursor(lastIncident.micros, lastIncident.id) : null;
 
   return {
     project: {
