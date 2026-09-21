@@ -15,10 +15,12 @@ describe("Environment Configuration", () => {
   async function loadEnv(overrides: Record<string, string | undefined>) {
     process.env.DATABASE_URL = "postgres://localhost/test";
     process.env.BETTER_AUTH_SECRET = "a".repeat(32);
+
     for (const [key, value] of Object.entries(overrides)) {
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;
     }
+
     return import("./env");
   }
 
@@ -79,6 +81,7 @@ describe("Environment Configuration", () => {
     const { isProduction, isDevelopment } = await loadEnv({
       NODE_ENV: nodeEnv as string | undefined,
     });
+
     expect(isProduction()).toBe(prod);
     expect(isDevelopment()).toBe(dev);
   });

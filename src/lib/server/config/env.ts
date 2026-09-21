@@ -36,6 +36,7 @@ export class EnvValidationError extends Error {
 // for the SSR bundle), which would make a production server report development - skipping
 // secret validation and issuing non-Secure session cookies.
 const nodeEnv = globalThis.process?.env?.NODE_ENV ?? "production";
+
 const isDevExplicit = nodeEnv === "development" || nodeEnv === "test";
 
 // Collect validation errors
@@ -43,6 +44,7 @@ const validationErrors: Array<{ variable: string; message: string }> = [];
 
 // Validate DATABASE_URL
 const rawDatabaseUrl = process.env.DATABASE_URL;
+
 if (!rawDatabaseUrl) {
   validationErrors.push({
     variable: "DATABASE_URL",
@@ -59,12 +61,15 @@ if (!rawDatabaseUrl) {
 // Re-read after validation to get narrowed type (validation throws if missing)
 function getDatabaseUrl(): string {
   const url = process.env.DATABASE_URL;
+
   if (!url) throw new Error("DATABASE_URL missing after validation");
+
   return url;
 }
 
 // Validate BETTER_AUTH_SECRET
 const authSecret = process.env.BETTER_AUTH_SECRET;
+
 if (!isDevExplicit) {
   if (!authSecret) {
     validationErrors.push({
@@ -93,6 +98,7 @@ if (validationErrors.length > 0) {
 // the default for unparsable values; the extra guard keeps an explicit 0 from becoming a
 // hard block for every client behind one NAT.
 const DEFAULT_INGEST_IP_RPM = 60000;
+
 const ingestIpRpm = parseEnvInt("RATE_LIMIT_INGEST_IP_RPM", DEFAULT_INGEST_IP_RPM);
 
 /**

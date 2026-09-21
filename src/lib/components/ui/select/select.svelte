@@ -13,6 +13,7 @@ let {
 function getValue() {
   return value as never;
 }
+
 function setValue(v: never) {
   value = v;
 }

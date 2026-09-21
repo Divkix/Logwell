@@ -50,6 +50,7 @@ describe("ActiveFilterChips", () => {
         props: { levels: [...levels], search, range, [prop]: callback },
       });
       screen.getByTestId(testId).click();
+
       if (expected === undefined) {
         expect(callback).toHaveBeenCalled();
       } else {

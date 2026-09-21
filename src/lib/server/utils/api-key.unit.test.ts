@@ -13,10 +13,12 @@ import {
 describe("API Key Generation", () => {
   it("generateApiKey returns lw_ prefixed 32-char unique strings", () => {
     const [key1, key2] = [generateApiKey(), generateApiKey()];
+
     for (const key of [key1, key2]) {
       expect(key).toMatch(/^lw_[A-Za-z0-9_-]{32}$/);
       expect(key).toHaveLength(35);
     }
+
     expect(key1).not.toBe(key2);
   });
 });
@@ -69,6 +71,7 @@ describe("API key cache invalidation races", () => {
 
   it("does not resurrect a key rotated while its lookup was in flight", async () => {
     const { promise, resolve } = Promise.withResolvers<Array<{ id: string }>>();
+
     const inFlight = validateApiKey(
       request(key),
       stubDb(() => promise),
@@ -83,13 +86,16 @@ describe("API key cache invalidation races", () => {
       request(key),
       stubDb(async () => []),
     );
+
     await expect(afterRotation).rejects.toBeInstanceOf(ApiKeyError);
   });
 
   it("caches successful lookups so a second request skips the database", async () => {
     let reads = 0;
+
     const db = stubDb(async () => {
       reads++;
+
       return [{ id: "project-2" }];
     });
 

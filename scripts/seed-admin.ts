@@ -31,6 +31,7 @@ async function seedAdmin() {
 
   try {
     const auth = createAuth(db);
+
     try {
       const result = await auth.api.signUpEmail({
         body: {
@@ -42,6 +43,7 @@ async function seedAdmin() {
       });
 
       const resultError = (result as { error?: { message: string } }).error;
+
       if (resultError) {
         throw new Error(`Failed to create admin user: ${resultError.message}`);
       }
@@ -51,6 +53,7 @@ async function seedAdmin() {
       console.log("  You can now sign in with the admin credentials");
     } catch (e) {
       const msg = e instanceof Error ? e.message.toLowerCase() : "";
+
       // Treat "user already exists" as success so the seed is idempotent across
       // container restarts. Covers DB unique-constraint errors (23505) and
       // better-auth's username plugin error ("Username is already taken",

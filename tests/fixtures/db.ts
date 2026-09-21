@@ -4,12 +4,15 @@ import * as schema from "../../src/lib/server/db/schema";
 import { hashApiKey } from "../../src/lib/server/utils/api-key";
 
 export type ProjectInsert = typeof schema.project.$inferInsert;
+
 export type ProjectSelect = typeof schema.project.$inferSelect;
 
 export type UserInsert = typeof schema.user.$inferInsert;
+
 export type UserSelect = typeof schema.user.$inferSelect;
 
 export type LogInsert = typeof schema.log.$inferInsert;
+
 export type LogSelect = typeof schema.log.$inferSelect;
 
 export function generateApiKey(): string {
@@ -22,9 +25,11 @@ export async function getOrCreateDefaultUser(
   db: PgliteDatabase<typeof schema>,
 ): Promise<UserSelect> {
   const cached = defaultUserCache.get(db);
+
   if (cached) return cached;
 
   const userId = nanoid();
+
   const [user] = await db
     .insert(schema.user)
     .values({
@@ -38,6 +43,7 @@ export async function getOrCreateDefaultUser(
   if (!user) throw new Error("Failed to create test user");
 
   defaultUserCache.set(db, user);
+
   return user;
 }
 
@@ -45,6 +51,7 @@ export function createProjectFactory(
   overrides: Partial<ProjectInsert> & { ownerId: string },
 ): ProjectInsert {
   const apiKeyHash = overrides.apiKeyHash ?? hashApiKey(generateApiKey());
+
   return {
     id: nanoid(),
     name: `test-project-${nanoid(8)}`,
@@ -91,7 +98,9 @@ export async function seedProject(
 
   const project = createProjectFactory({ ...overrides, ownerId });
   const [result] = await db.insert(schema.project).values(project).returning();
+
   if (!result) throw new Error("Failed to create test project");
+
   return result;
 }
 
@@ -102,6 +111,7 @@ export async function seedProjectWithApiKey(
   const apiKey = generateApiKey();
   const apiKeyHash = hashApiKey(apiKey);
   const result = await seedProject(db, { ...overrides, apiKeyHash });
+
   return { ...result, apiKey };
 }
 
@@ -125,7 +135,9 @@ export async function seedLog(
 ): Promise<LogSelect> {
   const log = createLogFactory({ projectId, ...overrides });
   const [result] = await db.insert(schema.log).values(log).returning();
+
   if (!result) throw new Error("Failed to create test log");
+
   return result;
 }
 

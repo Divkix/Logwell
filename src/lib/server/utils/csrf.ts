@@ -19,6 +19,7 @@ function headerHost(value: string): string | null {
 
 export function checkCsrfOrigin(event: RequestEvent): Response | null {
   const method = event.request.method;
+
   if (method === "GET" || method === "HEAD" || method === "OPTIONS") {
     return null;
   }
@@ -43,6 +44,7 @@ export function checkCsrfOrigin(event: RequestEvent): Response | null {
 
   const sameOrigin = (value: string) =>
     expectedOrigin === null ? headerHost(value) === expectedHost : value === expectedOrigin;
+
   const sameSite = (value: string) =>
     expectedOrigin === null
       ? headerHost(value) === expectedHost

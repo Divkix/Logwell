@@ -21,6 +21,7 @@ async function login(page: Page) {
 async function createProject(page: Page, name: string) {
   const response = await page.request.post("/api/projects", { data: { name } });
   expect(response.ok()).toBeTruthy();
+
   return response.json();
 }
 
@@ -62,9 +63,11 @@ test.describe("Incidents Page", () => {
 
     await page.goto(`/projects/${project.id}/incidents`);
     await expect(page.locator('[data-testid="incident-table"]')).toBeVisible();
+
     const visibleIncidentItems = page.locator(
       '[data-testid="incident-row"]:visible, [data-testid="incident-card"]:visible',
     );
+
     await expect(visibleIncidentItems).toHaveCount(1);
 
     const rowOrCard = visibleIncidentItems.first();

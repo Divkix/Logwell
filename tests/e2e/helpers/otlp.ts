@@ -12,14 +12,19 @@ const SEVERITY_NUMBER_BY_LEVEL: Record<LogLevel, number> = {
 
 function toOtlpAnyValue(value: unknown) {
   if (typeof value === "string") return { stringValue: value };
+
   if (typeof value === "boolean") return { boolValue: value };
+
   if (typeof value === "number") return { doubleValue: value };
+
   if (value === null || value === undefined) return { stringValue: "null" };
+
   return { stringValue: JSON.stringify(value) };
 }
 
 function toOtlpAttributes(record?: Record<string, unknown>) {
   if (!record) return undefined;
+
   return Object.entries(record).map(([key, value]) => ({
     key,
     value: toOtlpAnyValue(value),
@@ -53,6 +58,7 @@ export async function ingestOtlpLogs(
 ): Promise<void> {
   for (let i = 0; i < logs.length; i += MAX_BATCH_SIZE) {
     const batch = logs.slice(i, i + MAX_BATCH_SIZE);
+
     const logRecords = batch.map((log) => ({
       severityNumber: SEVERITY_NUMBER_BY_LEVEL[log.level],
       severityText: log.level.toUpperCase(),

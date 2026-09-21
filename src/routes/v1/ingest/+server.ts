@@ -17,5 +17,6 @@ import { parseSimpleIngestBody } from "$lib/server/utils/simple-ingest";
  */
 export const POST: RequestHandler = async ({ request, locals }) => {
   const db = await getDbClient(locals);
+
   return ingestLogs(request, db, parseSimpleIngestBody);
 };

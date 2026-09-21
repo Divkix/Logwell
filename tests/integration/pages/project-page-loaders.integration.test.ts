@@ -14,14 +14,18 @@ import { seedLog, seedProject } from "../../fixtures/db";
 type LoadFn = (event: never) => Promise<any>;
 
 const loadDashboard = (await import("../../../src/routes/(app)/+page.server")).load as LoadFn;
+
 const loadProjectLogs = (await import("../../../src/routes/(app)/projects/[id]/+page.server"))
   .load as LoadFn;
+
 const loadProjectSettings = (
   await import("../../../src/routes/(app)/projects/[id]/settings/+page.server")
 ).load as LoadFn;
+
 const loadProjectStats = (
   await import("../../../src/routes/(app)/projects/[id]/stats/+page.server")
 ).load as LoadFn;
+
 const loadProjectIncidents = (
   await import("../../../src/routes/(app)/projects/[id]/incidents/+page.server")
 ).load as LoadFn;
@@ -73,6 +77,7 @@ async function createAuthenticatedLocals(
     }).headers,
     db,
   );
+
   if (!sessionData) throw new Error("Session data must not be null");
 
   return {
@@ -152,6 +157,7 @@ describe("(app) page loaders — injected PGlite DB seam", () => {
         owner.locals,
         `http://localhost:5173/projects/${proj.id}?range=30d`,
       );
+
       const data = await loadProjectLogs(event as never);
 
       expect(data.filters.range).toBe("1h");
@@ -198,6 +204,7 @@ describe("(app) page loaders — injected PGlite DB seam", () => {
         owner.locals,
         `http://localhost:5173/projects/${proj.id}/stats?range=30d`,
       );
+
       const data = await loadProjectStats(event as never);
 
       expect(data.filters.range).toBe("24h");
@@ -232,6 +239,7 @@ describe("(app) page loaders — injected PGlite DB seam", () => {
       // holds 20, so the next cursor points into a millisecond that still has rows after it.
       const baseEpoch = Math.floor(Date.now() / 1000) + 0.123456;
       const seededIds: string[] = [];
+
       for (let i = 0; i < 25; i++) {
         const id = `inc-page-same-ms-${i}`;
         seededIds.push(id);
@@ -244,11 +252,13 @@ describe("(app) page loaders — injected PGlite DB seam", () => {
 
       const collectedIds: string[] = [];
       let cursor: string | null = null;
+
       for (let page = 0; page < 10; page++) {
         // limit=20 keeps the page below the 25 seeded rows (the loader defaults to 50).
         const url = cursor
           ? `http://localhost:5173/projects/${proj.id}/incidents?limit=20&cursor=${encodeURIComponent(cursor)}`
           : `http://localhost:5173/projects/${proj.id}/incidents?limit=20`;
+
         const data = await loadProjectIncidents(
           createLoadEvent(db, { id: proj.id }, owner.locals, url) as never,
         );
@@ -261,6 +271,7 @@ describe("(app) page loaders — injected PGlite DB seam", () => {
 
       expect(collectedIds).toHaveLength(25);
       expect(new Set(collectedIds).size).toBe(25);
+
       for (const id of seededIds) {
         expect(collectedIds.filter((c) => c === id)).toHaveLength(1);
       }

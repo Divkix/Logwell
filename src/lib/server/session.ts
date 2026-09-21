@@ -12,9 +12,11 @@ import type { DatabaseClient } from "./db/db";
 
 function getSessionToken(headers: Headers): string | null {
   const cookie = headers.get("cookie");
+
   if (!cookie) return null;
 
   const cookies = cookie.split(";").map((c) => c.trim());
+
   for (const cookie of cookies) {
     if (cookie.startsWith("better-auth.session_token=")) {
       return cookie.substring("better-auth.session_token=".length);
@@ -31,6 +33,7 @@ export async function getSession(
   const db = database || (await import("$lib/server/db")).db;
 
   const token = getSessionToken(headers);
+
   if (!token) return null;
 
   const result = await db
@@ -46,6 +49,7 @@ export async function getSession(
   if (result.length === 0) return null;
 
   const resultRow = result[0];
+
   if (!resultRow) return null;
   const { session, user } = resultRow;
 

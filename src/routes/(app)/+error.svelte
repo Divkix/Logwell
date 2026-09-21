@@ -6,7 +6,9 @@ import { page } from '$app/state';
 import { Button } from '$lib/components/ui/button/index.js';
 
 const errorCode = $derived(page.status);
+
 const errorMessage = $derived(page.error?.message || 'An unexpected error occurred');
+
 const errorId = $derived((page.error as { id?: string })?.id);
 
 function reload() {

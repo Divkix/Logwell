@@ -54,6 +54,7 @@ async function expectHttpError(
   } catch (error) {
     const httpError = error as HttpError;
     expect(httpError.status).toBe(expectedStatus);
+
     if (expectedBody) {
       expect(httpError.body).toEqual(expectedBody);
     }
@@ -89,6 +90,7 @@ describe("GET /api/projects/[id]/logs", () => {
     });
 
     const sessionData = await getSession(mockRequest.headers, db);
+
     if (!sessionData) throw new Error("Session data should not be null");
     userId = sessionData.user.id;
 
@@ -105,6 +107,7 @@ describe("GET /api/projects/[id]/logs", () => {
   describe("Authentication", () => {
     it("returns 401 for unauthenticated request", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
+
       const request = new Request(`http://localhost/api/projects/${testProject.id}/logs`, {
         method: "GET",
       });
@@ -119,14 +122,17 @@ describe("GET /api/projects/[id]/logs", () => {
       const testProject = await seedProject(db, { ownerId: userId });
 
       const now = new Date();
+
       const log1 = await seedLog(db, testProject.id, {
         message: "First log",
         timestamp: new Date(now.getTime() - 3000), // oldest
       });
+
       const log2 = await seedLog(db, testProject.id, {
         message: "Second log",
         timestamp: new Date(now.getTime() - 2000),
       });
+
       const log3 = await seedLog(db, testProject.id, {
         message: "Third log",
         timestamp: new Date(now.getTime() - 1000), // newest
@@ -227,11 +233,13 @@ describe("GET /api/projects/[id]/logs", () => {
 
       const now = new Date();
       const logs = [];
+
       for (let i = 0; i < 5; i++) {
         const log = await seedLog(db, testProject.id, {
           message: `Log ${i}`,
           timestamp: new Date(now.getTime() - (5 - i) * 1000),
         });
+
         logs.push(log);
       }
 
@@ -307,12 +315,14 @@ describe("GET /api/projects/[id]/logs", () => {
         message: "Old log",
         timestamp: new Date(now.getTime() - 3600000), // 1 hour ago
       });
+
       const recentLog = await seedLog(db, testProject.id, {
         message: "Recent log",
         timestamp: new Date(now.getTime() - 60000), // 1 minute ago
       });
 
       const fromTime = new Date(now.getTime() - 1800000).toISOString();
+
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/logs?from=${fromTime}`,
         { method: "GET" },
@@ -332,16 +342,19 @@ describe("GET /api/projects/[id]/logs", () => {
       const testProject = await seedProject(db, { ownerId: userId });
 
       const now = new Date();
+
       const oldLog = await seedLog(db, testProject.id, {
         message: "Old log",
         timestamp: new Date(now.getTime() - 3600000), // 1 hour ago
       });
+
       await seedLog(db, testProject.id, {
         message: "Recent log",
         timestamp: new Date(now.getTime() - 60000), // 1 minute ago
       });
 
       const toTime = new Date(now.getTime() - 1800000).toISOString();
+
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/logs?to=${toTime}`,
         { method: "GET" },
@@ -365,10 +378,12 @@ describe("GET /api/projects/[id]/logs", () => {
         message: "Very old log",
         timestamp: new Date(now.getTime() - 7200000), // 2 hours ago
       });
+
       const middleLog = await seedLog(db, testProject.id, {
         message: "Middle log",
         timestamp: new Date(now.getTime() - 3600000), // 1 hour ago
       });
+
       await seedLog(db, testProject.id, {
         message: "Recent log",
         timestamp: new Date(now.getTime() - 60000), // 1 minute ago
@@ -376,6 +391,7 @@ describe("GET /api/projects/[id]/logs", () => {
 
       const fromTime = new Date(now.getTime() - 5400000).toISOString();
       const toTime = new Date(now.getTime() - 1800000).toISOString();
+
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/logs?from=${fromTime}&to=${toTime}`,
         { method: "GET" },
@@ -664,6 +680,7 @@ describe("GET /api/projects/[id]/logs", () => {
         `http://localhost/api/projects/${testProject.id}/logs?limit=100`,
         { method: "GET" },
       );
+
       const event1 = createRequestEvent(request1, db, { id: testProject.id }, authenticatedLocals);
       const response1 = await GET(event1 as never);
       const body1 = await response1.json();
@@ -676,6 +693,7 @@ describe("GET /api/projects/[id]/logs", () => {
         `http://localhost/api/projects/${testProject.id}/logs?limit=100&cursor=${body1.nextCursor}`,
         { method: "GET" },
       );
+
       const event2 = createRequestEvent(request2, db, { id: testProject.id }, authenticatedLocals);
       const response2 = await GET(event2 as never);
       const body2 = await response2.json();
@@ -692,6 +710,7 @@ describe("GET /api/projects/[id]/logs", () => {
 
       const baseEpoch = 1767225600.123456; // 2026-01-01T00:00:00.123456Z
       const seededIds: string[] = [];
+
       for (let i = 0; i < 25; i++) {
         const id = nanoid();
         seededIds.push(id);
@@ -703,10 +722,12 @@ describe("GET /api/projects/[id]/logs", () => {
 
       const collectedIds: string[] = [];
       let cursor: string | null = null;
+
       for (let page = 0; page < 10; page++) {
         const url = cursor
           ? `http://localhost/api/projects/${testProject.id}/logs?limit=10&cursor=${encodeURIComponent(cursor)}`
           : `http://localhost/api/projects/${testProject.id}/logs?limit=10`;
+
         const request = new Request(url, { method: "GET" });
         const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
         const response = await GET(event as never);
@@ -735,6 +756,7 @@ describe("GET /api/projects/[id]/logs", () => {
       const first = new Request(`http://localhost/api/projects/${testProject.id}/logs?limit=1`, {
         method: "GET",
       });
+
       const firstEvent = createRequestEvent(first, db, { id: testProject.id }, authenticatedLocals);
       const firstResponse = await GET(firstEvent as never);
       expect(firstResponse.status).toBe(200);
@@ -748,12 +770,14 @@ describe("GET /api/projects/[id]/logs", () => {
         `http://localhost/api/projects/${testProject.id}/logs?limit=1&cursor=${firstBody.nextCursor}`,
         { method: "GET" },
       );
+
       const secondEvent = createRequestEvent(
         second,
         db,
         { id: testProject.id },
         authenticatedLocals,
       );
+
       const secondResponse = await GET(secondEvent as never);
 
       expect(secondResponse.status).toBe(200);
@@ -786,6 +810,7 @@ describe("GET /api/projects/[id]/logs", () => {
         `http://localhost/api/projects/${testProject.id}/logs?cursor=invalid-cursor-123`,
         { method: "GET" },
       );
+
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
       const response = await GET(event as never);
 
@@ -802,6 +827,7 @@ describe("GET /api/projects/[id]/logs", () => {
         `http://localhost/api/projects/${testProject.id}/logs?level=error&limit=2`,
         { method: "GET" },
       );
+
       const firstEvent = createRequestEvent(first, db, { id: testProject.id }, authenticatedLocals);
       const firstBody = await (await GET(firstEvent as never)).json();
       expect(firstBody.logs).toHaveLength(2);
@@ -811,12 +837,14 @@ describe("GET /api/projects/[id]/logs", () => {
         `http://localhost/api/projects/${testProject.id}/logs?level=error&limit=2&cursor=${firstBody.nextCursor}`,
         { method: "GET" },
       );
+
       const secondEvent = createRequestEvent(
         second,
         db,
         { id: testProject.id },
         authenticatedLocals,
       );
+
       const secondBody = await (await GET(secondEvent as never)).json();
       expect(secondBody.logs).toHaveLength(1);
       expect(secondBody.logs.every((l: { level: string }) => l.level === "error")).toBe(true);
@@ -829,6 +857,7 @@ describe("GET /api/projects/[id]/logs", () => {
       const request = new Request(`http://localhost/api/projects/${testProject.id}/logs?cursor=`, {
         method: "GET",
       });
+
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
       const response = await GET(event as never);
 

@@ -30,10 +30,12 @@ export function createAuth(database: DatabaseClient) {
 }
 
 let _auth: ReturnType<typeof createAuth> | undefined;
+
 let _initPromise: Promise<void> | undefined;
 
 async function initAuth(): Promise<void> {
   if (_auth) return;
+
   if (_initPromise) return _initPromise;
 
   _initPromise = (async () => {
@@ -49,6 +51,7 @@ export const auth = new Proxy({} as ReturnType<typeof createAuth>, {
     if (!_auth) {
       throw new Error("Auth not initialized. Call initAuth() before accessing auth properties.");
     }
+
     return _auth[prop as keyof typeof _auth];
   },
 });
@@ -56,4 +59,5 @@ export const auth = new Proxy({} as ReturnType<typeof createAuth>, {
 export { initAuth };
 
 export type Session = ReturnType<typeof createAuth>["$Infer"]["Session"]["session"];
+
 export type User = ReturnType<typeof createAuth>["$Infer"]["Session"]["user"];

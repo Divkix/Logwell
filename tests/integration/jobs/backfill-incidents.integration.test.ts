@@ -12,7 +12,9 @@ import { createLogFactory, seedLog, seedProject } from "../../fixtures/db";
 // LOG_BATCH_SIZE in incident-backfill.ts is 1000, so this many logs force the keyset pager
 // through a second batch: assignment and counters must still cover the whole window.
 const LOG_COUNT = 1200;
+
 const HALF = LOG_COUNT / 2;
+
 const MINUTE = 60_000;
 
 describe("backfillProjectIncidents batching", () => {
@@ -42,6 +44,7 @@ describe("backfillProjectIncidents batching", () => {
         timestamp: new Date(base.getTime() + index * MINUTE),
       }),
     );
+
     await db.insert(log).values(logs);
 
     const result = await backfillProjectIncidents(db, project.id, since);
@@ -59,6 +62,7 @@ describe("backfillProjectIncidents batching", () => {
 
     // "Error A" owns the even indexes (0..LOG_COUNT-2), "Error B" the odd ones.
     const incidentByFirstSeen = new Map(incidents.map((row) => [row.firstSeen.getTime(), row]));
+
     const expected = [
       { firstSeen: base.getTime(), lastSeen: base.getTime() + (LOG_COUNT - 2) * MINUTE },
       { firstSeen: base.getTime() + MINUTE, lastSeen: base.getTime() + (LOG_COUNT - 1) * MINUTE },

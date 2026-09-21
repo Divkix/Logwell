@@ -6,16 +6,20 @@ import { backfillProjectIncidents } from "../src/lib/server/utils/incident-backf
 
 function parseDaysArg(defaultDays: number): number {
   const arg = process.argv.find((value) => value.startsWith("--days="));
+
   if (!arg) return defaultDays;
   const raw = Number.parseInt(arg.split("=")[1] || "", 10);
+
   if (!Number.isFinite(raw) || raw <= 0) {
     throw new Error("Invalid --days argument. Expected a positive integer.");
   }
+
   return raw;
 }
 
 async function runBackfill() {
   const DATABASE_URL = process.env.DATABASE_URL;
+
   if (!DATABASE_URL) {
     throw new Error("DATABASE_URL environment variable is required");
   }
@@ -33,6 +37,7 @@ async function runBackfill() {
 
     if (projects.length === 0) {
       console.log("No projects found. Nothing to backfill.");
+
       return;
     }
 

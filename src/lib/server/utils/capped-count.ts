@@ -19,5 +19,6 @@ export async function cappedLogCount(
 
   const [row] = await db.select({ c: count() }).from(cappedSubquery);
   const total = row?.c ?? 0;
+
   return { total, capped: total >= ceiling };
 }

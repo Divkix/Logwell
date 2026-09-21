@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } fr
 
 function createMockSSEResponse(events: Array<{ event: string; data: string }>): Response {
   let eventIndex = 0;
+
   const stream = new ReadableStream<Uint8Array>({
     pull(controller) {
       if (eventIndex < events.length) {
@@ -18,6 +19,7 @@ function createMockSSEResponse(events: Array<{ event: string; data: string }>): 
       }
     },
   });
+
   return new Response(stream, { status: 200 });
 }
 

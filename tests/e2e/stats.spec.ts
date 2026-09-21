@@ -22,12 +22,15 @@ async function createProject(page: Page, name: string) {
   const response = await page.request.post("/api/projects", {
     data: { name },
   });
+
   expect(response.ok()).toBeTruthy();
+
   return response.json();
 }
 
 async function deleteProject(page: Page, projectId: string) {
   const response = await page.request.delete(`/api/projects/${projectId}`);
+
   return response.ok();
 }
 

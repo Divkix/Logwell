@@ -34,7 +34,9 @@ function handleKeyDown(event: KeyboardEvent) {
 }
 
 const navigationShortcuts = $derived(SHORTCUTS.filter((s) => s.group === 'navigation'));
+
 const searchShortcuts = $derived(SHORTCUTS.filter((s) => s.group === 'search'));
+
 const otherShortcuts = $derived(SHORTCUTS.filter((s) => s.group === 'other'));
 </script>
 

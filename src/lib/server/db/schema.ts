@@ -34,6 +34,7 @@ export const project = pgTable(
 );
 
 export type Project = typeof project.$inferSelect;
+
 export type NewProject = typeof project.$inferInsert;
 
 const tsvector = customType<{ data: string }>({
@@ -73,6 +74,7 @@ export const incident = pgTable(
 );
 
 export type Incident = typeof incident.$inferSelect;
+
 export type NewIncident = typeof incident.$inferInsert;
 
 export const log = pgTable(
@@ -143,7 +145,9 @@ export const log = pgTable(
 );
 
 export type Log = typeof log.$inferSelect;
+
 export type NewLog = typeof log.$inferInsert;
+
 export type LogLevel = "debug" | "info" | "warn" | "error" | "fatal";
 
 export const user = pgTable("user", {
@@ -162,6 +166,7 @@ export const user = pgTable("user", {
 });
 
 export type User = typeof user.$inferSelect;
+
 export type NewUser = typeof user.$inferInsert;
 
 export const session = pgTable(
@@ -185,6 +190,7 @@ export const session = pgTable(
 );
 
 export type Session = typeof session.$inferSelect;
+
 export type NewSession = typeof session.$inferInsert;
 
 export const account = pgTable(
@@ -219,6 +225,7 @@ export const account = pgTable(
 );
 
 export type Account = typeof account.$inferSelect;
+
 export type NewAccount = typeof account.$inferInsert;
 
 export const verification = pgTable(
@@ -238,4 +245,5 @@ export const verification = pgTable(
 );
 
 export type Verification = typeof verification.$inferSelect;
+
 export type NewVerification = typeof verification.$inferInsert;

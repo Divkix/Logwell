@@ -6,7 +6,9 @@ import { parseLevelFilter } from "$lib/shared/schemas/log";
 import type { RequestEvent } from "./$types";
 
 const DEFAULT_LIMIT = 100;
+
 const MIN_LIMIT = 1;
+
 const MAX_LIMIT = 500;
 
 function clamp(value: number, min: number, max: number): number {
@@ -43,6 +45,7 @@ function clamp(value: number, min: number, max: number): number {
  */
 export async function GET(event: RequestEvent): Promise<Response> {
   const authResult = await requireOwnedProjectRoute(event, event.params.id);
+
   if (authResult instanceof Response) return authResult;
 
   const { db } = authResult;
@@ -71,6 +74,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
   const toDate = toParam ? new Date(toParam) : null;
 
   let result: Awaited<ReturnType<typeof queryLogs>>;
+
   try {
     result = await queryLogs(db, {
       projectId,
@@ -86,6 +90,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
     if (error instanceof InvalidCursorError) {
       return apiError(400, "invalid_cursor", error.message);
     }
+
     throw error;
   }
 

@@ -3,6 +3,7 @@ import type { checkCsrfOrigin as CheckCsrfOrigin } from "$lib/server/utils/csrf"
 
 function makeEvent(method: string, url: string, headers: Record<string, string> = {}) {
   const request = new Request(url, { method, headers });
+
   return {
     request,
     url: new URL(url),
@@ -17,12 +18,14 @@ async function loadCsrf(origin: string | undefined): Promise<typeof CheckCsrfOri
   vi.stubEnv("ORIGIN", origin);
   vi.resetModules();
   const { checkCsrfOrigin } = await import("$lib/server/utils/csrf");
+
   return checkCsrfOrigin;
 }
 
 // What the bun adapter synthesizes for a plain-HTTP request to localhost:3000 with
 // ORIGIN unset: event.url is https://<Host> even though the browser speaks http.
 const ADAPTER_URL = "https://localhost:3000/api/projects";
+
 const ADAPTER_HOST = { Host: "localhost:3000" };
 
 describe("checkCsrfOrigin with ORIGIN unset (request-Host fallback)", () => {
@@ -62,6 +65,7 @@ describe("checkCsrfOrigin with ORIGIN unset (request-Host fallback)", () => {
 
   it.each(cases)("%s %j is %s", async (method, headers, allowed) => {
     const result = checkCsrfOrigin(makeEvent(method, ADAPTER_URL, headers));
+
     if (allowed) {
       expect(result).toBeNull();
     } else {
@@ -108,6 +112,7 @@ describe("checkCsrfOrigin with ORIGIN set (exact origin)", () => {
 
   it.each(cases)("%s %j is %s", async (method, headers, allowed) => {
     const result = checkCsrfOrigin(makeEvent(method, URL, headers));
+
     if (allowed) {
       expect(result).toBeNull();
     } else {

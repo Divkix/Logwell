@@ -7,11 +7,15 @@ import { Card, CardContent, CardDescription, CardHeader } from '$lib/components/
 import { Input } from '$lib/components/ui/input';
 
 let username = $state('');
+
 let password = $state('');
+
 let error = $state('');
+
 let isLoading = $state(false);
 
 let usernameError = $state('');
+
 let passwordError = $state('');
 
 let passwordInput: HTMLInputElement | null = $state(null);
@@ -70,6 +74,7 @@ async function handleSubmit(event: Event) {
 
     if (signInError) {
       error = signInError.message || 'Invalid credentials';
+
       return;
     }
 

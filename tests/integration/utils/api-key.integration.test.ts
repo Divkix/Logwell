@@ -59,6 +59,7 @@ describe("API Key Validation with Database", () => {
 
   it("validateApiKey throws 401 for malformed Authorization header (not Bearer)", async () => {
     const apiKey = generateApiKey();
+
     const request = new Request("http://localhost", {
       headers: {
         Authorization: `Basic ${apiKey}`,
@@ -72,6 +73,7 @@ describe("API Key Validation with Database", () => {
 
   it("validateApiKey throws 401 for invalid format", async () => {
     const invalidKey = "invalid_key_format";
+
     const request = new Request("http://localhost", {
       headers: {
         Authorization: `Bearer ${invalidKey}`,
@@ -83,6 +85,7 @@ describe("API Key Validation with Database", () => {
 
   it("validateApiKey throws 401 for non-existent key", async () => {
     const nonExistentKey = generateApiKey();
+
     const request = new Request("http://localhost", {
       headers: {
         Authorization: `Bearer ${nonExistentKey}`,
@@ -249,6 +252,7 @@ describe("API Key Validation with Database", () => {
     const request1 = new Request("http://localhost", {
       headers: { Authorization: `Bearer ${apiKey1}` },
     });
+
     const request2 = new Request("http://localhost", {
       headers: { Authorization: `Bearer ${apiKey2}` },
     });

@@ -23,7 +23,9 @@ interface Props {
 const { project }: Props = $props();
 
 const formattedLogCount = $derived(project.logCount.toLocaleString('en-US'));
+
 const logLabel = $derived(project.logCount === 1 ? 'log' : 'logs');
+
 const lastActivityText = $derived(
   project.lastActivity ? `Last log: ${formatRelativeTime(project.lastActivity)}` : 'No logs yet',
 );

@@ -80,6 +80,7 @@ export async function backfillProjectIncidents(
       .limit(LOG_BATCH_SIZE);
 
     const last = batch.at(-1);
+
     if (!last) break;
 
     cursor = { micros: last.micros, id: last.id };
@@ -87,6 +88,7 @@ export async function backfillProjectIncidents(
 
     const result = await backfillBatch(db, projectId, batch);
     updatedLogs += result.updatedLogs;
+
     for (const id of result.touchedIncidentIds) {
       touchedIncidentIds.add(id);
     }
@@ -124,6 +126,7 @@ async function backfillBatch(
 
     const aggregates = groupPreparedLogsByFingerprint(prepared);
     const fingerprints = aggregates.map((entry) => entry.fingerprint);
+
     const existingIncidents =
       fingerprints.length > 0
         ? await tx
@@ -137,6 +140,7 @@ async function backfillBatch(
     const incidentByFingerprint = new Map<string, Incident>(
       existingIncidents.map((entry) => [entry.fingerprint, entry]),
     );
+
     const touchedIncidents: Incident[] = [...existingIncidents];
 
     const missing = aggregates.filter(
@@ -145,6 +149,7 @@ async function backfillBatch(
 
     if (missing.length > 0) {
       const now = new Date();
+
       const created = await tx
         .insert(incident)
         .values(
@@ -184,6 +189,7 @@ async function backfillBatch(
     const assigned = assignIncidentIds(prepared, incidentByFingerprint);
 
     const updates: SQL[] = [];
+
     for (let i = 0; i < logs.length; i++) {
       const original = logs[i]!;
       const enriched = assigned[i]!;
@@ -219,6 +225,7 @@ async function backfillBatch(
     const touchedIncidentIds = [...touchedIncidents]
       .sort((a, b) => (a.fingerprint < b.fingerprint ? -1 : a.fingerprint > b.fingerprint ? 1 : 0))
       .map((entry) => entry.id);
+
     for (const incidentId of touchedIncidentIds) {
       const [stats] = await tx
         .select({

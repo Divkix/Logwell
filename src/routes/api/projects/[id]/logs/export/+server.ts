@@ -30,6 +30,7 @@ function validateFormat(formatParam: string | null): ExportFormat | null {
   if (!formatParam) return "json";
 
   const format = formatParam.toLowerCase();
+
   if (format === "csv" || format === "json") {
     return format as ExportFormat;
   }
@@ -40,6 +41,7 @@ function validateFormat(formatParam: string | null): ExportFormat | null {
 function generateFilename(projectName: string, format: ExportFormat): string {
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-").split("T")[0];
   const sanitizedName = projectName.replace(/[^a-zA-Z0-9-_]/g, "-");
+
   return `logs-${sanitizedName}-${timestamp}.${format}`;
 }
 
@@ -68,6 +70,7 @@ function generateFilename(projectName: string, format: ExportFormat): string {
  */
 export async function GET(event: RequestEvent): Promise<Response> {
   const authResult = await requireOwnedProjectRoute(event, event.params.id);
+
   if (authResult instanceof Response) return authResult;
 
   const { project: projectData, db } = authResult;
@@ -81,6 +84,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
   const toParam = url.searchParams.get("to");
 
   const format = validateFormat(formatParam);
+
   if (!format) {
     return apiError(400, "invalid_format", 'Invalid format parameter. Must be "csv" or "json".');
   }
@@ -99,12 +103,14 @@ export async function GET(event: RequestEvent): Promise<Response> {
   if (fromDate && !Number.isNaN(fromDate.getTime())) {
     conditions.push(gte(log.timestamp, fromDate));
   }
+
   if (toDate && !Number.isNaN(toDate.getTime())) {
     conditions.push(lte(log.timestamp, toDate));
   }
 
   if (searchParam?.trim()) {
     const tsquery = buildSearchQuery(searchParam);
+
     if (tsquery) {
       conditions.push(sql`${log.search} @@ to_tsquery('english', ${tsquery})`);
     }
@@ -162,10 +168,12 @@ export async function GET(event: RequestEvent): Promise<Response> {
                 l.userId,
                 l.ipAddress,
               ];
+
               ctrl.enqueue(encoder.encode(`${values.map(escapeCSVField).join(",")}\n`));
             }
 
             fetched += page.logs.length;
+
             if (!page.hasMore || !page.nextCursor) break;
             cursor = page.nextCursor;
           }
@@ -221,11 +229,13 @@ export async function GET(event: RequestEvent): Promise<Response> {
               userId: l.userId,
               ipAddress: l.ipAddress,
             };
+
             ctrl.enqueue(encoder.encode(`${first ? "" : ","}${JSON.stringify(exportable)}`));
             first = false;
           }
 
           fetched += page.logs.length;
+
           if (!page.hasMore || !page.nextCursor) break;
           cursor = page.nextCursor;
         }

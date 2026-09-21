@@ -21,19 +21,24 @@ async function createProject(page: Page, name: string) {
   const response = await page.request.post("/api/projects", {
     data: { name },
   });
+
   expect(response.ok()).toBeTruthy();
+
   return response.json();
 }
 
 async function deleteProject(page: Page, projectId: string) {
   const response = await page.request.delete(`/api/projects/${projectId}`);
+
   return response.ok();
 }
 
 async function cleanupProjects(page: Page) {
   const response = await page.request.get("/api/projects");
+
   if (response.ok()) {
     const { projects } = await response.json();
+
     for (const project of projects) {
       await deleteProject(page, project.id);
     }

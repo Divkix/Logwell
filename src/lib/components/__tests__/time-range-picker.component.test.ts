@@ -99,6 +99,7 @@ describe("TimeRangePicker", () => {
     render(TimeRangePicker, { props: { disabled: true } });
 
     const buttons = screen.getAllByRole("button");
+
     for (const button of buttons) {
       expect(button).toBeDisabled();
     }

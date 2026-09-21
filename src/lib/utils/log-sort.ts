@@ -17,6 +17,7 @@ export function sortLogs(logs: Log[], field: SortField | null, direction: SortDi
 
   return [...logs].sort((a, b) => {
     let comparison = 0;
+
     if (field === "timestamp") {
       comparison = (a.timestamp?.getTime() ?? 0) - (b.timestamp?.getTime() ?? 0);
     } else if (field === "level") {
@@ -24,6 +25,7 @@ export function sortLogs(logs: Log[], field: SortField | null, direction: SortDi
     } else if (field === "message") {
       comparison = a.message.localeCompare(b.message);
     }
+
     return direction === "desc" ? -comparison : comparison;
   });
 }

@@ -20,7 +20,9 @@ function createRequestEvent(request: Request, db: PgliteDatabase<typeof schema>)
 
 function post(body: unknown, apiKey?: string) {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
+
   if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+
   return new Request("http://localhost/v1/logs", {
     method: "POST",
     headers,

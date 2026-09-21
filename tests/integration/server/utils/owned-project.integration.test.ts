@@ -38,6 +38,7 @@ async function expectHttpError(
   } catch (error) {
     const httpError = error as HttpError;
     expect(httpError.status).toBe(expectedStatus);
+
     if (expectedBody) {
       expect(httpError.body).toEqual(expectedBody);
     }
@@ -73,11 +74,15 @@ describe("Auth Guard - requireAuth", () => {
     const signUpResult = await auth.api.signUpEmail({
       body: { email, password: "SecureP@ssw0rd123", name: "Owned Test" },
     });
+
     const sessionRequest = new Request("http://localhost:5173", {
       headers: { cookie: `better-auth.session_token=${signUpResult.token}` },
     });
+
     const sessionData = await getSession(sessionRequest.headers, db);
+
     if (!sessionData) throw new Error("Session data should not be null");
+
     return sessionData;
   }
 
@@ -150,6 +155,7 @@ describe("Auth Guard - requireAuth", () => {
 
     const sessionData = await getSession(mockRequest.headers, db);
     expect(sessionData).not.toBeNull();
+
     if (!sessionData) throw new Error("Session data should not be null");
 
     const event = mockEvent(mockRequest, {
@@ -184,6 +190,7 @@ describe("Auth Guard - requireAuth", () => {
 
     const sessionData = await getSession(mockRequest.headers, db);
     expect(sessionData).not.toBeNull();
+
     if (!sessionData) throw new Error("Session data should not be null");
 
     const event = mockEvent(mockRequest, {
@@ -207,13 +214,16 @@ describe("Auth Guard - requireAuth", () => {
 
     it("rejects a CSRF-less POST before the ownership lookup", async () => {
       const { user, session } = await signIn();
+
       const request = new Request("http://localhost/api/projects/does-not-exist/regenerate", {
         method: "POST",
       });
+
       const result = await requireOwnedProjectRoute(
         routeEvent(request, { user, session }),
         "does-not-exist",
       );
+
       expect(result).toBeInstanceOf(Response);
       expect((result as Response).status).toBe(403);
     });
@@ -221,10 +231,12 @@ describe("Auth Guard - requireAuth", () => {
     it("returns 404 (not 403) for a project the user does not own", async () => {
       const { user, session } = await signIn();
       const request = new Request("http://localhost/api/projects/does-not-exist");
+
       const result = await requireOwnedProjectRoute(
         routeEvent(request, { user, session }),
         "does-not-exist",
       );
+
       expect(result).toBeInstanceOf(Response);
       expect((result as Response).status).toBe(404);
       expect(await (result as Response).json()).toEqual({
@@ -235,14 +247,17 @@ describe("Auth Guard - requireAuth", () => {
 
     it("still enforces ownership when CSRF passes", async () => {
       const { user, session } = await signIn();
+
       const request = new Request("http://localhost/api/projects/does-not-exist/regenerate", {
         method: "POST",
         headers: { Origin: "http://localhost" },
       });
+
       const result = await requireOwnedProjectRoute(
         routeEvent(request, { user, session }),
         "does-not-exist",
       );
+
       expect(result).toBeInstanceOf(Response);
       expect((result as Response).status).toBe(404);
     });
@@ -251,10 +266,12 @@ describe("Auth Guard - requireAuth", () => {
       const { user, session } = await signIn();
       const seeded = await seedProject(db, { ownerId: user.id, name: "owned-project" });
       const request = new Request(`http://localhost/api/projects/${seeded.id}`);
+
       const result = await requireOwnedProjectRoute(
         routeEvent(request, { user, session }),
         seeded.id,
       );
+
       if (result instanceof Response) throw new Error("Expected owned project, got Response");
       expect(result.project.id).toBe(seeded.id);
       expect(result.project.ownerId).toBe(user.id);
@@ -265,6 +282,7 @@ describe("Auth Guard - requireAuth", () => {
   describe("requireOwnedProjectPage", () => {
     it("throws 404 for a project the user does not own", async () => {
       const { user, session } = await signIn();
+
       const event = mockEvent(
         new Request("http://localhost:5173/projects/does-not-exist"),
         { db, user, session },

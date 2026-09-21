@@ -32,8 +32,10 @@ export function encodeCursor(
   id: string,
 ): string {
   let micros: string;
+
   if (microsOrTimestamp instanceof Date) {
     const time = microsOrTimestamp.getTime();
+
     if (Number.isNaN(time)) throw new Error(MISSING_TIMESTAMP_ERROR);
     micros = String(time * 1000);
   } else if (typeof microsOrTimestamp === "string") {
@@ -85,6 +87,7 @@ export function decodeCursor(cursor: string): DecodedCursor {
     if (error instanceof Error && error.message.startsWith("Invalid cursor")) {
       throw error;
     }
+
     throw new Error("Invalid cursor");
   }
 }

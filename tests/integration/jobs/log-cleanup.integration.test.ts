@@ -237,6 +237,7 @@ describe("cleanupOldLogs batch selection", () => {
     const project1 = await seedProject(db, { retentionDays: 7 });
 
     const now = new Date();
+
     for (const days of [12, 10, 8, 5, 3, 1]) {
       await seedLog(db, project1.id, {
         message: `log-${days}d`,
@@ -258,6 +259,7 @@ describe("cleanupOldLogs batch selection", () => {
     expect(remaining.map((l) => l.message)).toEqual(["log-5d", "log-3d", "log-1d"]);
 
     const cutoff = new Date(now.getTime() - 7 * DAY_MS);
+
     for (const row of remaining) {
       expect(row.timestamp.getTime()).toBeGreaterThanOrEqual(cutoff.getTime());
     }

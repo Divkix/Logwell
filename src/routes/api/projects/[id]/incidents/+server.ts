@@ -17,7 +17,9 @@ import { parseTimeRange } from "$lib/utils/time-range";
 import type { RequestEvent } from "./$types";
 
 const DEFAULT_LIMIT = 50;
+
 const MIN_LIMIT = 20;
+
 const MAX_LIMIT = 200;
 
 function clamp(value: number, min: number, max: number): number {
@@ -29,12 +31,14 @@ function clamp(value: number, min: number, max: number): number {
  */
 export async function GET(event: RequestEvent): Promise<Response> {
   const authResult = await requireOwnedProjectRoute(event, event.params.id);
+
   if (authResult instanceof Response) return authResult;
 
   const { db } = authResult;
   const projectId = event.params.id;
 
   const params = event.url.searchParams;
+
   const limit = clamp(
     params.get("limit")
       ? Number.parseInt(params.get("limit") || "", 10) || DEFAULT_LIMIT
@@ -42,8 +46,10 @@ export async function GET(event: RequestEvent): Promise<Response> {
     MIN_LIMIT,
     MAX_LIMIT,
   );
+
   const cursorParam = params.get("cursor");
   const statusParam = params.get("status") || "open";
+
   const status = INCIDENT_STATUSES.includes(statusParam as (typeof INCIDENT_STATUSES)[number])
     ? (statusParam as (typeof INCIDENT_STATUSES)[number])
     : "open";
@@ -74,6 +80,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
   }
 
   const whereClause = and(...conditions);
+
   const total = cursorParam
     ? undefined
     : ((await db.select({ count: count() }).from(incident).where(whereClause))[0]?.count ?? 0);

@@ -14,14 +14,21 @@ interface Props {
 const { projectId }: Props = $props();
 
 const currentPath = $derived($page.url.pathname);
+
 const isHomePage = $derived(currentPath === '/');
+
 const isLogsPage = $derived(projectId && currentPath === `/projects/${projectId}`);
+
 const isIncidentsPage = $derived(projectId && currentPath === `/projects/${projectId}/incidents`);
+
 const isStatsPage = $derived(projectId && currentPath === `/projects/${projectId}/stats`);
+
 const isSettingsPage = $derived(projectId && currentPath === `/projects/${projectId}/settings`);
 
 const navItemClass = 'flex flex-col items-center gap-1 py-2 px-3 text-xs transition-colors';
+
 const activeClass = 'text-primary';
+
 const inactiveClass = 'text-muted-foreground hover:text-foreground';
 </script>
 

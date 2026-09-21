@@ -6,6 +6,7 @@ import LogDetailModal from "../log-detail-modal.svelte";
 const mockClipboard = {
   writeText: vi.fn().mockResolvedValue(undefined),
 };
+
 Object.assign(navigator, { clipboard: mockClipboard });
 
 vi.mock("$lib/utils/format", () => ({
@@ -86,6 +87,7 @@ describe("LogDetailModal", () => {
       metadata: null,
       timestamp: null as unknown as Date,
     };
+
     render(LogDetailModal, { props: { log: sparse, open: true } });
     expect(screen.getAllByText("N/A").length).toBeGreaterThanOrEqual(4);
 
@@ -125,6 +127,7 @@ describe("LogDetailModal", () => {
     } else {
       await fireEvent.keyDown(document, { key: "Escape" });
     }
+
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 

@@ -67,6 +67,7 @@ describe("GET /api/projects/[id]/logs/export", () => {
     });
 
     const sessionData = await getSession(mockRequest.headers, db);
+
     if (!sessionData) throw new Error("Session data should not be null");
     userId = sessionData.user.id;
 

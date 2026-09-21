@@ -25,6 +25,7 @@ const chartData = $derived(
 );
 
 const showChart = $derived(!loading && !error && data.length > 0);
+
 const showEmpty = $derived(!loading && !error && data.length === 0);
 
 function formatAxisLabel(date: Date): string {

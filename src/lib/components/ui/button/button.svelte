@@ -32,6 +32,7 @@ export const buttonVariants = tv({
 });
 
 export type ButtonVariant = VariantProps<typeof buttonVariants>['variant'];
+
 export type ButtonSize = VariantProps<typeof buttonVariants>['size'];
 
 export type ButtonProps = WithElementRef<HTMLButtonAttributes> &

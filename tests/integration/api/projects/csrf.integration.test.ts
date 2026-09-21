@@ -63,6 +63,7 @@ describe("CSRF Origin/Referer checks", () => {
     });
 
     const sessionData = await getSession(mockRequest.headers, db);
+
     if (!sessionData) throw new Error("Session data should not be null");
 
     authenticatedLocals = {

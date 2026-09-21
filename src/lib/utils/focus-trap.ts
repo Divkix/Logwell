@@ -17,8 +17,10 @@ const FOCUSABLE_SELECTOR = [
 
 function getFocusableElements(container: HTMLElement): HTMLElement[] {
   const elements = container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
+
   return Array.from(elements).filter((el) => {
     const style = window.getComputedStyle(el);
+
     return style.display !== "none" && style.visibility !== "hidden" && el.offsetParent !== null;
   });
 }
@@ -32,6 +34,7 @@ function createFocusTrap(container: HTMLElement, options: FocusTrapOptions = {})
     if (event.key !== "Tab") return;
 
     const focusableElements = getFocusableElements(container);
+
     if (focusableElements.length === 0) return;
 
     const firstFocusable = focusableElements[0];
@@ -56,6 +59,7 @@ function createFocusTrap(container: HTMLElement, options: FocusTrapOptions = {})
     if (!autoFocus) return;
 
     const focusableElements = getFocusableElements(container);
+
     if (focusableElements.length === 0) return;
 
     let elementToFocus: HTMLElement | null = null;
@@ -83,6 +87,7 @@ function createFocusTrap(container: HTMLElement, options: FocusTrapOptions = {})
   return {
     deactivate() {
       container.removeEventListener("keydown", handleKeyDown);
+
       if (previouslyFocused && typeof previouslyFocused.focus === "function") {
         previouslyFocused.focus();
       }

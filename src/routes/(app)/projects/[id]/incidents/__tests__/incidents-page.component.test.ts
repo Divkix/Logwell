@@ -31,6 +31,7 @@ vi.mock("$lib/utils/toast", () => ({
 
 vi.mock("$app/stores", async () => {
   const { writable } = await import("svelte/store");
+
   return {
     navigating: writable(null),
     page: writable({ url: { pathname: "/projects/proj_1/incidents" } }),
@@ -46,6 +47,7 @@ vi.mock("$lib/hooks/use-incident-stream.svelte", () => ({
     streamOptions.onIncidents = options.onIncidents;
     streamOptions.onError = options.onError;
     streamOptions.onConnectionChange = options.onConnectionChange;
+
     return {
       isConnected: false,
       isConnecting: false,
@@ -111,9 +113,11 @@ describe("IncidentsPage", () => {
   beforeEach(() => {
     fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
       const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+
       if (url.includes("/incidents?cursor=")) {
         return Promise.resolve(makeLoadMoreResponse());
       }
+
       return Promise.resolve(new Response(null, { status: 500 }));
     });
   });
@@ -243,7 +247,9 @@ describe("IncidentsPage", () => {
     // Plain stub so the promise the component awaits is exactly the one this test resolves.
     globalThis.fetch = ((input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+
       if (url.includes("/incidents?cursor=")) return fetchPromise;
+
       return Promise.resolve(new Response(null, { status: 500 }));
     }) as typeof fetch;
 
@@ -267,6 +273,7 @@ describe("IncidentsPage", () => {
     const staleResponse = new Response(null, { status: 200 });
     staleResponse.json = () => {
       staleJsonCalls++;
+
       return Promise.resolve({
         incidents: [makeIncident({ id: "inc_stale", title: "Stale incident" })],
         nextCursor: null,

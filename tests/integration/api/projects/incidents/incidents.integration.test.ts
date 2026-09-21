@@ -54,6 +54,7 @@ async function expectHttpError(
   } catch (error) {
     const httpError = error as HttpError;
     expect(httpError.status).toBe(expectedStatus);
+
     if (expectedBody) {
       expect(httpError.body).toEqual(expectedBody);
     }
@@ -84,7 +85,9 @@ describe("Incident APIs", () => {
     const mockRequest = new Request("http://localhost:5173", {
       headers: { cookie: `better-auth.session_token=${signUpResult.token}` },
     });
+
     const sessionData = await getSession(mockRequest.headers, db);
+
     if (!sessionData) throw new Error("Session data should not be null");
 
     userId = sessionData.user.id;
@@ -158,6 +161,7 @@ describe("Incident APIs", () => {
     const now = Date.now();
 
     const incidents = [];
+
     for (let i = 0; i < 50; i++) {
       incidents.push({
         id: `inc-boundary-${i}`,
@@ -174,6 +178,7 @@ describe("Incident APIs", () => {
         totalEvents: 1,
       });
     }
+
     await db.insert(incident).values(incidents);
 
     const request = new Request(`http://localhost/api/projects/${project.id}/incidents`);
@@ -189,6 +194,7 @@ describe("Incident APIs", () => {
 
   it("returns detail with source candidates and correlations", async () => {
     const project = await seedProject(db, { ownerId: userId });
+
     const [createdIncident] = await db
       .insert(incident)
       .values({
@@ -241,6 +247,7 @@ describe("Incident APIs", () => {
     const request = new Request(
       `http://localhost/api/projects/${project.id}/incidents/${createdIncident!.id}`,
     );
+
     const event = createRequestEvent(
       request,
       db,
@@ -248,6 +255,7 @@ describe("Incident APIs", () => {
       authenticatedLocals,
       "/api/projects/[id]/incidents/[incidentId]",
     );
+
     const response = await GET_DETAIL(event as never);
     expect(response.status).toBe(200);
 
@@ -264,6 +272,7 @@ describe("Incident APIs", () => {
 
   it("aggregates incident detail counts in SQL instead of selecting every incident log", async () => {
     const project = await seedProject(db, { ownerId: userId });
+
     const [createdIncident] = await db
       .insert(incident)
       .values({
@@ -309,6 +318,7 @@ describe("Incident APIs", () => {
     const request = new Request(
       `http://localhost/api/projects/${project.id}/incidents/${createdIncident!.id}`,
     );
+
     const event = createRequestEvent(
       request,
       db,
@@ -316,6 +326,7 @@ describe("Incident APIs", () => {
       authenticatedLocals,
       "/api/projects/[id]/incidents/[incidentId]",
     );
+
     const response = await GET_DETAIL(event as never);
     expect(response.status).toBe(200);
 
@@ -331,6 +342,7 @@ describe("Incident APIs", () => {
 
   it("returns timeline buckets with peak data", async () => {
     const project = await seedProject(db, { ownerId: userId });
+
     const [createdIncident] = await db
       .insert(incident)
       .values({
@@ -371,6 +383,7 @@ describe("Incident APIs", () => {
     const request = new Request(
       `http://localhost/api/projects/${project.id}/incidents/${createdIncident!.id}/timeline?range=1h`,
     );
+
     const event = createRequestEvent(
       request,
       db,
@@ -378,6 +391,7 @@ describe("Incident APIs", () => {
       authenticatedLocals,
       "/api/projects/[id]/incidents/[incidentId]/timeline",
     );
+
     const response = await GET_TIMELINE(event as never);
     expect(response.status).toBe(200);
 
@@ -389,6 +403,7 @@ describe("Incident APIs", () => {
 
   it("aggregates incident timeline buckets in SQL instead of selecting every timestamp", async () => {
     const project = await seedProject(db, { ownerId: userId });
+
     const [createdIncident] = await db
       .insert(incident)
       .values({
@@ -432,6 +447,7 @@ describe("Incident APIs", () => {
     const request = new Request(
       `http://localhost/api/projects/${project.id}/incidents/${createdIncident!.id}/timeline?range=1h`,
     );
+
     const event = createRequestEvent(
       request,
       db,
@@ -439,6 +455,7 @@ describe("Incident APIs", () => {
       authenticatedLocals,
       "/api/projects/[id]/incidents/[incidentId]/timeline",
     );
+
     const response = await GET_TIMELINE(event as never);
     expect(response.status).toBe(200);
 
@@ -454,13 +471,17 @@ describe("Incident APIs", () => {
         name: "Other User",
       },
     });
+
     const otherRequest = new Request("http://localhost:5173", {
       headers: { cookie: `better-auth.session_token=${otherUser.token}` },
     });
+
     const otherSession = await getSession(otherRequest.headers, db);
+
     if (!otherSession) throw new Error("Missing other session");
 
     const otherProject = await seedProject(db, { ownerId: otherSession.user.id });
+
     const [otherIncident] = await db
       .insert(incident)
       .values({
@@ -482,6 +503,7 @@ describe("Incident APIs", () => {
     const request = new Request(
       `http://localhost/api/projects/${otherProject.id}/incidents/${otherIncident!.id}`,
     );
+
     const event = createRequestEvent(
       request,
       db,
@@ -489,6 +511,7 @@ describe("Incident APIs", () => {
       authenticatedLocals,
       "/api/projects/[id]/incidents/[incidentId]",
     );
+
     const response = await GET_DETAIL(event as never);
     expect(response.status).toBe(404);
 
@@ -502,6 +525,7 @@ describe("Incident APIs", () => {
     const nowSecs = Date.now() / 1000;
     const baseEpoch = Math.floor(nowSecs) + 0.123456;
     const seededIds: string[] = [];
+
     for (let i = 0; i < 25; i++) {
       const id = `inc-same-ms-${i}`;
       seededIds.push(id);
@@ -514,10 +538,12 @@ describe("Incident APIs", () => {
 
     const collectedIds: string[] = [];
     let cursor: string | null = null;
+
     for (let page = 0; page < 10; page++) {
       const url = cursor
         ? `http://localhost/api/projects/${project.id}/incidents?limit=10&cursor=${encodeURIComponent(cursor)}`
         : `http://localhost/api/projects/${project.id}/incidents?limit=10`;
+
       const request = new Request(url);
       const event = createRequestEvent(request, db, { id: project.id }, authenticatedLocals);
       const response = await GET_LIST(event as never);
@@ -532,6 +558,7 @@ describe("Incident APIs", () => {
 
     expect(collectedIds).toHaveLength(25);
     expect(new Set(collectedIds).size).toBe(25);
+
     for (const id of seededIds) {
       expect(collectedIds.filter((c) => c === id)).toHaveLength(1);
     }

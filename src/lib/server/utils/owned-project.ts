@@ -21,6 +21,7 @@ export async function requireAuth(event: RequestEvent): Promise<AuthenticatedSes
     if (isApiRoute(event.route.id)) {
       throw error(401, { message: "Unauthorized" });
     }
+
     throw redirect(303, "/login");
   }
 
@@ -38,10 +39,12 @@ async function findOwnedProject(
 ): Promise<{ projectData: Project | undefined; db: DatabaseClient }> {
   const { user } = await requireAuth(event);
   const db = await getDbClient(event.locals);
+
   const [projectData] = await db
     .select()
     .from(project)
     .where(and(eq(project.id, projectId), eq(project.ownerId, user.id)));
+
   return { projectData, db };
 }
 
@@ -50,6 +53,7 @@ export async function requireOwnedProjectRoute(
   projectId: string,
 ): Promise<OwnedProject | Response> {
   const csrfError = checkCsrfOrigin(event);
+
   if (csrfError) return csrfError;
 
   const { projectData, db } = await findOwnedProject(event, projectId);

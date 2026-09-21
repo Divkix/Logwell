@@ -22,12 +22,15 @@ async function createProject(page: Page, name: string) {
   const response = await page.request.post("/api/projects", {
     data: { name },
   });
+
   expect(response.ok()).toBeTruthy();
+
   return response.json();
 }
 
 async function deleteProject(page: Page, projectId: string) {
   const response = await page.request.delete(`/api/projects/${projectId}`);
+
   return response.ok();
 }
 
@@ -76,11 +79,13 @@ test.describe("Log Export", () => {
     const download = await downloadPromise;
     const readStream = await download.createReadStream();
     const chunks: Buffer[] = [];
+
     if (readStream) {
       for await (const chunk of readStream) {
         chunks.push(Buffer.from(chunk));
       }
     }
+
     const csvContent = Buffer.concat(chunks).toString("utf-8");
 
     expect(csvContent).toContain("Error connecting to database");

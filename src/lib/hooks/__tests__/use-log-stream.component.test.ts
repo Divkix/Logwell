@@ -39,9 +39,11 @@ function createDelayedMockSSEResponse(
     async pull(controller) {
       if (eventIndex < events.length) {
         const event = events[eventIndex]!;
+
         if (event.delayMs) {
           await new Promise((resolve) => setTimeout(resolve, event.delayMs));
         }
+
         const sseData = `event: ${event.event}\ndata: ${event.data}\n\n`;
         controller.enqueue(new TextEncoder().encode(sseData));
         eventIndex++;
@@ -111,9 +113,11 @@ describe("useLogStream", () => {
       const mockResponse = createMockSSEResponse([
         { event: "heartbeat", data: JSON.stringify({ ts: Date.now() }) },
       ]);
+
       fetchMock.mockResolvedValueOnce(mockResponse);
 
       const onLogs = vi.fn();
+
       const stream = useLogStream({
         projectId: "test-project",
         enabled: true,
@@ -150,9 +154,11 @@ describe("useLogStream", () => {
 
     it("reports connecting state during connection", async () => {
       let resolveResponse!: (value: Response) => void;
+
       const responsePromise = new Promise<Response>((resolve) => {
         resolveResponse = resolve;
       });
+
       fetchMock.mockReturnValueOnce(responsePromise);
 
       const stream = useLogStream({
@@ -181,6 +187,7 @@ describe("useLogStream", () => {
         { event: "heartbeat", data: JSON.stringify({ ts: Date.now() }), delayMs: 100 },
         { event: "heartbeat", data: JSON.stringify({ ts: Date.now() }), delayMs: 100 },
       ]);
+
       fetchMock.mockResolvedValueOnce(mockResponse);
 
       const stream = useLogStream({
@@ -205,6 +212,7 @@ describe("useLogStream", () => {
       fetchMock.mockResolvedValueOnce(mockResponse);
 
       const onLogs = vi.fn();
+
       const stream = useLogStream({
         projectId: "test-project",
         enabled: true,
@@ -233,9 +241,11 @@ describe("useLogStream", () => {
         { event: "logs", data: JSON.stringify(batch1), delayMs: 10 },
         { event: "logs", data: JSON.stringify(batch2), delayMs: 10 },
       ]);
+
       fetchMock.mockResolvedValueOnce(mockResponse);
 
       const onLogs = vi.fn();
+
       const stream = useLogStream({
         projectId: "test-project",
         enabled: true,
@@ -263,9 +273,11 @@ describe("useLogStream", () => {
         { event: "heartbeat", data: JSON.stringify({ ts: Date.now() }) },
         { event: "heartbeat", data: JSON.stringify({ ts: Date.now() }) },
       ]);
+
       fetchMock.mockResolvedValueOnce(mockResponse);
 
       const onLogs = vi.fn();
+
       const stream = useLogStream({
         projectId: "test-project",
         enabled: true,
@@ -287,10 +299,12 @@ describe("useLogStream", () => {
           data: JSON.stringify([createSampleLog({ id: "valid-log" })]),
         },
       ]);
+
       fetchMock.mockResolvedValueOnce(mockResponse);
 
       const onLogs = vi.fn();
       const onError = vi.fn();
+
       const stream = useLogStream({
         projectId: "test-project",
         enabled: true,
@@ -319,9 +333,11 @@ describe("useLogStream", () => {
       const mockResponse = createMockSSEResponse([
         { event: "heartbeat", data: JSON.stringify({ ts: Date.now() }) },
       ]);
+
       fetchMock.mockResolvedValueOnce(mockResponse);
 
       const onError = vi.fn();
+
       const stream = useLogStream({
         projectId: "test-project",
         enabled: true,
@@ -418,6 +434,7 @@ describe("useLogStream", () => {
       fetchMock.mockRejectedValue(new Error("Network error"));
 
       const onError = vi.fn();
+
       const stream = useLogStream({
         projectId: "test-project",
         enabled: true,
@@ -453,6 +470,7 @@ describe("useLogStream", () => {
       const mockResponse = createDelayedMockSSEResponse([
         { event: "heartbeat", data: JSON.stringify({ ts: Date.now() }), delayMs: 1000 },
       ]);
+
       fetchMock.mockResolvedValueOnce(mockResponse);
 
       const stream = useLogStream({
@@ -495,6 +513,7 @@ describe("useLogStream", () => {
       const mockResponse = createDelayedMockSSEResponse([
         { event: "heartbeat", data: JSON.stringify({ ts: Date.now() }), delayMs: 100 },
       ]);
+
       fetchMock.mockResolvedValueOnce(mockResponse);
 
       const stream = useLogStream({
@@ -517,9 +536,11 @@ describe("useLogStream", () => {
       const mockResponse1 = createMockSSEResponse([
         { event: "heartbeat", data: JSON.stringify({ ts: Date.now() }) },
       ]);
+
       const mockResponse2 = createMockSSEResponse([
         { event: "heartbeat", data: JSON.stringify({ ts: Date.now() }) },
       ]);
+
       fetchMock.mockResolvedValueOnce(mockResponse1).mockResolvedValueOnce(mockResponse2);
 
       const stream = useLogStream({
@@ -548,6 +569,7 @@ describe("useLogStream", () => {
       fetchMock.mockRejectedValueOnce(new Error("Network error"));
 
       const onError = vi.fn();
+
       const stream = useLogStream({
         projectId: "test-project",
         enabled: true,
@@ -568,6 +590,7 @@ describe("useLogStream", () => {
       fetchMock.mockResolvedValueOnce(createErrorResponse(401, "Unauthorized"));
 
       const onError = vi.fn();
+
       const stream = useLogStream({
         projectId: "test-project",
         enabled: true,
@@ -606,9 +629,11 @@ describe("useLogStream", () => {
       const mockResponse = createDelayedMockSSEResponse([
         { event: "heartbeat", data: JSON.stringify({ ts: Date.now() }), delayMs: 100 },
       ]);
+
       fetchMock.mockResolvedValueOnce(mockResponse);
 
       const onConnectionChange = vi.fn();
+
       const stream = useLogStream({
         projectId: "test-project",
         enabled: true,
@@ -627,9 +652,11 @@ describe("useLogStream", () => {
       const mockResponse = createDelayedMockSSEResponse([
         { event: "heartbeat", data: JSON.stringify({ ts: Date.now() }), delayMs: 100 },
       ]);
+
       fetchMock.mockResolvedValueOnce(mockResponse);
 
       const onConnectionChange = vi.fn();
+
       const stream = useLogStream({
         projectId: "test-project",
         enabled: true,

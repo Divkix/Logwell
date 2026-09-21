@@ -52,6 +52,7 @@ const currentExampleCode = $derived(
       ? jsrExample
       : typescriptExample,
 );
+
 const currentExampleInstall = $derived(
   selectedExample === 'typescript'
     ? 'npm install logwell'

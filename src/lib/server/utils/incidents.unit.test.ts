@@ -25,6 +25,7 @@ function prepared(
 describe("groupPreparedLogsByFingerprint", () => {
   it("returns aggregates in fingerprint order regardless of input order", () => {
     const now = new Date("2026-01-01T00:00:00.000Z");
+
     const aggregates = groupPreparedLogsByFingerprint([
       prepared("fp-c", now),
       prepared("fp-a", now),
@@ -37,6 +38,7 @@ describe("groupPreparedLogsByFingerprint", () => {
 
   it("aggregates repeated fingerprints into one entry with the widest level and time span", () => {
     const base = new Date("2026-01-01T00:00:00.000Z");
+
     const [aggregate] = groupPreparedLogsByFingerprint([
       prepared("fp-x", new Date(base.getTime() + 5000), "error"),
       prepared("fp-x", base, "fatal"),

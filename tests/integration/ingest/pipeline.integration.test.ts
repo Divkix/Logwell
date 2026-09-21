@@ -38,8 +38,11 @@ const cases: Array<{
 
 function post(body: unknown, apiKey?: string, contentType: string | null = "application/json") {
   const headers: Record<string, string> = {};
+
   if (contentType) headers["Content-Type"] = contentType;
+
   if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+
   return new Request("http://localhost/v1/ingest", {
     method: "POST",
     headers,
@@ -83,6 +86,7 @@ describe("ingestLogs pipeline", () => {
           db,
           parse,
         );
+
         expect(unknown.status).toBe(401);
 
         const project = await seedProjectWithApiKey(db);
@@ -97,6 +101,7 @@ describe("ingestLogs pipeline", () => {
 
       it("returns normalized 429 with Retry-After and writes no logs", async () => {
         const project = await seedProjectWithApiKey(db);
+
         while (checkRateLimit(`ingest:${project.id}`, INGEST_RPM)) {}
 
         const response = await ingestLogs(post(validBody("limited"), project.apiKey), db, parse);
@@ -114,6 +119,7 @@ describe("ingestLogs pipeline", () => {
       it("isolates rate limits per project", async () => {
         const projectA = await seedProjectWithApiKey(db);
         const projectB = await seedProjectWithApiKey(db);
+
         while (checkRateLimit(`ingest:${projectA.id}`, INGEST_RPM)) {}
 
         const limited = await ingestLogs(post(validBody("A limited"), projectA.apiKey), db, parse);
@@ -152,10 +158,12 @@ describe("ingestLogs pipeline", () => {
 
   it("rejects batches over the insert limit from either parser", async () => {
     const project = await seedProjectWithApiKey(db);
+
     const oversized = Array.from({ length: API_CONFIG.BATCH_INSERT_LIMIT + 1 }, (_, i) => ({
       level: "info",
       message: `log ${i}`,
     }));
+
     const oversizedOtlp = {
       resourceLogs: [
         {
@@ -230,6 +238,7 @@ describe("ingestLogs pipeline", () => {
   it("fails junk-flooded batches as batch_too_large without echoing entry errors", async () => {
     const project = await seedProjectWithApiKey(db);
     const flood = Array.from({ length: 20000 }, () => null);
+
     const expectedBody = {
       error: "batch_too_large",
       message: `Batch exceeds maximum limit of ${API_CONFIG.BATCH_INSERT_LIMIT} logs.`,
@@ -259,6 +268,7 @@ describe("ingestLogs pipeline", () => {
       db,
       parseSimpleIngestBody,
     );
+
     expect(simpleResponse.status).toBe(200);
     expect(await simpleResponse.json()).toEqual({
       accepted: 0,
@@ -280,6 +290,7 @@ describe("ingestLogs pipeline", () => {
       db,
       parseOtlpIngestBody,
     );
+
     expect(otlpResponse.status).toBe(200);
     expect(await otlpResponse.json()).toEqual({
       accepted: 0,
@@ -308,6 +319,7 @@ describe("ingestLogs pipeline", () => {
       db,
       parseSimpleIngestBody,
     );
+
     expect(simpleResponse.status).toBe(200);
     expect(await simpleResponse.json()).toEqual({ accepted: 1 });
 
@@ -346,6 +358,7 @@ describe("ingestLogs pipeline", () => {
       db,
       parseOtlpIngestBody,
     );
+
     expect(otlpResponse.status).toBe(200);
     expect(await otlpResponse.json()).toEqual({ accepted: 1 });
 
@@ -373,6 +386,7 @@ describe("ingestLogs pipeline", () => {
       otlp.resourceAttributes,
       otlp.scopeAttributes,
     ]);
+
     expect(jsonbColumns).not.toContain("\\u0000");
   });
 
@@ -384,6 +398,7 @@ describe("ingestLogs pipeline", () => {
       db,
       parseOtlpIngestBody,
     );
+
     expect(otlpResponse.status).toBe(400);
     expect((await otlpResponse.json()).error).toBe("validation_error");
 
@@ -392,6 +407,7 @@ describe("ingestLogs pipeline", () => {
       db,
       parseSimpleIngestBody,
     );
+
     expect(simpleResponse.status).toBe(200);
     expect(await simpleResponse.json()).toEqual({
       accepted: 0,
@@ -404,6 +420,7 @@ describe("ingestLogs pipeline", () => {
 
   it("ingests partial batches with per-record errors as 200", async () => {
     const project = await seedProjectWithApiKey(db);
+
     const response = await ingestLogs(
       post(
         [
@@ -431,6 +448,7 @@ describe("ingestLogs pipeline", () => {
     const emittedLogs: string[] = [];
     const emittedIncidents: string[] = [];
     const unsubLog = logEventBus.onLog(project.id, (entry) => emittedLogs.push(entry.id));
+
     const unsubIncident = logEventBus.onIncident(project.id, (entry) =>
       emittedIncidents.push(entry.id),
     );
@@ -441,6 +459,7 @@ describe("ingestLogs pipeline", () => {
         db,
         parseOtlpIngestBody,
       );
+
       expect(response.status).toBe(200);
 
       const incidents = await db.select().from(incident).where(eq(incident.projectId, project.id));
@@ -460,11 +479,13 @@ describe("ingestLogs pipeline", () => {
 
   it("stores the service name from simple ingest", async () => {
     const project = await seedProjectWithApiKey(db);
+
     const response = await ingestLogs(
       post({ level: "info", message: "hi", service: "web" }, project.apiKey),
       db,
       parseSimpleIngestBody,
     );
+
     expect(response.status).toBe(200);
 
     const rows = await db.select().from(log).where(eq(log.projectId, project.id));

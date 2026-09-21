@@ -50,6 +50,7 @@ async function expectHttpError(
   } catch (error) {
     const httpError = error as HttpError;
     expect(httpError.status).toBe(expectedStatus);
+
     if (expectedBody) {
       expect(httpError.body).toEqual(expectedBody);
     }
@@ -85,6 +86,7 @@ describe("GET /api/projects/[id]/stats/timeseries", () => {
     });
 
     const sessionData = await getSession(mockRequest.headers, db);
+
     if (!sessionData) throw new Error("Session data should not be null");
     userId = sessionData.user.id;
 
@@ -101,6 +103,7 @@ describe("GET /api/projects/[id]/stats/timeseries", () => {
   describe("Authentication", () => {
     it("returns 401 for unauthenticated request", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
+
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/stats/timeseries`,
         { method: "GET" },
@@ -131,6 +134,7 @@ describe("GET /api/projects/[id]/stats/timeseries", () => {
   describe("Default Behavior", () => {
     it("defaults to 24h range when not specified", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
+
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/stats/timeseries`,
         { method: "GET" },
@@ -147,6 +151,7 @@ describe("GET /api/projects/[id]/stats/timeseries", () => {
 
     it("returns buckets for 15m range with minute granularity", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
+
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/stats/timeseries?range=15m`,
         { method: "GET" },
@@ -162,6 +167,7 @@ describe("GET /api/projects/[id]/stats/timeseries", () => {
 
     it("returns buckets for 1h range with 5-minute granularity", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
+
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/stats/timeseries?range=1h`,
         { method: "GET" },
@@ -177,6 +183,7 @@ describe("GET /api/projects/[id]/stats/timeseries", () => {
 
     it("returns buckets for 7d range with 6-hour granularity", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
+
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/stats/timeseries?range=7d`,
         { method: "GET" },
@@ -192,6 +199,7 @@ describe("GET /api/projects/[id]/stats/timeseries", () => {
 
     it("falls back to 24h for invalid range parameter", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
+
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/stats/timeseries?range=invalid`,
         { method: "GET" },
@@ -233,6 +241,7 @@ describe("GET /api/projects/[id]/stats/timeseries", () => {
       });
 
       const originalSelect = db.select.bind(db);
+
       const selectSpy = vi.spyOn(db, "select").mockImplementation(((fields?: unknown) => {
         if (
           fields &&
@@ -311,6 +320,7 @@ describe("GET /api/projects/[id]/stats/timeseries", () => {
   describe("Bucket Order", () => {
     it("returns buckets in chronological order", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
+
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/stats/timeseries?range=24h`,
         { method: "GET" },
@@ -323,6 +333,7 @@ describe("GET /api/projects/[id]/stats/timeseries", () => {
       const timestamps = data.buckets.map((b: { timestamp: string }) =>
         new Date(b.timestamp).getTime(),
       );
+
       const sorted = [...timestamps].sort((a, b) => a - b);
 
       expect(timestamps).toEqual(sorted);
@@ -330,6 +341,7 @@ describe("GET /api/projects/[id]/stats/timeseries", () => {
 
     it("returns buckets with valid ISO timestamps", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
+
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/stats/timeseries?range=24h`,
         { method: "GET" },

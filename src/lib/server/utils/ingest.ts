@@ -73,7 +73,9 @@ const MAX_NUL_STRIP_DEPTH = 32;
 
 function stripNulStrings(value: unknown, depth = 0): unknown {
   if (typeof value === "string") return value.replaceAll("\u0000", "");
+
   if (value === null || typeof value !== "object") return value;
+
   if (depth >= MAX_NUL_STRIP_DEPTH) return null;
 
   if (Array.isArray(value)) {
@@ -82,6 +84,7 @@ function stripNulStrings(value: unknown, depth = 0): unknown {
 
   // Only plain JSON containers are walked; class instances (e.g. Date) pass through.
   const prototype: unknown = Object.getPrototypeOf(value);
+
   if (prototype !== Object.prototype && prototype !== null) return value;
 
   return Object.fromEntries(
@@ -94,20 +97,24 @@ function stripNulStrings(value: unknown, depth = 0): unknown {
 
 function sanitizeIngestInput(input: IngestInputRow): IngestInputRow {
   const sanitized: Record<string, unknown> = { ...input };
+
   for (const [key, value] of Object.entries(sanitized)) {
     // A NUL in `message` is a per-record rejection in both parsers, never a strip.
     if (key === "message") continue;
     sanitized[key] = stripNulStrings(value);
   }
+
   return sanitized as IngestInputRow;
 }
 
 export function buildIngestResponse(accepted: number, rejected: number, errors: string[]) {
   const response: { accepted: number; rejected?: number; errors?: string[] } = { accepted };
+
   if (rejected > 0) {
     response.rejected = rejected;
     response.errors = errors;
   }
+
   return response;
 }
 
@@ -117,9 +124,11 @@ export async function ingestLogs(
   parse: IngestBodyParser,
 ): Promise<Response> {
   const contentTypeError = requireJsonContentType(request);
+
   if (contentTypeError) return contentTypeError;
 
   let projectId: string;
+
   try {
     projectId = await validateApiKey(request, db);
 
@@ -127,6 +136,7 @@ export async function ingestLogs(
       .select({ id: project.id })
       .from(project)
       .where(eq(project.id, projectId));
+
     if (!projectRow) {
       throw new ApiKeyError(401, "Invalid API key");
     }
@@ -134,6 +144,7 @@ export async function ingestLogs(
     if (err instanceof ApiKeyError) {
       return json({ error: "unauthorized", message: err.message }, { status: err.status });
     }
+
     throw err;
   }
 
@@ -145,6 +156,7 @@ export async function ingestLogs(
   }
 
   let body: unknown;
+
   try {
     body = await request.json();
   } catch {
@@ -155,15 +167,18 @@ export async function ingestLogs(
   }
 
   let parsed: ParsedIngest;
+
   try {
     parsed = parse(body);
   } catch (err) {
     if (err instanceof BatchTooLargeError) {
       return json({ error: "batch_too_large", message: err.message }, { status: 400 });
     }
+
     if (err instanceof OtlpValidationError || err instanceof SimpleIngestError) {
       return json({ error: "validation_error", message: err.message }, { status: 400 });
     }
+
     throw err;
   }
 
@@ -199,6 +214,7 @@ export async function ingestLogs(
             projectId,
             preparedLogs,
           );
+
           const assigned = assignIncidentIds(preparedLogs, incidentByFingerprint);
 
           const logEntries = assigned.map((prepared, index) => ({
@@ -214,6 +230,7 @@ export async function ingestLogs(
           const insertedLogs: StreamLog[] = await (
             tx.insert(log).values(logEntries) as any
           ).returning(LOG_RETURNING_COLUMNS);
+
           return { insertedLogs, touchedIncidents };
         })
       : { insertedLogs: [], touchedIncidents: [] };
@@ -221,6 +238,7 @@ export async function ingestLogs(
   for (const insertedLog of insertedLogs) {
     logEventBus.emitLog(insertedLog);
   }
+
   for (const touchedIncident of touchedIncidents) {
     logEventBus.emitIncident(touchedIncident);
   }

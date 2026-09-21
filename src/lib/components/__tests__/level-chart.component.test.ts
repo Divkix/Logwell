@@ -30,6 +30,7 @@ describe("LevelChart", () => {
     for (const level of ["debug", "info", "warn", "error", "fatal"]) {
       expect(screen.getByTestId(`chart-segment-${level}`)).toBeInTheDocument();
     }
+
     expect(screen.getByTestId("chart-total")).toBeInTheDocument();
     expect(screen.getByText("400")).toBeInTheDocument();
   });
@@ -39,6 +40,7 @@ describe("LevelChart", () => {
       levelCounts: { debug: 0, info: 100, warn: 0, error: 0, fatal: 0 },
       levelPercentages: { debug: 0, info: 100, warn: 0, error: 0, fatal: 0 },
     };
+
     render(LevelChart, { props: { data: dataWithZeros } });
 
     expect(screen.queryByTestId("chart-segment-debug")).not.toBeInTheDocument();

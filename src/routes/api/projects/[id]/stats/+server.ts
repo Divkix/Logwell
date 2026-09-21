@@ -39,6 +39,7 @@ import type { RequestEvent } from "./$types";
  */
 export async function GET(event: RequestEvent): Promise<Response> {
   const authResult = await requireOwnedProjectRoute(event, event.params.id);
+
   if (authResult instanceof Response) return authResult;
 
   const { db } = authResult;
@@ -56,6 +57,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
   if (fromDate && !Number.isNaN(fromDate.getTime())) {
     conditions.push(gte(log.timestamp, fromDate));
   }
+
   if (toDate && !Number.isNaN(toDate.getTime())) {
     conditions.push(lte(log.timestamp, toDate));
   }

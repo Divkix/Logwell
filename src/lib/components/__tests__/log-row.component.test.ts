@@ -9,6 +9,7 @@ vi.mock("$lib/utils/format", () => ({
     const minutes = date.getUTCMinutes().toString().padStart(2, "0");
     const seconds = date.getUTCSeconds().toString().padStart(2, "0");
     const milliseconds = date.getUTCMilliseconds().toString().padStart(3, "0");
+
     return `${hours}:${minutes}:${seconds}.${milliseconds}`;
   }),
 }));
@@ -84,8 +85,10 @@ describe("LogRow", () => {
     expect(screen.getByText("User logged in successfully")).toBeInTheDocument();
 
     cleanup();
+
     const longMessage =
       "This is a very long log message that should be truncated because it exceeds the maximum display length for a log row in the table view";
+
     render(LogRow, { props: { log: { ...baseLog, message: longMessage } } });
     expect(screen.getByTestId("log-message-desktop")).toHaveClass("truncate");
   });
@@ -122,6 +125,7 @@ describe("LogRow", () => {
     [{ sourceFile: "auth.ts", lineNumber: null }, "auth.ts", true],
   ] as const)("source info %#", (overrides, text, present) => {
     render(LogRow, { props: { log: { ...baseLog, ...overrides } } });
+
     if (present) {
       expect(screen.getByText(text)).toBeInTheDocument();
     } else {
@@ -136,6 +140,7 @@ describe("LogRow", () => {
   ])("isNew=%s applies log-new class: %s", (isNew, expected) => {
     render(LogRow, { props: { log: baseLog, isNew } });
     const row = screen.getByTestId("log-row");
+
     if (expected) {
       expect(row).toHaveClass("log-new");
     } else {

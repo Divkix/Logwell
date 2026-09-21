@@ -22,12 +22,15 @@ async function createProject(page: Page, name: string) {
   const response = await page.request.post("/api/projects", {
     data: { name },
   });
+
   expect(response.ok()).toBeTruthy();
+
   return response.json();
 }
 
 async function deleteProject(page: Page, projectId: string) {
   const response = await page.request.delete(`/api/projects/${projectId}`);
+
   return response.ok();
 }
 
@@ -49,9 +52,11 @@ test.describe("Cursor-based Pagination", () => {
 
   test("loads more logs when clicking load more", async ({ page }) => {
     const logs = [];
+
     for (let i = 0; i < 150; i++) {
       logs.push({ level: "info" as const, message: `INFO log message ${i}` });
     }
+
     await ingestOtlpLogs(page, testProject.apiKey, logs);
 
     await page.goto(`/projects/${testProject.id}`);

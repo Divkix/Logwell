@@ -46,6 +46,7 @@ function generateCreateTableSQL(table: PgTable): string {
     } else if (column.dataType === "date") {
       if (column.columnType === "PgTimestamp") {
         const withTimezone = (column as unknown as { withTimezone?: boolean }).withTimezone;
+
         if (withTimezone) {
           parts.push("TIMESTAMPTZ");
         } else {
@@ -79,24 +80,29 @@ function generateCreateTableSQL(table: PgTable): string {
     if (column.hasDefault && !generated) {
       if (column.dataType === "date") {
         const defaultFn = (column as unknown as { default?: unknown }).default;
+
         if (defaultFn) {
           parts.push("DEFAULT NOW()");
         }
       } else if (column.dataType === "boolean") {
         const defaultValue = (column as unknown as { default?: unknown }).default;
+
         if (defaultValue !== undefined) {
           const value =
             typeof defaultValue === "object" && defaultValue !== null && "value" in defaultValue
               ? (defaultValue as { value: unknown }).value
               : defaultValue;
+
           parts.push(`DEFAULT ${String(value)}`);
         }
       } else if (column.default !== undefined) {
         const rawDefault = column.default;
+
         const defaultValue =
           typeof rawDefault === "object" && rawDefault !== null && "value" in rawDefault
             ? (rawDefault as { value?: unknown }).value
             : rawDefault;
+
         if (defaultValue && typeof defaultValue === "object" && "sql" in defaultValue) {
           const sqlValue = (defaultValue as { sql?: string }).sql;
           parts.push(`DEFAULT ${sqlValue}`);
@@ -121,10 +127,12 @@ function generateCreateTableSQL(table: PgTable): string {
   }
 
   const foreignKeys: string[] = [];
+
   if (config.foreignKeys && config.foreignKeys.length > 0) {
     for (const fk of config.foreignKeys) {
       try {
         const ref = (fk as { reference: () => unknown }).reference();
+
         const refDetails = ref as {
           columns: Array<{ name: string }>;
           foreignColumns: Array<{ name: string }>;
@@ -140,6 +148,7 @@ function generateCreateTableSQL(table: PgTable): string {
         let fkConstraint = `FOREIGN KEY (${localColumns}) REFERENCES "${foreignTableName}"(${foreignColumns})`;
 
         const fkWithOptions = fk as { onDelete?: string; onUpdate?: string };
+
         if (fkWithOptions.onDelete) {
           fkConstraint += ` ON DELETE ${fkWithOptions.onDelete.toUpperCase()}`;
         }
@@ -218,6 +227,7 @@ export async function createTestDatabase(): Promise<PgliteDatabase<typeof schema
   for (const tableName of tableOrder) {
     const table = tables.find((t) => {
       const config = getTableConfig(t as PgTable);
+
       return config.name === tableName;
     });
 
@@ -226,6 +236,7 @@ export async function createTestDatabase(): Promise<PgliteDatabase<typeof schema
       await db.execute(sql.raw(createSQL));
 
       const indexSQLs = generateIndexSQL(table as PgTable);
+
       for (const indexSQL of indexSQLs) {
         await db.execute(sql.raw(indexSQL));
       }
@@ -240,6 +251,7 @@ export async function cleanDatabase(db: PgliteDatabase<typeof schema>): Promise<
 
   const tableNames = tables.map((table) => {
     const config = getTableConfig(table as PgTable);
+
     return config.name;
   });
 

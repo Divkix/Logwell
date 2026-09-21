@@ -62,11 +62,13 @@ export async function queryLogs(
   if (filter.cursor) {
     let cursorMicros: string;
     let cursorId: string;
+
     try {
       ({ micros: cursorMicros, id: cursorId } = decodeCursor(filter.cursor));
     } catch (error) {
       throw new InvalidCursorError(error instanceof Error ? error.message : "Invalid cursor");
     }
+
     conditions.push(cursorRowLessThan(log.timestamp, log.id, cursorMicros, cursorId));
   }
 
@@ -77,12 +79,14 @@ export async function queryLogs(
   if (filter.from) {
     conditions.push(gte(log.timestamp, filter.from));
   }
+
   if (filter.to) {
     conditions.push(lte(log.timestamp, filter.to));
   }
 
   if (filter.search?.trim()) {
     const tsquery = buildSearchQuery(filter.search);
+
     if (tsquery) {
       conditions.push(sql`${log.search} @@ to_tsquery('english', ${tsquery})`);
     }
@@ -120,6 +124,7 @@ export async function queryLogs(
   const page = hasMore ? rows.slice(0, filter.limit) : rows;
   const last = page.at(-1);
   const nextCursor = hasMore && last ? encodeCursor(last.micros, last.id) : null;
+
   const logsToReturn = page.map(
     // oxlint-disable-next-line no-unused-vars
     ({ micros, ...queried }) => queried,

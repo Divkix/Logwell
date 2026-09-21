@@ -17,8 +17,11 @@ interface Props {
 const { open, onClose, onCreate, triggerElement = null, class: className }: Props = $props();
 
 let name = $state('');
+
 let error = $state('');
+
 let isSubmitting = $state(false);
+
 let previouslyFocusedElement: HTMLElement | null = $state(null);
 
 $effect(() => {
@@ -57,12 +60,15 @@ async function handleSubmit(event: Event) {
 
   const trimmedName = name.trim();
   const validation = projectCreatePayloadSchema.safeParse({ name: trimmedName });
+
   if (!validation.success) {
     error = validation.error.issues?.[0]?.message ?? 'Project name is required';
+
     return;
   }
 
   isSubmitting = true;
+
   try {
     await onCreate?.(trimmedName);
     reset();

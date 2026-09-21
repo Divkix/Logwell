@@ -3,6 +3,7 @@ import type { Incident, Log } from "./db/schema";
 export type StreamLog = Omit<Log, "search">;
 
 export type LogListener = (log: StreamLog) => void;
+
 export type IncidentListener = (incident: Incident) => void;
 
 export type Listener<T> = (item: T) => void;
@@ -12,16 +13,20 @@ class ProjectChannel<T> {
 
   subscribe(projectId: string, listener: Listener<T>): () => void {
     let projectListeners = this.listeners.get(projectId);
+
     if (!projectListeners) {
       projectListeners = new Set();
       this.listeners.set(projectId, projectListeners);
     }
+
     projectListeners.add(listener);
 
     return () => {
       const projectListeners = this.listeners.get(projectId);
+
       if (projectListeners) {
         projectListeners.delete(listener);
+
         if (projectListeners.size === 0) {
           this.listeners.delete(projectId);
         }
@@ -31,6 +36,7 @@ class ProjectChannel<T> {
 
   emit(projectId: string, item: T): void {
     const projectListeners = this.listeners.get(projectId);
+
     if (projectListeners) {
       for (const listener of projectListeners) {
         try {

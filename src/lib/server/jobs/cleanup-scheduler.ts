@@ -2,7 +2,9 @@ import { RETENTION_CONFIG } from "$lib/server/config/performance";
 import { cleanupOldLogs } from "./log-cleanup";
 
 let cleanupStarted = false;
+
 let cleanupIntervalId: ReturnType<typeof setInterval> | null = null;
+
 let isRunning = false;
 
 export function startCleanupScheduler(): boolean {
@@ -28,6 +30,7 @@ export function stopCleanupScheduler(): void {
     clearInterval(cleanupIntervalId);
     cleanupIntervalId = null;
   }
+
   cleanupStarted = false;
   isRunning = false;
 }
@@ -35,6 +38,7 @@ export function stopCleanupScheduler(): void {
 async function runCleanupWithGuard(): Promise<void> {
   if (isRunning) return;
   isRunning = true;
+
   try {
     await runCleanup();
   } finally {
