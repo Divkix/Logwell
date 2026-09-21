@@ -85,6 +85,13 @@ COPY --from=build --chown=logwell:logwell /app/scripts ./scripts
 COPY --from=build --chown=logwell:logwell /app/src/lib/server ./src/lib/server
 COPY --from=build --chown=logwell:logwell /app/src/lib/shared ./src/lib/shared
 
+# entrypoint.sh runs these scripts against production dependencies alone; fail the build here
+# instead of at container start if one of their imports is a devDependency. $env/* is a
+# SvelteKit virtual module (injected at build time), not something node_modules provides.
+RUN bun build ./scripts/seed-admin.ts ./scripts/backfill-incidents.ts --target=bun \
+    --external '$env/*' --outdir /tmp/scripts-check && \
+    rm -rf /tmp/scripts-check
+
 COPY --chown=logwell:logwell entrypoint.sh ./
 RUN chmod +x entrypoint.sh
 
