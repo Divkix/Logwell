@@ -69,7 +69,8 @@ class BatchQueue:
     - Automatic flush on batch size threshold
     - Automatic flush on time interval
     - Queue overflow protection (drops oldest)
-    - Re-queue on send failure
+    - Re-queue on retryable send failure; non-retryable batches are reported
+      through on_error and dropped so they cannot block the queue
     - Graceful shutdown
     """
 
@@ -202,13 +203,36 @@ class BatchQueue:
             try:
                 last_response = await self._send_batch(chunk)
             except Exception as error:  # noqa: BLE001
+                if isinstance(error, LogwellError) and not error.retryable:
+                    # The chunk can never be accepted (invalid data, rejected
+                    # API key), so re-queuing it would block every later chunk
+                    # forever. Drop it after surfacing the failure.
+                    sent += len(chunk)
+                    if self._config.on_error:
+                        self._config.on_error(error)
+                    continue
                 send_error = error
                 failed_remaining = snapshot[sent:]
                 break
             sent += len(chunk)
+
+            rejected = last_response.get("rejected", 0)
+            if rejected:
+                # A 200 can still reject individual logs; the server already
+                # parsed them, so surface the loss and count only what it kept.
+                details = last_response.get("errors") or []
+                message = (
+                    f"{rejected} of {last_response['accepted'] + rejected} logs "
+                    "rejected by the server"
+                )
+                if details:
+                    message += ": " + "; ".join(details)
+                if self._config.on_error:
+                    self._config.on_error(LogwellError(message, LogwellErrorCode.VALIDATION_ERROR))
+
             if self._config.on_flush:
                 try:
-                    self._config.on_flush(len(chunk))
+                    self._config.on_flush(last_response["accepted"])
                 except Exception as flush_err:  # noqa: BLE001
                     if self._config.on_error:
                         self._config.on_error(flush_err)

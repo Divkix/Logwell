@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock, call, patch
 
 import httpx
@@ -7,6 +9,9 @@ import pytest
 
 from logwell.errors import LogwellError, LogwellErrorCode
 from logwell.transport import HttpTransport
+
+if TYPE_CHECKING:
+    from logwell.types import LogEntry
 
 VALID_KEY = "lw_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 VALID_ENDPOINT = "https://logs.example.com"
@@ -96,3 +101,27 @@ class TestRetryAfterCap:
         assert len(mock_sleep.await_args_list) == 1
         slept = mock_sleep.await_args_list[0].args[0]
         assert 0.1 <= slept < 0.13
+
+
+class TestSerializationFailure:
+    @pytest.mark.asyncio
+    async def test_non_serializable_payload_is_not_retried(self) -> None:
+        transport = HttpTransport(
+            {
+                "api_key": VALID_KEY,
+                "endpoint": VALID_ENDPOINT,
+                "max_retries": 3,
+            }
+        )
+
+        entry: LogEntry = {
+            "level": "info",
+            "message": "with unserializable metadata",
+            "metadata": {"when": datetime.now(timezone.utc)},
+        }
+
+        with pytest.raises(LogwellError) as exc_info:
+            await transport.send([entry])
+
+        assert exc_info.value.code == LogwellErrorCode.VALIDATION_ERROR
+        assert exc_info.value.retryable is False

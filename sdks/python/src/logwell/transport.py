@@ -168,6 +168,18 @@ class HttpTransport:
                 None,
                 True,
             ) from e
+        except (TypeError, ValueError) as e:
+            # httpx encodes `json=` with the stdlib encoder before sending, so
+            # entries holding non-serializable values (datetime, sets, circular
+            # references) raise here. The payload can never be accepted, so
+            # classify it as a non-retryable validation error.
+            raise LogwellError(
+                f"Failed to serialize {len(logs)} log(s) for {self._ingest_url}: {e}. "
+                "Log entries and metadata must contain JSON-serializable values.",
+                LogwellErrorCode.VALIDATION_ERROR,
+                None,
+                False,
+            ) from e
 
         if not response.is_success:
             error_body = self._try_parse_error(response)
