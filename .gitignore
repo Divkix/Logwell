@@ -31,6 +31,12 @@ playwright-report/
 specs/.current-spec
 **/.progress.md
 
+# Vendored upstream sources under tools/ are tracked: an environment-level
+# `vendor/` ignore rule (e.g. a global gitignore) would otherwise drop them
+# from the commit and break `vp check` on a fresh checkout.
+!tools/oxlint/anti-slop/vendor/
+!tools/oxlint/anti-slop/vendor/**
+
 # Python
 __pycache__/
 *.py[cod]
