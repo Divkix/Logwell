@@ -11,6 +11,8 @@ import {
   requireOwnedProjectRoute,
 } from "$lib/server/utils/owned-project";
 import { seedProject } from "../../../fixtures/db";
+import type { JsonObject } from "$lib/shared/schemas/json";
+import type { LayoutParams, RouteId } from "$app/types";
 
 async function expectRedirect(
   promise: Promise<unknown>,
@@ -21,6 +23,10 @@ async function expectRedirect(
     await promise;
     expect.fail("Expected redirect to be thrown");
   } catch (error) {
+    // SAFETY: the guards under test throw redirects only via SvelteKit
+    // redirect(), whose thrown value always carries a numeric status and a
+    // location header; a resolved promise instead fails the assertions below
+    // through expect.fail's own error.
     const redirect = error as Redirect;
     expect(redirect.status).toBe(expectedStatus);
     expect(redirect.location).toBe(expectedLocation);
@@ -30,12 +36,16 @@ async function expectRedirect(
 async function expectHttpError(
   promise: Promise<unknown>,
   expectedStatus: number,
-  expectedBody?: Record<string, unknown>,
+  expectedBody?: JsonObject,
 ): Promise<void> {
   try {
     await promise;
     expect.fail("Expected HTTP error to be thrown");
   } catch (error) {
+    // SAFETY: the guards under test report failures only via SvelteKit error(),
+    // whose thrown value always carries a numeric status and a JSON body; a
+    // resolved promise instead fails the assertions below through expect.fail's
+    // own error.
     const httpError = error as HttpError;
     expect(httpError.status).toBe(expectedStatus);
 
@@ -57,9 +67,9 @@ describe("Auth Guard - requireAuth", () => {
 
   function mockEvent(
     request: Request,
-    locals: Record<string, unknown> = {},
-    params: Record<string, string> = {},
-    routeId = "/dashboard",
+    locals: Partial<App.Locals> = {},
+    params: LayoutParams<"/"> = {},
+    routeId: RouteId = "/",
   ): RequestEvent {
     return {
       request,
@@ -67,7 +77,22 @@ describe("Auth Guard - requireAuth", () => {
       url: new URL(request.url),
       params,
       route: { id: routeId },
-    } as unknown as RequestEvent;
+      platform: undefined,
+      isDataRequest: false,
+      isSubRequest: false,
+      isRemoteRequest: false,
+      tracing: { enabled: false, root: undefined, current: undefined },
+      cookies: {
+        get: () => undefined,
+        getAll: () => [],
+        set: () => {},
+        delete: () => {},
+        serialize: () => "",
+      },
+      fetch: globalThis.fetch,
+      getClientAddress: () => "127.0.0.1",
+      setHeaders: () => {},
+    };
   }
 
   async function signIn(email = "owned-test@example.com") {
@@ -124,7 +149,14 @@ describe("Auth Guard - requireAuth", () => {
 
   it("throws redirect when session is missing but user exists", async () => {
     const event = mockEvent(new Request("http://localhost:5173/dashboard"), {
-      user: { id: "user-123", email: "test@example.com", name: "Test" },
+      user: {
+        id: "user-123",
+        email: "test@example.com",
+        name: "Test",
+        emailVerified: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
     });
 
     await expectRedirect(requireAuth(event), 303, "/login");
@@ -132,7 +164,14 @@ describe("Auth Guard - requireAuth", () => {
 
   it("throws redirect when user is missing but session exists", async () => {
     const event = mockEvent(new Request("http://localhost:5173/dashboard"), {
-      session: { id: "session-123", userId: "user-123", expiresAt: new Date() },
+      session: {
+        id: "session-123",
+        userId: "user-123",
+        expiresAt: new Date(),
+        token: "session-token",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
     });
 
     await expectRedirect(requireAuth(event), 303, "/login");
@@ -225,6 +264,8 @@ describe("Auth Guard - requireAuth", () => {
       );
 
       expect(result).toBeInstanceOf(Response);
+      // SAFETY: the toBeInstanceOf assertion immediately above throws unless
+      // result is a Response.
       expect((result as Response).status).toBe(403);
     });
 
@@ -238,8 +279,11 @@ describe("Auth Guard - requireAuth", () => {
       );
 
       expect(result).toBeInstanceOf(Response);
-      expect((result as Response).status).toBe(404);
-      expect(await (result as Response).json()).toEqual({
+      // SAFETY: the toBeInstanceOf assertion immediately above throws unless
+      // result is a Response.
+      const response = result as Response;
+      expect(response.status).toBe(404);
+      expect(await response.json()).toEqual({
         error: "not_found",
         message: "Project not found",
       });
@@ -259,6 +303,8 @@ describe("Auth Guard - requireAuth", () => {
       );
 
       expect(result).toBeInstanceOf(Response);
+      // SAFETY: the toBeInstanceOf assertion immediately above throws unless
+      // result is a Response.
       expect((result as Response).status).toBe(404);
     });
 

@@ -47,7 +47,7 @@ function createRequestEvent(
     fetch: globalThis.fetch,
     getClientAddress: () => "127.0.0.1",
     setHeaders: () => {},
-  } as unknown;
+  };
 }
 
 async function* parseSSEStream(
@@ -188,6 +188,7 @@ describe("POST /api/projects/[id]/incidents/stream", () => {
         await import("../../../../../../../src/routes/api/projects/[id]/incidents/stream/+server");
 
       try {
+        // SAFETY: the fixture event provides every RequestEvent member the stream handler reads (request, url, params, locals, cookies, fetch, getClientAddress, setHeaders); tracing stays null because the handler never reads it.
         await POST(event as never);
         expect.fail("Should have thrown HTTP error");
       } catch (e) {
@@ -217,6 +218,7 @@ describe("POST /api/projects/[id]/incidents/stream", () => {
       const { POST } =
         await import("../../../../../../../src/routes/api/projects/[id]/incidents/stream/+server");
 
+      // SAFETY: the fixture event provides every RequestEvent member the stream handler reads (request, url, params, locals, cookies, fetch, getClientAddress, setHeaders); tracing stays null because the handler never reads it.
       const response = await POST(event as never);
 
       expect(response.status).toBe(404);
@@ -266,6 +268,7 @@ describe("POST /api/projects/[id]/incidents/stream", () => {
       const { POST } =
         await import("../../../../../../../src/routes/api/projects/[id]/incidents/stream/+server");
 
+      // SAFETY: the fixture event provides every RequestEvent member the stream handler reads (request, url, params, locals, cookies, fetch, getClientAddress, setHeaders); tracing stays null because the handler never reads it.
       const response = await POST(event as never);
 
       expect(response.status).toBe(403);
@@ -287,6 +290,7 @@ describe("POST /api/projects/[id]/incidents/stream", () => {
       const { POST } =
         await import("../../../../../../../src/routes/api/projects/[id]/incidents/stream/+server");
 
+      // SAFETY: the fixture event provides every RequestEvent member the stream handler reads (request, url, params, locals, cookies, fetch, getClientAddress, setHeaders); tracing stays null because the handler never reads it.
       const response = await POST(event as never);
 
       expect(response.status).toBe(200);
@@ -309,6 +313,7 @@ describe("POST /api/projects/[id]/incidents/stream", () => {
       const { POST } =
         await import("../../../../../../../src/routes/api/projects/[id]/incidents/stream/+server");
 
+      // SAFETY: the fixture event provides every RequestEvent member the stream handler reads (request, url, params, locals, cookies, fetch, getClientAddress, setHeaders); tracing stays null because the handler never reads it.
       const response = await POST(event as never);
 
       await new Promise((resolve) => setTimeout(resolve, 50));
@@ -343,6 +348,7 @@ describe("POST /api/projects/[id]/incidents/stream", () => {
       const { POST } =
         await import("../../../../../../../src/routes/api/projects/[id]/incidents/stream/+server");
 
+      // SAFETY: the fixture event provides every RequestEvent member the stream handler reads (request, url, params, locals, cookies, fetch, getClientAddress, setHeaders); tracing stays null because the handler never reads it.
       const response = await POST(event as never);
 
       const otherIncident = createMockIncident(project2.id, { title: "Other project incident" });
@@ -386,6 +392,7 @@ describe("POST /api/projects/[id]/incidents/stream", () => {
       const initialCount = logEventBus.getIncidentListenerCount(project.id);
       expect(initialCount).toBe(0);
 
+      // SAFETY: the fixture event provides every RequestEvent member the stream handler reads (request, url, params, locals, cookies, fetch, getClientAddress, setHeaders); tracing stays null because the handler never reads it.
       const response = await POST(event as never);
 
       await new Promise((resolve) => setTimeout(resolve, 50));

@@ -59,7 +59,7 @@ export async function cleanupOldLogs(dbClient?: DatabaseClient): Promise<Cleanup
             RETURNING id
           `);
 
-          const rows = getQueryRows(raw as Parameters<typeof getQueryRows>[0]);
+          const rows = getQueryRows(raw);
 
           if (rows.length === 0) break;
           deletedInProject += rows.length;

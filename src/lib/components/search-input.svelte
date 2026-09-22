@@ -39,6 +39,8 @@ function clearDebounceTimer() {
 }
 
 function handleInput(event: Event) {
+  // SAFETY: handleInput is bound only to this component's <input> (oninput below), so the
+  // input event's target is always that HTMLInputElement.
   const target = event.target as HTMLInputElement;
   value = target.value;
 

@@ -12,6 +12,8 @@ import type { PageData } from './$types';
 
 const { data }: { data: PageData } = $props();
 
+// SAFETY: the stats loader parses the range query param through parseTimeRange with a "24h"
+// fallback before returning it in data.filters, so this value is always a TimeRange.
 // svelte-ignore state_referenced_locally
 let selectedRange = $state<TimeRange>((data.filters.range as TimeRange) || '24h');
 

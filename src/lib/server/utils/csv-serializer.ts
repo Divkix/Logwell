@@ -1,12 +1,16 @@
-export function escapeCSVField(field: unknown): string {
+import { z } from "zod";
+import type { JsonValue } from "$lib/shared/schemas/json";
+
+const jsonPrimitiveSchema = z.union([z.string(), z.number(), z.boolean()]);
+
+export function escapeCSVField(field: JsonValue | undefined): string {
   if (field === null || field === undefined) {
     return "";
   }
 
-  let value =
-    typeof field === "object" && field !== null
-      ? JSON.stringify(field)
-      : String(field as string | number | boolean | bigint);
+  const primitive = jsonPrimitiveSchema.safeParse(field);
+
+  let value = primitive.success ? String(primitive.data) : JSON.stringify(field);
 
   if (/^[=+\-@]/.test(value.trimStart())) {
     value = `'${value}`;

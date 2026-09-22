@@ -45,7 +45,7 @@ function createProjectStreamResponse<T>(
           if (isClosed) return "closed";
 
           try {
-            const size = (controller as ReadableStreamDefaultController).desiredSize;
+            const size = controller.desiredSize;
 
             if (size !== null && size < 0) {
               consecutiveDrops += 1;

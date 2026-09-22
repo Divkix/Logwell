@@ -56,8 +56,8 @@ export function generateApiKey(): string {
   return `lw_${nanoid(32)}`;
 }
 
-export function validateApiKeyFormat(key: string): boolean {
-  if (!key || typeof key !== "string") {
+export function validateApiKeyFormat(key: string | null | undefined): boolean {
+  if (!key) {
     return false;
   }
 

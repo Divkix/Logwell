@@ -70,6 +70,9 @@ describe("Modal accessibility", () => {
     ["log detail", LogDetailModal, { log: baseLog, open: true }],
     ["create project", CreateProjectModal, { open: true }],
   ])("%s modal traps Tab focus within the dialog", async (_name, component, props) => {
+    // SAFETY: each it.each row pairs a modal component with the props that exact component
+    // expects, so the union-typed row is valid as rendered; `never` defers the pair check to
+    // render(), where a mismatch would throw.
     render(component as typeof LogDetailModal, { props: props as never });
 
     const modal = screen.getByRole("dialog");
@@ -80,7 +83,11 @@ describe("Modal accessibility", () => {
 
     expect(focusableElements.length).toBeGreaterThan(0);
 
+    // SAFETY: the query above matches only focusable HTML controls (button, a[href], input,
+    // select, textarea, tabindex), and the length assertion guarantees this index is in range.
     const lastFocusable = focusableElements[focusableElements.length - 1] as HTMLElement;
+    // SAFETY: same focusable-only selector as above; index 0 exists because length > 0 was
+    // asserted on line 81.
     const firstFocusable = focusableElements[0] as HTMLElement;
     lastFocusable.focus();
     await fireEvent.keyDown(modal, { key: "Tab" });

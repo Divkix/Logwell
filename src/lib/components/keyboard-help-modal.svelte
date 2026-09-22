@@ -16,6 +16,9 @@ let previouslyFocusedElement: HTMLElement | null = $state(null);
 
 $effect(() => {
   if (open && !previouslyFocusedElement) {
+    // SAFETY: the dialog only opens in response to a user interaction, so document.activeElement
+    // is the focused control (or <body> when focus has not moved) — an element the restore
+    // effect below can re-focus.
     previouslyFocusedElement = document.activeElement as HTMLElement;
   }
 });

@@ -1,6 +1,7 @@
 import { json } from "@sveltejs/kit";
 import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
+import { z } from "zod";
 import { API_CONFIG } from "$lib/server/config/performance";
 import type { DatabaseClient } from "$lib/server/db/db";
 import { log, type NewLog, project } from "$lib/server/db/schema";
@@ -15,6 +16,7 @@ import {
 import { BatchTooLargeError, OtlpValidationError } from "$lib/server/utils/otlp";
 import { checkRateLimit, INGEST_RPM } from "$lib/server/utils/rate-limit";
 import { SimpleIngestError } from "$lib/server/utils/simple-ingest";
+import { jsonObjectSchema, type JsonObject, type JsonValue } from "../../shared/schemas/json";
 
 export const LOG_RETURNING_COLUMNS = {
   id: log.id,
@@ -50,10 +52,34 @@ export const LOG_RETURNING_COLUMNS = {
   timestamp: log.timestamp,
 } as const;
 
+// DatabaseClient is a union of two flavours, which defeats overload resolution on
+// the projected `.returning(fields)` call, so the insert builder is narrowed to the
+// contract both flavours declare. The projection names every log column but the
+// generated `search`, which is exactly StreamLog.
+type LogInsertReturning = {
+  returning: (fields: typeof LOG_RETURNING_COLUMNS) => PromiseLike<StreamLog[]>;
+};
+
+// drizzle types jsonb columns as unknown, which is wider than the JSON values
+// both ingest parsers actually assign, so the four jsonb columns are re-declared
+// as the JSON domain they hold.
 export type IngestInputRow = Omit<
   NewLog,
-  "id" | "projectId" | "incidentId" | "fingerprint" | "serviceName" | "search"
+  | "id"
+  | "projectId"
+  | "incidentId"
+  | "fingerprint"
+  | "serviceName"
+  | "search"
+  | "body"
+  | "metadata"
+  | "resourceAttributes"
+  | "scopeAttributes"
 > & {
+  body: JsonValue;
+  metadata: JsonObject | null;
+  resourceAttributes: JsonObject | null;
+  scopeAttributes: JsonObject | null;
   timestamp: Date;
 };
 
@@ -64,17 +90,19 @@ export interface ParsedIngest {
   errors: string[];
 }
 
-export type IngestBodyParser = (body: unknown) => ParsedIngest;
+export type IngestBodyParser = (body: JsonValue | undefined) => ParsedIngest;
 
 // Postgres rejects U+0000 in both text and jsonb columns, so NUL characters are
 // stripped from every string bound for a column. The walk is depth-bounded
 // because the payload is attacker-controlled; deeper levels are dropped.
 const MAX_NUL_STRIP_DEPTH = 32;
 
-function stripNulStrings(value: unknown, depth = 0): unknown {
-  if (typeof value === "string") return value.replaceAll("\u0000", "");
+const nulStrippedString = z.string().transform((text) => text.replaceAll("\u0000", ""));
 
-  if (value === null || typeof value !== "object") return value;
+function stripNulStrings(value: JsonValue, depth = 0): JsonValue {
+  const text = nulStrippedString.safeParse(value);
+
+  if (text.success) return text.data;
 
   if (depth >= MAX_NUL_STRIP_DEPTH) return null;
 
@@ -82,13 +110,12 @@ function stripNulStrings(value: unknown, depth = 0): unknown {
     return value.map((entry) => stripNulStrings(entry, depth + 1));
   }
 
-  // Only plain JSON containers are walked; class instances (e.g. Date) pass through.
-  const prototype: unknown = Object.getPrototypeOf(value);
+  const record = jsonObjectSchema.safeParse(value);
 
-  if (prototype !== Object.prototype && prototype !== null) return value;
+  if (!record.success) return value;
 
   return Object.fromEntries(
-    Object.entries(value).map(([key, entry]) => [
+    Object.entries(record.data).map(([key, entry]) => [
       key.replaceAll("\u0000", ""),
       stripNulStrings(entry, depth + 1),
     ]),
@@ -96,26 +123,23 @@ function stripNulStrings(value: unknown, depth = 0): unknown {
 }
 
 function sanitizeIngestInput(input: IngestInputRow): IngestInputRow {
-  const sanitized: Record<string, unknown> = { ...input };
-
-  for (const [key, value] of Object.entries(sanitized)) {
-    // A NUL in `message` is a per-record rejection in both parsers, never a strip.
-    if (key === "message") continue;
-    sanitized[key] = stripNulStrings(value);
-  }
-
-  return sanitized as IngestInputRow;
+  // SAFETY: Object.entries keeps every own enumerable key of `input` (including
+  // `message`, which is passed through untouched); only NUL bytes are stripped
+  // from the other values, so the rebuilt object has IngestInputRow's exact
+  // runtime shape.
+  return Object.fromEntries(
+    Object.entries(input).map(([key, value]) =>
+      // A NUL in `message` is a per-record rejection in both parsers, never a strip.
+      // The timestamp is a Date, which is bound to its column untouched.
+      key === "message" || value instanceof Date ? [key, value] : [key, stripNulStrings(value)],
+    ),
+  ) as IngestInputRow;
 }
 
 export function buildIngestResponse(accepted: number, rejected: number, errors: string[]) {
-  const response: { accepted: number; rejected?: number; errors?: string[] } = { accepted };
+  if (rejected <= 0) return { accepted };
 
-  if (rejected > 0) {
-    response.rejected = rejected;
-    response.errors = errors;
-  }
-
-  return response;
+  return { accepted, rejected, errors };
 }
 
 export async function ingestLogs(
@@ -155,7 +179,7 @@ export async function ingestLogs(
     );
   }
 
-  let body: unknown;
+  let body: JsonValue | undefined;
 
   try {
     body = await request.json();
@@ -226,10 +250,11 @@ export async function ingestLogs(
             serviceName: prepared.serviceName,
           }));
 
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const insertedLogs: StreamLog[] = await (
-            tx.insert(log).values(logEntries) as any
-          ).returning(LOG_RETURNING_COLUMNS);
+          // SAFETY: DatabaseClient's union defeats overload resolution on the projected
+          // `.returning()`; both flavours declare it with this signature, so the builder is
+          // narrowed to the contract it already satisfies.
+          const projectedInsert = tx.insert(log).values(logEntries) as LogInsertReturning;
+          const insertedLogs: StreamLog[] = await projectedInsert.returning(LOG_RETURNING_COLUMNS);
 
           return { insertedLogs, touchedIncidents };
         })

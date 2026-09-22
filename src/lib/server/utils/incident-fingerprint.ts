@@ -50,7 +50,7 @@ export function buildIncidentFingerprint(params: {
   serviceName: string | null;
   sourceFile: string | null;
   lineNumber: number | null;
-}): { fingerprint: string; normalizedMessage: string; seed: string } {
+}) {
   const normalizedMessage = normalizeIncidentMessage(params.message);
 
   const seed = buildIncidentFingerprintSeed({

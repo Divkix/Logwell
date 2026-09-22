@@ -210,7 +210,7 @@ describe("better-auth Integration", () => {
       const [createdUser] = await db.select().from(user).where(eq(user.email, email));
 
       expect(createdUser!.id).toBeDefined();
-      expect(typeof createdUser!.id).toBe("string");
+      expect(createdUser!.id).toEqual(expect.any(String));
       expect(createdUser!.name).toBe(name);
       expect(createdUser!.email).toBe(email);
       expect(createdUser!.emailVerified).toBe(false);

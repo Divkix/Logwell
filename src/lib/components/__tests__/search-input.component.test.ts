@@ -45,7 +45,7 @@ describe("SearchInput", () => {
   it("calls onEscape and blurs on Escape, ignoring other keys", async () => {
     const onEscape = vi.fn();
     render(SearchInput, { props: { onEscape } });
-    const input = screen.getByRole("textbox") as HTMLInputElement;
+    const input = screen.getByRole("textbox");
     input.focus();
 
     await fireEvent.keyDown(input, { key: "Enter" });

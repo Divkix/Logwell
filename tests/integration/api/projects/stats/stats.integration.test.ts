@@ -6,6 +6,7 @@ import type * as schema from "$lib/server/db/schema";
 import { setupTestDatabase } from "$lib/server/db/test-db";
 import { getSession } from "$lib/server/session";
 import { clearApiKeyCache } from "$lib/server/utils/api-key";
+import type { JsonObject } from "$lib/shared/schemas/json";
 import { GET } from "../../../../../src/routes/api/projects/[id]/stats/+server";
 import { seedLogs, seedProject } from "../../../../fixtures/db";
 
@@ -36,18 +37,19 @@ function createRequestEvent(
     fetch: globalThis.fetch,
     getClientAddress: () => "127.0.0.1",
     setHeaders: () => {},
-  } as unknown;
+  };
 }
 
 async function expectHttpError(
   promise: Promise<unknown>,
   expectedStatus: number,
-  expectedBody?: Record<string, unknown>,
+  expectedBody?: JsonObject,
 ): Promise<void> {
   try {
     await promise;
     expect.fail("Expected HTTP error to be thrown");
   } catch (error) {
+    // SAFETY: the awaited GET handler rejects only through SvelteKit's error() helper, which throws an HttpError with a numeric status and a body; if it resolves instead, expect.fail's throw lands here and the status check below fails the test.
     const httpError = error as HttpError;
     expect(httpError.status).toBe(expectedStatus);
 
@@ -109,6 +111,7 @@ describe("GET /api/projects/[id]/stats", () => {
       });
 
       const event = createRequestEvent(request, db, { id: testProject.id });
+      // SAFETY: createRequestEvent supplies every RequestEvent field GET and requireOwnedProjectRoute read (request, url, params, route.id, locals, cookies); its tracing stays null because tests build no OTel Spans, so the event is passed as never.
       await expectHttpError(GET(event as never), 401, { message: "Unauthorized" });
     });
   });
@@ -128,6 +131,7 @@ describe("GET /api/projects/[id]/stats", () => {
       });
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+      // SAFETY: createRequestEvent supplies every RequestEvent field GET and requireOwnedProjectRoute read (request, url, params, route.id, locals, cookies); its tracing stays null because tests build no OTel Spans, so the event is passed as never.
       const response = await GET(event as never);
 
       expect(response.status).toBe(200);
@@ -155,6 +159,7 @@ describe("GET /api/projects/[id]/stats", () => {
       });
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+      // SAFETY: createRequestEvent supplies every RequestEvent field GET and requireOwnedProjectRoute read (request, url, params, route.id, locals, cookies); its tracing stays null because tests build no OTel Spans, so the event is passed as never.
       const response = await GET(event as never);
 
       expect(response.status).toBe(200);
@@ -183,6 +188,7 @@ describe("GET /api/projects/[id]/stats", () => {
       });
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+      // SAFETY: createRequestEvent supplies every RequestEvent field GET and requireOwnedProjectRoute read (request, url, params, route.id, locals, cookies); its tracing stays null because tests build no OTel Spans, so the event is passed as never.
       const response = await GET(event as never);
 
       expect(response.status).toBe(200);
@@ -206,6 +212,7 @@ describe("GET /api/projects/[id]/stats", () => {
       });
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+      // SAFETY: createRequestEvent supplies every RequestEvent field GET and requireOwnedProjectRoute read (request, url, params, route.id, locals, cookies); its tracing stays null because tests build no OTel Spans, so the event is passed as never.
       const response = await GET(event as never);
 
       expect(response.status).toBe(200);
@@ -231,15 +238,14 @@ describe("GET /api/projects/[id]/stats", () => {
       });
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+      // SAFETY: createRequestEvent supplies every RequestEvent field GET and requireOwnedProjectRoute read (request, url, params, route.id, locals, cookies); its tracing stays null because tests build no OTel Spans, so the event is passed as never.
       const response = await GET(event as never);
 
       expect(response.status).toBe(200);
       const body = await response.json();
 
-      const totalPercentage = Object.values(body.levelPercentages as Record<string, number>).reduce(
-        (sum, pct) => sum + pct,
-        0,
-      );
+      const levelPercentages: Record<string, number> = body.levelPercentages;
+      const totalPercentage = Object.values(levelPercentages).reduce((sum, pct) => sum + pct, 0);
 
       expect(totalPercentage).toBeCloseTo(100, 0);
     });
@@ -267,6 +273,7 @@ describe("GET /api/projects/[id]/stats", () => {
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+      // SAFETY: createRequestEvent supplies every RequestEvent field GET and requireOwnedProjectRoute read (request, url, params, route.id, locals, cookies); its tracing stays null because tests build no OTel Spans, so the event is passed as never.
       const response = await GET(event as never);
 
       expect(response.status).toBe(200);
@@ -297,6 +304,7 @@ describe("GET /api/projects/[id]/stats", () => {
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+      // SAFETY: createRequestEvent supplies every RequestEvent field GET and requireOwnedProjectRoute read (request, url, params, route.id, locals, cookies); its tracing stays null because tests build no OTel Spans, so the event is passed as never.
       const response = await GET(event as never);
 
       expect(response.status).toBe(200);
@@ -336,6 +344,7 @@ describe("GET /api/projects/[id]/stats", () => {
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+      // SAFETY: createRequestEvent supplies every RequestEvent field GET and requireOwnedProjectRoute read (request, url, params, route.id, locals, cookies); its tracing stays null because tests build no OTel Spans, so the event is passed as never.
       const response = await GET(event as never);
 
       expect(response.status).toBe(200);
@@ -353,6 +362,7 @@ describe("GET /api/projects/[id]/stats", () => {
       });
 
       const event = createRequestEvent(request, db, { id: "non-existent-id" }, authenticatedLocals);
+      // SAFETY: createRequestEvent supplies every RequestEvent field GET and requireOwnedProjectRoute read (request, url, params, route.id, locals, cookies); its tracing stays null because tests build no OTel Spans, so the event is passed as never.
       const response = await GET(event as never);
 
       expect(response.status).toBe(404);
@@ -371,6 +381,7 @@ describe("GET /api/projects/[id]/stats", () => {
       });
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+      // SAFETY: createRequestEvent supplies every RequestEvent field GET and requireOwnedProjectRoute read (request, url, params, route.id, locals, cookies); its tracing stays null because tests build no OTel Spans, so the event is passed as never.
       const response = await GET(event as never);
 
       expect(response.status).toBe(200);
@@ -398,6 +409,7 @@ describe("GET /api/projects/[id]/stats", () => {
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+      // SAFETY: createRequestEvent supplies every RequestEvent field GET and requireOwnedProjectRoute read (request, url, params, route.id, locals, cookies); its tracing stays null because tests build no OTel Spans, so the event is passed as never.
       const response = await GET(event as never);
 
       expect(response.status).toBe(200);

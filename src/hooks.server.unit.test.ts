@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { LOGIN_RPM } from "./lib/server/utils/rate-limit";
 import { handle } from "./hooks.server";
 
+// SAFETY: beforeEach assigns ORIGIN a concrete origin string and the unset-origin test
+// assigns undefined, so the field's type must widen past the undefined literal.
 const mocks = vi.hoisted(() => ({
   db: { kind: "test-db" },
   getSession: vi.fn(),
@@ -43,14 +45,20 @@ vi.mock("$lib/server/utils/rate-limit", async () => await import("./lib/server/u
 const ORIGIN = "http://localhost";
 
 function createEvent(url: string, init: RequestInit = {}, address = "203.0.113.10"): RequestEvent {
-  return {
+  const event: Partial<RequestEvent> = {
     request: new Request(url, init),
     url: new URL(url),
     locals: {},
     params: {},
-    route: { id: "test" },
+    route: { id: null },
     getClientAddress: () => address,
-  } as unknown as RequestEvent;
+  };
+
+  // SAFETY: handle, checkCsrfOrigin and better-auth's svelteKitHandler read only request,
+  // url, locals and getClientAddress from the event — all set above — and no test reaches
+  // handleError, the sole reader of route.id, so the omitted members (cookies, fetch,
+  // tracing, setHeaders, platform, …) are never accessed.
+  return event as RequestEvent;
 }
 
 describe("hooks.server handle", () => {

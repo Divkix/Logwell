@@ -1,4 +1,6 @@
+import { z } from "zod";
 import type { LogLevel } from "$lib/shared/types";
+import { jsonObjectSchema, type JsonObject, type JsonValue } from "../../shared/schemas/json";
 import { API_CONFIG } from "../config/performance";
 import type { ParsedIngest } from "./ingest";
 
@@ -18,63 +20,23 @@ export class BatchTooLargeError extends OtlpValidationError {
   }
 }
 
-type OtlpAnyValue = {
-  stringValue?: string;
-  boolValue?: boolean;
-  intValue?: string | number;
-  doubleValue?: number;
-  arrayValue?: { values?: OtlpAnyValue[] };
-  kvlistValue?: { values?: OtlpKeyValue[] };
-  bytesValue?: string;
-};
-
-type OtlpKeyValue = {
-  key?: string;
-  value?: OtlpAnyValue;
-};
-
-type OtlpLogRecord = {
-  timeUnixNano?: string | number;
-  observedTimeUnixNano?: string | number;
-  severityNumber?: number | string;
-  severityText?: string;
-  body?: OtlpAnyValue;
-  attributes?: OtlpKeyValue[];
-  droppedAttributesCount?: number;
-  flags?: number;
-  traceId?: string;
-  spanId?: string;
-};
-
-type OtlpScope = {
-  name?: string;
-  version?: string;
-  attributes?: OtlpKeyValue[];
-  droppedAttributesCount?: number;
-};
-
-type OtlpResource = {
-  attributes?: OtlpKeyValue[];
-  droppedAttributesCount?: number;
-};
-
 export type NormalizedOtlpLogRecord = {
   timeUnixNano: string | null;
   observedTimeUnixNano: string | null;
   severityNumber: number | null;
   severityText: string | null;
-  body: unknown;
-  attributes: Record<string, unknown> | null;
+  body: JsonValue;
+  attributes: JsonObject | null;
   droppedAttributesCount: number | null;
   flags: number | null;
   traceId: string | null;
   spanId: string | null;
-  resourceAttributes: Record<string, unknown> | null;
+  resourceAttributes: JsonObject | null;
   resourceDroppedAttributesCount: number | null;
   resourceSchemaUrl: string | null;
   scopeName: string | null;
   scopeVersion: string | null;
-  scopeAttributes: Record<string, unknown> | null;
+  scopeAttributes: JsonObject | null;
   scopeDroppedAttributesCount: number | null;
   scopeSchemaUrl: string | null;
   message: string;
@@ -92,8 +54,18 @@ const TRACE_ID_REGEX = /^[0-9a-f]{32}$/i;
 
 const SPAN_ID_REGEX = /^[0-9a-f]{16}$/i;
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+// Wire values are decoded JSON: parse once with the project's JSON-object
+// schema, then consume the named output instead of re-guarding ad hoc.
+function decodeObject(value: JsonValue | undefined): JsonObject | null {
+  const decoded = jsonObjectSchema.safeParse(value);
+
+  return decoded.success ? decoded.data : null;
+}
+
+function decodeString(value: JsonValue | undefined): string | null {
+  const decoded = z.string().safeParse(value);
+
+  return decoded.success ? decoded.data : null;
 }
 
 function clampInt32(value: number): number | null {
@@ -105,9 +77,11 @@ function clampInt32(value: number): number | null {
   return t;
 }
 
-export function parseUint64String(value: unknown): string | null {
-  if (typeof value === "string") {
-    const trimmed = value.trim();
+export function parseUint64String(value: JsonValue | undefined): string | null {
+  const asString = decodeString(value);
+
+  if (asString !== null) {
+    const trimmed = asString.trim();
 
     if (!trimmed) return null;
 
@@ -116,25 +90,26 @@ export function parseUint64String(value: unknown): string | null {
     return trimmed;
   }
 
-  if (
-    typeof value === "number" &&
-    Number.isFinite(value) &&
-    Number.isInteger(value) &&
-    value >= 0
-  ) {
-    return Math.trunc(value).toString();
+  const asNumber = z.number().safeParse(value);
+
+  if (asNumber.success && Number.isInteger(asNumber.data) && asNumber.data >= 0) {
+    return Math.trunc(asNumber.data).toString();
   }
 
   return null;
 }
 
-function parseOptionalNumber(value: unknown): number | null {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return clampInt32(value);
+function parseOptionalNumber(value: JsonValue | undefined): number | null {
+  const asNumber = z.number().safeParse(value);
+
+  if (asNumber.success) {
+    return clampInt32(asNumber.data);
   }
 
-  if (typeof value === "string" && value.trim()) {
-    const parsed = Number(value);
+  const asString = decodeString(value);
+
+  if (asString !== null && asString.trim()) {
+    const parsed = Number(asString);
 
     return Number.isFinite(parsed) ? clampInt32(parsed) : null;
   }
@@ -142,13 +117,17 @@ function parseOptionalNumber(value: unknown): number | null {
   return null;
 }
 
-function parseIntValue(value: unknown): number | string | null {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return Number.isSafeInteger(value) ? value : Math.trunc(value);
+function parseIntValue(value: JsonValue | undefined): number | string | null {
+  const asNumber = z.number().safeParse(value);
+
+  if (asNumber.success) {
+    return Number.isSafeInteger(asNumber.data) ? asNumber.data : Math.trunc(asNumber.data);
   }
 
-  if (typeof value === "string") {
-    const trimmed = value.trim();
+  const asString = decodeString(value);
+
+  if (asString !== null) {
+    const trimmed = asString.trim();
 
     if (!/^-?\d+$/.test(trimmed)) return null;
     const parsed = Number(trimmed);
@@ -191,7 +170,7 @@ function parseTimestamp(timeUnixNano: string | null, observedTimeUnixNano: strin
   }
 }
 
-function parseSeverityNumber(value: unknown): number | null {
+function parseSeverityNumber(value: JsonValue | undefined): number | null {
   const numberValue = parseOptionalNumber(value);
 
   if (numberValue === null) return null;
@@ -245,35 +224,36 @@ export function severityNumberToLogLevel(value: number | null | undefined): LogL
   return "fatal";
 }
 
-function attributeString(
-  attributes: Record<string, unknown> | null,
-  keys: string[],
-): string | null {
+function attributeString(attributes: JsonObject | null, keys: string[]): string | null {
   if (!attributes) return null;
 
   for (const key of keys) {
     const value = attributes[key];
+    const decoded = decodeString(value);
 
-    if (typeof value === "string" && value.trim()) {
-      return value;
+    if (decoded !== null && decoded.trim()) {
+      return decoded;
     }
   }
 
   return null;
 }
 
-function attributeInt(attributes: Record<string, unknown> | null, keys: string[]): number | null {
+function attributeInt(attributes: JsonObject | null, keys: string[]): number | null {
   if (!attributes) return null;
 
   for (const key of keys) {
     const value = attributes[key];
+    const asNumber = z.number().safeParse(value);
 
-    if (typeof value === "number" && Number.isSafeInteger(value)) {
-      return value > 0 ? clampInt32(value) : null;
+    if (asNumber.success && Number.isSafeInteger(asNumber.data)) {
+      return asNumber.data > 0 ? clampInt32(asNumber.data) : null;
     }
 
-    if (typeof value === "string" && value.trim()) {
-      const parsed = Number.parseInt(value, 10);
+    const decoded = decodeString(value);
+
+    if (decoded !== null && decoded.trim()) {
+      const parsed = Number.parseInt(decoded, 10);
 
       if (Number.isSafeInteger(parsed)) {
         return parsed > 0 ? clampInt32(parsed) : null;
@@ -284,7 +264,7 @@ function attributeInt(attributes: Record<string, unknown> | null, keys: string[]
   return null;
 }
 
-export function mapOtlpAttributesToLogColumns(attributes: Record<string, unknown> | null) {
+export function mapOtlpAttributesToLogColumns(attributes: JsonObject | null) {
   const sourceFile = attributeString(attributes, ["code.filepath", "source.file", "source_file"]);
   const lineNumber = attributeInt(attributes, ["code.lineno", "source.line", "line_number"]);
   const requestId = attributeString(attributes, ["request.id", "request_id", "http.request_id"]);
@@ -301,87 +281,99 @@ export function mapOtlpAttributesToLogColumns(attributes: Record<string, unknown
   return { sourceFile, lineNumber, requestId, userId, ipAddress };
 }
 
-export function normalizeTraceId(value: unknown): string | null {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
+export function normalizeTraceId(value: JsonValue | undefined): string | null {
+  const decoded = decodeString(value);
+
+  if (decoded === null) return null;
+  const trimmed = decoded.trim();
 
   if (!TRACE_ID_REGEX.test(trimmed)) return null;
 
   return trimmed.toLowerCase();
 }
 
-export function normalizeSpanId(value: unknown): string | null {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
+export function normalizeSpanId(value: JsonValue | undefined): string | null {
+  const decoded = decodeString(value);
+
+  if (decoded === null) return null;
+  const trimmed = decoded.trim();
 
   if (!SPAN_ID_REGEX.test(trimmed)) return null;
 
   return trimmed.toLowerCase();
 }
 
-export function parseOtlpAnyValue(value: OtlpAnyValue, depth = 0): unknown {
+export function parseOtlpAnyValue(value: JsonValue | undefined, depth = 0): JsonValue {
   if (depth > 32) return null;
 
-  if (!isRecord(value)) return null;
+  const record = decodeObject(value);
 
-  if (value.stringValue !== undefined) return value.stringValue;
+  if (record === null) return null;
 
-  if (value.boolValue !== undefined) return value.boolValue;
+  if (record.stringValue !== undefined) return record.stringValue;
 
-  if (value.intValue !== undefined) {
-    return parseIntValue(value.intValue);
+  if (record.boolValue !== undefined) return record.boolValue;
+
+  if (record.intValue !== undefined) {
+    return parseIntValue(record.intValue);
   }
 
-  if (value.doubleValue !== undefined) {
-    return value.doubleValue;
+  if (record.doubleValue !== undefined) {
+    return record.doubleValue;
   }
 
-  if (value.arrayValue !== undefined) {
-    const values = Array.isArray(value.arrayValue?.values) ? (value.arrayValue?.values ?? []) : [];
+  if (record.arrayValue !== undefined) {
+    const values = decodeObject(record.arrayValue)?.values;
 
-    return values.map((entry) => parseOtlpAnyValue(entry, depth + 1));
+    return Array.isArray(values) ? values.map((entry) => parseOtlpAnyValue(entry, depth + 1)) : [];
   }
 
-  if (value.kvlistValue !== undefined) {
-    return parseKeyValueList(value.kvlistValue?.values, depth + 1);
+  if (record.kvlistValue !== undefined) {
+    return parseKeyValueList(decodeObject(record.kvlistValue)?.values, depth + 1);
   }
 
-  if (value.bytesValue !== undefined) {
-    return value.bytesValue;
+  if (record.bytesValue !== undefined) {
+    return record.bytesValue;
   }
 
   return null;
 }
 
-function parseKeyValueList(values?: OtlpKeyValue[], depth = 0): Record<string, unknown> {
+function parseKeyValueList(values: JsonValue | undefined, depth = 0): JsonObject {
   if (depth > 32) return {};
 
   if (!Array.isArray(values)) return {};
-  const record: Record<string, unknown> = {};
+  const record: JsonObject = {};
 
   for (const entry of values) {
-    if (!isRecord(entry)) continue;
-    const key = typeof entry.key === "string" ? entry.key : null;
+    const entryObject = decodeObject(entry);
+
+    if (entryObject === null) continue;
+    const key = decodeString(entryObject.key);
 
     if (!key) continue;
-    const parsedValue = entry.value ? parseOtlpAnyValue(entry.value, depth + 1) : null;
+    const parsedValue = entryObject.value ? parseOtlpAnyValue(entryObject.value, depth + 1) : null;
     record[key] = parsedValue;
   }
 
   return record;
 }
 
-function parseAttributes(values?: OtlpKeyValue[]): Record<string, unknown> | null {
+function parseAttributes(values: JsonValue | undefined): JsonObject | null {
   const record = parseKeyValueList(values);
 
   return Object.keys(record).length > 0 ? record : null;
 }
 
-function deriveMessage(body: unknown, attributes: Record<string, unknown> | null): string {
-  if (typeof body === "string") return body;
-  const attrMessage = attributes?.message ?? attributes?.["log.message"];
+function deriveMessage(body: JsonValue | undefined, attributes: JsonObject | null): string {
+  const bodyString = decodeString(body);
 
-  if (typeof attrMessage === "string") return attrMessage;
+  if (bodyString !== null) return bodyString;
+
+  const attrMessage = attributes?.message ?? attributes?.["log.message"];
+  const attrString = decodeString(attrMessage);
+
+  if (attrString !== null) return attrString;
 
   if (body === null || body === undefined) return "";
 
@@ -400,12 +392,14 @@ function deriveLevel(severityNumber: number | null, severityText: string | null)
   return severityTextToLogLevel(severityText) ?? "info";
 }
 
-export function normalizeOtlpLogsRequest(body: unknown): NormalizedOtlpLogsResult {
-  if (!isRecord(body)) {
+export function normalizeOtlpLogsRequest(body: JsonValue | undefined): NormalizedOtlpLogsResult {
+  const bodyObject = decodeObject(body);
+
+  if (bodyObject === null) {
     throw new OtlpValidationError("Request body must be an object.");
   }
 
-  const resourceLogs = body.resourceLogs;
+  const resourceLogs = bodyObject.resourceLogs;
 
   if (!Array.isArray(resourceLogs)) {
     throw new OtlpValidationError("resourceLogs must be an array.");
@@ -426,53 +420,57 @@ export function normalizeOtlpLogsRequest(body: unknown): NormalizedOtlpLogsResul
   };
 
   for (const [resourceIndex, resourceLog] of resourceLogs.entries()) {
-    if (!isRecord(resourceLog)) {
+    const resourceLogObject = decodeObject(resourceLog);
+
+    if (resourceLogObject === null) {
       countEntry();
       rejectedLogRecords += 1;
       errors.push(`Malformed resourceLog at index ${resourceIndex}`);
       continue;
     }
 
-    const resource = isRecord(resourceLog.resource) ? (resourceLog.resource as OtlpResource) : null;
+    const resource = decodeObject(resourceLogObject.resource);
     const resourceAttributes = parseAttributes(resource?.attributes);
     const resourceDroppedAttributesCount = parseOptionalNumber(resource?.droppedAttributesCount);
 
-    const resourceSchemaUrl =
-      typeof resourceLog.schemaUrl === "string" ? resourceLog.schemaUrl : null;
+    const resourceSchemaUrl = decodeString(resourceLogObject.schemaUrl);
 
-    const scopeLogs = Array.isArray(resourceLog.scopeLogs) ? resourceLog.scopeLogs : [];
+    const scopeLogs = Array.isArray(resourceLogObject.scopeLogs) ? resourceLogObject.scopeLogs : [];
 
     for (const [scopeIndex, scopeLog] of scopeLogs.entries()) {
-      if (!isRecord(scopeLog)) {
+      const scopeLogObject = decodeObject(scopeLog);
+
+      if (scopeLogObject === null) {
         countEntry();
         rejectedLogRecords += 1;
         errors.push(`Malformed scopeLog at index ${scopeIndex}`);
         continue;
       }
 
-      const scope = isRecord(scopeLog.scope) ? (scopeLog.scope as OtlpScope) : null;
-      const scopeName = typeof scope?.name === "string" ? scope.name : null;
-      const scopeVersion = typeof scope?.version === "string" ? scope.version : null;
+      const scope = decodeObject(scopeLogObject.scope);
+      const scopeName = decodeString(scope?.name);
+      const scopeVersion = decodeString(scope?.version);
       const scopeAttributes = parseAttributes(scope?.attributes);
       const scopeDroppedAttributesCount = parseOptionalNumber(scope?.droppedAttributesCount);
-      const scopeSchemaUrl = typeof scopeLog.schemaUrl === "string" ? scopeLog.schemaUrl : null;
+      const scopeSchemaUrl = decodeString(scopeLogObject.schemaUrl);
 
-      const logRecords = Array.isArray(scopeLog.logRecords) ? scopeLog.logRecords : [];
+      const logRecords = Array.isArray(scopeLogObject.logRecords) ? scopeLogObject.logRecords : [];
 
       for (const logRecord of logRecords) {
         countEntry();
 
-        if (!isRecord(logRecord)) {
+        const record = decodeObject(logRecord);
+
+        if (record === null) {
           rejectedLogRecords += 1;
           errors.push("Log record rejected: must be an object.");
           continue;
         }
 
-        const record = logRecord as OtlpLogRecord;
         const timeUnixNano = parseUint64String(record.timeUnixNano);
         const observedTimeUnixNano = parseUint64String(record.observedTimeUnixNano);
         const severityNumber = parseSeverityNumber(record.severityNumber);
-        const severityText = typeof record.severityText === "string" ? record.severityText : null;
+        const severityText = decodeString(record.severityText);
         const bodyValue = record.body ? parseOtlpAnyValue(record.body) : null;
         const attributes = parseAttributes(record.attributes);
         const droppedAttributesCount = parseOptionalNumber(record.droppedAttributesCount);
@@ -526,7 +524,7 @@ export function normalizeOtlpLogsRequest(body: unknown): NormalizedOtlpLogsResul
   return { records, rejectedLogRecords, errors };
 }
 
-export function parseOtlpIngestBody(body: unknown): ParsedIngest {
+export function parseOtlpIngestBody(body: JsonValue | undefined): ParsedIngest {
   const normalized = normalizeOtlpLogsRequest(body);
 
   return {

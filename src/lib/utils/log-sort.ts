@@ -4,7 +4,7 @@ export type SortField = "timestamp" | "level" | "message";
 
 export type SortDirection = "asc" | "desc" | null;
 
-const LEVEL_SORT_PRIORITY: Record<string, number> = {
+const LEVEL_SORT_PRIORITY = {
   fatal: 5,
   error: 4,
   warn: 3,

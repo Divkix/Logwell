@@ -163,7 +163,9 @@ export async function PATCH(event: RequestEvent): Promise<Response> {
     });
   }
 
-  const updateData: { name?: string; retentionDays?: number | null; updatedAt?: Date } = {};
+  type ProjectUpdatePatch = { name?: string; retentionDays?: number | null; updatedAt?: Date };
+
+  const updateData: ProjectUpdatePatch = {};
 
   if (name !== undefined) {
     updateData.name = name;

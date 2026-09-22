@@ -1,4 +1,5 @@
 import { formatFullDate, formatRelativeTime, formatTimestamp, getTimeRangeStart } from "./format";
+import type { TimeRange } from "./time-range";
 
 describe("formatTimestamp", () => {
   it.each([
@@ -80,14 +81,14 @@ describe("formatRelativeTime", () => {
       const futureDate = new Date(now.getTime() + 5 * 60 * 1000);
       const result = formatRelativeTime(futureDate, now);
       expect(result).toBeDefined();
-      expect(typeof result).toBe("string");
+      expect(result).toEqual(expect.any(String));
     });
 
     it("uses current time when reference time is not provided", () => {
       const pastDate = new Date(Date.now() - 10 * 1000);
       const result = formatRelativeTime(pastDate);
       expect(result).toBeDefined();
-      expect(typeof result).toBe("string");
+      expect(result).toEqual(expect.any(String));
     });
   });
 });
@@ -95,13 +96,13 @@ describe("formatRelativeTime", () => {
 describe("getTimeRangeStart", () => {
   const now = new Date("2024-01-15T14:30:45.123Z");
 
-  it.each([
+  it.each<[TimeRange, number, string]>([
     ["15m", 15 * 60 * 1000, "15 minutes"],
     ["1h", 60 * 60 * 1000, "1 hour"],
     ["24h", 24 * 60 * 60 * 1000, "24 hours"],
     ["7d", 7 * 24 * 60 * 60 * 1000, "7 days"],
   ])("getTimeRangeStart(%s) returns Date %i ms before reference time (%s)", (range, offset) => {
-    const result = getTimeRangeStart(range as "15m" | "1h" | "24h" | "7d", now);
+    const result = getTimeRangeStart(range, now);
     const expected = new Date(now.getTime() - offset);
     expect(result).toEqual(expected);
     expect(result.getTime()).toBe(now.getTime() - offset);

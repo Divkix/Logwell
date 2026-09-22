@@ -24,9 +24,14 @@ import type { PageData } from './$types';
 const incidentDetailSchema = z
   .object({
     id: z.string(),
+    projectId: z.string(),
     status: z.enum(INCIDENT_STATUSES),
     title: z.string(),
     fingerprint: z.string(),
+    normalizedMessage: z.string(),
+    serviceName: z.string().nullable(),
+    sourceFile: z.string().nullable(),
+    lineNumber: z.number().nullable(),
     highestLevel: z.enum(['debug', 'info', 'warn', 'error', 'fatal']),
     firstSeen: z.string(),
     lastSeen: z.string(),
@@ -71,9 +76,13 @@ let nextCursor = $state<string | null>(data.pagination.nextCursor ?? null);
 
 let isLoadingMore = $state(false);
 
+// SAFETY: the incidents loader validates status through INCIDENT_STATUSES before returning
+// data.filters, so this cast restates a set the loader already enforced.
 // svelte-ignore state_referenced_locally
 let selectedStatus = $state<IncidentStatus>(data.filters.status as IncidentStatus);
 
+// SAFETY: the incidents loader parses range through parseTimeRange with a "24h" fallback
+// before returning data.filters, so the value is always an IncidentRange.
 // svelte-ignore state_referenced_locally
 let selectedRange = $state<IncidentRange>(data.filters.range as IncidentRange);
 
@@ -209,8 +218,12 @@ $effect(() => {
 $effect(() => {
   // svelte-ignore state_referenced_locally
   const nextProjectId = data.project.id;
+  // SAFETY: the incidents loader validates status through INCIDENT_STATUSES before returning
+  // data.filters, so this cast restates a set the loader already enforced.
   // svelte-ignore state_referenced_locally
   const nextStatus = data.filters.status as IncidentStatus;
+  // SAFETY: the incidents loader parses range through parseTimeRange with a "24h" fallback
+  // before returning data.filters, so the value is always an IncidentRange.
   // svelte-ignore state_referenced_locally
   const nextRange = data.filters.range as IncidentRange;
   // svelte-ignore state_referenced_locally
@@ -266,10 +279,8 @@ async function fetchIncidentDetail(incidentId: string) {
     const detailParsed = incidentDetailSchema.safeParse(detailJson);
     const timelineParsed = incidentTimelineSchema.safeParse(timelineJson);
 
-    detail = detailParsed.success ? (detailParsed.data as unknown as IncidentDetail) : null;
-    timeline = timelineParsed.success
-      ? (timelineParsed.data as unknown as IncidentTimelineResponse)
-      : null;
+    detail = detailParsed.success ? detailParsed.data : null;
+    timeline = timelineParsed.success ? timelineParsed.data : null;
   } finally {
     if (myId === detailRequestId) {
       detailLoading = false;

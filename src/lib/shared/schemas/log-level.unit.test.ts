@@ -16,14 +16,14 @@ describe("parseLevelFilter", () => {
     expect(parseLevelFilter(input)).toBeNull();
   });
 
-  it.each([
+  it.each<[string, string[] | null, string]>([
     ["critical,trace", null, "all invalid"],
     ["error", ["error"], "single level"],
     ["error,fatal", ["error", "fatal"], "comma-separated"],
     [" warn , info ", ["warn", "info"], "trims whitespace"],
     ["ERROR,WARN", ["error", "warn"], "lowercases"],
     ["error,critical,fatal", ["error", "fatal"], "drops invalid"],
-  ] as [string, string[] | null, string][])("parseLevelFilter(%s) (%s)", (input, expected) => {
+  ])("parseLevelFilter(%s) (%s)", (input, expected) => {
     expect(parseLevelFilter(input)).toEqual(expected);
   });
 

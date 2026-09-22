@@ -47,6 +47,8 @@ const isNavigating = $derived.by(() => {
 });
 
 function parseLogTimestamp(log: PageData['logs'][number]): Log {
+  // SAFETY: the loader spreads every column of the log table row and only serializes timestamp
+  // (a NOT NULL column in the schema) to a string, so the rebuilt Date satisfies Log.
   return {
     ...log,
     timestamp: log.timestamp ? new Date(log.timestamp) : null,
@@ -54,6 +56,9 @@ function parseLogTimestamp(log: PageData['logs'][number]): Log {
 }
 
 function parseClientLog(log: ClientLog): Log {
+  // SAFETY: a streamed ClientLog carries an ISO timestamp string and every display field this
+  // page and its row components read; database-only columns are never accessed for stream-fed
+  // rows, so the rebuilt Date satisfies Log.
   return {
     ...log,
     timestamp: log.timestamp ? new Date(log.timestamp) : null,

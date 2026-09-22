@@ -2,7 +2,7 @@ import { describe, expect, test } from "vite-plus/test";
 import { escapeCSVField } from "./csv-serializer";
 
 describe("escapeCSVField", () => {
-  test.each([
+  const escaping: Array<[string | number | null | undefined, string, string]> = [
     [null, "", "null"],
     [undefined, "", "undefined"],
     ["", "", "empty string"],
@@ -16,12 +16,11 @@ describe("escapeCSVField", () => {
     ['say "hello"', '"say ""hello"""', "quotes doubled"],
     ["line1\nline2", '"line1\nline2"', "newline"],
     ['error: "value", unexpected', '"error: ""value"", unexpected"', "comma+quotes"],
-  ] as [string | number | null | undefined, string, string][])(
-    "escapeCSVField(%s) returns %s (%s)",
-    (input, expected) => {
-      expect(escapeCSVField(input)).toBe(expected);
-    },
-  );
+  ];
+
+  test.each(escaping)("escapeCSVField(%s) returns %s (%s)", (input, expected) => {
+    expect(escapeCSVField(input)).toBe(expected);
+  });
 
   // OWASP CSV formula-injection guard: leading = + - @ get a ' prefix
   test.each([

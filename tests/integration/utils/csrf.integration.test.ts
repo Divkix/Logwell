@@ -4,6 +4,7 @@ import type { checkCsrfOrigin as CheckCsrfOrigin } from "$lib/server/utils/csrf"
 function makeEvent(method: string, url: string, headers: Record<string, string> = {}) {
   const request = new Request(url, { method, headers });
 
+  // SAFETY: checkCsrfOrigin reads only event.request (method, Origin/Referer headers) and event.url — both are built above from the arguments; no other RequestEvent field is accessed.
   return {
     request,
     url: new URL(url),

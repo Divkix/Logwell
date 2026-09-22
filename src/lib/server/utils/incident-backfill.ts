@@ -1,6 +1,7 @@
 import { and, eq, gte, inArray, sql, type SQL } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { INCIDENT_GROUPED_LEVELS } from "../../shared/schemas/incident";
+import type { JsonValue } from "../../shared/schemas/json";
 import type { DatabaseClient } from "../db/db";
 import { type Incident, incident, type LogLevel, log } from "../db/schema";
 import { cursorRowGreaterThan, microsColumn } from "./cursor";
@@ -112,6 +113,8 @@ async function backfillBatch(
     // incident locks again) and Postgres kills one with a 40P01 deadlock.
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${projectId}))`);
 
+    // SAFETY: the backfill reads only jsonb columns the ingest path wrote from decoded
+    // request JSON, so both values are in the JSON domain drizzle types as unknown.
     const prepared = prepareLogsForIncidents(
       logs.map((entry) => ({
         level: entry.level,
@@ -119,8 +122,8 @@ async function backfillBatch(
         timestamp: entry.timestamp,
         sourceFile: entry.sourceFile,
         lineNumber: entry.lineNumber,
-        resourceAttributes: entry.resourceAttributes,
-        metadata: entry.metadata,
+        resourceAttributes: entry.resourceAttributes as JsonValue,
+        metadata: entry.metadata as JsonValue,
       })),
     );
 

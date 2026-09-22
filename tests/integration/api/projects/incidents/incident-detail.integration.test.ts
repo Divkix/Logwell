@@ -35,7 +35,7 @@ function createRequestEvent(
     fetch: globalThis.fetch,
     getClientAddress: () => "127.0.0.1",
     setHeaders: () => {},
-  } as unknown;
+  };
 }
 
 describe("GET /api/projects/[id]/incidents/[incidentId]", () => {
@@ -110,6 +110,7 @@ describe("GET /api/projects/[id]/incidents/[incidentId]", () => {
       authenticatedLocals,
     );
 
+    // SAFETY: the fixture event provides every RequestEvent member the detail handler reads (request, url, params, locals, cookies, fetch, getClientAddress, setHeaders); tracing stays null because the handler never reads it.
     const response = await GET_DETAIL(event as never);
 
     expect(response.status).toBe(200);
@@ -134,6 +135,7 @@ describe("GET /api/projects/[id]/incidents/[incidentId]", () => {
       authenticatedLocals,
     );
 
+    // SAFETY: the fixture event provides every RequestEvent member the detail handler reads (request, url, params, locals, cookies, fetch, getClientAddress, setHeaders); tracing stays null because the handler never reads it.
     const response = await GET_DETAIL(event as never);
 
     expect(response.status).toBe(404);
@@ -191,6 +193,7 @@ describe("GET /api/projects/[id]/incidents/[incidentId]", () => {
       authenticatedLocals,
     );
 
+    // SAFETY: the fixture event provides every RequestEvent member the detail handler reads (request, url, params, locals, cookies, fetch, getClientAddress, setHeaders); tracing stays null because the handler never reads it.
     const response = await GET_DETAIL(event as never);
 
     expect(response.status).toBe(404);
@@ -229,11 +232,11 @@ describe("GET /api/projects/[id]/incidents/[incidentId]", () => {
     });
 
     try {
+      // SAFETY: the fixture event provides every RequestEvent member the detail handler reads (request, url, params, locals, cookies, fetch, getClientAddress, setHeaders); tracing stays null because the handler never reads it.
       const response = await GET_DETAIL(event as never);
       expect(response.status).toBe(401);
     } catch (error) {
-      const httpError = error as { status: number };
-      expect(httpError.status).toBe(401);
+      expect(error).toHaveProperty("status", 401);
     }
   });
 });

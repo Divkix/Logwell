@@ -1,4 +1,5 @@
 import { sql, type Column, type SQL } from "drizzle-orm";
+import { z } from "zod";
 
 const DECIMAL_INTEGER = /^-?\d+$/;
 
@@ -23,10 +24,6 @@ export function cursorRowGreaterThan(col: Column, idCol: Column, micros: string,
   return sql`(${col}, ${idCol}) > (${microsTimestamp(micros)}, ${id})`;
 }
 
-export function encodeCursor(micros: string | number, id: string): string;
-
-export function encodeCursor(timestamp: Date | null | undefined, id: string): string;
-
 export function encodeCursor(
   microsOrTimestamp: string | number | Date | null | undefined,
   id: string,
@@ -38,12 +35,20 @@ export function encodeCursor(
 
     if (Number.isNaN(time)) throw new Error(MISSING_TIMESTAMP_ERROR);
     micros = String(time * 1000);
-  } else if (typeof microsOrTimestamp === "string") {
-    micros = microsOrTimestamp;
-  } else if (typeof microsOrTimestamp === "number" && !Number.isNaN(microsOrTimestamp)) {
-    micros = String(microsOrTimestamp);
   } else {
-    throw new Error(MISSING_TIMESTAMP_ERROR);
+    // z.number() is finite-only in zod 4, so the ±Infinity literals keep
+    // non-finite numbers flowing to the DECIMAL_INTEGER check below, exactly as
+    // the original non-NaN number branch did. NaN fails every arm of this union
+    // and stays on the missing-timestamp error.
+    const decoded = z
+      .union([z.string(), z.number(), z.literal(Infinity), z.literal(-Infinity)])
+      .safeParse(microsOrTimestamp);
+
+    if (!decoded.success) {
+      throw new Error(MISSING_TIMESTAMP_ERROR);
+    }
+
+    micros = String(decoded.data);
   }
 
   if (!DECIMAL_INTEGER.test(micros)) {

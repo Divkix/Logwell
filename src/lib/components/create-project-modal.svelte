@@ -26,6 +26,9 @@ let previouslyFocusedElement: HTMLElement | null = $state(null);
 
 $effect(() => {
   if (open && !previouslyFocusedElement) {
+    // SAFETY: triggerElement is this dialog's own opener (typed HTMLElement in Props) and, when
+    // absent, document.activeElement is the focused control or <body> — always an element the
+    // restore effect below can re-focus.
     previouslyFocusedElement = (triggerElement || document.activeElement) as HTMLElement;
   }
 });

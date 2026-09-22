@@ -62,17 +62,14 @@ const sampleLogs: Log[] = [
 ];
 
 describe("sortLogs", () => {
-  it.each([
+  it.each<[SortField | null, SortDirection]>([
     [null, null],
     ["timestamp", null],
-  ] as [SortField | null, SortDirection][])(
-    "returns the original array when sort is inactive (%s, %s)",
-    (key, dir) => {
-      expect(sortLogs(sampleLogs, key, dir)).toBe(sampleLogs);
-    },
-  );
+  ])("returns the original array when sort is inactive (%s, %s)", (key, dir) => {
+    expect(sortLogs(sampleLogs, key, dir)).toBe(sampleLogs);
+  });
 
-  it.each([
+  it.each<[SortField, Exclude<SortDirection, null>, string[]]>([
     ["timestamp", "asc", ["log_1", "log_3", "log_2"]],
     ["timestamp", "desc", ["log_2", "log_3", "log_1"]],
     ["level", "asc", ["log_2", "log_3", "log_1"]],
@@ -80,9 +77,7 @@ describe("sortLogs", () => {
     ["message", "asc", ["log_2", "log_1", "log_3"]],
     ["message", "desc", ["log_3", "log_1", "log_2"]],
   ])("sorts by %s %s", (key, dir, expected) => {
-    expect(
-      sortLogs(sampleLogs, key as SortField, dir as Exclude<SortDirection, null>).map((l) => l.id),
-    ).toEqual(expected as string[]);
+    expect(sortLogs(sampleLogs, key, dir).map((l) => l.id)).toEqual(expected);
   });
 
   it("does not mutate the input array", () => {

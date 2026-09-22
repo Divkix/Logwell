@@ -10,7 +10,7 @@ describe("getLevelColor", () => {
   ] as const)("returns %s for %s level", (level, expected) => {
     const result = getLevelColor(level);
     expect(result).toBe(expected);
-    expect(typeof result).toBe("string");
+    expect(result).toEqual(expect.any(String));
     expect(result).toMatch(/^hsl\(\d+,\s*\d+%,\s*\d+%\)$/);
   });
 });
@@ -25,7 +25,7 @@ describe("getLevelBgClass", () => {
   ] as const)("returns %s for %s level with semantic color %s", (level, expected, colorFamily) => {
     const result = getLevelBgClass(level);
     expect(result).toBe(expected);
-    expect(typeof result).toBe("string");
+    expect(result).toEqual(expect.any(String));
     expect(result).toMatch(/^bg-[\w-]+\/\d+$/);
     expect(result).toContain("/20");
     expect(result).toContain(colorFamily);

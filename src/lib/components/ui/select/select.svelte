@@ -11,6 +11,9 @@ let {
 // TypeScript can't infer the correct type when using $bindable() with destructuring.
 // Using never cast satisfies both TypeScript and Svelte 5's bind syntax.
 function getValue() {
+  // SAFETY: value holds exactly the item value bits-ui stored in this Select at runtime;
+  // `never` only satisfies both sides of the discriminated bindable getter/setter pair and
+  // never changes the value that flows through.
   return value as never;
 }
 

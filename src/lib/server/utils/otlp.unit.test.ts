@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
+import type { JsonValue } from "../../shared/schemas/json";
 import {
   normalizeOtlpLogsRequest,
   normalizeSpanId,
@@ -73,7 +74,7 @@ describe("normalizeOtlpLogsRequest", () => {
   });
 
   it("stringifies non-string bodies for message fallback", () => {
-    const payload = {
+    const payload: JsonValue = {
       resourceLogs: [
         {
           scopeLogs: [
@@ -103,7 +104,7 @@ describe("normalizeOtlpLogsRequest", () => {
   });
 
   it("rejects records with an empty or whitespace-only derived message", () => {
-    const payload = {
+    const payload: JsonValue = {
       resourceLogs: [
         {
           scopeLogs: [

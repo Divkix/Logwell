@@ -10,5 +10,5 @@ export const TIME_RANGE_LABELS: Record<TimeRange, string> = {
 };
 
 export function parseTimeRange(param: string | null): TimeRange | null {
-  return param && (TIME_RANGES as readonly string[]).includes(param) ? (param as TimeRange) : null;
+  return TIME_RANGES.find((range) => range === param) ?? null;
 }

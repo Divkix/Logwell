@@ -3,6 +3,7 @@ import { is, sql, SQL } from "drizzle-orm";
 import { getTableConfig, PgDialect, PgTable } from "drizzle-orm/pg-core";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
 import { drizzle } from "drizzle-orm/pglite";
+import { z } from "zod";
 import * as schema from "./schema";
 
 function generateCreateTableSQL(table: PgTable): string {
@@ -17,7 +18,7 @@ function generateCreateTableSQL(table: PgTable): string {
     const columnType = column.columnType;
     const isCustomType = columnType === "PgCustomColumn";
     const isEnumType = columnType === "PgEnumColumn";
-    const generated = (column as { generated?: { as: SQL | string | (() => SQL) } }).generated;
+    const generated = column.generated;
 
     if (isCustomType || isEnumType) {
       // Both column classes expose their real Postgres type through getSQLType():
@@ -25,8 +26,7 @@ function generateCreateTableSQL(table: PgTable): string {
       // returns the enum factory's name (e.g. log_level). The name is NOT a
       // property of the column (reading `enumName` off it yields undefined and
       // silently degrades the column to TEXT).
-      const typedColumn = column as unknown as { getSQLType: () => string };
-      parts.push(typedColumn.getSQLType());
+      parts.push(column.getSQLType());
     } else if (column.dataType === "number") {
       if (column.columnType === "PgSerial") {
         parts.push("SERIAL");
@@ -45,7 +45,7 @@ function generateCreateTableSQL(table: PgTable): string {
       parts.push("BOOLEAN");
     } else if (column.dataType === "date") {
       if (column.columnType === "PgTimestamp") {
-        const withTimezone = (column as unknown as { withTimezone?: boolean }).withTimezone;
+        const withTimezone = "withTimezone" in column ? column.withTimezone : undefined;
 
         if (withTimezone) {
           parts.push("TIMESTAMPTZ");
@@ -64,7 +64,7 @@ function generateCreateTableSQL(table: PgTable): string {
     if (generated) {
       // `as` is the SQL expression, a thunk returning it, or a raw column-type
       // string; PgDialect renders the SQL form with the columns qualified.
-      const as = typeof generated.as === "function" ? generated.as() : generated.as;
+      const as = generated.as instanceof Function ? generated.as() : generated.as;
       const expression = is(as, SQL) ? new PgDialect().sqlToQuery(as).sql : String(as);
       parts.push(`GENERATED ALWAYS AS (${expression}) STORED`);
     }
@@ -79,18 +79,18 @@ function generateCreateTableSQL(table: PgTable): string {
 
     if (column.hasDefault && !generated) {
       if (column.dataType === "date") {
-        const defaultFn = (column as unknown as { default?: unknown }).default;
+        const defaultFn = column.default;
 
         if (defaultFn) {
           parts.push("DEFAULT NOW()");
         }
       } else if (column.dataType === "boolean") {
-        const defaultValue = (column as unknown as { default?: unknown }).default;
+        const defaultValue = column.default;
 
         if (defaultValue !== undefined) {
           const value =
-            typeof defaultValue === "object" && defaultValue !== null && "value" in defaultValue
-              ? (defaultValue as { value: unknown }).value
+            defaultValue instanceof Object && "value" in defaultValue
+              ? defaultValue.value
               : defaultValue;
 
           parts.push(`DEFAULT ${String(value)}`);
@@ -99,19 +99,17 @@ function generateCreateTableSQL(table: PgTable): string {
         const rawDefault = column.default;
 
         const defaultValue =
-          typeof rawDefault === "object" && rawDefault !== null && "value" in rawDefault
-            ? (rawDefault as { value?: unknown }).value
-            : rawDefault;
+          rawDefault instanceof Object && "value" in rawDefault ? rawDefault.value : rawDefault;
 
-        if (defaultValue && typeof defaultValue === "object" && "sql" in defaultValue) {
-          const sqlValue = (defaultValue as { sql?: string }).sql;
+        if (defaultValue instanceof Object && "sql" in defaultValue) {
+          const sqlValue = String(defaultValue.sql);
           parts.push(`DEFAULT ${sqlValue}`);
-        } else if (typeof defaultValue === "string") {
-          parts.push(`DEFAULT '${defaultValue}'`);
-        } else if (typeof defaultValue === "number") {
-          parts.push(`DEFAULT ${defaultValue}`);
-        } else if (typeof defaultValue === "boolean") {
-          parts.push(`DEFAULT ${defaultValue}`);
+        } else if (z.string().safeParse(defaultValue).success) {
+          parts.push(`DEFAULT '${String(defaultValue)}'`);
+        } else if (Number.isFinite(defaultValue)) {
+          parts.push(`DEFAULT ${String(defaultValue)}`);
+        } else if (defaultValue === true || defaultValue === false) {
+          parts.push(`DEFAULT ${String(defaultValue)}`);
         }
       }
     }
@@ -131,30 +129,22 @@ function generateCreateTableSQL(table: PgTable): string {
   if (config.foreignKeys && config.foreignKeys.length > 0) {
     for (const fk of config.foreignKeys) {
       try {
-        const ref = (fk as { reference: () => unknown }).reference();
+        const ref = fk.reference();
 
-        const refDetails = ref as {
-          columns: Array<{ name: string }>;
-          foreignColumns: Array<{ name: string }>;
-          foreignTable: PgTable;
-        };
+        const localColumns = ref.columns.map((c) => `"${c.name}"`).join(", ");
+        const foreignColumns = ref.foreignColumns.map((c) => `"${c.name}"`).join(", ");
 
-        const localColumns = refDetails.columns.map((c) => `"${c.name}"`).join(", ");
-        const foreignColumns = refDetails.foreignColumns.map((c) => `"${c.name}"`).join(", ");
-
-        const foreignTableConfig = getTableConfig(refDetails.foreignTable);
+        const foreignTableConfig = getTableConfig(ref.foreignTable);
         const foreignTableName = foreignTableConfig.name;
 
         let fkConstraint = `FOREIGN KEY (${localColumns}) REFERENCES "${foreignTableName}"(${foreignColumns})`;
 
-        const fkWithOptions = fk as { onDelete?: string; onUpdate?: string };
-
-        if (fkWithOptions.onDelete) {
-          fkConstraint += ` ON DELETE ${fkWithOptions.onDelete.toUpperCase()}`;
+        if (fk.onDelete) {
+          fkConstraint += ` ON DELETE ${fk.onDelete.toUpperCase()}`;
         }
 
-        if (fkWithOptions.onUpdate) {
-          fkConstraint += ` ON UPDATE ${fkWithOptions.onUpdate.toUpperCase()}`;
+        if (fk.onUpdate) {
+          fkConstraint += ` ON UPDATE ${fk.onUpdate.toUpperCase()}`;
         }
 
         foreignKeys.push(fkConstraint);
@@ -177,16 +167,12 @@ function generateIndexSQL(table: PgTable): string[] {
   const indexSQLs: string[] = [];
 
   for (const index of config.indexes ?? []) {
-    const indexConfig = (
-      index as unknown as {
-        config?: { name?: string; method?: string; unique?: boolean; columns?: unknown[] };
-      }
-    ).config;
+    const indexConfig = index.config;
 
-    if (!indexConfig?.name || !indexConfig.columns?.length) continue;
+    if (!indexConfig.name || !indexConfig.columns?.length) continue;
 
     const columnNames = indexConfig.columns
-      .map((col) => `"${(col as { name: string }).name}"`)
+      .map((col) => `"${"name" in col ? col.name : undefined}"`)
       .join(", ");
 
     const unique = indexConfig.unique ? "UNIQUE " : "";
@@ -226,16 +212,16 @@ export async function createTestDatabase(): Promise<PgliteDatabase<typeof schema
 
   for (const tableName of tableOrder) {
     const table = tables.find((t) => {
-      const config = getTableConfig(t as PgTable);
+      const config = getTableConfig(t);
 
       return config.name === tableName;
     });
 
     if (table) {
-      const createSQL = generateCreateTableSQL(table as PgTable);
+      const createSQL = generateCreateTableSQL(table);
       await db.execute(sql.raw(createSQL));
 
-      const indexSQLs = generateIndexSQL(table as PgTable);
+      const indexSQLs = generateIndexSQL(table);
 
       for (const indexSQL of indexSQLs) {
         await db.execute(sql.raw(indexSQL));
@@ -250,7 +236,7 @@ export async function cleanDatabase(db: PgliteDatabase<typeof schema>): Promise<
   const tables = Object.values(schema).filter((item) => is(item, PgTable));
 
   const tableNames = tables.map((table) => {
-    const config = getTableConfig(table as PgTable);
+    const config = getTableConfig(table);
 
     return config.name;
   });

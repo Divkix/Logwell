@@ -24,6 +24,8 @@ describe("Environment Configuration", () => {
     return import("./env");
   }
 
+  // SAFETY: each row is [env overrides record, expected error fragment, label] — the
+  // literals above the callback only take those three shapes.
   it.each([
     [
       { DATABASE_URL: undefined, BETTER_AUTH_SECRET: "a".repeat(32) },
@@ -60,11 +62,15 @@ describe("Environment Configuration", () => {
     ["ORIGIN", "https://myapp.com", "origin"],
   ])("exports %s from environment (%s)", async (key, value) => {
     const { env } = await loadEnv({ [key]: value });
+    // SAFETY: DATABASE_URL, BETTER_AUTH_SECRET, ADMIN_PASSWORD and ORIGIN are all exports
+    // of config/env, so both key and value exist on env as asserted below.
     expect(env[key as keyof typeof env]).toBe(value);
   });
 
   it.each([["ADMIN_PASSWORD"], ["ORIGIN"]])("returns undefined for unset %s", async (key) => {
     const { env } = await loadEnv({ [key]: undefined });
+    // SAFETY: ADMIN_PASSWORD and ORIGIN are actual exports of config/env, so keyof covers
+    // both keys and unsetting them leaves env[key] undefined as asserted.
     expect(env[key as keyof typeof env]).toBeUndefined();
   });
 
@@ -78,6 +84,8 @@ describe("Environment Configuration", () => {
     ["development", false, true],
     [undefined, true, false],
   ])("NODE_ENV=%s → isProduction=%s isDevelopment=%s", async (nodeEnv, prod, dev) => {
+    // SAFETY: the it.each table above only supplies a string or undefined for NODE_ENV —
+    // the booleans occupy the isProduction/isDevelopment slots.
     const { isProduction, isDevelopment } = await loadEnv({
       NODE_ENV: nodeEnv as string | undefined,
     });

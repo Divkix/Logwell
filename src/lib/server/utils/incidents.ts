@@ -1,9 +1,11 @@
 import { sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
+import { z } from "zod";
 import type { DatabaseClient } from "../db/db";
 import { type IncidentStatus, isIncidentGroupedLevel, maxIncidentLevel } from "../../shared/types";
 import { INCIDENT_CONFIG } from "../config/performance";
 import { type Incident, incident, type LogLevel } from "../db/schema";
+import { jsonObjectSchema, type JsonObject, type JsonValue } from "../../shared/schemas/json";
 import { buildIncidentFingerprint } from "./incident-fingerprint";
 
 export interface IncidentLogInput {
@@ -12,8 +14,8 @@ export interface IncidentLogInput {
   timestamp: Date;
   sourceFile: string | null;
   lineNumber: number | null;
-  resourceAttributes: unknown;
-  metadata: unknown;
+  resourceAttributes: JsonValue;
+  metadata: JsonValue;
 }
 
 export interface PreparedIncidentLog extends IncidentLogInput {
@@ -42,29 +44,30 @@ export interface IncidentUpsertResult {
   touchedIncidents: Incident[];
 }
 
-function asRecord(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return null;
-  }
+function asRecord(value: JsonValue): JsonObject | null {
+  const decoded = jsonObjectSchema.safeParse(value);
 
-  return value as Record<string, unknown>;
+  return decoded.success ? decoded.data : null;
 }
 
-function stringField(record: Record<string, unknown> | null, keys: string[]): string | null {
+function stringField(record: JsonObject | null, keys: string[]): string | null {
   if (!record) return null;
 
   for (const key of keys) {
-    const value = record[key];
+    const decoded = z.string().safeParse(record[key]);
 
-    if (typeof value === "string" && value.trim()) {
-      return value.trim();
+    if (decoded.success && decoded.data.trim()) {
+      return decoded.data.trim();
     }
   }
 
   return null;
 }
 
-export function extractServiceName(resourceAttributes: unknown, metadata: unknown): string | null {
+export function extractServiceName(
+  resourceAttributes: JsonValue,
+  metadata: JsonValue,
+): string | null {
   const resource = asRecord(resourceAttributes);
   const meta = asRecord(metadata);
 

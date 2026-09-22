@@ -28,7 +28,7 @@ function getFocusableElements(container: HTMLElement): HTMLElement[] {
 function createFocusTrap(container: HTMLElement, options: FocusTrapOptions = {}) {
   const { initialFocus, returnFocus, autoFocus = true } = options;
 
-  const previouslyFocused = (returnFocus || document.activeElement) as HTMLElement | null;
+  const previouslyFocused = returnFocus || document.activeElement;
 
   function handleKeyDown(event: KeyboardEvent) {
     if (event.key !== "Tab") return;
@@ -64,12 +64,12 @@ function createFocusTrap(container: HTMLElement, options: FocusTrapOptions = {})
 
     let elementToFocus: HTMLElement | null = null;
 
-    if (typeof initialFocus === "string") {
-      elementToFocus = container.querySelector(initialFocus);
-    } else if (initialFocus instanceof HTMLElement) {
+    if (initialFocus instanceof HTMLElement) {
       elementToFocus = initialFocus;
-    } else {
+    } else if (initialFocus === null || initialFocus === undefined) {
       elementToFocus = focusableElements[0] ?? null;
+    } else {
+      elementToFocus = container.querySelector(initialFocus);
     }
 
     if (elementToFocus) {
@@ -88,7 +88,7 @@ function createFocusTrap(container: HTMLElement, options: FocusTrapOptions = {})
     deactivate() {
       container.removeEventListener("keydown", handleKeyDown);
 
-      if (previouslyFocused && typeof previouslyFocused.focus === "function") {
+      if (previouslyFocused instanceof HTMLElement) {
         previouslyFocused.focus();
       }
     },

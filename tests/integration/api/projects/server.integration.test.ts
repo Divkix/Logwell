@@ -1,5 +1,6 @@
 import type { HttpError } from "@sveltejs/kit";
 import { eq } from "drizzle-orm";
+import type { SelectedFields } from "drizzle-orm/pg-core";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { createAuth } from "$lib/server/auth";
@@ -8,6 +9,7 @@ import { project } from "$lib/server/db/schema";
 import { setupTestDatabase } from "$lib/server/db/test-db";
 import { getSession } from "$lib/server/session";
 import { hashApiKey } from "$lib/server/utils/api-key";
+import type { JsonObject, JsonValue } from "$lib/shared/schemas/json";
 import { GET, POST } from "../../../../src/routes/api/projects/+server";
 import {
   DELETE as DELETE_BY_ID,
@@ -21,20 +23,25 @@ function createIdRequestEvent(
   db: PgliteDatabase<typeof schema>,
   id: string,
   locals: Partial<App.Locals> = {},
-) {
-  return {
+): Parameters<typeof GET_BY_ID>[0] {
+  const event: Partial<Parameters<typeof GET_BY_ID>[0]> = {
     request,
     locals: { db, ...locals },
     params: { id },
     url: new URL(request.url),
-  } as unknown as Parameters<typeof GET_BY_ID>[0];
+  };
+
+  // SAFETY: requireAuth, getDbClient and checkCsrfOrigin read only event.locals, event.request
+  // and event.url — all set above — and every [id] test passes an authenticated session, so
+  // the route.id, cookies, fetch and tracing members are never accessed and stay omitted.
+  return event as Parameters<typeof GET_BY_ID>[0];
 }
 
 function createRequestEvent(
   request: Request,
   db: PgliteDatabase<typeof schema>,
   locals: Partial<App.Locals> = {},
-) {
+): Parameters<typeof GET>[0] {
   const safeMethod = ["GET", "HEAD", "OPTIONS"].includes(request.method);
   const hasOrigin = request.headers.has("Origin");
 
@@ -45,7 +52,7 @@ function createRequestEvent(
         })
       : request;
 
-  return {
+  const event: Partial<Parameters<typeof GET>[0]> = {
     request: effectiveRequest,
     locals: { db, ...locals },
     params: {},
@@ -55,7 +62,6 @@ function createRequestEvent(
     isDataRequest: false,
     isSubRequest: false,
     isRemoteRequest: false,
-    tracing: null,
     cookies: {
       get: () => undefined,
       getAll: () => [],
@@ -66,18 +72,27 @@ function createRequestEvent(
     fetch: globalThis.fetch,
     getClientAddress: () => "127.0.0.1",
     setHeaders: () => {},
-  } as unknown;
+  };
+
+  // SAFETY: requireAuth, getDbClient and checkCsrfOrigin read only event.locals, event.request
+  // and event.url — all set above — and event.route.id is "/api/projects", so unauthenticated
+  // requests take requireAuth's 401 branch; the omitted tracing member (previously null) is
+  // never accessed.
+  return event as Parameters<typeof GET>[0];
 }
 
 async function expectHttpError(
   promise: Promise<unknown>,
   expectedStatus: number,
-  expectedBody?: Record<string, unknown>,
+  expectedBody?: JsonObject,
 ): Promise<void> {
   try {
     await promise;
     expect.fail("Expected HTTP error to be thrown");
   } catch (error) {
+    // SAFETY: this helper is only awaited on handler promises, and the route handlers report
+    // failures by throwing SvelteKit's error()/httpError() values — the HttpError shape whose
+    // .status and .body are asserted here.
     const httpError = error as HttpError;
     expect(httpError.status).toBe(expectedStatus);
 
@@ -136,7 +151,7 @@ describe("GET /api/projects", () => {
       });
 
       const event = createRequestEvent(request, db);
-      await expectHttpError(GET(event as never), 401, { message: "Unauthorized" });
+      await expectHttpError(GET(event), 401, { message: "Unauthorized" });
     });
   });
 
@@ -147,7 +162,7 @@ describe("GET /api/projects", () => {
       });
 
       const event = createRequestEvent(request, db, authenticatedLocals);
-      const response = await GET(event as never);
+      const response = await GET(event);
 
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -165,7 +180,7 @@ describe("GET /api/projects", () => {
       });
 
       const event = createRequestEvent(request, db, authenticatedLocals);
-      const response = await GET(event as never);
+      const response = await GET(event);
 
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -195,7 +210,7 @@ describe("GET /api/projects", () => {
       });
 
       const event = createRequestEvent(request, db, authenticatedLocals);
-      const response = await GET(event as never);
+      const response = await GET(event);
 
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -209,12 +224,16 @@ describe("GET /api/projects", () => {
       await seedLogs(db, project1!.id, 5);
 
       const originalSelect = db.select.bind(db);
-      vi.spyOn(db, "select").mockImplementation(((fields?: unknown) => {
-        if (fields && typeof fields === "object" && "count" in fields && !("projectId" in fields)) {
+      // SAFETY: drizzle's select is overloaded (no-arg full-table and generic field-map forms),
+      // which a single mock signature cannot express; the wrapper forwards `fields` unchanged
+      // to the bound original and only throws for the count-without-projectId projection this
+      // test forbids.
+      vi.spyOn(db, "select").mockImplementation(((fields?: SelectedFields) => {
+        if (fields && "count" in fields && !("projectId" in fields)) {
           throw new Error("project list must aggregate log counts in SQL");
         }
 
-        return originalSelect(fields as never);
+        return fields ? originalSelect(fields) : originalSelect();
       }) as typeof db.select);
 
       const request = new Request("http://localhost/api/projects", {
@@ -222,7 +241,7 @@ describe("GET /api/projects", () => {
       });
 
       const event = createRequestEvent(request, db, authenticatedLocals);
-      const response = await GET(event as never);
+      const response = await GET(event);
 
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -242,7 +261,7 @@ describe("GET /api/projects", () => {
       });
 
       const event = createRequestEvent(request, db, authenticatedLocals);
-      const response = await GET(event as never);
+      const response = await GET(event);
 
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -304,7 +323,7 @@ describe("POST /api/projects", () => {
       });
 
       const event = createRequestEvent(request, db);
-      await expectHttpError(POST(event as never), 401, { message: "Unauthorized" });
+      await expectHttpError(POST(event), 401, { message: "Unauthorized" });
     });
   });
 
@@ -319,7 +338,7 @@ describe("POST /api/projects", () => {
       });
 
       const event = createRequestEvent(request, db, authenticatedLocals);
-      const response = await POST(event as never);
+      const response = await POST(event);
 
       expect(response.status).toBe(201);
       const body = await response.json();
@@ -349,7 +368,7 @@ describe("POST /api/projects", () => {
       });
 
       const event = createRequestEvent(request, db, authenticatedLocals);
-      const response = await POST(event as never);
+      const response = await POST(event);
 
       expect(response.status).toBe(400);
       const body = await response.json();
@@ -394,7 +413,7 @@ describe("POST /api/projects", () => {
       });
 
       const event = createRequestEvent(request, db, otherUserLocals);
-      const response = await POST(event as never);
+      const response = await POST(event);
 
       expect(response.status).toBe(201);
       const body = await response.json();
@@ -412,7 +431,7 @@ describe("POST /api/projects", () => {
       });
 
       const event = createRequestEvent(request, db, authenticatedLocals);
-      const response = await POST(event as never);
+      const response = await POST(event);
 
       expect(response.status).toBe(400);
       const body = await response.json();
@@ -430,7 +449,7 @@ describe("POST /api/projects", () => {
       });
 
       const event = createRequestEvent(request, db, authenticatedLocals);
-      const response = await POST(event as never);
+      const response = await POST(event);
 
       expect(response.status).toBe(400);
       const body = await response.json();
@@ -448,7 +467,7 @@ describe("POST /api/projects", () => {
       });
 
       const event = createRequestEvent(request, db, authenticatedLocals);
-      const response = await POST(event as never);
+      const response = await POST(event);
 
       expect(response.status).toBe(400);
       const body = await response.json();
@@ -466,7 +485,7 @@ describe("POST /api/projects", () => {
       });
 
       const event = createRequestEvent(request, db, authenticatedLocals);
-      const response = await POST(event as never);
+      const response = await POST(event);
 
       expect(response.status).toBe(415);
       const body = await response.json();
@@ -484,7 +503,7 @@ describe("POST /api/projects", () => {
       });
 
       const event = createRequestEvent(request, db, authenticatedLocals);
-      const response = await POST(event as never);
+      const response = await POST(event);
 
       expect(response.status).toBe(400);
       const body = await response.json();
@@ -501,7 +520,7 @@ describe("POST /api/projects", () => {
       });
 
       const event = createRequestEvent(request, db, authenticatedLocals);
-      const response = await POST(event as never);
+      const response = await POST(event);
 
       expect(response.status).toBe(400);
       const body = await response.json();
@@ -525,8 +544,8 @@ describe("POST /api/projects", () => {
       const event1 = createRequestEvent(request1, db, authenticatedLocals);
       const event2 = createRequestEvent(request2, db, authenticatedLocals);
 
-      const response1 = await POST(event1 as never);
-      const response2 = await POST(event2 as never);
+      const response1 = await POST(event1);
+      const response2 = await POST(event2);
 
       expect(response1.status).toBe(201);
       expect(response2.status).toBe(201);
@@ -547,7 +566,7 @@ describe("POST /api/projects", () => {
       });
 
       const event = createRequestEvent(request, db, authenticatedLocals);
-      const response = await POST(event as never);
+      const response = await POST(event);
 
       expect(response.status).toBe(201);
       const body = await response.json();
@@ -687,7 +706,7 @@ describe("PATCH /api/projects/[id] (canonical patch home)", () => {
     await cleanup();
   });
 
-  function patchRequest(id: string, body: unknown) {
+  function patchRequest(id: string, body: JsonValue) {
     return new Request(`http://localhost/api/projects/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", Origin: "http://localhost" },

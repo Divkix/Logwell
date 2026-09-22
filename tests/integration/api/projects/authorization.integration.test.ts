@@ -21,12 +21,20 @@ import { POST as POST_REGENERATE } from "../../../../src/routes/api/projects/[id
 import { GET as GET_STATS } from "../../../../src/routes/api/projects/[id]/stats/+server";
 import { seedProject, seedProjectWithApiKey } from "../../../fixtures/db";
 
+// One fixture serves every /api/projects route, so its type is the intersection of the five
+// route event types — assignable to each handler's parameter.
+type ProjectsRouteEvent = Parameters<typeof GET_PROJECTS>[0] &
+  Parameters<typeof GET_PROJECT>[0] &
+  Parameters<typeof GET_LOGS>[0] &
+  Parameters<typeof GET_STATS>[0] &
+  Parameters<typeof POST_REGENERATE>[0];
+
 function createRequestEvent(
   request: Request,
   db: PgliteDatabase<typeof schema>,
   params: Record<string, string> = {},
   locals: Partial<App.Locals> = {},
-) {
+): ProjectsRouteEvent {
   const safeMethod = ["GET", "HEAD", "OPTIONS"].includes(request.method);
   const hasOrigin = request.headers.has("Origin");
 
@@ -37,7 +45,7 @@ function createRequestEvent(
         })
       : request;
 
-  return {
+  const event: Partial<Parameters<typeof GET_PROJECTS>[0]> = {
     request: effectiveRequest,
     locals: { db, ...locals },
     params,
@@ -47,7 +55,6 @@ function createRequestEvent(
     isDataRequest: false,
     isSubRequest: false,
     isRemoteRequest: false,
-    tracing: null,
     cookies: {
       get: () => undefined,
       getAll: () => [],
@@ -58,7 +65,13 @@ function createRequestEvent(
     fetch: globalThis.fetch,
     getClientAddress: () => "127.0.0.1",
     setHeaders: () => {},
-  } as unknown;
+  };
+
+  // SAFETY: requireAuth, getDbClient, checkCsrfOrigin and the [id] ownership lookup read only
+  // event.locals, event.request, event.url and event.params.id — all set above — and every test
+  // passes an authenticated session, so the route.id fallback is never taken; the fixture keeps
+  // its original route value and the omitted tracing member (previously null) is never accessed.
+  return event as ProjectsRouteEvent;
 }
 
 async function createAuthenticatedUser(
@@ -124,7 +137,7 @@ describe("Project Authorization - Ownership Isolation", () => {
 
       const request = new Request("http://localhost/api/projects", { method: "GET" });
       const event = createRequestEvent(request, db, {}, userA.locals);
-      const response = await GET_PROJECTS(event as never);
+      const response = await GET_PROJECTS(event);
 
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -139,7 +152,7 @@ describe("Project Authorization - Ownership Isolation", () => {
 
       const request = new Request("http://localhost/api/projects", { method: "GET" });
       const event = createRequestEvent(request, db, {}, userA.locals);
-      const response = await GET_PROJECTS(event as never);
+      const response = await GET_PROJECTS(event);
 
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -157,7 +170,7 @@ describe("Project Authorization - Ownership Isolation", () => {
       });
 
       const event = createRequestEvent(request, db, {}, userA.locals);
-      const response = await POST_PROJECTS(event as never);
+      const response = await POST_PROJECTS(event);
 
       expect(response.status).toBe(201);
       const body = await response.json();
@@ -177,7 +190,7 @@ describe("Project Authorization - Ownership Isolation", () => {
       });
 
       const event = createRequestEvent(request, db, { id: projectB.id }, userA.locals);
-      const response = await GET_PROJECT(event as never);
+      const response = await GET_PROJECT(event);
 
       expect(response.status).toBe(404);
       const body = await response.json();
@@ -192,7 +205,7 @@ describe("Project Authorization - Ownership Isolation", () => {
       });
 
       const event = createRequestEvent(request, db, { id: projectA.id }, userA.locals);
-      const response = await GET_PROJECT(event as never);
+      const response = await GET_PROJECT(event);
 
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -211,7 +224,7 @@ describe("Project Authorization - Ownership Isolation", () => {
       });
 
       const event = createRequestEvent(request, db, { id: projectB.id }, userA.locals);
-      const response = await PATCH(event as never);
+      const response = await PATCH(event);
 
       expect(response.status).toBe(404);
 
@@ -229,7 +242,7 @@ describe("Project Authorization - Ownership Isolation", () => {
       });
 
       const event = createRequestEvent(request, db, { id: projectA.id }, userA.locals);
-      const response = await PATCH(event as never);
+      const response = await PATCH(event);
 
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -246,7 +259,7 @@ describe("Project Authorization - Ownership Isolation", () => {
       });
 
       const event = createRequestEvent(request, db, { id: projectB.id }, userA.locals);
-      const response = await DELETE(event as never);
+      const response = await DELETE(event);
 
       expect(response.status).toBe(404);
 
@@ -262,7 +275,7 @@ describe("Project Authorization - Ownership Isolation", () => {
       });
 
       const event = createRequestEvent(request, db, { id: projectA.id }, userA.locals);
-      const response = await DELETE(event as never);
+      const response = await DELETE(event);
 
       expect(response.status).toBe(200);
 
@@ -285,7 +298,7 @@ describe("Project Authorization - Ownership Isolation", () => {
       });
 
       const event = createRequestEvent(request, db, { id: projectB.id }, userA.locals);
-      const response = await POST_REGENERATE(event as never);
+      const response = await POST_REGENERATE(event);
 
       expect(response.status).toBe(404);
 
@@ -306,7 +319,7 @@ describe("Project Authorization - Ownership Isolation", () => {
       });
 
       const event = createRequestEvent(request, db, { id: projectA.id }, userA.locals);
-      const response = await POST_REGENERATE(event as never);
+      const response = await POST_REGENERATE(event);
 
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -323,7 +336,7 @@ describe("Project Authorization - Ownership Isolation", () => {
       });
 
       const event = createRequestEvent(request, db, { id: projectB.id }, userA.locals);
-      const response = await GET_LOGS(event as never);
+      const response = await GET_LOGS(event);
 
       expect(response.status).toBe(404);
     });
@@ -338,7 +351,7 @@ describe("Project Authorization - Ownership Isolation", () => {
       });
 
       const event = createRequestEvent(request, db, { id: projectB.id }, userA.locals);
-      const response = await GET_STATS(event as never);
+      const response = await GET_STATS(event);
 
       expect(response.status).toBe(404);
     });

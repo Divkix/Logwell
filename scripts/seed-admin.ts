@@ -42,7 +42,12 @@ async function seedAdmin() {
         },
       });
 
-      const resultError = (result as { error?: { message: string } }).error;
+      // SAFETY: better-auth resolves signUpEmail with a plain JSON response body and
+      // rejects with APIError on failure; only a failure body carries an optional
+      // `error: { message: string }` key. Reading that optional key off a plain object
+      // yields undefined when the key is absent and fabricates no value.
+      const resultWithError = result as { error?: { message: string } };
+      const resultError = resultWithError.error;
 
       if (resultError) {
         throw new Error(`Failed to create admin user: ${resultError.message}`);
