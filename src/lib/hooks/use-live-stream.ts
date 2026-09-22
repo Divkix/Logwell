@@ -117,6 +117,8 @@ export function useLiveStream<T>(options: LiveStreamOptions<T>): LiveStreamRetur
 
       if (event && data && event === streamEvent) {
         try {
+          // SAFETY: the frame's event matched streamEvent above, and that stream's producer only
+          // serializes JSON.stringify'd T[] batches, so the parsed payload is that array.
           const items = JSON.parse(data) as T[];
           onData?.(items);
         } catch {}

@@ -25,11 +25,7 @@ export function getTimeBucketConfig(range: TimeRange): TimeBucketConfig {
   }
 }
 
-export function bucketTimestamps(
-  timestamps: Date[],
-  config: TimeBucketConfig,
-  rangeStart: Date,
-): Record<number, number> {
+export function bucketTimestamps(timestamps: Date[], config: TimeBucketConfig, rangeStart: Date) {
   const buckets: Record<number, number> = {};
   const startMs = rangeStart.getTime();
 

@@ -1,8 +1,20 @@
 import { describe, expect, it } from "vite-plus/test";
+import type { JsonValue } from "../../shared/schemas/json";
 import { parseSimpleIngestRequest, SimpleIngestError } from "./simple-ingest";
 
 describe("parseSimpleIngestRequest", () => {
   const validEntry = { level: "info", message: "test message" };
+
+  // JSON has no undefined, so an absent optional field arrives as a missing key.
+  function entryWith(overrides: Record<string, JsonValue | undefined>): JsonValue {
+    const entry: Record<string, JsonValue> = {};
+
+    for (const [key, value] of Object.entries({ ...validEntry, ...overrides })) {
+      if (value !== undefined) entry[key] = value;
+    }
+
+    return entry;
+  }
 
   describe("input validation", () => {
     it.each([[null], [undefined]])("throws SimpleIngestError on %s body", (body) => {
@@ -29,6 +41,7 @@ describe("parseSimpleIngestRequest", () => {
   });
 
   describe("required fields", () => {
+    // SAFETY: every row is a [payload, expected error, label] triple whose payload is a JSON value.
     it.each([
       [{ message: "test" }, "missing required field 'level'", "missing level"],
       [{ level: "invalid", message: "test" }, "invalid level 'invalid'", "invalid level"],
@@ -38,7 +51,7 @@ describe("parseSimpleIngestRequest", () => {
       [[null], "must be an object", "null entry"],
       [["not an object"], "must be an object", "string entry"],
       [[123], "must be an object", "number entry"],
-    ] as [unknown, string, string][])("rejects %s (%s)", (input, message) => {
+    ] as [JsonValue, string, string][])("rejects %s (%s)", (input, message) => {
       const result = parseSimpleIngestRequest(input);
       expect(result.rejected).toBe(1);
       expect(result.errors[0]!).toContain(message);
@@ -65,7 +78,7 @@ describe("parseSimpleIngestRequest", () => {
         "falls back to now for timestamp %s",
         (timestamp) => {
           const before = Date.now();
-          const result = parseSimpleIngestRequest({ ...validEntry, timestamp });
+          const result = parseSimpleIngestRequest(entryWith({ timestamp }));
           const after = Date.now();
           expect(result.records[0]!.timestamp.getTime()).toBeGreaterThanOrEqual(before);
           expect(result.records[0]!.timestamp.getTime()).toBeLessThanOrEqual(after);
@@ -80,7 +93,7 @@ describe("parseSimpleIngestRequest", () => {
       });
 
       it.each([[undefined], [123]])("returns null resourceAttributes for service %s", (service) => {
-        const result = parseSimpleIngestRequest({ ...validEntry, service });
+        const result = parseSimpleIngestRequest(entryWith({ service }));
         expect(result.records[0]!.resourceAttributes).toBeNull();
       });
     });
@@ -95,7 +108,7 @@ describe("parseSimpleIngestRequest", () => {
       it.each([[undefined], ["string"], [null], [{}]])(
         "returns null metadata for %s",
         (metadata) => {
-          const result = parseSimpleIngestRequest({ ...validEntry, metadata });
+          const result = parseSimpleIngestRequest(entryWith({ metadata }));
           expect(result.records[0]!.metadata).toBeNull();
         },
       );
@@ -110,7 +123,7 @@ describe("parseSimpleIngestRequest", () => {
       });
 
       it.each([[undefined], [123], [null]])("returns null sourceFile for %s", (sourceFile) => {
-        const result = parseSimpleIngestRequest({ ...validEntry, sourceFile });
+        const result = parseSimpleIngestRequest(entryWith({ sourceFile }));
         expect(result.records[0]!.sourceFile).toBeNull();
       });
     });
@@ -124,7 +137,7 @@ describe("parseSimpleIngestRequest", () => {
       it.each([[undefined], ["42"], [0], [-5], [null]])(
         "returns null lineNumber for %s",
         (lineNumber) => {
-          const result = parseSimpleIngestRequest({ ...validEntry, lineNumber });
+          const result = parseSimpleIngestRequest(entryWith({ lineNumber }));
           expect(result.records[0]!.lineNumber).toBeNull();
         },
       );
@@ -145,6 +158,7 @@ describe("parseSimpleIngestRequest", () => {
   });
 
   describe("metadata extraction", () => {
+    // SAFETY: every row is a [metadata, column, expected, label] triple whose column is one of NormalizedSimpleLog's identity fields.
     it.each([
       [{ "request.id": "req-123" }, "requestId", "req-123", "OTLP request key"],
       [{ "enduser.id": "user-456" }, "userId", "user-456", "OTLP user key"],
@@ -152,11 +166,11 @@ describe("parseSimpleIngestRequest", () => {
       [{ request_id: "req-789" }, "requestId", "req-789", "fallback request key"],
       [{ user_id: "user-999" }, "userId", "user-999", "fallback user key"],
       [{ ip_address: "10.0.0.1" }, "ipAddress", "10.0.0.1", "fallback ip key"],
-    ] as [Record<string, string>, string, string, string][])(
+    ] as [Record<string, string>, "requestId" | "userId" | "ipAddress", string, string][])(
       "extracts %s from metadata (%s)",
       (metadata, field, expected) => {
         const result = parseSimpleIngestRequest({ ...validEntry, metadata });
-        expect(result.records[0]![field as "requestId"]).toBe(expected);
+        expect(result.records[0]![field]).toBe(expected);
       },
     );
 
@@ -195,7 +209,7 @@ describe("parseSimpleIngestRequest", () => {
     });
 
     it("collects all errors", () => {
-      const entries = [
+      const entries: JsonValue[] = [
         { level: "invalid", message: "bad" },
         { message: "missing level" },
         { level: "info" },

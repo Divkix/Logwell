@@ -7,7 +7,7 @@ function createMockKeyboardEvent(options: {
   ctrlKey?: boolean;
   altKey?: boolean;
   metaKey?: boolean;
-}): KeyboardEvent {
+}) {
   const {
     targetTagName = "DIV",
     isComposing = false,
@@ -16,17 +16,14 @@ function createMockKeyboardEvent(options: {
     metaKey = false,
   } = options;
 
-  return {
-    target: targetTagName === null ? null : { tagName: targetTagName },
-    isComposing,
-    ctrlKey,
-    altKey,
-    metaKey,
-  } as unknown as KeyboardEvent;
+  const target =
+    targetTagName === null ? null : Object.assign(new EventTarget(), { tagName: targetTagName });
+
+  return { target, isComposing, ctrlKey, altKey, metaKey };
 }
 
 describe("shouldBlockShortcut", () => {
-  it.each([
+  it.each<[Parameters<typeof createMockKeyboardEvent>[0], string]>([
     [{ targetTagName: "INPUT" }, "form input"],
     [{ targetTagName: "TEXTAREA" }, "form textarea"],
     [{ targetTagName: "SELECT" }, "form select"],
@@ -35,12 +32,9 @@ describe("shouldBlockShortcut", () => {
     [{ altKey: true }, "alt"],
     [{ metaKey: true }, "meta"],
     [{ ctrlKey: true, altKey: true }, "multiple modifiers"],
-  ] as [Parameters<typeof createMockKeyboardEvent>[0], string][])(
-    "blocks shortcut (%s)",
-    (options) => {
-      expect(shouldBlockShortcut(createMockKeyboardEvent(options))).toBe(true);
-    },
-  );
+  ])("blocks shortcut (%s)", (options) => {
+    expect(shouldBlockShortcut(createMockKeyboardEvent(options))).toBe(true);
+  });
 
   it.each([["DIV"], ["TABLE"], ["BUTTON"], ["BODY"]])("allows shortcut for %s target", (tag) => {
     expect(shouldBlockShortcut(createMockKeyboardEvent({ targetTagName: tag }))).toBe(false);
@@ -66,8 +60,8 @@ describe("SHORTCUTS", () => {
     }
 
     for (const shortcut of SHORTCUTS) {
-      expect(typeof shortcut.key).toBe("string");
-      expect(typeof shortcut.description).toBe("string");
+      expect(shortcut.key).toEqual(expect.any(String));
+      expect(shortcut.description).toEqual(expect.any(String));
       expect(["navigation", "search", "other"]).toContain(shortcut.group);
     }
 

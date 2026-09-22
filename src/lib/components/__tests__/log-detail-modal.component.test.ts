@@ -85,7 +85,7 @@ describe("LogDetailModal", () => {
       userId: null,
       ipAddress: null,
       metadata: null,
-      timestamp: null as unknown as Date,
+      timestamp: null!,
     };
 
     render(LogDetailModal, { props: { log: sparse, open: true } });

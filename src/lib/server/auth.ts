@@ -19,7 +19,7 @@ export function createAuth(database: DatabaseClient) {
       updateAge: 60 * 60 * 24,
     },
     secret: env.BETTER_AUTH_SECRET,
-    trustedOrigins: [process.env.ORIGIN].filter(Boolean) as string[],
+    trustedOrigins: [process.env.ORIGIN].filter((origin): origin is string => Boolean(origin)),
     advanced: {
       // better-auth infers Secure (and the __Secure- name prefix) from NODE_ENV === "production",
       // but this app treats an unset NODE_ENV as production (see config/env.ts). Without this,
@@ -46,12 +46,17 @@ async function initAuth(): Promise<void> {
   return _initPromise;
 }
 
+// SAFETY: every access is served by the get trap below from the initialized _auth;
+// the empty target object itself is never read.
 export const auth = new Proxy({} as ReturnType<typeof createAuth>, {
   get(_target, prop) {
     if (!_auth) {
       throw new Error("Auth not initialized. Call initAuth() before accessing auth properties.");
     }
 
+    // SAFETY: TypeScript checks every typed `auth.<member>` access against
+    // keyof typeof createAuth before it reaches this trap, and any other key the runtime
+    // probes (e.g. `then` or a well-known symbol) reads as undefined from _auth instead of throwing.
     return _auth[prop as keyof typeof _auth];
   },
 });

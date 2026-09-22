@@ -22,12 +22,12 @@ describe("Toast Utility", () => {
     expect(sonner.toast.success).toHaveBeenCalledWith("Done", { duration: 3000 });
   });
 
-  it.each([
+  it.each<[Parameters<typeof toastError>[0], string, string]>([
     ["Something went wrong", "Something went wrong", "plain message"],
     [new Error("Database connection failed"), "Database connection failed", "Error object"],
     [{ foo: "bar" }, "An unexpected error occurred", "unknown type fallback"],
-  ] as [unknown, string, string][])("toastError(%s) shows %s (%s)", (input, expected) => {
-    toastError(input as string);
+  ])("toastError(%s) shows %s (%s)", (input, expected) => {
+    toastError(input);
     expect(sonner.toast.error).toHaveBeenCalledWith(expected, undefined);
   });
 });

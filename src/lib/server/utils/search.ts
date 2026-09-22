@@ -1,5 +1,5 @@
 export function buildSearchQuery(searchTerm: string): string {
-  if (!searchTerm || typeof searchTerm !== "string") {
+  if (!searchTerm) {
     return "";
   }
 

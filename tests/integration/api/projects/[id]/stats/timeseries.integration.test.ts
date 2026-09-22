@@ -1,4 +1,5 @@
 import type { HttpError } from "@sveltejs/kit";
+import type { SelectedFields } from "drizzle-orm/pg-core";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { createAuth } from "$lib/server/auth";
@@ -6,6 +7,7 @@ import type * as schema from "$lib/server/db/schema";
 import { setupTestDatabase } from "$lib/server/db/test-db";
 import { getSession } from "$lib/server/session";
 import { clearApiKeyCache } from "$lib/server/utils/api-key";
+import type { JsonObject } from "$lib/shared/schemas/json";
 import { GET } from "../../../../../../src/routes/api/projects/[id]/stats/timeseries/+server";
 import { seedLogs, seedProject } from "../../../../../fixtures/db";
 
@@ -36,18 +38,19 @@ function createRequestEvent(
     fetch: globalThis.fetch,
     getClientAddress: () => "127.0.0.1",
     setHeaders: () => {},
-  } as unknown;
+  };
 }
 
 async function expectHttpError(
   promise: Promise<unknown>,
   expectedStatus: number,
-  expectedBody?: Record<string, unknown>,
+  expectedBody?: JsonObject,
 ): Promise<void> {
   try {
     await promise;
     expect.fail("Expected HTTP error to be thrown");
   } catch (error) {
+    // SAFETY: the awaited GET handler rejects only through SvelteKit's error() helper, which throws an HttpError with a numeric status and a body; if it resolves instead, expect.fail's throw lands here and the status check below fails the test.
     const httpError = error as HttpError;
     expect(httpError.status).toBe(expectedStatus);
 
@@ -110,6 +113,7 @@ describe("GET /api/projects/[id]/stats/timeseries", () => {
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id });
+      // SAFETY: createRequestEvent supplies every RequestEvent field GET and requireOwnedProjectRoute read (request, url, params, route.id, locals, cookies); its tracing stays null because tests build no OTel Spans, so the event is passed as never.
       await expectHttpError(GET(event as never), 401, { message: "Unauthorized" });
     });
   });
@@ -122,6 +126,7 @@ describe("GET /api/projects/[id]/stats/timeseries", () => {
       );
 
       const event = createRequestEvent(request, db, { id: "non-existent-id" }, authenticatedLocals);
+      // SAFETY: createRequestEvent supplies every RequestEvent field GET and requireOwnedProjectRoute read (request, url, params, route.id, locals, cookies); its tracing stays null because tests build no OTel Spans, so the event is passed as never.
       const response = await GET(event as never);
 
       expect(response.status).toBe(404);
@@ -141,6 +146,7 @@ describe("GET /api/projects/[id]/stats/timeseries", () => {
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+      // SAFETY: createRequestEvent supplies every RequestEvent field GET and requireOwnedProjectRoute read (request, url, params, route.id, locals, cookies); its tracing stays null because tests build no OTel Spans, so the event is passed as never.
       const response = await GET(event as never);
       const data = await response.json();
 
@@ -158,6 +164,7 @@ describe("GET /api/projects/[id]/stats/timeseries", () => {
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+      // SAFETY: createRequestEvent supplies every RequestEvent field GET and requireOwnedProjectRoute read (request, url, params, route.id, locals, cookies); its tracing stays null because tests build no OTel Spans, so the event is passed as never.
       const response = await GET(event as never);
       const data = await response.json();
 
@@ -174,6 +181,7 @@ describe("GET /api/projects/[id]/stats/timeseries", () => {
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+      // SAFETY: createRequestEvent supplies every RequestEvent field GET and requireOwnedProjectRoute read (request, url, params, route.id, locals, cookies); its tracing stays null because tests build no OTel Spans, so the event is passed as never.
       const response = await GET(event as never);
       const data = await response.json();
 
@@ -190,6 +198,7 @@ describe("GET /api/projects/[id]/stats/timeseries", () => {
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+      // SAFETY: createRequestEvent supplies every RequestEvent field GET and requireOwnedProjectRoute read (request, url, params, route.id, locals, cookies); its tracing stays null because tests build no OTel Spans, so the event is passed as never.
       const response = await GET(event as never);
       const data = await response.json();
 
@@ -206,6 +215,7 @@ describe("GET /api/projects/[id]/stats/timeseries", () => {
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+      // SAFETY: createRequestEvent supplies every RequestEvent field GET and requireOwnedProjectRoute read (request, url, params, route.id, locals, cookies); its tracing stays null because tests build no OTel Spans, so the event is passed as never.
       const response = await GET(event as never);
       const data = await response.json();
 
@@ -224,6 +234,7 @@ describe("GET /api/projects/[id]/stats/timeseries", () => {
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+      // SAFETY: createRequestEvent supplies every RequestEvent field GET and requireOwnedProjectRoute read (request, url, params, route.id, locals, cookies); its tracing stays null because tests build no OTel Spans, so the event is passed as never.
       const response = await GET(event as never);
       const data = await response.json();
 
@@ -242,18 +253,14 @@ describe("GET /api/projects/[id]/stats/timeseries", () => {
 
       const originalSelect = db.select.bind(db);
 
-      const selectSpy = vi.spyOn(db, "select").mockImplementation(((fields?: unknown) => {
-        if (
-          fields &&
-          typeof fields === "object" &&
-          Object.keys(fields).length === 1 &&
-          "timestamp" in fields
-        ) {
+      const selectSpy = vi.spyOn(db, "select").mockImplementation((fields?: SelectedFields) => {
+        if (fields && Object.keys(fields).length === 1 && "timestamp" in fields) {
           throw new Error("timeseries must aggregate timestamps in SQL");
         }
 
+        // SAFETY: fields holds only drizzle's own selection objects, or undefined from no-argument db.select calls; the bound original accepts both forms at runtime, so the selection is passed through unchanged.
         return originalSelect(fields as never);
-      }) as typeof db.select);
+      });
 
       const request = new Request(
         `http://localhost/api/projects/${testProject.id}/stats/timeseries?range=1h`,
@@ -261,6 +268,7 @@ describe("GET /api/projects/[id]/stats/timeseries", () => {
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+      // SAFETY: createRequestEvent supplies every RequestEvent field GET and requireOwnedProjectRoute read (request, url, params, route.id, locals, cookies); its tracing stays null because tests build no OTel Spans, so the event is passed as never.
       const response = await GET(event as never);
       const data = await response.json();
 
@@ -282,6 +290,7 @@ describe("GET /api/projects/[id]/stats/timeseries", () => {
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+      // SAFETY: createRequestEvent supplies every RequestEvent field GET and requireOwnedProjectRoute read (request, url, params, route.id, locals, cookies); its tracing stays null because tests build no OTel Spans, so the event is passed as never.
       const response = await GET(event as never);
       const data = await response.json();
 
@@ -308,6 +317,7 @@ describe("GET /api/projects/[id]/stats/timeseries", () => {
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+      // SAFETY: createRequestEvent supplies every RequestEvent field GET and requireOwnedProjectRoute read (request, url, params, route.id, locals, cookies); its tracing stays null because tests build no OTel Spans, so the event is passed as never.
       const response = await GET(event as never);
       const data = await response.json();
 
@@ -327,6 +337,7 @@ describe("GET /api/projects/[id]/stats/timeseries", () => {
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+      // SAFETY: createRequestEvent supplies every RequestEvent field GET and requireOwnedProjectRoute read (request, url, params, route.id, locals, cookies); its tracing stays null because tests build no OTel Spans, so the event is passed as never.
       const response = await GET(event as never);
       const data = await response.json();
 
@@ -348,6 +359,7 @@ describe("GET /api/projects/[id]/stats/timeseries", () => {
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+      // SAFETY: createRequestEvent supplies every RequestEvent field GET and requireOwnedProjectRoute read (request, url, params, route.id, locals, cookies); its tracing stays null because tests build no OTel Spans, so the event is passed as never.
       const response = await GET(event as never);
       const data = await response.json();
 
@@ -373,6 +385,7 @@ describe("GET /api/projects/[id]/stats/timeseries", () => {
       );
 
       const event = createRequestEvent(request, db, { id: project1.id }, authenticatedLocals);
+      // SAFETY: createRequestEvent supplies every RequestEvent field GET and requireOwnedProjectRoute read (request, url, params, route.id, locals, cookies); its tracing stays null because tests build no OTel Spans, so the event is passed as never.
       const response = await GET(event as never);
       const data = await response.json();
 
@@ -398,6 +411,7 @@ describe("GET /api/projects/[id]/stats/timeseries", () => {
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+      // SAFETY: createRequestEvent supplies every RequestEvent field GET and requireOwnedProjectRoute read (request, url, params, route.id, locals, cookies); its tracing stays null because tests build no OTel Spans, so the event is passed as never.
       const response = await GET(event as never);
       const data = await response.json();
 

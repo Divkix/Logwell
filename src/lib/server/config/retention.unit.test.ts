@@ -23,6 +23,8 @@ describe("Retention Configuration", () => {
     return import("./performance");
   }
 
+  // SAFETY: each row is [LOG_RETENTION_DAYS or unset, expected value, label] — the
+  // literals below only take those three shapes.
   it.each([
     [undefined, 30, "default 30"],
     ["0", 0, "0 disables"],
@@ -34,13 +36,15 @@ describe("Retention Configuration", () => {
     "LOG_RETENTION_DAYS=%s → %s (%s)",
     async (value, expected) => {
       const { RETENTION_CONFIG } = await loadRetention({
-        LOG_RETENTION_DAYS: value as string | undefined,
+        LOG_RETENTION_DAYS: value,
       });
 
       expect(RETENTION_CONFIG.LOG_RETENTION_DAYS).toBe(expected);
     },
   );
 
+  // SAFETY: each row is [LOG_CLEANUP_INTERVAL_MS or unset, expected value, label] — the
+  // literals below only take those three shapes.
   it.each([
     [undefined, 3600000, "default 1 hour"],
     ["30000", 60000, "below min clamps to 1 minute"],
@@ -51,7 +55,7 @@ describe("Retention Configuration", () => {
     "LOG_CLEANUP_INTERVAL_MS=%s → %s (%s)",
     async (value, expected) => {
       const { RETENTION_CONFIG } = await loadRetention({
-        LOG_CLEANUP_INTERVAL_MS: value as string | undefined,
+        LOG_CLEANUP_INTERVAL_MS: value,
       });
 
       expect(RETENTION_CONFIG.LOG_CLEANUP_INTERVAL_MS).toBe(expected);

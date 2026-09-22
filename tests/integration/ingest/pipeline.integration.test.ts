@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
 import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
+import { z } from "zod";
 import { API_CONFIG } from "../../../src/lib/server/config/performance";
 import type * as schema from "../../../src/lib/server/db/schema";
 import { incident, log, project as projectTable } from "../../../src/lib/server/db/schema";
@@ -11,6 +12,7 @@ import { ingestLogs, type IngestBodyParser } from "../../../src/lib/server/utils
 import { parseOtlpIngestBody } from "../../../src/lib/server/utils/otlp";
 import { checkRateLimit, INGEST_RPM } from "../../../src/lib/server/utils/rate-limit";
 import { parseSimpleIngestBody } from "../../../src/lib/server/utils/simple-ingest";
+import type { JsonValue } from "../../../src/lib/shared/schemas/json";
 import { seedProjectWithApiKey } from "../../fixtures/db";
 
 const otlpBody = (message: string) => ({
@@ -30,23 +32,26 @@ const simpleBody = (message: string) => ({ level: "info", message, service: "web
 const cases: Array<{
   name: string;
   parse: IngestBodyParser;
-  validBody: (message: string) => unknown;
+  validBody: (message: string) => JsonValue;
 }> = [
   { name: "otlp", parse: parseOtlpIngestBody, validBody: otlpBody },
   { name: "simple", parse: parseSimpleIngestBody, validBody: simpleBody },
 ];
 
-function post(body: unknown, apiKey?: string, contentType: string | null = "application/json") {
+function post(body: JsonValue, apiKey?: string, contentType: string | null = "application/json") {
   const headers: Record<string, string> = {};
 
   if (contentType) headers["Content-Type"] = contentType;
 
   if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
 
+  // Raw strings (the junk-body cases) go over the wire untouched; anything else is JSON-encoded.
+  const rawText = z.string().safeParse(body);
+
   return new Request("http://localhost/v1/ingest", {
     method: "POST",
     headers,
-    body: typeof body === "string" ? body : JSON.stringify(body),
+    body: rawText.success ? rawText.data : JSON.stringify(body),
   });
 }
 
@@ -196,7 +201,7 @@ describe("ingestLogs pipeline", () => {
     const project = await seedProjectWithApiKey(db);
     const valid = Array.from({ length: API_CONFIG.BATCH_INSERT_LIMIT - 1 }, (_, i) => `log ${i}`);
 
-    const bodies: Array<[IngestBodyParser, unknown]> = [
+    const bodies: Array<[IngestBodyParser, JsonValue]> = [
       [
         parseSimpleIngestBody,
         [
@@ -244,7 +249,7 @@ describe("ingestLogs pipeline", () => {
       message: `Batch exceeds maximum limit of ${API_CONFIG.BATCH_INSERT_LIMIT} logs.`,
     };
 
-    const bodies: Array<[IngestBodyParser, unknown]> = [
+    const bodies: Array<[IngestBodyParser, JsonValue]> = [
       [parseSimpleIngestBody, flood],
       [parseOtlpIngestBody, { resourceLogs: [{ scopeLogs: [{ logRecords: flood }] }] }],
       [parseOtlpIngestBody, { resourceLogs: flood }],

@@ -8,17 +8,23 @@ import type { ClientIncident } from "$lib/hooks/use-incident-stream.svelte";
 import type { IncidentListItem } from "$lib/shared/types";
 import type { PageData } from "../$types";
 
-const { mockGoto, mockToastError, mockConnect, mockDisconnect, streamOptions } = vi.hoisted(() => ({
-  mockGoto: vi.fn().mockResolvedValue(undefined),
-  mockToastError: vi.fn(),
-  mockConnect: vi.fn(),
-  mockDisconnect: vi.fn(),
-  streamOptions: {} as {
-    onIncidents?: (updates: ClientIncident[]) => void;
-    onError?: (error: Error) => void;
-    onConnectionChange?: (connected: boolean) => void;
-  },
-}));
+type IncidentStreamOptions = {
+  onIncidents?: (updates: ClientIncident[]) => void;
+  onError?: (error: Error) => void;
+  onConnectionChange?: (connected: boolean) => void;
+};
+
+const { mockGoto, mockToastError, mockConnect, mockDisconnect, streamOptions } = vi.hoisted(() => {
+  const streamOptions: IncidentStreamOptions = {};
+
+  return {
+    mockGoto: vi.fn().mockResolvedValue(undefined),
+    mockToastError: vi.fn(),
+    mockConnect: vi.fn(),
+    mockDisconnect: vi.fn(),
+    streamOptions,
+  };
+});
 
 vi.mock("$app/navigation", () => ({
   goto: mockGoto,
@@ -112,7 +118,7 @@ describe("IncidentsPage", () => {
 
   beforeEach(() => {
     fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
-      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      const url = input instanceof URL ? input.href : input instanceof Request ? input.url : input;
 
       if (url.includes("/incidents?cursor=")) {
         return Promise.resolve(makeLoadMoreResponse());
@@ -245,13 +251,13 @@ describe("IncidentsPage", () => {
     let staleJsonCalls = 0;
 
     // Plain stub so the promise the component awaits is exactly the one this test resolves.
-    globalThis.fetch = ((input: RequestInfo | URL) => {
-      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+    globalThis.fetch = (input: RequestInfo | URL) => {
+      const url = input instanceof URL ? input.href : input instanceof Request ? input.url : input;
 
       if (url.includes("/incidents?cursor=")) return fetchPromise;
 
       return Promise.resolve(new Response(null, { status: 500 }));
-    }) as typeof fetch;
+    };
 
     const { rerender } = render(IncidentsPage, { props: { data: makeData() } });
 

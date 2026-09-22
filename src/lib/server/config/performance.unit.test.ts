@@ -27,6 +27,8 @@ describe("Performance Configuration", () => {
     ])("exports %s with default value of %d", async (key, expected) => {
       vi.resetModules();
       const { SSE_CONFIG } = await import("./performance");
+      // SAFETY: BATCH_WINDOW_MS and MAX_BATCH_SIZE are real SSE_CONFIG members; any other
+      // key would read undefined and fail the toBe below.
       expect(SSE_CONFIG[key as keyof typeof SSE_CONFIG]).toBe(expected);
     });
 
@@ -37,6 +39,8 @@ describe("Performance Configuration", () => {
       vi.resetModules();
       process.env[envKey] = envValue;
       const { SSE_CONFIG } = await import("./performance");
+      // SAFETY: both rows' config keys (BATCH_WINDOW_MS, MAX_BATCH_SIZE) are real SSE_CONFIG
+      // members; a typo would read undefined and fail the toBe below.
       expect(SSE_CONFIG[configKey as keyof typeof SSE_CONFIG]).toBe(expected);
     });
 
@@ -56,6 +60,8 @@ describe("Performance Configuration", () => {
       vi.resetModules();
       process.env[envKey] = envValue;
       const { SSE_CONFIG } = await import("./performance");
+      // SAFETY: the rows' config keys (BATCH_WINDOW_MS, MAX_BATCH_SIZE, HEARTBEAT_INTERVAL_MS)
+      // are all real SSE_CONFIG members; a typo would read undefined and fail the toBe below.
       expect(SSE_CONFIG[configKey as keyof typeof SSE_CONFIG]).toBe(expected);
     });
 
@@ -68,6 +74,8 @@ describe("Performance Configuration", () => {
       async (envKey, configKey, value, expected) => {
         process.env[envKey] = value;
         const { SSE_CONFIG } = await import("./performance");
+        // SAFETY: both config keys (BATCH_WINDOW_MS, MAX_BATCH_SIZE) are real SSE_CONFIG
+        // members; a typo would read undefined and fail the toBe below.
         expect(SSE_CONFIG[configKey as keyof typeof SSE_CONFIG]).toBe(expected);
       },
     );
@@ -76,6 +84,8 @@ describe("Performance Configuration", () => {
   describe("SSE Heartbeat vs Server Idle Timeout", () => {
     // IDLE_TIMEOUT is what build/index.js hands to Bun.serve; the config module reads it once at
     // import time, so every case re-imports a fresh module with its own env.
+    // SAFETY: each row is [IDLE_TIMEOUT or unset, expected heartbeat, idle-window cap, label] —
+    // the literals below only take those four shapes.
     it.each([
       [undefined, 5000, 10_000, "unset → adapter default 10s"],
       ["10", 5000, 10_000, "explicit 10s"],
@@ -111,6 +121,8 @@ describe("Performance Configuration", () => {
   });
 
   describe("Log Stream Configuration", () => {
+    // SAFETY: each row is [LOG_STREAM_MAX_LOGS or unset, expected value, label] — the
+    // literals below only take those three shapes.
     it.each([
       [undefined, 1000, "default 1000"],
       ["5000", 5000, "env override"],
@@ -122,7 +134,7 @@ describe("Performance Configuration", () => {
         vi.resetModules();
 
         if (value === undefined) delete process.env.LOG_STREAM_MAX_LOGS;
-        else process.env.LOG_STREAM_MAX_LOGS = value as string;
+        else process.env.LOG_STREAM_MAX_LOGS = value;
         const { LOG_STREAM_CONFIG } = await import("./performance");
         expect(LOG_STREAM_CONFIG.DEFAULT_MAX_LOGS).toBe(expected);
       },
@@ -135,6 +147,8 @@ describe("Performance Configuration", () => {
   });
 
   describe("Retention Configuration", () => {
+    // SAFETY: each row is [LOG_RETENTION_DAYS or unset, expected value, label] — the
+    // literals below only take those three shapes.
     it.each([
       [undefined, 30, "default 30"],
       ["0", 0, "0 is documented as disabled, so it stays 0"],
@@ -151,12 +165,14 @@ describe("Performance Configuration", () => {
         vi.resetModules();
 
         if (value === undefined) delete process.env.LOG_RETENTION_DAYS;
-        else process.env.LOG_RETENTION_DAYS = value as string;
+        else process.env.LOG_RETENTION_DAYS = value;
         const { RETENTION_CONFIG } = await import("./performance");
         expect(RETENTION_CONFIG.LOG_RETENTION_DAYS).toBe(expected);
       },
     );
 
+    // SAFETY: each row is [LOG_CLEANUP_INTERVAL_MS or unset, expected value, label] — the
+    // literals below only take those three shapes.
     it.each([
       [undefined, 3600000, "default 1 hour"],
       ["1800000", 1800000, "in range"],
@@ -169,7 +185,7 @@ describe("Performance Configuration", () => {
         vi.resetModules();
 
         if (value === undefined) delete process.env.LOG_CLEANUP_INTERVAL_MS;
-        else process.env.LOG_CLEANUP_INTERVAL_MS = value as string;
+        else process.env.LOG_CLEANUP_INTERVAL_MS = value;
         const { RETENTION_CONFIG } = await import("./performance");
         expect(RETENTION_CONFIG.LOG_CLEANUP_INTERVAL_MS).toBe(expected);
       },
@@ -183,11 +199,15 @@ describe("Performance Configuration", () => {
       ["MAX_PAGE_SIZE", 500],
     ])("exports %s with value %d", async (key, expected) => {
       const { API_CONFIG } = await import("./performance");
+      // SAFETY: BATCH_INSERT_LIMIT, DEFAULT_PAGE_SIZE and MAX_PAGE_SIZE are real API_CONFIG
+      // members; any other key would read undefined and fail the toBe below.
       expect(API_CONFIG[key as keyof typeof API_CONFIG]).toBe(expected);
     });
   });
 
   describe("Incident Configuration", () => {
+    // SAFETY: each row is [INCIDENT_AUTO_RESOLVE_MINUTES or unset, expected value, label] —
+    // the literals below only take those three shapes.
     it.each([
       [undefined, 30, "default 30"],
       ["45", 45, "env override"],
@@ -199,7 +219,7 @@ describe("Performance Configuration", () => {
         vi.resetModules();
 
         if (value === undefined) delete process.env.INCIDENT_AUTO_RESOLVE_MINUTES;
-        else process.env.INCIDENT_AUTO_RESOLVE_MINUTES = value as string;
+        else process.env.INCIDENT_AUTO_RESOLVE_MINUTES = value;
         const { INCIDENT_CONFIG } = await import("./performance");
         expect(INCIDENT_CONFIG.AUTO_RESOLVE_MINUTES).toBe(expected);
       },

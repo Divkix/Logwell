@@ -50,6 +50,8 @@ export async function GET(event: RequestEvent): Promise<Response> {
   const cursorParam = params.get("cursor");
   const statusParam = params.get("status") || "open";
 
+  // SAFETY: the ternary only keeps statusParam when INCIDENT_STATUSES.includes() accepted it,
+  // so the value is one of the statuses the query-param set allows.
   const status = INCIDENT_STATUSES.includes(statusParam as (typeof INCIDENT_STATUSES)[number])
     ? (statusParam as (typeof INCIDENT_STATUSES)[number])
     : "open";

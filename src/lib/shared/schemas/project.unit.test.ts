@@ -19,7 +19,7 @@ describe("projectCreatePayloadSchema", () => {
 });
 
 describe("projectUpdatePayloadSchema with retentionDays", () => {
-  it.each([
+  it.each<[number | null, boolean, string]>([
     [null, true, "system default"],
     [0, true, "never delete"],
     [1, true, "min positive"],
@@ -28,12 +28,9 @@ describe("projectUpdatePayloadSchema with retentionDays", () => {
     [-1, false, "negative"],
     [3.5, false, "non-integer"],
     [3651, false, "over max"],
-  ] as [number | null, boolean, string][])(
-    "retentionDays %s valid=%s (%s)",
-    (retentionDays, valid) => {
-      expect(projectUpdatePayloadSchema.safeParse({ retentionDays }).success).toBe(valid);
-    },
-  );
+  ])("retentionDays %s valid=%s (%s)", (retentionDays, valid) => {
+    expect(projectUpdatePayloadSchema.safeParse({ retentionDays }).success).toBe(valid);
+  });
 
   it("allows omitting retentionDays (optional field)", () => {
     const result = projectUpdatePayloadSchema.safeParse({ name: "updated-project" });

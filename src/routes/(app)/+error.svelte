@@ -9,13 +9,16 @@ const errorCode = $derived(page.status);
 
 const errorMessage = $derived(page.error?.message || 'An unexpected error occurred');
 
+// SAFETY: hooks.server.ts handleError returns buildErrorResponse's { id, message }, and
+// SvelteKit surfaces that object as page.error, so the optional id exists on every error
+// this page renders.
 const errorId = $derived((page.error as { id?: string })?.id);
 
 function reload() {
   window.location.reload();
 }
 
-const errorTitles: Record<number, string> = {
+const errorTitles = {
   400: 'Bad Request',
   401: 'Unauthorized',
   403: 'Forbidden',
@@ -23,9 +26,12 @@ const errorTitles: Record<number, string> = {
   500: 'Server Error',
   502: 'Bad Gateway',
   503: 'Service Unavailable',
-};
+} satisfies Record<number, string>;
 
-const errorTitle = $derived(errorTitles[errorCode] || 'Error');
+// SAFETY: errorCode is an arbitrary HTTP status number, so the keyof cast only names the
+// literal keys for the index expression — statuses outside the table fall back to 'Error'
+// at runtime.
+const errorTitle = $derived(errorTitles[errorCode as keyof typeof errorTitles] || 'Error');
 </script>
 
 <div class="flex items-center justify-center min-h-[60vh] p-4">

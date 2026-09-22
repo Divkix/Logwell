@@ -1,5 +1,5 @@
-import type { HttpError } from "@sveltejs/kit";
 import { sql } from "drizzle-orm";
+import type { SelectedFields } from "drizzle-orm/pg-core";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { createAuth } from "$lib/server/auth";
@@ -7,6 +7,7 @@ import type * as schema from "$lib/server/db/schema";
 import { incident } from "$lib/server/db/schema";
 import { setupTestDatabase } from "$lib/server/db/test-db";
 import { getSession } from "$lib/server/session";
+import type { JsonObject } from "$lib/shared/schemas/json";
 import { GET as GET_LIST } from "../../../../../src/routes/api/projects/[id]/incidents/+server";
 import { GET as GET_DETAIL } from "../../../../../src/routes/api/projects/[id]/incidents/[incidentId]/+server";
 import { GET as GET_TIMELINE } from "../../../../../src/routes/api/projects/[id]/incidents/[incidentId]/timeline/+server";
@@ -40,23 +41,22 @@ function createRequestEvent(
     fetch: globalThis.fetch,
     getClientAddress: () => "127.0.0.1",
     setHeaders: () => {},
-  } as unknown;
+  };
 }
 
 async function expectHttpError(
   promise: Promise<unknown>,
   expectedStatus: number,
-  expectedBody?: Record<string, unknown>,
+  expectedBody?: JsonObject,
 ): Promise<void> {
   try {
     await promise;
     expect.fail("Expected HTTP error to be thrown");
   } catch (error) {
-    const httpError = error as HttpError;
-    expect(httpError.status).toBe(expectedStatus);
+    expect(error).toHaveProperty("status", expectedStatus);
 
     if (expectedBody) {
-      expect(httpError.body).toEqual(expectedBody);
+      expect(error).toHaveProperty("body", expectedBody);
     }
   }
 }
@@ -106,6 +106,7 @@ describe("Incident APIs", () => {
     const request = new Request(`http://localhost/api/projects/${project.id}/incidents`);
     const event = createRequestEvent(request, db, { id: project.id });
 
+    // SAFETY: the fixture event provides every RequestEvent member these handlers read (request, url, params, locals, cookies, fetch, getClientAddress, setHeaders); tracing stays null because no handler reads it.
     await expectHttpError(GET_LIST(event as never), 401, { message: "Unauthorized" });
   });
 
@@ -146,6 +147,7 @@ describe("Incident APIs", () => {
 
     const request = new Request(`http://localhost/api/projects/${project.id}/incidents`);
     const event = createRequestEvent(request, db, { id: project.id }, authenticatedLocals);
+    // SAFETY: the fixture event provides every RequestEvent member these handlers read (request, url, params, locals, cookies, fetch, getClientAddress, setHeaders); tracing stays null because no handler reads it.
     const response = await GET_LIST(event as never);
     expect(response.status).toBe(200);
 
@@ -183,6 +185,7 @@ describe("Incident APIs", () => {
 
     const request = new Request(`http://localhost/api/projects/${project.id}/incidents`);
     const event = createRequestEvent(request, db, { id: project.id }, authenticatedLocals);
+    // SAFETY: the fixture event provides every RequestEvent member these handlers read (request, url, params, locals, cookies, fetch, getClientAddress, setHeaders); tracing stays null because no handler reads it.
     const response = await GET_LIST(event as never);
     expect(response.status).toBe(200);
 
@@ -256,6 +259,7 @@ describe("Incident APIs", () => {
       "/api/projects/[id]/incidents/[incidentId]",
     );
 
+    // SAFETY: the fixture event provides every RequestEvent member these handlers read (request, url, params, locals, cookies, fetch, getClientAddress, setHeaders); tracing stays null because no handler reads it.
     const response = await GET_DETAIL(event as never);
     expect(response.status).toBe(200);
 
@@ -303,15 +307,18 @@ describe("Incident APIs", () => {
     });
 
     const originalSelect = db.select.bind(db);
-    vi.spyOn(db, "select").mockImplementation(((fields?: unknown) => {
+    // SAFETY: the spy forwards every non-matching db.select call to the bound original
+    // select, so all callers still receive a working query builder at runtime.
+    vi.spyOn(db, "select").mockImplementation(((fields?: SelectedFields) => {
       if (
         fields &&
-        typeof fields === "object" &&
         ["sourceFile", "lineNumber", "requestId", "traceId"].every((key) => key in fields)
       ) {
         throw new Error("incident detail must aggregate log counts in SQL");
       }
 
+      // SAFETY: fields is passed through unchanged; the never type only keeps the returned
+      // PgSelectBuilder assignable to both db.select overloads the spy must satisfy.
       return originalSelect(fields as never);
     }) as typeof db.select);
 
@@ -327,6 +334,7 @@ describe("Incident APIs", () => {
       "/api/projects/[id]/incidents/[incidentId]",
     );
 
+    // SAFETY: the fixture event provides every RequestEvent member these handlers read (request, url, params, locals, cookies, fetch, getClientAddress, setHeaders); tracing stays null because no handler reads it.
     const response = await GET_DETAIL(event as never);
     expect(response.status).toBe(200);
 
@@ -392,6 +400,7 @@ describe("Incident APIs", () => {
       "/api/projects/[id]/incidents/[incidentId]/timeline",
     );
 
+    // SAFETY: the fixture event provides every RequestEvent member these handlers read (request, url, params, locals, cookies, fetch, getClientAddress, setHeaders); tracing stays null because no handler reads it.
     const response = await GET_TIMELINE(event as never);
     expect(response.status).toBe(200);
 
@@ -431,16 +440,15 @@ describe("Incident APIs", () => {
     });
 
     const originalSelect = db.select.bind(db);
-    vi.spyOn(db, "select").mockImplementation(((fields?: unknown) => {
-      if (
-        fields &&
-        typeof fields === "object" &&
-        Object.keys(fields).length === 1 &&
-        "timestamp" in fields
-      ) {
+    // SAFETY: the spy forwards every non-matching db.select call to the bound original
+    // select, so all callers still receive a working query builder at runtime.
+    vi.spyOn(db, "select").mockImplementation(((fields?: SelectedFields) => {
+      if (fields && Object.keys(fields).length === 1 && "timestamp" in fields) {
         throw new Error("incident timeline must aggregate timestamps in SQL");
       }
 
+      // SAFETY: fields is passed through unchanged; the never type only keeps the returned
+      // PgSelectBuilder assignable to both db.select overloads the spy must satisfy.
       return originalSelect(fields as never);
     }) as typeof db.select);
 
@@ -456,6 +464,7 @@ describe("Incident APIs", () => {
       "/api/projects/[id]/incidents/[incidentId]/timeline",
     );
 
+    // SAFETY: the fixture event provides every RequestEvent member these handlers read (request, url, params, locals, cookies, fetch, getClientAddress, setHeaders); tracing stays null because no handler reads it.
     const response = await GET_TIMELINE(event as never);
     expect(response.status).toBe(200);
 
@@ -512,6 +521,7 @@ describe("Incident APIs", () => {
       "/api/projects/[id]/incidents/[incidentId]",
     );
 
+    // SAFETY: the fixture event provides every RequestEvent member these handlers read (request, url, params, locals, cookies, fetch, getClientAddress, setHeaders); tracing stays null because no handler reads it.
     const response = await GET_DETAIL(event as never);
     expect(response.status).toBe(404);
 
@@ -546,6 +556,7 @@ describe("Incident APIs", () => {
 
       const request = new Request(url);
       const event = createRequestEvent(request, db, { id: project.id }, authenticatedLocals);
+      // SAFETY: the fixture event provides every RequestEvent member these handlers read (request, url, params, locals, cookies, fetch, getClientAddress, setHeaders); tracing stays null because no handler reads it.
       const response = await GET_LIST(event as never);
       expect(response.status).toBe(200);
       const body = await response.json();

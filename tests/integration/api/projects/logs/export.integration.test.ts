@@ -13,7 +13,7 @@ function createRequestEvent(
   db: PgliteDatabase<typeof schema>,
   params: { id: string },
   locals: Partial<App.Locals> = {},
-) {
+): Parameters<typeof GET>[0] {
   return {
     request,
     locals: { db, ...locals },
@@ -24,7 +24,7 @@ function createRequestEvent(
     isDataRequest: false,
     isSubRequest: false,
     isRemoteRequest: false,
-    tracing: null,
+    tracing: { enabled: false, root: undefined, current: undefined },
     cookies: {
       get: () => undefined,
       getAll: () => [],
@@ -35,7 +35,7 @@ function createRequestEvent(
     fetch: globalThis.fetch,
     getClientAddress: () => "127.0.0.1",
     setHeaders: () => {},
-  } as unknown;
+  };
 }
 
 describe("GET /api/projects/[id]/logs/export", () => {
@@ -92,7 +92,7 @@ describe("GET /api/projects/[id]/logs/export", () => {
     );
 
     const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
-    const response = await GET(event as never);
+    const response = await GET(event);
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toBe("application/json");
@@ -113,7 +113,7 @@ describe("GET /api/projects/[id]/logs/export", () => {
     });
 
     const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
-    const response = await GET(event as never);
+    const response = await GET(event);
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toBe("application/json");
@@ -132,7 +132,7 @@ describe("GET /api/projects/[id]/logs/export", () => {
     );
 
     const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
-    const response = await GET(event as never);
+    const response = await GET(event);
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toBe("text/csv; charset=utf-8");
@@ -151,7 +151,7 @@ describe("GET /api/projects/[id]/logs/export", () => {
     );
 
     const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
-    const response = await GET(event as never);
+    const response = await GET(event);
 
     expect(response.status).toBe(400);
     const body = await response.json();

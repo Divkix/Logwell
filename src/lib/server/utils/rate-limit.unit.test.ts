@@ -28,6 +28,8 @@ describe("rate-limit env parsing", () => {
     return import("./rate-limit");
   }
 
+  // SAFETY: each row is [RATE_LIMIT_LOGIN_RPM or unset, expected limit, label] — the
+  // literals below only take those three shapes.
   it.each([
     [undefined, 10, "unset"],
     ["", 10, "empty"],
@@ -46,6 +48,8 @@ describe("rate-limit env parsing", () => {
     },
   );
 
+  // SAFETY: each row is [RATE_LIMIT_INGEST_RPM or unset, expected limit, label] — the
+  // literals below only take those three shapes.
   it.each([
     [undefined, 600, "unset"],
     ["0", 600, "zero"],

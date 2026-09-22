@@ -41,6 +41,8 @@ export const load: PageServerLoad = async (event) => {
   const cursorParam = params.get("cursor");
   const statusParam = params.get("status") || "open";
 
+  // SAFETY: the ternary only keeps statusParam when INCIDENT_STATUSES.includes() accepted it,
+  // so the value is exactly IncidentStatus.
   const status: IncidentStatus = INCIDENT_STATUSES.includes(statusParam as IncidentStatus)
     ? (statusParam as IncidentStatus)
     : "open";

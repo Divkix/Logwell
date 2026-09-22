@@ -8,6 +8,7 @@ import { queryLogs } from "$lib/server/utils/log-query";
 import { requireOwnedProjectRoute } from "$lib/server/utils/owned-project";
 import { buildSearchQuery } from "$lib/server/utils/search";
 import { parseLevelFilter } from "$lib/shared/schemas/log";
+import type { JsonValue } from "$lib/shared/schemas/json";
 import type { ExportFormat } from "$lib/types/export";
 import type { RequestEvent } from "./$types";
 
@@ -32,7 +33,7 @@ function validateFormat(formatParam: string | null): ExportFormat | null {
   const format = formatParam.toLowerCase();
 
   if (format === "csv" || format === "json") {
-    return format as ExportFormat;
+    return format;
   }
 
   return null;
@@ -156,7 +157,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
             if (page.logs.length === 0) break;
 
             for (const l of page.logs) {
-              const values: unknown[] = [
+              const values: JsonValue[] = [
                 l.id,
                 l.timestamp?.toISOString() ?? "",
                 l.level,

@@ -45,7 +45,7 @@ describe("API Key Format Validation", () => {
   });
 
   it.each([[null], [undefined]])("validateApiKeyFormat rejects %s", (key) => {
-    expect(validateApiKeyFormat(key as unknown as string)).toBe(false);
+    expect(validateApiKeyFormat(key)).toBe(false);
   });
 });
 
@@ -60,9 +60,15 @@ describe("API key cache invalidation races", () => {
 
   /** Minimal stand-in for the drizzle chain validateApiKey awaits. */
   function stubDb(read: () => Promise<Array<{ id: string }>>): DatabaseClient {
-    return {
-      select: () => ({ from: () => ({ where: () => read() }) }),
-    } as unknown as DatabaseClient;
+    // SAFETY: validateApiKey only awaits select().from(project).where(...), the exact chain this
+    // stub implements, so the query builder is passed as never and the stub is built as a partial.
+    const stub: Partial<DatabaseClient> = {
+      select: (() => ({ from: () => ({ where: () => read() }) })) as never,
+    };
+
+    // SAFETY: `select` is the only member validateApiKey reaches; the tests assert only the
+    // resolved row id or ApiKeyError, never another DatabaseClient member.
+    return stub as DatabaseClient;
   }
 
   beforeEach(() => {

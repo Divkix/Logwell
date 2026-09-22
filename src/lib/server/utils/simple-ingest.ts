@@ -1,4 +1,11 @@
-import { LOG_LEVELS, type LogLevel } from "../../shared/schemas/log";
+import { z } from "zod";
+import {
+  jsonObjectSchema,
+  jsonValueSchema,
+  type JsonObject,
+  type JsonValue,
+} from "../../shared/schemas/json";
+import { LOG_LEVELS, logLevelSchema, type LogLevel } from "../../shared/schemas/log";
 import { API_CONFIG } from "../config/performance";
 import type { ParsedIngest } from "./ingest";
 import { BatchTooLargeError, mapOtlpAttributesToLogColumns } from "./otlp";
@@ -8,7 +15,7 @@ export interface SimpleLogInput {
   message: string;
   timestamp?: string;
   service?: string;
-  metadata?: Record<string, unknown>;
+  metadata?: JsonObject;
   sourceFile?: string;
   lineNumber?: number;
 }
@@ -18,7 +25,7 @@ export interface NormalizedSimpleLog {
   message: string;
   timestamp: Date;
   resourceAttributes: { "service.name": string } | null;
-  metadata: Record<string, unknown> | null;
+  metadata: JsonObject | null;
   sourceFile: string | null;
   lineNumber: number | null;
   requestId: string | null;
@@ -40,16 +47,32 @@ export class SimpleIngestError extends Error {
   }
 }
 
+// The array arm keeps a JSON-array batch element on the required-field path:
+// it decodes, then fails the `level` check below instead of the object decode.
+const entrySchema = z.union([jsonObjectSchema, z.array(jsonValueSchema)]);
+
+const stringSchema = z.string();
+
+const lineNumberSchema = z.number().int().min(1).max(2147483647);
+
 function isValidLevel(level: unknown): level is LogLevel {
-  return typeof level === "string" && LOG_LEVELS.includes(level as LogLevel);
+  return logLevelSchema.safeParse(level).success;
 }
 
-function parseTimestamp(timestamp: unknown): Date {
-  if (!timestamp || typeof timestamp !== "string") {
+function optionalString(value: JsonValue | undefined): string | null {
+  const decoded = stringSchema.safeParse(value);
+
+  return decoded.success ? decoded.data : null;
+}
+
+function parseTimestamp(timestamp: JsonValue | undefined): Date {
+  const value = optionalString(timestamp);
+
+  if (value === null) {
     return new Date();
   }
 
-  const parsed = new Date(timestamp);
+  const parsed = new Date(value);
 
   if (Number.isNaN(parsed.getTime())) {
     return new Date();
@@ -59,23 +82,32 @@ function parseTimestamp(timestamp: unknown): Date {
 }
 
 function validateLogEntry(
-  input: unknown,
+  input: JsonValue,
   index: number,
 ): { log: NormalizedSimpleLog; error: null } | { log: null; error: string } {
-  if (!input || typeof input !== "object") {
+  const decoded = entrySchema.safeParse(input);
+
+  if (!decoded.success) {
     return { log: null, error: `Entry at index ${index}: must be an object` };
   }
 
-  const entry = input as Record<string, unknown>;
+  const entry = decoded.data;
 
   if (!("level" in entry)) {
     return { log: null, error: `Entry at index ${index}: missing required field 'level'` };
   }
 
-  if (!isValidLevel(entry.level)) {
+  const level = entry.level;
+
+  if (!isValidLevel(level)) {
+    // The rejected level is raw JSON; pass it to String() untyped so every
+    // value renders verbatim (primitives as themselves, containers as their
+    // default stringification).
+    const rejectedLevel: unknown = level;
+
     return {
       log: null,
-      error: `Entry at index ${index}: invalid level '${String(entry.level)}' (must be one of: ${LOG_LEVELS.join(", ")})`,
+      error: `Entry at index ${index}: invalid level '${String(rejectedLevel)}' (must be one of: ${LOG_LEVELS.join(", ")})`,
     };
   }
 
@@ -83,15 +115,19 @@ function validateLogEntry(
     return { log: null, error: `Entry at index ${index}: missing required field 'message'` };
   }
 
-  if (typeof entry.message !== "string") {
+  const decodedMessage = stringSchema.safeParse(entry.message);
+
+  if (!decodedMessage.success) {
     return { log: null, error: `Entry at index ${index}: message must be a string` };
   }
 
-  if (entry.message.trim() === "") {
+  const message = decodedMessage.data;
+
+  if (message.trim() === "") {
     return { log: null, error: `Entry at index ${index}: message cannot be empty` };
   }
 
-  if (entry.message.includes("\u0000")) {
+  if (message.includes("\u0000")) {
     return {
       log: null,
       error: `Entry at index ${index}: message cannot contain NUL characters`,
@@ -99,30 +135,26 @@ function validateLogEntry(
   }
 
   const timestamp = parseTimestamp(entry.timestamp);
-  const service = typeof entry.service === "string" ? entry.service : null;
+  const service = optionalString(entry.service);
 
-  const rawMetadata =
-    entry.metadata && typeof entry.metadata === "object" && !Array.isArray(entry.metadata)
-      ? (entry.metadata as Record<string, unknown>)
+  const metadataResult = jsonObjectSchema.safeParse(entry.metadata);
+
+  const metadata =
+    metadataResult.success && Object.keys(metadataResult.data).length > 0
+      ? metadataResult.data
       : null;
 
-  const metadata = rawMetadata && Object.keys(rawMetadata).length > 0 ? rawMetadata : null;
-  const sourceFile = typeof entry.sourceFile === "string" ? entry.sourceFile : null;
+  const sourceFile = optionalString(entry.sourceFile);
 
-  const lineNumber =
-    typeof entry.lineNumber === "number" &&
-    Number.isInteger(entry.lineNumber) &&
-    entry.lineNumber > 0 &&
-    entry.lineNumber <= 2147483647
-      ? entry.lineNumber
-      : null;
+  const lineNumberResult = lineNumberSchema.safeParse(entry.lineNumber);
+  const lineNumber = lineNumberResult.success ? lineNumberResult.data : null;
 
   const mapped = mapOtlpAttributesToLogColumns(metadata);
 
   return {
     log: {
-      level: entry.level as LogLevel,
-      message: entry.message,
+      level,
+      message,
       timestamp,
       resourceAttributes: service ? { "service.name": service } : null,
       metadata,
@@ -136,7 +168,7 @@ function validateLogEntry(
   };
 }
 
-export function parseSimpleIngestRequest(body: unknown): SimpleIngestResult {
+export function parseSimpleIngestRequest(body: JsonValue | undefined): SimpleIngestResult {
   if (body === null || body === undefined) {
     throw new SimpleIngestError("Request body cannot be empty");
   }
@@ -157,7 +189,7 @@ export function parseSimpleIngestRequest(body: unknown): SimpleIngestResult {
   const errors: string[] = [];
 
   for (let i = 0; i < entries.length; i++) {
-    const result = validateLogEntry(entries[i], i);
+    const result = validateLogEntry(entries[i]!, i);
 
     if (result.log) {
       records.push(result.log);
@@ -174,7 +206,7 @@ export function parseSimpleIngestRequest(body: unknown): SimpleIngestResult {
   };
 }
 
-export function parseSimpleIngestBody(body: unknown): ParsedIngest {
+export function parseSimpleIngestBody(body: JsonValue | undefined): ParsedIngest {
   const result = parseSimpleIngestRequest(body);
 
   return {

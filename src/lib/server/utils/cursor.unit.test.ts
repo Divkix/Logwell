@@ -33,7 +33,7 @@ describe("cursor utilities", () => {
       expect(encodeCursor(TS, "log_123")).not.toBe(encodeCursor(TS, "log_456"));
     });
 
-    it.each([
+    const unencodable: Array<[string | number | Date | null | undefined, string]> = [
       [null, "Cannot encode cursor for log without timestamp"],
       [undefined, "Cannot encode cursor for log without timestamp"],
       [Number.NaN, "Cannot encode cursor for log without timestamp"],
@@ -41,8 +41,10 @@ describe("cursor utilities", () => {
       [1.5, "micros must be a decimal integer"],
       [Number.POSITIVE_INFINITY, "micros must be a decimal integer"],
       ["not-a-number", "micros must be a decimal integer"],
-    ])("throws for unencodable micros %s", (value, message) => {
-      expect(() => encodeCursor(value as never, "log_123")).toThrow(message);
+    ];
+
+    it.each(unencodable)("throws for unencodable micros %s", (value, message) => {
+      expect(() => encodeCursor(value, "log_123")).toThrow(message);
     });
   });
 

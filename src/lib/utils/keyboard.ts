@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 export const FORM_ELEMENTS = ["INPUT", "TEXTAREA", "SELECT"] as const;
 
 interface ShortcutDefinition {
@@ -18,10 +20,14 @@ export const SHORTCUTS: ShortcutDefinition[] = [
   { key: "?", description: "Show keyboard shortcuts", group: "other" },
 ];
 
-export function shouldBlockShortcut(event: KeyboardEvent): boolean {
-  const target = event.target as HTMLElement | null;
+const eventTargetSchema = z.object({ tagName: z.string() });
 
-  if (target && FORM_ELEMENTS.includes(target.tagName as (typeof FORM_ELEMENTS)[number])) {
+export function shouldBlockShortcut(
+  event: Pick<KeyboardEvent, "target" | "isComposing" | "ctrlKey" | "altKey" | "metaKey">,
+): boolean {
+  const target = eventTargetSchema.safeParse(event.target);
+
+  if (target.success && FORM_ELEMENTS.some((element) => element === target.data.tagName)) {
     return true;
   }
 

@@ -11,8 +11,8 @@ function createRequestEvent(
   db: PgliteDatabase<typeof schema>,
   locals: Partial<App.Locals> = {},
   params: Record<string, string> = {},
-) {
-  return {
+): Parameters<typeof POST_PROJECTS>[0] {
+  const event: Partial<Parameters<typeof POST_PROJECTS>[0]> = {
     request,
     locals: { db, ...locals },
     params,
@@ -22,7 +22,6 @@ function createRequestEvent(
     isDataRequest: false,
     isSubRequest: false,
     isRemoteRequest: false,
-    tracing: null,
     cookies: {
       get: () => undefined,
       getAll: () => [],
@@ -33,7 +32,13 @@ function createRequestEvent(
     fetch: globalThis.fetch,
     getClientAddress: () => "127.0.0.1",
     setHeaders: () => {},
-  } as unknown;
+  };
+
+  // SAFETY: requireAuth, getDbClient and checkCsrfOrigin read only event.locals, event.request
+  // and event.url — all set above — and both tests pass an authenticated session, so the
+  // route.id fallback is never taken; the omitted tracing member (previously null) is never
+  // accessed.
+  return event as Parameters<typeof POST_PROJECTS>[0];
 }
 
 describe("CSRF Origin/Referer checks", () => {
@@ -88,7 +93,7 @@ describe("CSRF Origin/Referer checks", () => {
       });
 
       const event = createRequestEvent(request, db, authenticatedLocals);
-      const response = await POST_PROJECTS(event as never);
+      const response = await POST_PROJECTS(event);
 
       expect(response.status).toBe(403);
       const body = await response.json();
@@ -106,7 +111,7 @@ describe("CSRF Origin/Referer checks", () => {
       });
 
       const event = createRequestEvent(request, db, authenticatedLocals);
-      const response = await POST_PROJECTS(event as never);
+      const response = await POST_PROJECTS(event);
 
       expect(response.status).toBe(201);
     });

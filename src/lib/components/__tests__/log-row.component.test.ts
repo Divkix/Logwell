@@ -65,7 +65,7 @@ describe("LogRow", () => {
   });
 
   it("renders row without timestamp text when timestamp is null", () => {
-    render(LogRow, { props: { log: { ...baseLog, timestamp: null as unknown as Date } } });
+    render(LogRow, { props: { log: { ...baseLog, timestamp: null! } } });
     expect(screen.getByTestId("log-timestamp-desktop")).toBeInTheDocument();
   });
 

@@ -31,7 +31,7 @@ const totalCount = $derived(
   Object.values(data.levelCounts).reduce((sum, count) => sum + (count ?? 0), 0),
 );
 
-function polarToCartesian(radius: number, angleInDegrees: number): { x: number; y: number } {
+function polarToCartesian(radius: number, angleInDegrees: number) {
   const angleInRadians = ((angleInDegrees - 90) * Math.PI) / 180;
 
   return {

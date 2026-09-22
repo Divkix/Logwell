@@ -7,11 +7,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test"
 import type { ClientLog } from "$lib/stores/logs.svelte";
 import type { PageData } from "../$types";
 
+type NavigatingState = { to: { url: URL } | null; from: null; type: "goto" } | null;
+
 const mocks = vi.hoisted(() => ({
   goto: vi.fn().mockResolvedValue(undefined),
   toastError: vi.fn(),
-  navigating: null as unknown as { set(value: unknown): void },
-  onLogs: null as unknown as (logs: ClientLog[]) => void,
+  navigating: { set(_value: NavigatingState) {} },
+  onLogs: (_logs: ClientLog[]) => {},
   connect: vi.fn(),
   disconnect: vi.fn(),
   setProjectId: vi.fn(),
@@ -240,13 +242,13 @@ describe("LogsPage", () => {
     let staleJsonCalls = 0;
 
     // Plain stub so the promise the component awaits is exactly the one this test resolves.
-    globalThis.fetch = ((input: RequestInfo | URL) => {
-      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+    globalThis.fetch = (input: RequestInfo | URL) => {
+      const url = input instanceof URL ? input.href : input instanceof Request ? input.url : input;
 
       if (url.includes("/api/projects/proj_1/logs?cursor=")) return fetchPromise;
 
       return Promise.resolve(new Response(null, { status: 500 }));
-    }) as typeof fetch;
+    };
 
     const { rerender } = render(LogsPage, { props: { data: makeLoadMoreData() } });
 
@@ -293,13 +295,13 @@ describe("LogsPage", () => {
   it("does not report a failure for a Load More response that a filter change superseded", async () => {
     const { promise: fetchPromise, resolve: resolveFetch } = Promise.withResolvers<Response>();
 
-    globalThis.fetch = ((input: RequestInfo | URL) => {
-      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+    globalThis.fetch = (input: RequestInfo | URL) => {
+      const url = input instanceof URL ? input.href : input instanceof Request ? input.url : input;
 
       if (url.includes("/api/projects/proj_1/logs?cursor=")) return fetchPromise;
 
       return Promise.resolve(new Response(null, { status: 500 }));
-    }) as typeof fetch;
+    };
 
     const { rerender } = render(LogsPage, { props: { data: makeLoadMoreData() } });
 

@@ -3,10 +3,14 @@ import type { Incident } from "./db/schema";
 import { logEventBus, type StreamLog } from "./events";
 
 function mockLog(projectId: string, message: string): StreamLog {
+  // SAFETY: emitLog routes on projectId and the assertions below read only message; the
+  // remaining Log fields (id, level, timestamp, …) are never touched in this file.
   return { projectId, message } as StreamLog;
 }
 
 function mockIncident(projectId: string, fingerprint: string): Incident {
+  // SAFETY: emitIncident routes on projectId and the assertions below read only fingerprint;
+  // the remaining Incident fields (id, title, firstSeen, …) are never touched in this file.
   return { projectId, fingerprint } as Incident;
 }
 

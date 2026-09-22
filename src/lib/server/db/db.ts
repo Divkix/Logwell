@@ -17,7 +17,7 @@ export type BucketCountRow = {
 
 export async function getDbClient(locals: App.Locals): Promise<DatabaseClient> {
   if (locals.db) {
-    return locals.db as DatabaseClient;
+    return locals.db;
   }
 
   const { db } = await import("./index");

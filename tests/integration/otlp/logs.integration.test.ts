@@ -6,22 +6,24 @@ import { log } from "../../../src/lib/server/db/schema";
 import { setupTestDatabase } from "../../../src/lib/server/db/test-db";
 import { logEventBus } from "../../../src/lib/server/events";
 import { clearApiKeyCache } from "../../../src/lib/server/utils/api-key";
+import type { JsonValue } from "../../../src/lib/shared/schemas/json";
 import { POST } from "../../../src/routes/v1/logs/+server";
 import { seedProjectWithApiKey } from "../../fixtures/db";
 
 function createRequestEvent(request: Request, db: PgliteDatabase<typeof schema>) {
+  // SAFETY: POST destructures only { request, locals } — both are present here: the harness-built Request and the real test PgliteDatabase.
   return {
     request,
     locals: { db },
     params: {},
     url: new URL(request.url),
-  } as unknown as Parameters<typeof POST>[0];
+  } as Parameters<typeof POST>[0];
 }
 
-function post(body: unknown, apiKey?: string) {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
+function post(body: JsonValue, apiKey?: string) {
+  const headers = new Headers({ "Content-Type": "application/json" });
 
-  if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+  if (apiKey) headers.set("Authorization", `Bearer ${apiKey}`);
 
   return new Request("http://localhost/v1/logs", {
     method: "POST",
@@ -52,7 +54,7 @@ describe("POST /v1/logs (OTLP mapping)", () => {
   it("maps OTLP fields onto the log row", async () => {
     const project = await seedProjectWithApiKey(db);
 
-    const payload = {
+    const payload: JsonValue = {
       resourceLogs: [
         {
           resource: {

@@ -12,7 +12,7 @@ export function parseLevelFilter(levelParam: string | null): LogLevel[] | null {
   const levels = levelParam
     .split(",")
     .map((l) => l.trim().toLowerCase())
-    .filter((l): l is LogLevel => LOG_LEVELS.includes(l as LogLevel));
+    .filter((l): l is LogLevel => logLevelSchema.safeParse(l).success);
 
   return levels.length > 0 ? levels : null;
 }

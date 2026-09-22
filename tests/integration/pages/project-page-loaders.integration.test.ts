@@ -1,4 +1,3 @@
-import type { HttpError } from "@sveltejs/kit";
 import { sql } from "drizzle-orm";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
 import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
@@ -13,19 +12,24 @@ import { seedLog, seedProject } from "../../fixtures/db";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type LoadFn = (event: never) => Promise<any>;
 
+// SAFETY: each +page.server module exports the SvelteKit-generated load function, so module.load is the callable under test.
 const loadDashboard = (await import("../../../src/routes/(app)/+page.server")).load as LoadFn;
 
+// SAFETY: each +page.server module exports the SvelteKit-generated load function, so module.load is the callable under test.
 const loadProjectLogs = (await import("../../../src/routes/(app)/projects/[id]/+page.server"))
   .load as LoadFn;
 
+// SAFETY: each +page.server module exports the SvelteKit-generated load function, so module.load is the callable under test.
 const loadProjectSettings = (
   await import("../../../src/routes/(app)/projects/[id]/settings/+page.server")
 ).load as LoadFn;
 
+// SAFETY: each +page.server module exports the SvelteKit-generated load function, so module.load is the callable under test.
 const loadProjectStats = (
   await import("../../../src/routes/(app)/projects/[id]/stats/+page.server")
 ).load as LoadFn;
 
+// SAFETY: each +page.server module exports the SvelteKit-generated load function, so module.load is the callable under test.
 const loadProjectIncidents = (
   await import("../../../src/routes/(app)/projects/[id]/incidents/+page.server")
 ).load as LoadFn;
@@ -59,7 +63,7 @@ function createLoadEvent(
     setHeaders: () => {},
     depends: () => {},
     parent: async () => ({}),
-  } as unknown;
+  };
 }
 
 async function createAuthenticatedLocals(
@@ -91,9 +95,10 @@ async function expectSvelteKit404(promise: Promise<unknown>): Promise<void> {
     await promise;
     expect.fail("Expected a SvelteKit 404 error to be thrown");
   } catch (err) {
-    const httpError = err as HttpError;
-    expect(httpError.status).toBe(404);
-    expect(httpError.body).toMatchObject({ message: "Project not found" });
+    expect(err).toMatchObject({
+      status: 404,
+      body: { message: "Project not found" },
+    });
   }
 }
 
@@ -124,6 +129,7 @@ describe("(app) page loaders — injected PGlite DB seam", () => {
       await seedProject(db, { name: "other-project", ownerId: nonOwner.userId });
 
       const event = createLoadEvent(db, {}, owner.locals);
+      // SAFETY: createLoadEvent builds every event member these load functions read (url, params, locals, cookies, fetch, setHeaders, getClientAddress, depends, parent); tracing stays null because no load function reads it.
       const data = await loadDashboard(event as never);
 
       expect(data.projects).toHaveLength(1);
@@ -136,6 +142,7 @@ describe("(app) page loaders — injected PGlite DB seam", () => {
       const proj = await seedProject(db, { name: "test-proj", ownerId: owner.userId });
 
       const event = createLoadEvent(db, { id: proj.id }, owner.locals);
+      // SAFETY: createLoadEvent builds every event member these load functions read (url, params, locals, cookies, fetch, setHeaders, getClientAddress, depends, parent); tracing stays null because no load function reads it.
       const data = await loadProjectLogs(event as never);
 
       expect(data.project.id).toBe(proj.id);
@@ -158,6 +165,7 @@ describe("(app) page loaders — injected PGlite DB seam", () => {
         `http://localhost:5173/projects/${proj.id}?range=30d`,
       );
 
+      // SAFETY: createLoadEvent builds every event member these load functions read (url, params, locals, cookies, fetch, setHeaders, getClientAddress, depends, parent); tracing stays null because no load function reads it.
       const data = await loadProjectLogs(event as never);
 
       expect(data.filters.range).toBe("1h");
@@ -173,11 +181,13 @@ describe("(app) page loaders — injected PGlite DB seam", () => {
       const proj = await seedProject(db, { name: "other-proj", ownerId: owner.userId });
 
       const event = createLoadEvent(db, { id: proj.id }, nonOwner.locals);
+      // SAFETY: createLoadEvent builds every event member these load functions read (url, params, locals, cookies, fetch, setHeaders, getClientAddress, depends, parent); tracing stays null because no load function reads it.
       await expectSvelteKit404(loadProjectLogs(event as never));
     });
 
     it("throws SvelteKit 404 for a project that does not exist", async () => {
       const event = createLoadEvent(db, { id: "nonexistent-id" }, owner.locals);
+      // SAFETY: createLoadEvent builds every event member these load functions read (url, params, locals, cookies, fetch, setHeaders, getClientAddress, depends, parent); tracing stays null because no load function reads it.
       await expectSvelteKit404(loadProjectLogs(event as never));
     });
   });
@@ -187,6 +197,7 @@ describe("(app) page loaders — injected PGlite DB seam", () => {
       const proj = await seedProject(db, { name: "stats-proj", ownerId: owner.userId });
 
       const event = createLoadEvent(db, { id: proj.id }, nonOwner.locals);
+      // SAFETY: createLoadEvent builds every event member these load functions read (url, params, locals, cookies, fetch, setHeaders, getClientAddress, depends, parent); tracing stays null because no load function reads it.
       await expectSvelteKit404(loadProjectStats(event as never));
     });
 
@@ -205,6 +216,7 @@ describe("(app) page loaders — injected PGlite DB seam", () => {
         `http://localhost:5173/projects/${proj.id}/stats?range=30d`,
       );
 
+      // SAFETY: createLoadEvent builds every event member these load functions read (url, params, locals, cookies, fetch, setHeaders, getClientAddress, depends, parent); tracing stays null because no load function reads it.
       const data = await loadProjectStats(event as never);
 
       expect(data.filters.range).toBe("24h");
@@ -220,6 +232,7 @@ describe("(app) page loaders — injected PGlite DB seam", () => {
       const proj = await seedProject(db, { name: "settings-proj", ownerId: owner.userId });
 
       const event = createLoadEvent(db, { id: proj.id }, nonOwner.locals);
+      // SAFETY: createLoadEvent builds every event member these load functions read (url, params, locals, cookies, fetch, setHeaders, getClientAddress, depends, parent); tracing stays null because no load function reads it.
       await expectSvelteKit404(loadProjectSettings(event as never));
     });
   });
@@ -229,6 +242,7 @@ describe("(app) page loaders — injected PGlite DB seam", () => {
       const proj = await seedProject(db, { name: "incidents-proj", ownerId: owner.userId });
 
       const event = createLoadEvent(db, { id: proj.id }, nonOwner.locals);
+      // SAFETY: createLoadEvent builds every event member these load functions read (url, params, locals, cookies, fetch, setHeaders, getClientAddress, depends, parent); tracing stays null because no load function reads it.
       await expectSvelteKit404(loadProjectIncidents(event as never));
     });
 
@@ -259,6 +273,7 @@ describe("(app) page loaders — injected PGlite DB seam", () => {
           ? `http://localhost:5173/projects/${proj.id}/incidents?limit=20&cursor=${encodeURIComponent(cursor)}`
           : `http://localhost:5173/projects/${proj.id}/incidents?limit=20`;
 
+        // SAFETY: createLoadEvent builds every event member these load functions read (url, params, locals, cookies, fetch, setHeaders, getClientAddress, depends, parent); tracing stays null because no load function reads it.
         const data = await loadProjectIncidents(
           createLoadEvent(db, { id: proj.id }, owner.locals, url) as never,
         );

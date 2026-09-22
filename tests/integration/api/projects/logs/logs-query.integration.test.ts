@@ -10,6 +10,7 @@ import { setupTestDatabase } from "$lib/server/db/test-db";
 import { getSession } from "$lib/server/session";
 import { clearApiKeyCache } from "$lib/server/utils/api-key";
 import { cappedLogCount } from "$lib/server/utils/capped-count";
+import type { JsonObject } from "$lib/shared/schemas/json";
 import { GET } from "../../../../../src/routes/api/projects/[id]/logs/+server";
 import { seedLog, seedLogs, seedProject } from "../../../../fixtures/db";
 
@@ -18,7 +19,7 @@ function createRequestEvent(
   db: PgliteDatabase<typeof schema>,
   params: { id: string },
   locals: Partial<App.Locals> = {},
-) {
+): Parameters<typeof GET>[0] {
   return {
     request,
     locals: { db, ...locals },
@@ -29,7 +30,7 @@ function createRequestEvent(
     isDataRequest: false,
     isSubRequest: false,
     isRemoteRequest: false,
-    tracing: null,
+    tracing: { enabled: false, root: undefined, current: undefined },
     cookies: {
       get: () => undefined,
       getAll: () => [],
@@ -40,18 +41,21 @@ function createRequestEvent(
     fetch: globalThis.fetch,
     getClientAddress: () => "127.0.0.1",
     setHeaders: () => {},
-  } as unknown;
+  };
 }
 
 async function expectHttpError(
   promise: Promise<unknown>,
   expectedStatus: number,
-  expectedBody?: Record<string, unknown>,
+  expectedBody?: JsonObject,
 ): Promise<void> {
   try {
     await promise;
     expect.fail("Expected HTTP error to be thrown");
   } catch (error) {
+    // SAFETY: a rejection here is SvelteKit error() from requireAuth's 401
+    // branch, which always carries a numeric status and a JSON body; a resolved
+    // promise instead fails the status assertion through expect.fail's own error.
     const httpError = error as HttpError;
     expect(httpError.status).toBe(expectedStatus);
 
@@ -113,7 +117,7 @@ describe("GET /api/projects/[id]/logs", () => {
       });
 
       const event = createRequestEvent(request, db, { id: testProject.id });
-      await expectHttpError(GET(event as never), 401, { message: "Unauthorized" });
+      await expectHttpError(GET(event), 401, { message: "Unauthorized" });
     });
   });
 
@@ -143,7 +147,7 @@ describe("GET /api/projects/[id]/logs", () => {
       });
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
-      const response = await GET(event as never);
+      const response = await GET(event);
 
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -165,7 +169,7 @@ describe("GET /api/projects/[id]/logs", () => {
       });
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
-      const response = await GET(event as never);
+      const response = await GET(event);
 
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -183,7 +187,7 @@ describe("GET /api/projects/[id]/logs", () => {
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
-      const response = await GET(event as never);
+      const response = await GET(event);
 
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -200,7 +204,7 @@ describe("GET /api/projects/[id]/logs", () => {
       });
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
-      const response = await GET(event as never);
+      const response = await GET(event);
 
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -218,7 +222,7 @@ describe("GET /api/projects/[id]/logs", () => {
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
-      const response = await GET(event as never);
+      const response = await GET(event);
 
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -249,7 +253,7 @@ describe("GET /api/projects/[id]/logs", () => {
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
-      const response = await GET(event as never);
+      const response = await GET(event);
 
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -272,7 +276,7 @@ describe("GET /api/projects/[id]/logs", () => {
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
-      const response = await GET(event as never);
+      const response = await GET(event);
 
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -294,7 +298,7 @@ describe("GET /api/projects/[id]/logs", () => {
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
-      const response = await GET(event as never);
+      const response = await GET(event);
 
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -329,7 +333,7 @@ describe("GET /api/projects/[id]/logs", () => {
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
-      const response = await GET(event as never);
+      const response = await GET(event);
 
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -361,7 +365,7 @@ describe("GET /api/projects/[id]/logs", () => {
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
-      const response = await GET(event as never);
+      const response = await GET(event);
 
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -398,7 +402,7 @@ describe("GET /api/projects/[id]/logs", () => {
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
-      const response = await GET(event as never);
+      const response = await GET(event);
 
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -422,7 +426,7 @@ describe("GET /api/projects/[id]/logs", () => {
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
-      const response = await GET(event as never);
+      const response = await GET(event);
 
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -453,7 +457,7 @@ describe("GET /api/projects/[id]/logs", () => {
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
-      const response = await GET(event as never);
+      const response = await GET(event);
 
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -480,7 +484,7 @@ describe("GET /api/projects/[id]/logs", () => {
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
-      const response = await GET(event as never);
+      const response = await GET(event);
 
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -507,7 +511,7 @@ describe("GET /api/projects/[id]/logs", () => {
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
-      const response = await GET(event as never);
+      const response = await GET(event);
 
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -534,7 +538,7 @@ describe("GET /api/projects/[id]/logs", () => {
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
-      const response = await GET(event as never);
+      const response = await GET(event);
 
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -556,7 +560,7 @@ describe("GET /api/projects/[id]/logs", () => {
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
-      const response = await GET(event as never);
+      const response = await GET(event);
 
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -576,7 +580,7 @@ describe("GET /api/projects/[id]/logs", () => {
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
-      const response = await GET(event as never);
+      const response = await GET(event);
 
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -599,7 +603,7 @@ describe("GET /api/projects/[id]/logs", () => {
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
-      const response = await GET(event as never);
+      const response = await GET(event);
 
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -620,7 +624,7 @@ describe("GET /api/projects/[id]/logs", () => {
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
-      const response = await GET(event as never);
+      const response = await GET(event);
 
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -640,7 +644,7 @@ describe("GET /api/projects/[id]/logs", () => {
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
-      const response = await GET(event as never);
+      const response = await GET(event);
 
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -661,7 +665,7 @@ describe("GET /api/projects/[id]/logs", () => {
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
-      const response = await GET(event as never);
+      const response = await GET(event);
 
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -682,7 +686,7 @@ describe("GET /api/projects/[id]/logs", () => {
       );
 
       const event1 = createRequestEvent(request1, db, { id: testProject.id }, authenticatedLocals);
-      const response1 = await GET(event1 as never);
+      const response1 = await GET(event1);
       const body1 = await response1.json();
 
       expect(body1.logs).toHaveLength(100);
@@ -695,7 +699,7 @@ describe("GET /api/projects/[id]/logs", () => {
       );
 
       const event2 = createRequestEvent(request2, db, { id: testProject.id }, authenticatedLocals);
-      const response2 = await GET(event2 as never);
+      const response2 = await GET(event2);
       const body2 = await response2.json();
 
       expect(body2.logs).toHaveLength(100);
@@ -730,7 +734,7 @@ describe("GET /api/projects/[id]/logs", () => {
 
         const request = new Request(url, { method: "GET" });
         const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
-        const response = await GET(event as never);
+        const response = await GET(event);
         expect(response.status).toBe(200);
         const body = await response.json();
 
@@ -758,7 +762,7 @@ describe("GET /api/projects/[id]/logs", () => {
       });
 
       const firstEvent = createRequestEvent(first, db, { id: testProject.id }, authenticatedLocals);
-      const firstResponse = await GET(firstEvent as never);
+      const firstResponse = await GET(firstEvent);
       expect(firstResponse.status).toBe(200);
       const firstBody = await firstResponse.json();
 
@@ -778,7 +782,7 @@ describe("GET /api/projects/[id]/logs", () => {
         authenticatedLocals,
       );
 
-      const secondResponse = await GET(secondEvent as never);
+      const secondResponse = await GET(secondEvent);
 
       expect(secondResponse.status).toBe(200);
       const secondBody = await secondResponse.json();
@@ -812,7 +816,7 @@ describe("GET /api/projects/[id]/logs", () => {
       );
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
-      const response = await GET(event as never);
+      const response = await GET(event);
 
       expect(response.status).toBe(400);
       expect(await response.json()).toMatchObject({ error: "invalid_cursor" });
@@ -829,7 +833,7 @@ describe("GET /api/projects/[id]/logs", () => {
       );
 
       const firstEvent = createRequestEvent(first, db, { id: testProject.id }, authenticatedLocals);
-      const firstBody = await (await GET(firstEvent as never)).json();
+      const firstBody = await (await GET(firstEvent)).json();
       expect(firstBody.logs).toHaveLength(2);
       expect(firstBody.has_more).toBe(true);
 
@@ -845,7 +849,7 @@ describe("GET /api/projects/[id]/logs", () => {
         authenticatedLocals,
       );
 
-      const secondBody = await (await GET(secondEvent as never)).json();
+      const secondBody = await (await GET(secondEvent)).json();
       expect(secondBody.logs).toHaveLength(1);
       expect(secondBody.logs.every((l: { level: string }) => l.level === "error")).toBe(true);
     });
@@ -859,7 +863,7 @@ describe("GET /api/projects/[id]/logs", () => {
       });
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
-      const response = await GET(event as never);
+      const response = await GET(event);
 
       expect(response.status).toBe(200);
       expect((await response.json()).logs).toHaveLength(2);
@@ -873,7 +877,7 @@ describe("GET /api/projects/[id]/logs", () => {
       });
 
       const event = createRequestEvent(request, db, { id: "non-existent-id" }, authenticatedLocals);
-      const response = await GET(event as never);
+      const response = await GET(event);
 
       expect(response.status).toBe(404);
       const body = await response.json();
@@ -890,7 +894,7 @@ describe("GET /api/projects/[id]/logs", () => {
       });
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
-      const response = await GET(event as never);
+      const response = await GET(event);
 
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -921,7 +925,7 @@ describe("GET /api/projects/[id]/logs", () => {
       });
 
       const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
-      const response = await GET(event as never);
+      const response = await GET(event);
 
       expect(response.status).toBe(200);
       const body = await response.json();

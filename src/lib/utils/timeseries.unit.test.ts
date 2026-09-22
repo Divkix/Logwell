@@ -1,14 +1,15 @@
 import { describe, expect, it } from "vite-plus/test";
+import type { TimeRange } from "./time-range";
 import { bucketTimestamps, fillMissingBuckets, getTimeBucketConfig } from "./timeseries";
 
 describe("getTimeBucketConfig", () => {
-  it.each([
+  it.each<[TimeRange, number, number]>([
     ["15m", 60 * 1000, 15],
     ["1h", 5 * 60 * 1000, 12],
     ["24h", 60 * 60 * 1000, 24],
     ["7d", 6 * 60 * 60 * 1000, 28],
   ])("returns %sms interval for %s range (%s buckets)", (range, intervalMs, expectedBuckets) => {
-    const config = getTimeBucketConfig(range as "15m");
+    const config = getTimeBucketConfig(range);
     expect(config.intervalMs).toBe(intervalMs);
     expect(config.expectedBuckets).toBe(expectedBuckets);
   });

@@ -14,9 +14,9 @@ import { seedProject, seedProjectWithApiKey } from "../../../fixtures/db";
 function createRequestEvent(
   request: Request,
   db: PgliteDatabase<typeof schema>,
-  params: Record<string, string> = {},
+  params: { id: string },
   locals: Partial<App.Locals> = {},
-) {
+): Parameters<typeof POST_REGENERATE>[0] {
   const safeMethod = ["GET", "HEAD", "OPTIONS"].includes(request.method);
   const hasOrigin = request.headers.has("Origin");
 
@@ -27,7 +27,7 @@ function createRequestEvent(
         })
       : request;
 
-  return {
+  const event: Partial<Parameters<typeof POST_REGENERATE>[0]> = {
     request: effectiveRequest,
     locals: { db, ...locals },
     params,
@@ -37,7 +37,6 @@ function createRequestEvent(
     isDataRequest: false,
     isSubRequest: false,
     isRemoteRequest: false,
-    tracing: null,
     cookies: {
       get: () => undefined,
       getAll: () => [],
@@ -48,7 +47,13 @@ function createRequestEvent(
     fetch: globalThis.fetch,
     getClientAddress: () => "127.0.0.1",
     setHeaders: () => {},
-  } as unknown;
+  };
+
+  // SAFETY: requireAuth, getDbClient, checkCsrfOrigin and the handler's params.id lookup read
+  // only event.locals, event.request, event.url and event.params.id — all set above — and
+  // event.route.id is "/api/projects/[id]/regenerate", so the unauthenticated test takes
+  // requireAuth's 401 branch; the omitted tracing member (previously null) is never accessed.
+  return event as Parameters<typeof POST_REGENERATE>[0];
 }
 
 async function expectHttpError(promise: Promise<unknown>, expectedStatus: number): Promise<void> {
@@ -56,6 +61,9 @@ async function expectHttpError(promise: Promise<unknown>, expectedStatus: number
     await promise;
     expect.fail("Expected HTTP error to be thrown");
   } catch (error) {
+    // SAFETY: this helper is only awaited on the POST_REGENERATE promise, and the route reports
+    // failures by throwing SvelteKit's error()/httpError() values — the HttpError shape whose
+    // .status is asserted here.
     const httpError = error as HttpError;
     expect(httpError.status).toBe(expectedStatus);
   }
@@ -109,7 +117,7 @@ describe("POST /api/projects/[id]/regenerate", () => {
     });
 
     const event = createRequestEvent(request, db, { id: testProject.id });
-    await expectHttpError(POST_REGENERATE(event as never), 401);
+    await expectHttpError(POST_REGENERATE(event), 401);
   });
 
   it("returns 404 for project not owned by user", async () => {
@@ -137,7 +145,7 @@ describe("POST /api/projects/[id]/regenerate", () => {
     });
 
     const event = createRequestEvent(request, db, { id: otherProject.id }, authenticatedLocals);
-    const response = await POST_REGENERATE(event as never);
+    const response = await POST_REGENERATE(event);
     expect(response.status).toBe(404);
   });
 
@@ -151,7 +159,7 @@ describe("POST /api/projects/[id]/regenerate", () => {
     });
 
     const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
-    const response = await POST_REGENERATE(event as never);
+    const response = await POST_REGENERATE(event);
 
     expect(response.status).toBe(200);
     const body = await response.json();
@@ -169,7 +177,7 @@ describe("POST /api/projects/[id]/regenerate", () => {
     });
 
     const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
-    const response = await POST_REGENERATE(event as never);
+    const response = await POST_REGENERATE(event);
 
     expect(response.status).toBe(200);
     const body = await response.json();
@@ -193,7 +201,7 @@ describe("POST /api/projects/[id]/regenerate", () => {
     });
 
     const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
-    const response = await POST_REGENERATE(event as never);
+    const response = await POST_REGENERATE(event);
 
     expect(response.status).toBe(403);
     const body = await response.json();

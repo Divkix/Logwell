@@ -62,7 +62,7 @@ export const INCIDENT_GROUPED_LEVELS: readonly LogLevel[] = ["error", "fatal"] a
 export function isIncidentGroupedLevel(
   level: string,
 ): level is (typeof INCIDENT_GROUPED_LEVELS)[number] {
-  return (INCIDENT_GROUPED_LEVELS as readonly string[]).includes(level);
+  return INCIDENT_GROUPED_LEVELS.some((groupedLevel) => groupedLevel === level);
 }
 
 const LEVEL_RANK: Record<LogLevel, number> = {
