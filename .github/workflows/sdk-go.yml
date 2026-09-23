@@ -8,9 +8,6 @@ on:
       - ".github/workflows/sdk-go.yml"
   pull_request:
     branches: [main]
-    paths:
-      - "sdks/go/**"
-      - ".github/workflows/sdk-go.yml"
   workflow_dispatch:
 
 permissions:
@@ -29,11 +26,45 @@ env:
   GOTOOLCHAIN: local
 
 jobs:
+  changes:
+    name: SDK Go Change Detection
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.detect.outputs.run }}
+    steps:
+      - name: Checkout PR merge commit
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Detect SDK changes
+        id: detect
+        working-directory: .
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [[ "$EVENT_NAME" != 'pull_request' ]]; then
+            echo 'run=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git fetch --no-tags --depth=1 origin "$BASE_SHA"
+          if git diff --quiet "$BASE_SHA" HEAD -- sdks/go/ .github/workflows/sdk-go.yml; then
+            echo 'run=false' >> "$GITHUB_OUTPUT"
+          else
+            status=$?
+            if [[ "$status" -ne 1 ]]; then exit "$status"; fi
+            echo 'run=true' >> "$GITHUB_OUTPUT"
+          fi
+
   # =============================================================================
   # Lint
   # =============================================================================
   lint:
     name: Lint
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -63,6 +94,8 @@ jobs:
   # =============================================================================
   test:
     name: Test (Go ${{ matrix.go-version }})
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     strategy:
@@ -90,6 +123,8 @@ jobs:
   # =============================================================================
   coverage:
     name: Coverage
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -127,21 +162,27 @@ jobs:
   # Final Status Check (required for branch protection)
   # =============================================================================
   ci-success:
-    name: CI Success
+    name: SDK Go CI Success
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [lint, test, coverage]
+    needs: [changes, lint, test, coverage]
     if: always()
+    env:
+      CHANGE_RESULT: ${{ needs.changes.result }}
+      SHOULD_RUN: ${{ needs.changes.outputs.run }}
+      LINT: ${{ needs.lint.result }}
+      TEST: ${{ needs.test.result }}
+      COVERAGE: ${{ needs.coverage.result }}
 
     steps:
       - name: Check all jobs status
         run: |
-          results=("${{ needs.lint.result }}" "${{ needs.test.result }}" "${{ needs.coverage.result }}")
-          for result in "${results[@]}"; do
-            if [[ "$result" != "success" && "$result" != "skipped" ]]; then
-              echo "Job failed with result: $result"
-              exit 1
-            fi
+          [[ "$CHANGE_RESULT" == 'success' ]] || exit 1
+          if [[ "$SHOULD_RUN" == 'true' ]]; then expected=success
+          elif [[ "$SHOULD_RUN" == 'false' ]]; then expected=skipped
+          else exit 1
+          fi
+          for result in "$LINT" "$TEST" "$COVERAGE"; do
+            [[ "$result" == "$expected" ]] || exit 1
           done
-          echo "All jobs passed or were skipped"
         working-directory: .
