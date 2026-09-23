@@ -1,0 +1,4 @@
+# Require the repository owner's review for CI policy changes.
+# Enable "Require review from Code Owners" on main after this file lands.
+/.github/ @Divkix
+/scripts/test_sdk_ci_gate.py @Divkix

@@ -8,14 +8,10 @@ on:
       - ".github/workflows/sdk-python.yml"
   pull_request:
     branches: [main]
-    paths:
-      - "sdks/python/**"
-      - ".github/workflows/sdk-python.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
-  id-token: write
 
 # Cancel in-progress runs on same branch/PR
 concurrency:
@@ -27,11 +23,45 @@ defaults:
     working-directory: sdks/python
 
 jobs:
+  changes:
+    name: SDK Python Change Detection
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.detect.outputs.run }}
+    steps:
+      - name: Checkout PR merge commit
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Detect SDK changes
+        id: detect
+        working-directory: .
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [[ "$EVENT_NAME" != 'pull_request' ]]; then
+            echo 'run=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git fetch --no-tags --depth=1 origin "$BASE_SHA"
+          if git diff --quiet "$BASE_SHA" HEAD -- sdks/python/ .github/workflows/sdk-python.yml; then
+            echo 'run=false' >> "$GITHUB_OUTPUT"
+          else
+            status=$?
+            if [[ "$status" -ne 1 ]]; then exit "$status"; fi
+            echo 'run=true' >> "$GITHUB_OUTPUT"
+          fi
+
   # =============================================================================
   # Lint & Type Check
   # =============================================================================
   lint:
     name: Lint & Type Check
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -68,6 +98,8 @@ jobs:
   # =============================================================================
   test-unit:
     name: Unit Tests
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     strategy:
@@ -101,6 +133,8 @@ jobs:
   # =============================================================================
   test-integration:
     name: Integration Tests
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -131,6 +165,8 @@ jobs:
   # =============================================================================
   coverage:
     name: Coverage Report
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -167,6 +203,8 @@ jobs:
   # =============================================================================
   build:
     name: Build & Verify
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -211,6 +249,9 @@ jobs:
   # =============================================================================
   publish:
     name: Publish to PyPI
+    permissions:
+      contents: read
+      id-token: write
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: [lint, test-unit, test-integration, coverage, build]
@@ -282,3 +323,30 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Version \`${{ steps.version-check.outputs.local_version }}\` already exists on PyPI." >> $GITHUB_STEP_SUMMARY
           echo "Bump the version in \`sdks/python/pyproject.toml\` to trigger a new publish." >> $GITHUB_STEP_SUMMARY
+
+  sdk-ci-success:
+    name: SDK Python CI Success
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [changes, lint, test-unit, test-integration, coverage, build]
+    if: always()
+    env:
+      CHANGE_RESULT: ${{ needs.changes.result }}
+      SHOULD_RUN: ${{ needs.changes.outputs.run }}
+      LINT: ${{ needs.lint.result }}
+      UNIT: ${{ needs.test-unit.result }}
+      INTEGRATION: ${{ needs.test-integration.result }}
+      COVERAGE: ${{ needs.coverage.result }}
+      BUILD: ${{ needs.build.result }}
+    steps:
+      - name: Require all applicable SDK checks
+        working-directory: .
+        run: |
+          [[ "$CHANGE_RESULT" == 'success' ]] || exit 1
+          if [[ "$SHOULD_RUN" == 'true' ]]; then expected=success
+          elif [[ "$SHOULD_RUN" == 'false' ]]; then expected=skipped
+          else exit 1
+          fi
+          for result in "$LINT" "$UNIT" "$INTEGRATION" "$COVERAGE" "$BUILD"; do
+            [[ "$result" == "$expected" ]] || exit 1
+          done
