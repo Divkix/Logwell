@@ -61,17 +61,13 @@
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",
     "@size-limit/preset-small-lib": "^14.0.0",
-    "@vitest/coverage-v8": "4.1.11",
+    "@vitest/coverage-v8": "catalog:",
     "msw": "^2.15.0",
     "size-limit": "^14.0.0",
     "typescript": "^7.0.2",
-    "vite": "npm:@voidzero-dev/vite-plus-core@0.3.1",
-    "vite-plus": "0.3.1",
-    "vitest": "4.1.11"
-  },
-  "overrides": {
-    "vite": "npm:@voidzero-dev/vite-plus-core@0.3.1",
-    "vitest": "4.1.11"
+    "vite": "catalog:",
+    "vite-plus": "catalog:",
+    "vitest": "catalog:"
   },
   "size-limit": [
     {
@@ -81,6 +77,5 @@
   ],
   "engines": {
     "node": ">=20.0.0"
-  },
-  "packageManager": "pnpm@12.5.1"
+  }
 }

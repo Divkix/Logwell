@@ -87,36 +87,6 @@ updates:
       - dependencies
       - docker
 
-  # TypeScript SDK
-  # npm ecosystem: the npm updater understands pnpm lockfiles and keeps
-  # sdks/typescript/pnpm-lock.yaml in sync, so CI's
-  # `pnpm install --frozen-lockfile` passes.
-  - package-ecosystem: npm
-    directory: /sdks/typescript
-    schedule:
-      interval: weekly
-      day: monday
-      time: "09:00"
-      timezone: "America/Phoenix"
-    open-pull-requests-limit: 5
-    commit-message:
-      prefix: "deps(sdk-ts)"
-      include: scope
-    labels:
-      - dependencies
-      - sdk
-    ignore:
-      # SDK runs `vp test run --coverage`: toolchain moves via `vp migrate` only.
-      - dependency-name: "vite-plus"
-      - dependency-name: "vite"
-      - dependency-name: "vitest"
-      - dependency-name: "@vitest/*"
-      - dependency-name: "@voidzero-dev/vite-plus-core"
-    groups:
-      sdk-typescript:
-        patterns:
-          - "*"
-
   # Python SDK
   - package-ecosystem: pip
     directory: /sdks/python

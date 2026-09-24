@@ -29,22 +29,24 @@ FROM base AS deps
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY sdks/typescript/package.json ./sdks/typescript/package.json
 
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 ENV PUPPETEER_SKIP_DOWNLOAD=1
 ENV PLAYWRIGHT_BROWSERS_PATH=/dev/null
 
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile --prod --ignore-scripts
+    pnpm --filter logwell-app install --frozen-lockfile --prod --ignore-scripts
 
 FROM base AS deps-dev
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY sdks/typescript/package.json ./sdks/typescript/package.json
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 ENV PUPPETEER_SKIP_DOWNLOAD=1
 ENV PLAYWRIGHT_BROWSERS_PATH=/dev/null
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile --ignore-scripts && bun run prepare
+    pnpm --filter logwell-app install --frozen-lockfile --ignore-scripts && bun run prepare
 
 FROM deps-dev AS build
 WORKDIR /app
