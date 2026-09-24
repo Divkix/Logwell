@@ -166,6 +166,8 @@ pnpm --filter logwell-app up     # app only
 pnpm --filter logwell up         # TypeScript SDK only
 ```
 
+To update pnpm itself, run `pnpm self-update` here and update the pinned version and release-asset checksums in `Dockerfile`.
+
 Vite+/Vite/Vitest share versions in the root workspace catalog. Upgrade them together via `pnpm exec vp migrate --full` rather than independently. Python (`sdks/python/uv.lock`) and Go (`sdks/go/go.mod`) remain separate ecosystems; update them with `uv lock --upgrade` and `go get -u ./...` from their respective SDK directories.
 
 ## Environment Variables
