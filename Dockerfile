@@ -11,11 +11,11 @@ RUN apk add --no-cache curl
 
 # pnpm 12 ships a self-contained musl binary and needs no Node.js. Pinned to an exact release
 # and per-architecture sha256, same policy as the base image.
-ARG PNPM_VERSION=12.5.1
+ARG PNPM_VERSION=12.6.0
 ARG TARGETARCH
 RUN case "${TARGETARCH}" in \
-      amd64) asset="pnpm-linux-x64-musl.tar.gz";  sha256="9b1910e07dac85bb7a2f5e0d1eb15da49b9e6220e0862b339877f8729bfb467a" ;; \
-      arm64) asset="pnpm-linux-arm64-musl.tar.gz"; sha256="41d24fdc91360b431d667c54720f62b2d32e14ba71b09b2d0a63a8c859dcc4e3" ;; \
+      amd64) asset="pnpm-linux-x64-musl.tar.gz";  sha256="bf23d242a6c7a4d42b21bf1d93bff9d6a473cf8b6a7a990c6ed3094228513048" ;; \
+      arm64) asset="pnpm-linux-arm64-musl.tar.gz"; sha256="61e5a2b9aa8c1ebb73ea22203021531f88b8aff9499b68be03f695d9377928c1" ;; \
       *) echo "unsupported architecture: ${TARGETARCH}" >&2; exit 1 ;; \
     esac \
  && curl -fsSL -o /tmp/pnpm.tgz \
@@ -29,22 +29,24 @@ FROM base AS deps
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY sdks/typescript/package.json ./sdks/typescript/package.json
 
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 ENV PUPPETEER_SKIP_DOWNLOAD=1
 ENV PLAYWRIGHT_BROWSERS_PATH=/dev/null
 
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile --prod --ignore-scripts
+    pnpm --filter logwell-app install --frozen-lockfile --prod --ignore-scripts
 
 FROM base AS deps-dev
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY sdks/typescript/package.json ./sdks/typescript/package.json
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 ENV PUPPETEER_SKIP_DOWNLOAD=1
 ENV PLAYWRIGHT_BROWSERS_PATH=/dev/null
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile --ignore-scripts && bun run prepare
+    pnpm --filter logwell-app install --frozen-lockfile --ignore-scripts && bun run prepare
 
 FROM deps-dev AS build
 WORKDIR /app

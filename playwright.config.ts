@@ -34,7 +34,8 @@ const config: PlaywrightTestConfig = {
     },
   ],
   webServer: {
-    command: isCI ? "pnpm run build && pnpm run preview" : "pnpm run dev",
+    // pnpm 12 detaches run-script children; launch preview directly so Playwright can stop it.
+    command: isCI ? "pnpm run build && ./node_modules/.bin/vp -C . preview" : "pnpm run dev",
     url: `http://localhost:${port}`,
     reuseExistingServer: !isCI,
     timeout: 180000,

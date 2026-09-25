@@ -155,6 +155,21 @@ Open http://localhost:5173 and sign in with:
 
 > **Note:** Development runs on port **5173** (Vite). Production builds run on port **3000**.
 
+## Dependency management
+
+The app and TypeScript SDK are one pnpm workspace with a shared root `pnpm-lock.yaml`. From the repository root:
+
+```bash
+pnpm install                     # both JS projects
+pnpm up -r                       # update both within declared ranges
+pnpm --filter logwell-app up     # app only
+pnpm --filter logwell up         # TypeScript SDK only
+```
+
+To update pnpm itself, run `pnpm self-update` here and update the pinned version and release-asset checksums in `Dockerfile`.
+
+Vite+/Vite/Vitest share versions in the root workspace catalog. Upgrade them together via `pnpm exec vp migrate --full` rather than independently. Python (`sdks/python/uv.lock`) and Go (`sdks/go/go.mod`) remain separate ecosystems; update them with `uv lock --upgrade` and `go get -u ./...` from their respective SDK directories.
+
 ## Environment Variables
 
 Create a `.env` file with the following:
@@ -561,6 +576,8 @@ Logwell derives some UI fields from common OTLP log attributes (if present):
 | `pnpm run test:e2e`         | Run E2E tests (Playwright) |
 | `pnpm run test:coverage`    | Run tests with coverage    |
 | `pnpm run test:ui`          | Open Vitest UI             |
+
+CI builds before Playwright tests and launches Vite+ preview directly; wrapping preview in `pnpm run` leaves its process running after the tests.
 
 ## Production Deployment
 
