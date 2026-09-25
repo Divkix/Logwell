@@ -1,1 +1,10 @@
+set -e
+
 vp staged
+vp check
+pnpm run knip
+
+# The SDK has its own lint config; run it only when its files are staged.
+if git diff --cached --name-only --diff-filter=ACMR | grep -q '^sdks/typescript/'; then
+  pnpm --dir sdks/typescript run check
+fi

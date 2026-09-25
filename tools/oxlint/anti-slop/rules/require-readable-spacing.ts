@@ -1,4 +1,4 @@
-import type { CreateRule } from "@oxlint/plugins";
+import type { CreateRule } from "vite-plus/lint/plugins";
 
 import createPaddingLineRule from "../vendor/eslint-stylistic/padding-line-between-statements.ts";
 

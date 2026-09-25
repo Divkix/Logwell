@@ -107,7 +107,7 @@ The project maintains the following coverage thresholds:
 
 ## Tech Stack
 
-- **Test Runner:** Vitest 4
+- **Test Runner:** Vitest 5 (via Vite+)
 - **E2E Framework:** Playwright
 - **Component Testing:** @testing-library/svelte
 - **Assertions:** @testing-library/jest-dom

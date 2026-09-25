@@ -15,7 +15,6 @@ const agentAssetIgnores = [
   ".continue/**",
   ".cursor/**",
   ".gemini/**",
-  ".husky/**",
   ".opencode/**",
   ".pi/**",
   ".roo/**",
@@ -28,7 +27,7 @@ const isApp = process.cwd() === import.meta.dirname;
 
 export default defineConfig({
   staged: {
-    "*": "vp check --fix",
+    "*": "vp fmt --no-error-on-unmatched-pattern",
   },
   fmt: {
     ignorePatterns: ["**/.svelte-kit/**", ...agentAssetIgnores],
