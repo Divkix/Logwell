@@ -15,17 +15,18 @@ peerDependencyRules:
   allowedVersions:
     # svelte-adapter-bun declares typescript ^5; the repo builds with TypeScript 6.
     typescript: "6"
+    vite: "*"
+    vitest: "*"
   allowAny:
-    # "vite" resolves to the vite-plus core fork, which carries its own 0.3.1
-    # version that no consumer's vite peer range can match.
+    # Vite resolves to the Vite+ core alias; its package version differs from Vite peers.
     - vite
     - vitest
 catalog:
-  vite: npm:@voidzero-dev/vite-plus-core@0.3.1
-  vitest: 4.1.11
-  vite-plus: 0.3.1
-  "@vitest/coverage-v8": 4.1.11
-  "@vitest/ui": 4.1.11
+  vite: npm:@voidzero-dev/vite-plus-core@1.0.0-rc.0
+  vitest: 5.0.1
+  vite-plus: 1.0.0-rc.0
+  "@vitest/coverage-v8": 5.0.1
+  "@vitest/ui": 5.0.1
 overrides:
   "@esbuild-kit/core-utils>esbuild": ^0.25.12
   cookie: ^0.7.2

@@ -14,7 +14,6 @@
   },
   "ignoreDependencies": [
     "tw-animate-css",
-    "@oxlint/plugins",
     "@divkix/logwell",
     "layerchart",
     "d3-scale",

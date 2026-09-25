@@ -27,7 +27,7 @@ describe("CreateProjectModal", () => {
 
     const error = screen.getByTestId("error-message");
     expect(error).toBeInTheDocument();
-    expect(error).toHaveTextContent(/cannot be empty/i);
+    expect(error.textContent).toMatch(/cannot be empty/i);
     expect(onCreate).not.toHaveBeenCalled();
   });
 
@@ -42,7 +42,7 @@ describe("CreateProjectModal", () => {
 
     const error = screen.getByTestId("error-message");
     expect(error).toBeInTheDocument();
-    expect(error).toHaveTextContent(/cannot be empty/i);
+    expect(error.textContent).toMatch(/cannot be empty/i);
     expect(onCreate).not.toHaveBeenCalled();
   });
 
@@ -57,7 +57,7 @@ describe("CreateProjectModal", () => {
 
     const error = screen.getByTestId("error-message");
     expect(error).toBeInTheDocument();
-    expect(error).toHaveTextContent(/alphanumeric/i);
+    expect(error.textContent).toMatch(/alphanumeric/i);
     expect(onCreate).not.toHaveBeenCalled();
   });
 
@@ -72,7 +72,7 @@ describe("CreateProjectModal", () => {
 
     const error = screen.getByTestId("error-message");
     expect(error).toBeInTheDocument();
-    expect(error).toHaveTextContent(/cannot exceed 50/i);
+    expect(error.textContent).toMatch(/cannot exceed 50/i);
     expect(onCreate).not.toHaveBeenCalled();
   });
 

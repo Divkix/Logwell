@@ -116,7 +116,7 @@ Logwell is a lightweight, self-hosted log aggregation platform for developers wh
 
 ## Prerequisites
 
-- [Node.js](https://nodejs.org) >= 22.18 (build, tests, tooling)
+- [Node.js](https://nodejs.org) ^22.22.2, ^24.15.0, or >=26 (build, tests, and Vite+ hooks)
 - [pnpm](https://pnpm.io) 12 (`packageManager` pins the exact version)
 - [Bun](https://bun.sh) >= 1.2 (runtime for the built server and `scripts/*.ts`)
 - [Docker](https://docker.com) (for PostgreSQL)
@@ -168,7 +168,7 @@ pnpm --filter logwell up         # TypeScript SDK only
 
 To update pnpm itself, run `pnpm self-update` here and update the pinned version and release-asset checksums in `Dockerfile`.
 
-Vite+/Vite/Vitest share versions in the root workspace catalog. Upgrade them together via `pnpm exec vp migrate --full` rather than independently. Python (`sdks/python/uv.lock`) and Go (`sdks/go/go.mod`) remain separate ecosystems; update them with `uv lock --upgrade` and `go get -u ./...` from their respective SDK directories.
+Vite+/Vite/Vitest share versions in the root workspace catalog. Upgrade them together from the workspace root with the current global `vp migrate --full --no-interactive` (not one package at a time). Python (`sdks/python/uv.lock`) and Go (`sdks/go/go.mod`) remain separate ecosystems; update them with `uv lock --upgrade` and `go get -u ./...` from their respective SDK directories.
 
 ## Environment Variables
 

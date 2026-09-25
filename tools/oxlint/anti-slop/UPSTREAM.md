@@ -1,6 +1,6 @@
 # Vendored anti-slop plugin
 
-Installed 2026-09-21 from the `install-anti-slop` skill bundle (`assets/anti-slop`). The installer only copies files; this tree is the bundle copy, unmodified.
+Installed 2026-09-21 from the `install-anti-slop` skill bundle (`assets/anti-slop`). The bundle was byte-identical at install time; see Local deviations for the later Vite+ import migration.
 
 ## Source identity
 
@@ -19,11 +19,11 @@ Installed 2026-09-21 from the `install-anti-slop` skill bundle (`assets/anti-slo
 
 - `vite.config.ts`: `lint.jsPlugins` → `./tools/oxlint/anti-slop/index.ts`; all 18 generic rules plus the native companion `oxc/no-accumulating-spread` run at `"error"`.
 - `tools/oxlint/anti-slop/**` is in both `lint.ignorePatterns` and `fmt.ignorePatterns`: vendored code is never linted or reformatted as application source.
-- Dependency: `@oxlint/plugins` pinned exactly to `1.81.0` (devDependency), matching the oxlint that Vite+ 0.3.1 executes (`pnpm-lock.yaml`). Move both together with the Vite+ oxlint upgrade; never bump one alone.
+- Dependency: Vite+ bundles the matching Oxlint plugin API at `vite-plus/lint/plugins`; no separate `@oxlint/plugins` dependency is needed. Upgrade Oxlint with Vite+ through `vp migrate`.
 
 ## Local deviations
 
-None in the vendored source. Local additions are limited to this record and the lint/format configuration above.
+Vite+ 1.0 migration changed the plugin-authoring imports from `@oxlint/plugins` to `vite-plus/lint/plugins` throughout the vendored source. Rule behavior is unchanged. Local additions also include this record and the lint/format configuration above.
 
 ## Verification at install
 
