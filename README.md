@@ -577,6 +577,8 @@ Logwell derives some UI fields from common OTLP log attributes (if present):
 | `pnpm run test:coverage`    | Run tests with coverage    |
 | `pnpm run test:ui`          | Open Vitest UI             |
 
+CI builds before Playwright tests and launches Vite+ preview directly; wrapping preview in `pnpm run` leaves its process running after the tests.
+
 ## Production Deployment
 
 ### One-Click Deploy
