@@ -60,10 +60,10 @@
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",
-    "@size-limit/preset-small-lib": "^14.0.0",
+    "@size-limit/preset-small-lib": "^14.0.1",
     "@vitest/coverage-v8": "catalog:",
     "msw": "^2.15.0",
-    "size-limit": "^14.0.0",
+    "size-limit": "^14.0.1",
     "typescript": "^7.0.2",
     "vite": "catalog:",
     "vite-plus": "catalog:",
