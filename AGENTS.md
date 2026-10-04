@@ -18,7 +18,7 @@ Self-hosted, single-tenant logging + incident-intelligence platform. Services sh
 ## Key Directories
 
 - `src/routes/(app)/`: guarded dashboard pages (`+layout.server.ts` session guard); `src/routes/login/`, `src/routes/api/`, `src/routes/v1/`
-- `src/lib/server/`: `auth.ts`, `db/`, `config/env.ts`, `config/performance.ts`, `jobs/`, `utils/ingest.ts`, `utils/log-query.ts`, `utils/api-key.ts`, `utils/csrf.ts`, `utils/rate-limit.ts`, `utils/cursor.ts`, `utils/search.ts`, `events.ts`, `error-handler.ts`, `owned-project.ts`
+- `src/lib/server/`: `auth.ts`, `db/`, `config/env.ts`, `config/performance.ts`, `jobs/`, `utils/ingest.ts`, `utils/log-query.ts`, `utils/api-key.ts`, `utils/csrf.ts`, `utils/rate-limit.ts`, `utils/cursor.ts`, `utils/search.ts`, `utils/owned-project.ts`, `events.ts`, `error-handler.ts`
 - `src/lib/shared/schemas/`: Zod contract — `project.ts`, `log.ts`, `incident.ts` (client/server/SDKs single source)
 - `src/lib/stores/`, `src/lib/hooks/use-log-stream`, `use-incident-stream`: POST SSE consumers, `onLogs`/`onIncidents` callbacks
 - `src/lib/components/ui/`: shadcn-svelte vendor — don't test, excluded from coverage/knip
@@ -63,7 +63,7 @@ Local build needs dummy env: `DATABASE_URL=postgres://… BETTER_AUTH_SECRET=<�
 - `src/hooks.server.ts`: lifecycle, rate-limit, CSRF, DB injection
 - `src/lib/server/auth.ts:12-28`: better-auth options; `src/lib/server/db/schema.ts`: tables/types source of truth; `src/lib/server/db/db.ts`: injection seam; `src/lib/server/db/test-db.ts`: PGlite reflection engine
 - `src/lib/server/utils/ingest.ts`, `log-query.ts`, `api-key.ts` (`lw_` + 32 chars, SHA-256 hex only, cache 5m/30s neg), `otlp.ts`, `simple-ingest.ts`, `incidents.ts`, `rate-limit.ts`, `cursor.ts`, `search.ts`
-- `src/lib/server/events.ts`, `error-handler.ts`, `owned-project.ts`
+- `src/lib/server/events.ts`, `error-handler.ts`, `utils/owned-project.ts`
 - `src/lib/shared/schemas/project.ts` (name `^[a-zA-Z0-9_-]+$` 1–50, `retentionDays` null/0/1–3650), `log.ts`, `incident.ts`
 - `src/routes/v1/logs/+server.ts`, `v1/ingest/+server.ts`, `api/projects/[id]/logs/+server.ts`, `logs/stream/+server.ts`, `incidents/stream/+server.ts`
 - `drizzle/` SQL + `compose.yaml` + `Dockerfile` + `entrypoint.sh` (migrate → seed if `ADMIN_PASSWORD` → `bun ./build/index.js`)
@@ -73,7 +73,7 @@ Local build needs dummy env: `DATABASE_URL=postgres://… BETTER_AUTH_SECRET=<�
 
 - **pnpm 12 + Bun.** pnpm manages dependencies (`packageManager pnpm@12.6.0`; the app and `sdks/typescript` share the root `pnpm-lock.yaml`). Settings live in `pnpm-workspace.yaml`, not `.npmrc`, and install scripts are denied unless listed under `allowBuilds` — an unreviewed one fails `pnpm install`, as does a `package.json` change (`pnpm install` is frozen by default; regenerate with `pnpm install --lockfile-only` first). Bun (`engines.bun >=1.2.0`, pinned 1.4.2 in the CI e2e jobs + Docker `oven/bun:1.4.2-alpine`) stays the runtime: it serves the built output and runs `scripts/*.ts`, which rely on bun's extensionless TS resolution. One-off CLIs: `pnpm dlx → bunx → npx`.
 - **Vite+ (`vp`) 1.0.0-rc.0**, **Vitest 5.0.1** via the workspace catalog/overrides; `@vitest/coverage-v8` must match the runner (hard-fail otherwise). Root TS 6 + `@typescript/native` 7 for `--tsgo` (svelte-check 4.x rejects TS7 main). Upgrade the toolchain from the workspace root with the current global `vp migrate --full`, not one package at a time.
-- **Postgres 18-alpine** everywhere (PG19 beta — don't bump). `db:push` dev-only; prod/CI `db:migrate`. `db:generate` needs TTY; if it replays old migrations (meta snapshots cover 0000–0005+0011), hand-write SQL.
+- **Postgres 18-alpine** everywhere (PG19 beta — don't bump). `db:push` dev-only; prod/CI `db:migrate`. `db:generate` needs TTY; if it replays old migrations (meta snapshots cover 0000–0005, 0011, 0012), hand-write SQL.
 - Env: `DATABASE_URL` (must start `postgres`, required), `BETTER_AUTH_SECRET` (≥32, required unless dev/test), `ORIGIN` (prod proxies), `RATE_LIMIT_*_RPM`, `SSE_*`, `LOG_*`, `IDLE_TIMEOUT` (Bun.serve idle timeout in seconds; image ships 120, heartbeat clamped to half), `INCIDENT_AUTO_RESOLVE_MINUTES=30`. Behind proxy set `ADDRESS_HEADER` + `XFF_DEPTH` or IP limiting sees socket IP.
 - Never commit/push/rebase unless asked; never `reset --hard`, `clean -fd`, print secrets.
 
@@ -88,7 +88,6 @@ Tier by **filename suffix** (Playwright excluded from Vitest). Import from `vite
 | Integration | `tests/integration/**/*.integration.test.ts` + `scripts/**/*.test.ts` | PGlite        | `pnpm run test:integration` |
 | E2E         | `tests/e2e/**`                                                        | real Postgres | `pnpm run test:e2e`         |
 
-- **Integration:** fresh PGlite per test via schema reflection (not `drizzle/*.sql`); new column types may need `test-db.ts` type map / `tableOrder` or table silently skipped. Seed via `tests/fixtures/db.ts` (`seedProject`, `seedLog`, `seedProjectWithApiKey` — plaintext once); add same-origin `Origin`; `clearApiKeyCache()` in `beforeEach`. Don't copy `health.integration.test.ts` inline `CREATE TABLE` (legacy `api_key` col).
-- **Conventions before refactor:** timeseries/incident-detail/timeline tests spy on `db.select` and throw on full-row pulls — aggregate in SQL. `hooks.server.unit.test.ts` drives the real `handle` (session population, `/v1` + `/api/health` fast paths, login + `/v1` rate limits, signup kill-switch, CSRF).
-- **E2E:** CI preview `:4173`, local dev `:5173`, `workers:1 retries:2`, `extraHTTPHeaders` Origin, admin `admin/adminpass`, `RATE_LIMIT_LOGIN_RPM=10000`, login specs wrap in `expect(…).toPass({timeout:45000})`. Helpers: `helpers/otlp.ts`, `helpers/log-selectors.ts`. Chromium+firefox local, chromium-only CI.
+- **Integration:** fresh PGlite per test via schema reflection (not `drizzle/*.sql`); new column types may need `test-db.ts` type map / `tableOrder` or table silently skipped. Seed via `tests/fixtures/db.ts` (`seedProject`, `seedLog`, `seedProjectWithApiKey` — plaintext once); add same-origin `Origin`; `clearApiKeyCache()` in `beforeEach`.- **Conventions before refactor:** timeseries/incident-detail/timeline tests spy on `db.select` and throw on full-row pulls — aggregate in SQL. `hooks.server.unit.test.ts` drives the real `handle` (session population, `/v1` + `/api/health` fast paths, login + `/v1` rate limits, signup kill-switch, CSRF).
+- **E2E:** CI preview `:4173` (`workers:1 retries:2`), local dev `:5173` (default workers, no retries), `extraHTTPHeaders` Origin, admin `admin/adminpass`, `RATE_LIMIT_LOGIN_RPM=10000`, login specs wrap in `expect(…).toPass({timeout:45000})`. Helpers: `helpers/otlp.ts`, `helpers/log-selectors.ts`. Chromium+firefox local, chromium-only CI.
 - Pre-commit: Vite+ dispatcher runs `vp staged && vp check && pnpm run knip` (plus SDK check when SDK files are staged). Run `pnpm run check` for Svelte/TS and nearest test tier for touched code. Coverage signal-only.
