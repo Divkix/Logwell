@@ -154,25 +154,21 @@ describe("hooks.server handle", () => {
   });
 
   describe("CSRF enforcement on /api/auth/*", () => {
-    it("rejects a cross-origin non-GET request with csrf_error", async () => {
-      const event = createEvent(`${ORIGIN}/api/auth/sign-out`, {
-        method: "POST",
-        headers: { Origin: "https://evil.example" },
-      });
+    // Both rows drive the real handle() path; the exhaustive header matrix lives in
+    // tests/integration/utils/csrf.integration.test.ts.
+    const cases: [string, RequestInit][] = [
+      ["cross-origin Origin", { method: "POST", headers: { Origin: "https://evil.example" } }],
+      ["neither Origin nor Referer", { method: "POST" }],
+    ];
+
+    it.each(cases)("rejects a non-GET request with csrf_error (%s)", async (_scenario, init) => {
+      const event = createEvent(`${ORIGIN}/api/auth/sign-out`, init);
 
       const response = await handle({ event, resolve });
 
       expect(response.status).toBe(403);
       expect((await response.json()).error).toBe("csrf_error");
       expect(mocks.authHandler).not.toHaveBeenCalled();
-    });
-
-    it("rejects a non-GET request carrying neither Origin nor Referer", async () => {
-      const event = createEvent(`${ORIGIN}/api/auth/sign-out`, { method: "POST" });
-      const response = await handle({ event, resolve });
-
-      expect(response.status).toBe(403);
-      expect((await response.json()).error).toBe("csrf_error");
     });
 
     it("delegates same-origin auth routes to the better-auth handler", async () => {

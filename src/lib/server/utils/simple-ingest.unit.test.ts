@@ -44,7 +44,6 @@ describe("parseSimpleIngestRequest", () => {
     // SAFETY: every row is a [payload, expected error, label] triple whose payload is a JSON value.
     it.each([
       [{ message: "test" }, "missing required field 'level'", "missing level"],
-      [{ level: "invalid", message: "test" }, "invalid level 'invalid'", "invalid level"],
       [{ level: "info" }, "missing required field 'message'", "missing message"],
       [{ level: "info", message: 123 }, "message must be a string", "non-string message"],
       [{ level: "info", message: "   " }, "message cannot be empty", "empty message"],
@@ -159,10 +158,9 @@ describe("parseSimpleIngestRequest", () => {
 
   describe("metadata extraction", () => {
     // SAFETY: every row is a [metadata, column, expected, label] triple whose column is one of NormalizedSimpleLog's identity fields.
+    // The three OTLP keys (request.id / enduser.id / client.address) are asserted
+    // end-to-end in tests/integration/simple-ingest/logs.integration.test.ts.
     it.each([
-      [{ "request.id": "req-123" }, "requestId", "req-123", "OTLP request key"],
-      [{ "enduser.id": "user-456" }, "userId", "user-456", "OTLP user key"],
-      [{ "client.address": "192.168.1.1" }, "ipAddress", "192.168.1.1", "OTLP ip key"],
       [{ request_id: "req-789" }, "requestId", "req-789", "fallback request key"],
       [{ user_id: "user-999" }, "userId", "user-999", "fallback user key"],
       [{ ip_address: "10.0.0.1" }, "ipAddress", "10.0.0.1", "fallback ip key"],

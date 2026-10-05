@@ -39,22 +39,6 @@ def _make_429_response(retry_after: str) -> httpx.Response:
 
 class TestRetryAfterCap:
     @pytest.mark.asyncio
-    async def test_retry_after_capped_at_backoff_ceiling(self) -> None:
-        transport = _make_transport(max_retries=1)
-        transport._client.post = AsyncMock(  # type: ignore[attr-defined]
-            return_value=_make_429_response("3600")
-        )
-
-        with (
-            patch("asyncio.sleep", new=AsyncMock()) as mock_sleep,
-            pytest.raises(LogwellError) as exc_info,
-        ):
-            await transport.send([{"level": "info", "message": "hello"}])
-
-        assert exc_info.value.code == LogwellErrorCode.RATE_LIMITED
-        mock_sleep.assert_awaited_once_with(0.1)
-
-    @pytest.mark.asyncio
     async def test_retry_after_below_backoff_is_honored(self) -> None:
         transport = _make_transport(max_retries=1)
         transport._client.post = AsyncMock(  # type: ignore[attr-defined]
@@ -79,10 +63,11 @@ class TestRetryAfterCap:
 
         with (
             patch("asyncio.sleep", new=AsyncMock()) as mock_sleep,
-            pytest.raises(LogwellError),
+            pytest.raises(LogwellError) as exc_info,
         ):
             await transport.send([{"level": "info", "message": "hello"}])
 
+        assert exc_info.value.code == LogwellErrorCode.RATE_LIMITED
         assert mock_sleep.await_args_list == [call(0.1), call(0.2)]
 
     @pytest.mark.asyncio

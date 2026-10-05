@@ -1,12 +1,12 @@
 # Testing Infrastructure
 
-This project follows the Testing Trophy methodology, prioritizing integration tests while maintaining comprehensive coverage across all test types.
+This project follows the Testing Trophy methodology: confidence per test, weighted toward integration. Test tiers are selected by filename suffix, and each tier runs with its own command.
 
 ## Test Structure
 
 ### Unit Tests (`.unit.test.ts`)
 
-Located alongside source files in `src/`. Tests pure functions and utilities in isolation.
+Located alongside source files in `src/`. Cover the boundaries higher tiers cannot reach cheaply: parsers, validators, security-sensitive configuration, state machines.
 
 ```bash
 pnpm run test:unit
@@ -36,13 +36,18 @@ Located in `tests/e2e/`. Full end-to-end tests using Playwright across multiple 
 pnpm run test:e2e
 ```
 
+## What Belongs in Which Tier
+
+- **Integration carries the weight.** Orchestration — routes, DB, auth, CSRF, ingest pipeline, SSE streams — runs through the real handler against PGlite.
+- **Unit tests hold the boundaries.** Parsers, validators, security-sensitive configuration, and state machines stay unit-tested where integration cannot exercise them cheaply.
+- **No overlapping assertions.** If a higher tier already asserts a behavior, do not re-assert it below. A component test that mocks or re-implements a module does not count as coverage of that module.
+- **Table tests keep their inputs.** Deduplicate rows freely, but preserve every distinct boundary, type, and error input.
+- **No coverage quotas.** Coverage is a signal for finding untested behavior, never a target, and no tier carries a required case count.
+
 ## Running Tests
 
 ```bash
-# Run all tests (unit + integration)
-pnpm run test
-
-# Run tests in watch mode
+# Run all Vitest tiers (unit + component + integration)
 pnpm run test
 
 # Run specific test types
@@ -96,14 +101,9 @@ describe("My Integration Test", () => {
 });
 ```
 
-## Coverage Thresholds
+## Coverage
 
-The project maintains the following coverage thresholds:
-
-- Lines: 75%
-- Functions: 75%
-- Branches: 65%
-- Statements: 75%
+Coverage is collected with the v8 provider via `pnpm run test:coverage`. It is signal-only: `vitest.config.ts` defines no coverage thresholds and CI runs the report without a gate. Use it to find untested behavior, not as a target.
 
 ## Tech Stack
 

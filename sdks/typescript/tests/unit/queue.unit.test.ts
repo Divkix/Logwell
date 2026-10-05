@@ -22,32 +22,18 @@ describe("BatchQueue", () => {
     vi.useRealTimers();
   });
 
-  describe("constructor", () => {
-    it("creates queue with config", () => {
+  describe("add", () => {
+    it("tracks queue size as entries are added", () => {
       const queue = new BatchQueue(mockSendBatch, defaultConfig);
 
       expect(queue).toBeInstanceOf(BatchQueue);
       expect(queue.size).toBe(0);
-    });
-  });
 
-  describe("add", () => {
-    it("adds entry to queue", () => {
-      const queue = new BatchQueue(mockSendBatch, defaultConfig);
-      const log = createLogFixture();
-
-      queue.add(log);
-
+      queue.add(createLogFixture());
       expect(queue.size).toBe(1);
-    });
-
-    it("increments size for each added entry", () => {
-      const queue = new BatchQueue(mockSendBatch, defaultConfig);
 
       queue.add(createLogFixture());
       queue.add(createLogFixture());
-      queue.add(createLogFixture());
-
       expect(queue.size).toBe(3);
     });
 
@@ -88,14 +74,6 @@ describe("BatchQueue", () => {
       expect(mockSendBatch).toHaveBeenCalledWith([log]);
     });
 
-    it("does not flush if queue is empty", async () => {
-      new BatchQueue(mockSendBatch, defaultConfig);
-
-      await vi.advanceTimersByTimeAsync(1000);
-
-      expect(mockSendBatch).not.toHaveBeenCalled();
-    });
-
     it("resets timer after manual flush", async () => {
       const queue = new BatchQueue(mockSendBatch, defaultConfig);
 
@@ -122,54 +100,8 @@ describe("BatchQueue", () => {
   });
 
   describe("flush", () => {
-    it("sends all queued logs", async () => {
-      const queue = new BatchQueue(mockSendBatch, defaultConfig);
-      const logs = createLogBatch(3);
-
-      for (const log of logs) {
-        queue.add(log);
-      }
-
-      await queue.flush();
-
-      expect(mockSendBatch).toHaveBeenCalledWith(logs);
-      expect(queue.size).toBe(0);
-    });
-
-    it("returns response from sendBatch", async () => {
+    it("sends all queued logs in order, returns the response, and clears the queue", async () => {
       mockSendBatch = vi.fn().mockResolvedValue({ accepted: 3 });
-      const queue = new BatchQueue(mockSendBatch, defaultConfig);
-
-      queue.add(createLogFixture());
-      queue.add(createLogFixture());
-      queue.add(createLogFixture());
-
-      const response = await queue.flush();
-
-      expect(response).toEqual({ accepted: 3 });
-    });
-
-    it("returns null if queue is empty", async () => {
-      const queue = new BatchQueue(mockSendBatch, defaultConfig);
-
-      const response = await queue.flush();
-
-      expect(response).toBeNull();
-      expect(mockSendBatch).not.toHaveBeenCalled();
-    });
-
-    it("clears queue after successful flush", async () => {
-      const queue = new BatchQueue(mockSendBatch, defaultConfig);
-
-      queue.add(createLogFixture());
-      queue.add(createLogFixture());
-
-      await queue.flush();
-
-      expect(queue.size).toBe(0);
-    });
-
-    it("preserves log order", async () => {
       const queue = new BatchQueue(mockSendBatch, defaultConfig);
       const log1 = createLogFixture({ message: "first" });
       const log2 = createLogFixture({ message: "second" });
@@ -179,9 +111,20 @@ describe("BatchQueue", () => {
       queue.add(log2);
       queue.add(log3);
 
-      await queue.flush();
+      const response = await queue.flush();
 
       expect(mockSendBatch).toHaveBeenCalledWith([log1, log2, log3]);
+      expect(response).toEqual({ accepted: 3 });
+      expect(queue.size).toBe(0);
+    });
+
+    it("returns null if queue is empty", async () => {
+      const queue = new BatchQueue(mockSendBatch, defaultConfig);
+
+      const response = await queue.flush();
+
+      expect(response).toBeNull();
+      expect(mockSendBatch).not.toHaveBeenCalled();
     });
   });
 

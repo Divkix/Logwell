@@ -96,17 +96,6 @@ describe("API key cache invalidation races", () => {
     await expect(afterRotation).rejects.toBeInstanceOf(ApiKeyError);
   });
 
-  it("caches successful lookups so a second request skips the database", async () => {
-    let reads = 0;
-
-    const db = stubDb(async () => {
-      reads++;
-
-      return [{ id: "project-2" }];
-    });
-
-    await expect(validateApiKey(request(key), db)).resolves.toBe("project-2");
-    await expect(validateApiKey(request(key), db)).resolves.toBe("project-2");
-    expect(reads).toBe(1);
-  });
+  // Plain cache-hit behavior (a second lookup skips the database) is asserted with a
+  // stronger DB-read spy in tests/integration/utils/api-key.integration.test.ts.
 });

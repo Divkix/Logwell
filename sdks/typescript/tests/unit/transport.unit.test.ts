@@ -85,38 +85,25 @@ describe("HttpTransport - 4xx mapping", () => {
     vi.restoreAllMocks();
   });
 
-  it("maps 403 to non-retryable VALIDATION_ERROR without retrying", async () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response(JSON.stringify({ error: "forbidden", message: "Forbidden" }), {
-        status: 403,
-        headers: { "Content-Type": "application/json" },
-      }),
-    );
-    const transport = new HttpTransport({ endpoint, apiKey, maxRetries: 2 });
+  it.each([403, 422] as const)(
+    "maps %i to non-retryable VALIDATION_ERROR without retrying",
+    async (status) => {
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        new Response(JSON.stringify({ error: "rejected", message: "Rejected" }), {
+          status,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+      const transport = new HttpTransport({ endpoint, apiKey, maxRetries: 2 });
 
-    await expect(transport.send([createLogFixture()])).rejects.toMatchObject({
-      code: "VALIDATION_ERROR",
-      statusCode: 403,
-      retryable: false,
-    });
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
-  });
-
-  it("maps 422 to non-retryable VALIDATION_ERROR", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response(JSON.stringify({ error: "unprocessable", message: "Unprocessable" }), {
-        status: 422,
-        headers: { "Content-Type": "application/json" },
-      }),
-    );
-    const transport = new HttpTransport({ endpoint, apiKey, maxRetries: 2 });
-
-    await expect(transport.send([createLogFixture()])).rejects.toMatchObject({
-      code: "VALIDATION_ERROR",
-      statusCode: 422,
-      retryable: false,
-    });
-  });
+      await expect(transport.send([createLogFixture()])).rejects.toMatchObject({
+        code: "VALIDATION_ERROR",
+        statusCode: status,
+        retryable: false,
+      });
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    },
+  );
 
   it("still maps 429 to retryable RATE_LIMITED", async () => {
     const fetchSpy = vi

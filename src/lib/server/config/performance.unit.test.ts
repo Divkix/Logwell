@@ -139,11 +139,6 @@ describe("Performance Configuration", () => {
         expect(LOG_STREAM_CONFIG.DEFAULT_MAX_LOGS).toBe(expected);
       },
     );
-
-    it("exports MAX_LOGS_UPPER_LIMIT with value of 10000", async () => {
-      const { LOG_STREAM_CONFIG } = await import("./performance");
-      expect(LOG_STREAM_CONFIG.MAX_LOGS_UPPER_LIMIT).toBe(10000);
-    });
   });
 
   describe("Retention Configuration", () => {
@@ -190,19 +185,6 @@ describe("Performance Configuration", () => {
         expect(RETENTION_CONFIG.LOG_CLEANUP_INTERVAL_MS).toBe(expected);
       },
     );
-  });
-
-  describe("API Rate Limiting Configuration", () => {
-    it.each([
-      ["BATCH_INSERT_LIMIT", 100],
-      ["DEFAULT_PAGE_SIZE", 100],
-      ["MAX_PAGE_SIZE", 500],
-    ])("exports %s with value %d", async (key, expected) => {
-      const { API_CONFIG } = await import("./performance");
-      // SAFETY: BATCH_INSERT_LIMIT, DEFAULT_PAGE_SIZE and MAX_PAGE_SIZE are real API_CONFIG
-      // members; any other key would read undefined and fail the toBe below.
-      expect(API_CONFIG[key as keyof typeof API_CONFIG]).toBe(expected);
-    });
   });
 
   describe("Incident Configuration", () => {

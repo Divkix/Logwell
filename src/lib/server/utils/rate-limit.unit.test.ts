@@ -28,40 +28,31 @@ describe("rate-limit env parsing", () => {
     return import("./rate-limit");
   }
 
-  // SAFETY: each row is [RATE_LIMIT_LOGIN_RPM or unset, expected limit, label] — the
-  // literals below only take those three shapes.
+  // SAFETY: each row is [RATE_LIMIT_LOGIN_RPM / RATE_LIMIT_INGEST_RPM, value or unset, expected
+  // limit, label] — the literals below only take those four shapes. Each variable keeps its own
+  // fallback rows so both exports' wiring is proven independently.
   it.each([
-    [undefined, 10, "unset"],
-    ["", 10, "empty"],
-    ["30", 30, "in range"],
-    ["0", 10, "zero has no documented meaning, so it is invalid"],
-    ["-1", 10, "negative"],
-    ["0.5", 10, "fractional"],
-    ["abc", 10, "non-numeric"],
-    ["600rpm", 10, "numeric prefix with a unit"],
-    ["1e999", 10, "overflow"],
-  ] as [string | undefined, number, string][])(
-    "RATE_LIMIT_LOGIN_RPM=%s → %s (%s)",
-    async (value, expected) => {
-      const { LOGIN_RPM } = await loadLimit("RATE_LIMIT_LOGIN_RPM", value);
-      expect(LOGIN_RPM).toBe(expected);
-    },
-  );
+    ["RATE_LIMIT_LOGIN_RPM", undefined, 10, "unset"],
+    ["RATE_LIMIT_LOGIN_RPM", "", 10, "empty"],
+    ["RATE_LIMIT_LOGIN_RPM", "30", 30, "in range"],
+    ["RATE_LIMIT_LOGIN_RPM", "0", 10, "zero has no documented meaning, so it is invalid"],
+    ["RATE_LIMIT_LOGIN_RPM", "-1", 10, "negative"],
+    ["RATE_LIMIT_LOGIN_RPM", "0.5", 10, "fractional"],
+    ["RATE_LIMIT_LOGIN_RPM", "abc", 10, "non-numeric"],
+    ["RATE_LIMIT_LOGIN_RPM", "600rpm", 10, "numeric prefix with a unit"],
+    ["RATE_LIMIT_LOGIN_RPM", "1e999", 10, "overflow"],
+    ["RATE_LIMIT_INGEST_RPM", undefined, 600, "unset"],
+    ["RATE_LIMIT_INGEST_RPM", "0", 600, "zero"],
+    ["RATE_LIMIT_INGEST_RPM", "-100", 600, "negative"],
+    ["RATE_LIMIT_INGEST_RPM", "0.9", 600, "fractional"],
+    ["RATE_LIMIT_INGEST_RPM", "600 rpm", 600, "numeric prefix with a unit"],
+    ["RATE_LIMIT_INGEST_RPM", "1200", 1200, "in range"],
+  ] as [string, string | undefined, number, string][])(
+    "%s=%s → %s (%s)",
+    async (key, value, expected) => {
+      const { LOGIN_RPM, INGEST_RPM } = await loadLimit(key, value);
 
-  // SAFETY: each row is [RATE_LIMIT_INGEST_RPM or unset, expected limit, label] — the
-  // literals below only take those three shapes.
-  it.each([
-    [undefined, 600, "unset"],
-    ["0", 600, "zero"],
-    ["-100", 600, "negative"],
-    ["0.9", 600, "fractional"],
-    ["600 rpm", 600, "numeric prefix with a unit"],
-    ["1200", 1200, "in range"],
-  ] as [string | undefined, number, string][])(
-    "RATE_LIMIT_INGEST_RPM=%s → %s (%s)",
-    async (value, expected) => {
-      const { INGEST_RPM } = await loadLimit("RATE_LIMIT_INGEST_RPM", value);
-      expect(INGEST_RPM).toBe(expected);
+      expect(key === "RATE_LIMIT_LOGIN_RPM" ? LOGIN_RPM : INGEST_RPM).toBe(expected);
     },
   );
 

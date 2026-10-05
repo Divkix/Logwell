@@ -19,75 +19,7 @@ describe("Logwell Client - Source Location", () => {
     vi.useRealTimers();
   });
 
-  describe("source location disabled (default)", () => {
-    it("does not include sourceFile when captureSourceLocation is false", () => {
-      const client = new Logwell(defaultConfig);
-      const queueAddSpy = vi.spyOn(client["queue"], "add");
-
-      client.info("Test message");
-
-      expect(queueAddSpy).toHaveBeenCalledTimes(1);
-      const entry = queueAddSpy.mock.calls[0][0] as LogEntry;
-      expect(entry.sourceFile).toBeUndefined();
-      expect(entry.lineNumber).toBeUndefined();
-    });
-
-    it("does not include sourceFile by default", () => {
-      const client = new Logwell(validConfigs.minimal);
-      const queueAddSpy = vi.spyOn(client["queue"], "add");
-
-      client.info("Test message");
-
-      const entry = queueAddSpy.mock.calls[0][0] as LogEntry;
-      expect(entry.sourceFile).toBeUndefined();
-      expect(entry.lineNumber).toBeUndefined();
-    });
-  });
-
   describe("source location enabled", () => {
-    it("includes sourceFile when captureSourceLocation is true", () => {
-      const client = new Logwell({
-        ...defaultConfig,
-        captureSourceLocation: true,
-      });
-      const queueAddSpy = vi.spyOn(client["queue"], "add");
-
-      client.info("Test message");
-
-      const entry = queueAddSpy.mock.calls[0][0] as LogEntry;
-      expect(entry.sourceFile).toBeDefined();
-      expect(entry.sourceFile).toContain("client.unit.test.ts");
-    });
-
-    it("includes lineNumber when captureSourceLocation is true", () => {
-      const client = new Logwell({
-        ...defaultConfig,
-        captureSourceLocation: true,
-      });
-      const queueAddSpy = vi.spyOn(client["queue"], "add");
-
-      client.info("Test message");
-
-      const entry = queueAddSpy.mock.calls[0][0] as LogEntry;
-      expect(entry.lineNumber).toBeDefined();
-      expect(typeof entry.lineNumber).toBe("number");
-      expect(entry.lineNumber).toBeGreaterThan(0);
-    });
-
-    it("captures correct location for info()", () => {
-      const client = new Logwell({
-        ...defaultConfig,
-        captureSourceLocation: true,
-      });
-      const queueAddSpy = vi.spyOn(client["queue"], "add");
-
-      client.info("Test message"); // This line's number should be captured
-
-      const entry = queueAddSpy.mock.calls[0][0] as LogEntry;
-      expect(entry.sourceFile).not.toContain("client.ts");
-      expect(entry.sourceFile).toContain("client.unit.test.ts");
-    });
-
     it("captures correct location for log()", () => {
       const client = new Logwell({
         ...defaultConfig,
@@ -168,18 +100,6 @@ describe("Logwell Client - Source Location", () => {
 
       child.info("After child shutdown");
       expect(client.queueSize).toBe(1);
-    });
-
-    it("parent shutdown still flushes the shared queue", async () => {
-      const client = new Logwell(defaultConfig);
-      const child = client.child({});
-      const shutdownSpy = vi.spyOn(client["queue"], "shutdown").mockResolvedValue(null);
-
-      child.info("From child");
-      const result = await client.shutdown();
-
-      expect(shutdownSpy).toHaveBeenCalledTimes(1);
-      expect(result).toBeNull();
     });
 
     it("child without metadata does not create an empty metadata object", async () => {

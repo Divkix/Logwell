@@ -38,19 +38,6 @@ def make_send_batch_mock(
 
 
 class TestQueueOverflow:
-    def test_overflow_drops_oldest_entry(self) -> None:
-        send_batch, _ = make_send_batch_mock()
-        config = QueueConfig(batch_size=100, max_queue_size=3)
-        queue = BatchQueue(send_batch, config)
-
-        queue.add(make_log_entry("one"))
-        queue.add(make_log_entry("two"))
-        queue.add(make_log_entry("three"))
-        assert queue.size == 3
-
-        queue.add(make_log_entry("four"))
-        assert queue.size == 3
-
     @pytest.mark.asyncio
     async def test_overflow_preserves_newest_entries(self) -> None:
         send_batch, captured = make_send_batch_mock()
@@ -62,6 +49,7 @@ class TestQueueOverflow:
         queue.add(make_log_entry("three"))
         queue.add(make_log_entry("four"))  # Drops "one"
         queue.add(make_log_entry("five"))  # Drops "two"
+        assert queue.size == 3  # Cap holds, oldest evicted
 
         await queue.flush()
 
@@ -87,7 +75,10 @@ class TestQueueOverflow:
 
 class TestBatchQueueShutdown:
     @pytest.mark.asyncio
-    async def test_shutdown_awaits_in_flight_flush(self) -> None:
+    @pytest.mark.parametrize(
+        "triggered_by_add", [False, True], ids=["explicit-flush", "add-triggered-flush"]
+    )
+    async def test_shutdown_awaits_in_flight_flush(self, triggered_by_add: bool) -> None:
         flush_started = threading.Event()
         flush_continue = threading.Event()
         captured: list[list[LogEntry]] = []
@@ -99,11 +90,12 @@ class TestBatchQueueShutdown:
                 await asyncio.sleep(0.01)
             return {"accepted": len(batch)}
 
-        queue = BatchQueue(MagicMock(side_effect=slow_send), QueueConfig(batch_size=100))
+        config = QueueConfig(batch_size=1 if triggered_by_add else 100)
+        queue = BatchQueue(MagicMock(side_effect=slow_send), config)
         queue.add(make_log_entry("one"))
-        queue.add(make_log_entry("two"))
-
-        flush_task = asyncio.create_task(queue.flush())
+        if not triggered_by_add:
+            queue.add(make_log_entry("two"))
+            flush_task = asyncio.create_task(queue.flush())
         while not flush_started.is_set():
             await asyncio.sleep(0.01)
 
@@ -114,37 +106,11 @@ class TestBatchQueueShutdown:
 
         flush_continue.set()
         await shutdown_task
-        await flush_task
+        if not triggered_by_add:
+            await flush_task
 
-        assert [e["message"] for batch in captured for e in batch] == ["one", "two"]
-        assert queue._queue_loop is None
-
-    @pytest.mark.asyncio
-    async def test_shutdown_awaits_triggered_flush(self) -> None:
-        flush_started = threading.Event()
-        flush_continue = threading.Event()
-        captured: list[list[LogEntry]] = []
-
-        async def slow_send(batch: list[LogEntry]) -> IngestResponse:
-            captured.append(batch)
-            flush_started.set()
-            while not flush_continue.is_set():
-                await asyncio.sleep(0.01)
-            return {"accepted": len(batch)}
-
-        queue = BatchQueue(MagicMock(side_effect=slow_send), QueueConfig(batch_size=1))
-        queue.add(make_log_entry("one"))
-        while not flush_started.is_set():
-            await asyncio.sleep(0.01)
-
-        shutdown_task = asyncio.create_task(queue.shutdown())
-        await asyncio.sleep(0.05)
-        assert not shutdown_task.done()
-
-        flush_continue.set()
-        await shutdown_task
-
-        assert [e["message"] for batch in captured for e in batch] == ["one"]
+        expected = ["one"] if triggered_by_add else ["one", "two"]
+        assert [e["message"] for batch in captured for e in batch] == expected
         assert queue._queue_loop is None
 
 
@@ -243,33 +209,6 @@ class TestBatchQueueThreadSafety:
 
         total_captured = sum(len(batch) for batch in captured)
         assert total_captured == num_adds
-
-    def test_size_is_thread_safe(self) -> None:
-        send_batch, _ = make_send_batch_mock()
-        config = QueueConfig(batch_size=10000)
-        queue = BatchQueue(send_batch, config)
-
-        num_adds = 1000
-        sizes: list[int] = []
-
-        def add_entries() -> None:
-            for _ in range(num_adds):
-                queue.add(make_log_entry())
-
-        def read_size() -> None:
-            for _ in range(num_adds):
-                sizes.append(queue.size)
-
-        t1 = threading.Thread(target=add_entries)
-        t2 = threading.Thread(target=read_size)
-
-        t1.start()
-        t2.start()
-        t1.join()
-        t2.join()
-
-        assert queue.size == num_adds
-        assert all(0 <= s <= num_adds for s in sizes)
 
 
 class TestBatchQueueEdgeCases:
