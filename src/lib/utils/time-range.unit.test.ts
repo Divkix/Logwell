@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { TIME_RANGES, parseTimeRange } from "./time-range";
+import { parseTimeRange } from "./time-range";
 
 describe("parseTimeRange", () => {
   it("returns null for null input", () => {
@@ -16,10 +16,8 @@ describe("parseTimeRange", () => {
     expect(parseTimeRange("30m")).toBeNull();
   });
 
-  it.each(TIME_RANGES)("returns %s for valid range input %s", (range) => {
-    expect(parseTimeRange(range)).toBe(range);
-  });
-
+  // Successful parsing of every valid range is asserted end-to-end by the
+  // timeseries/stats integration tests and the picker component tests.
   it("is case-sensitive (uppercase variants are invalid)", () => {
     expect(parseTimeRange("15M")).toBeNull();
     expect(parseTimeRange("1H")).toBeNull();

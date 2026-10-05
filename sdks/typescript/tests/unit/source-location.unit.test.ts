@@ -40,11 +40,16 @@ describe("parseStackFrame", () => {
     });
 
     it("parses stack frame with constructor (new)", () => {
-      const frame = "    at new Foo (/Users/dev/app/src/foo.ts:10:5)";
-      const result = parseStackFrame(frame);
-      expect(result).toEqual({
+      const fooFrame = "    at new Foo (/Users/dev/app/src/foo.ts:10:5)";
+      const classFrame = "    at new MyClass (/Users/dev/app/src/my-class.ts:15:3)";
+
+      expect(parseStackFrame(fooFrame)).toEqual({
         sourceFile: "/Users/dev/app/src/foo.ts",
         lineNumber: 10,
+      });
+      expect(parseStackFrame(classFrame)).toEqual({
+        sourceFile: "/Users/dev/app/src/my-class.ts",
+        lineNumber: 15,
       });
     });
 
@@ -54,15 +59,6 @@ describe("parseStackFrame", () => {
       expect(result).toEqual({
         sourceFile: "/Users/dev/app/src/utils.ts",
         lineNumber: 50,
-      });
-    });
-
-    it("parses stack frame with new and class name", () => {
-      const frame = "    at new MyClass (/Users/dev/app/src/my-class.ts:15:3)";
-      const result = parseStackFrame(frame);
-      expect(result).toEqual({
-        sourceFile: "/Users/dev/app/src/my-class.ts",
-        lineNumber: 15,
       });
     });
   });

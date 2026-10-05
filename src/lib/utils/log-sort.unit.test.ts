@@ -69,10 +69,9 @@ describe("sortLogs", () => {
     expect(sortLogs(sampleLogs, key, dir)).toBe(sampleLogs);
   });
 
+  // Timestamp/level ascending and timestamp descending are covered end-to-end
+  // by log-table.component.test.ts; keep the remaining directions here.
   it.each<[SortField, Exclude<SortDirection, null>, string[]]>([
-    ["timestamp", "asc", ["log_1", "log_3", "log_2"]],
-    ["timestamp", "desc", ["log_2", "log_3", "log_1"]],
-    ["level", "asc", ["log_2", "log_3", "log_1"]],
     ["level", "desc", ["log_1", "log_3", "log_2"]],
     ["message", "asc", ["log_2", "log_1", "log_3"]],
     ["message", "desc", ["log_3", "log_1", "log_2"]],

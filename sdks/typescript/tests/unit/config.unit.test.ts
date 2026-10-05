@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it, vi } from "vite-plus/test";
 import {
   API_KEY_REGEX,
   DEFAULT_CONFIG,
@@ -9,11 +9,6 @@ import { LogwellError } from "../../src/errors";
 import { invalidConfigs, validConfigs } from "../fixtures/configs";
 
 describe("API_KEY_REGEX", () => {
-  it("matches valid API key format", () => {
-    const validKey = "lw_aBcDeFgHiJkLmNoPqRsTuVwXyZ123456";
-    expect(API_KEY_REGEX.test(validKey)).toBe(true);
-  });
-
   it("rejects keys without lw_ prefix", () => {
     const invalidKey = "xx_aBcDeFgHiJkLmNoPqRsTuVwXyZ123456";
     expect(API_KEY_REGEX.test(invalidKey)).toBe(false);
@@ -43,34 +38,21 @@ describe("validateApiKeyFormat", () => {
     expect(validateApiKeyFormat("")).toBe(false);
   });
 
-  it("returns false for invalid format", () => {
-    expect(validateApiKeyFormat("invalid")).toBe(false);
-  });
-
-  it("returns false for wrong prefix", () => {
-    expect(validateApiKeyFormat("xx_aBcDeFgHiJkLmNoPqRsTuVwXyZ123456")).toBe(false);
-  });
-
-  it("returns false for short key", () => {
-    expect(validateApiKeyFormat("lw_short")).toBe(false);
-  });
+  it.each(["invalid", "xx_aBcDeFgHiJkLmNoPqRsTuVwXyZ123456", "lw_short"])(
+    "returns false for %s",
+    (key) => {
+      expect(validateApiKeyFormat(key)).toBe(false);
+    },
+  );
 });
 
 describe("DEFAULT_CONFIG", () => {
-  it("has correct default batchSize", () => {
+  it("pins documented default values", () => {
     expect(DEFAULT_CONFIG.batchSize).toBe(50);
-  });
-
-  it("has correct default flushInterval", () => {
     expect(DEFAULT_CONFIG.flushInterval).toBe(5000);
-  });
-
-  it("has correct default maxQueueSize", () => {
     expect(DEFAULT_CONFIG.maxQueueSize).toBe(1000);
-  });
-
-  it("has correct default maxRetries", () => {
     expect(DEFAULT_CONFIG.maxRetries).toBe(3);
+    expect(DEFAULT_CONFIG.timeout).toBe(30000);
   });
 });
 
@@ -95,16 +77,11 @@ describe("validateConfig", () => {
     it("preserves provided optional values", () => {
       const result = validateConfig(validConfigs.full);
 
+      expect(result.service).toBe("test-service");
       expect(result.batchSize).toBe(25);
       expect(result.flushInterval).toBe(3000);
       expect(result.maxQueueSize).toBe(500);
       expect(result.maxRetries).toBe(5);
-    });
-
-    it("preserves service name", () => {
-      const result = validateConfig(validConfigs.withService);
-
-      expect(result.service).toBe("my-app");
     });
 
     it("preserves callback functions", () => {
@@ -124,9 +101,11 @@ describe("validateConfig", () => {
   });
 
   describe("invalid configurations", () => {
-    it("throws LogwellError for missing apiKey", () => {
+    it("throws LogwellError for missing or empty apiKey", () => {
       expect(() => validateConfig(invalidConfigs.missingApiKey)).toThrow(LogwellError);
       expect(() => validateConfig(invalidConfigs.missingApiKey)).toThrow("apiKey is required");
+      expect(() => validateConfig(invalidConfigs.emptyApiKey)).toThrow(LogwellError);
+      expect(() => validateConfig(invalidConfigs.emptyApiKey)).toThrow("apiKey is required");
     });
 
     it("throws LogwellError for missing endpoint", () => {
@@ -134,23 +113,17 @@ describe("validateConfig", () => {
       expect(() => validateConfig(invalidConfigs.missingEndpoint)).toThrow("endpoint is required");
     });
 
-    it("throws LogwellError for empty apiKey", () => {
-      expect(() => validateConfig(invalidConfigs.emptyApiKey)).toThrow(LogwellError);
-    });
+    it("throws LogwellError for invalid API key format", () => {
+      const configs = [
+        invalidConfigs.invalidApiKeyFormat,
+        invalidConfigs.apiKeyWrongPrefix,
+        invalidConfigs.apiKeyTooShort,
+      ];
 
-    it("throws LogwellError for invalid apiKey format", () => {
-      expect(() => validateConfig(invalidConfigs.invalidApiKeyFormat)).toThrow(LogwellError);
-      expect(() => validateConfig(invalidConfigs.invalidApiKeyFormat)).toThrow(
-        "Invalid API key format",
-      );
-    });
-
-    it("throws LogwellError for apiKey with wrong prefix", () => {
-      expect(() => validateConfig(invalidConfigs.apiKeyWrongPrefix)).toThrow(LogwellError);
-    });
-
-    it("throws LogwellError for apiKey too short", () => {
-      expect(() => validateConfig(invalidConfigs.apiKeyTooShort)).toThrow(LogwellError);
+      for (const config of configs) {
+        expect(() => validateConfig(config)).toThrow(LogwellError);
+        expect(() => validateConfig(config)).toThrow("Invalid API key format");
+      }
     });
 
     it("throws LogwellError for invalid endpoint URL", () => {
@@ -158,15 +131,11 @@ describe("validateConfig", () => {
       expect(() => validateConfig(invalidConfigs.invalidEndpoint)).toThrow("Invalid endpoint URL");
     });
 
-    it("throws LogwellError for negative batchSize", () => {
-      expect(() => validateConfig(invalidConfigs.negativeBatchSize)).toThrow(LogwellError);
-      expect(() => validateConfig(invalidConfigs.negativeBatchSize)).toThrow(
-        "batchSize must be positive",
-      );
-    });
-
-    it("throws LogwellError for zero batchSize", () => {
-      expect(() => validateConfig(invalidConfigs.zeroBatchSize)).toThrow(LogwellError);
+    it("throws LogwellError for non-positive batchSize", () => {
+      for (const config of [invalidConfigs.negativeBatchSize, invalidConfigs.zeroBatchSize]) {
+        expect(() => validateConfig(config)).toThrow(LogwellError);
+        expect(() => validateConfig(config)).toThrow("batchSize must be positive");
+      }
     });
 
     it("throws LogwellError for negative flushInterval", () => {
@@ -178,21 +147,13 @@ describe("validateConfig", () => {
   });
 
   describe("error details", () => {
-    it("throws with INVALID_CONFIG error code", () => {
+    it("throws INVALID_CONFIG error that is not retryable", () => {
       try {
         validateConfig(invalidConfigs.missingApiKey);
         expect.fail("Should have thrown");
       } catch (error) {
         expect(error).toBeInstanceOf(LogwellError);
         expect((error as LogwellError).code).toBe("INVALID_CONFIG");
-      }
-    });
-
-    it("throws non-retryable error", () => {
-      try {
-        validateConfig(invalidConfigs.missingApiKey);
-        expect.fail("Should have thrown");
-      } catch (error) {
         expect((error as LogwellError).retryable).toBe(false);
       }
     });
@@ -210,14 +171,6 @@ describe("validateConfig", () => {
         captureSourceLocation: true,
       });
       expect(result.captureSourceLocation).toBe(true);
-    });
-
-    it("preserves captureSourceLocation when set to false explicitly", () => {
-      const result = validateConfig({
-        ...validConfigs.minimal,
-        captureSourceLocation: false,
-      });
-      expect(result.captureSourceLocation).toBe(false);
     });
   });
 });

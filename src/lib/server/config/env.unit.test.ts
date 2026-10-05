@@ -67,28 +67,24 @@ describe("Environment Configuration", () => {
     expect(env[key as keyof typeof env]).toBe(value);
   });
 
-  it.each([["ADMIN_PASSWORD"], ["ORIGIN"]])("returns undefined for unset %s", async (key) => {
-    const { env } = await loadEnv({ [key]: undefined });
-    // SAFETY: ADMIN_PASSWORD and ORIGIN are actual exports of config/env, so keyof covers
-    // both keys and unsetting them leaves env[key] undefined as asserted.
-    expect(env[key as keyof typeof env]).toBeUndefined();
+  it("returns undefined for unset optional variables", async () => {
+    const { env } = await loadEnv({ ADMIN_PASSWORD: undefined, ORIGIN: undefined });
+    expect(env.ADMIN_PASSWORD).toBeUndefined();
+    expect(env.ORIGIN).toBeUndefined();
   });
 
   it("defaults NODE_ENV to production when unset", async () => {
-    const { env } = await loadEnv({ NODE_ENV: undefined });
+    const { env, isProduction, isDevelopment } = await loadEnv({ NODE_ENV: undefined });
     expect(env.NODE_ENV).toBe("production");
+    expect(isProduction()).toBe(true);
+    expect(isDevelopment()).toBe(false);
   });
 
   it.each([
     ["production", true, false],
     ["development", false, true],
-    [undefined, true, false],
   ])("NODE_ENV=%s → isProduction=%s isDevelopment=%s", async (nodeEnv, prod, dev) => {
-    // SAFETY: the it.each table above only supplies a string or undefined for NODE_ENV —
-    // the booleans occupy the isProduction/isDevelopment slots.
-    const { isProduction, isDevelopment } = await loadEnv({
-      NODE_ENV: nodeEnv as string | undefined,
-    });
+    const { isProduction, isDevelopment } = await loadEnv({ NODE_ENV: nodeEnv });
 
     expect(isProduction()).toBe(prod);
     expect(isDevelopment()).toBe(dev);

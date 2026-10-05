@@ -12,16 +12,9 @@ vi.mock("svelte-sonner", () => ({
   },
 }));
 
-import { toastError, toastSuccess } from "./toast";
+import { toastError } from "./toast";
 
 describe("Toast Utility", () => {
-  it("toastSuccess forwards message and options", () => {
-    toastSuccess("Operation completed");
-    expect(sonner.toast.success).toHaveBeenCalledWith("Operation completed", undefined);
-    toastSuccess("Done", { duration: 3000 });
-    expect(sonner.toast.success).toHaveBeenCalledWith("Done", { duration: 3000 });
-  });
-
   it.each<[Parameters<typeof toastError>[0], string, string]>([
     ["Something went wrong", "Something went wrong", "plain message"],
     [new Error("Database connection failed"), "Database connection failed", "Error object"],

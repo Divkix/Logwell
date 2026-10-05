@@ -25,22 +25,6 @@ export function getTimeBucketConfig(range: TimeRange): TimeBucketConfig {
   }
 }
 
-export function bucketTimestamps(timestamps: Date[], config: TimeBucketConfig, rangeStart: Date) {
-  const buckets: Record<number, number> = {};
-  const startMs = rangeStart.getTime();
-
-  for (const ts of timestamps) {
-    const offsetMs = ts.getTime() - startMs;
-    const bucketIndex = Math.floor(offsetMs / config.intervalMs);
-
-    if (bucketIndex >= 0 && bucketIndex < config.expectedBuckets) {
-      buckets[bucketIndex] = (buckets[bucketIndex] || 0) + 1;
-    }
-  }
-
-  return buckets;
-}
-
 export function fillMissingBuckets(
   bucketCounts: Record<number, number>,
   config: TimeBucketConfig,

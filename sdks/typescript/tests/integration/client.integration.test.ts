@@ -277,7 +277,7 @@ describe("Logwell Client", () => {
 
       expect(client.queueSize).toBe(2);
 
-      await client.flush();
+      await client.shutdown();
 
       expect(capturedLogs).toHaveLength(2);
     });

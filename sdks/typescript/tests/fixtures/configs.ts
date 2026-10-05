@@ -18,12 +18,6 @@ export const validConfigs = {
     onFlush: () => {},
   } satisfies LogwellConfig,
 
-  withService: {
-    apiKey: "lw_aBcDeFgHiJkLmNoPqRsTuVwXyZ123456",
-    endpoint: "https://test.logwell.io",
-    service: "my-app",
-  } satisfies LogwellConfig,
-
   withSourceLocation: {
     apiKey: "lw_aBcDeFgHiJkLmNoPqRsTuVwXyZ123456",
     endpoint: "https://test.logwell.io",

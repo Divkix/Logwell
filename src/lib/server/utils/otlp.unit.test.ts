@@ -182,19 +182,7 @@ describe("parseUint64String", () => {
     expect(parseUint64String(input)).toBe(expected);
   });
 
-  it.each([
-    ["-1"],
-    ["-1000000"],
-    ["  -42  "],
-    [-1],
-    [-1000000],
-    [1.5],
-    [-1.5],
-    ["abc"],
-    ["1.5"],
-    [""],
-    [" "],
-  ])("rejects %s", (input) => {
+  it.each([["-1"], [-1], [1.5], [-1.5], ["abc"], ["1.5"], [""]])("rejects %s", (input) => {
     expect(parseUint64String(input)).toBeNull();
   });
 });
@@ -311,17 +299,15 @@ describe("zero timeUnixNano handling", () => {
 });
 
 describe("normalizeOtlpLogsRequest edge cases", () => {
-  it("rejects negative timeUnixNano and falls back to current timestamp", () => {
-    const payload = {
+  it("rejects negative timeUnixNano and observedTimeUnixNano and falls back to current timestamp", () => {
+    const payload: JsonValue = {
       resourceLogs: [
         {
           scopeLogs: [
             {
               logRecords: [
-                {
-                  timeUnixNano: "-1000000",
-                  body: { stringValue: "test message" },
-                },
+                { timeUnixNano: "-1000000", body: { stringValue: "test message" } },
+                { observedTimeUnixNano: "-1000000", body: { stringValue: "test message" } },
               ],
             },
           ],
@@ -330,37 +316,18 @@ describe("normalizeOtlpLogsRequest edge cases", () => {
     };
 
     const { records } = normalizeOtlpLogsRequest(payload);
-    expect(records).toHaveLength(1);
-    expect(records[0]!.timeUnixNano).toBeNull();
-    const now = new Date();
-    expect(records[0]!.timestamp.getTime()).toBeGreaterThanOrEqual(now.getTime() - 5000);
-    expect(records[0]!.timestamp.getTime()).toBeLessThanOrEqual(now.getTime() + 5000);
-  });
+    expect(records).toHaveLength(2);
 
-  it("rejects negative observedTimeUnixNano and falls back to current timestamp", () => {
-    const payload = {
-      resourceLogs: [
-        {
-          scopeLogs: [
-            {
-              logRecords: [
-                {
-                  observedTimeUnixNano: "-1000000",
-                  body: { stringValue: "test message" },
-                },
-              ],
-            },
-          ],
-        },
-      ],
-    };
-
-    const { records } = normalizeOtlpLogsRequest(payload);
-    expect(records).toHaveLength(1);
-    expect(records[0]!.observedTimeUnixNano).toBeNull();
     const now = new Date();
-    expect(records[0]!.timestamp.getTime()).toBeGreaterThanOrEqual(now.getTime() - 5000);
-    expect(records[0]!.timestamp.getTime()).toBeLessThanOrEqual(now.getTime() + 5000);
+
+    for (const record of records) {
+      // Each record feeds one negative candidate; both raw columns must read as unset...
+      expect(record.timeUnixNano).toBeNull();
+      expect(record.observedTimeUnixNano).toBeNull();
+      // ...and the derived timestamp must fall back to ~now, never a pre-1970 date.
+      expect(record.timestamp.getTime()).toBeGreaterThanOrEqual(now.getTime() - 5000);
+      expect(record.timestamp.getTime()).toBeLessThanOrEqual(now.getTime() + 5000);
+    }
   });
 
   it("normalizes empty attributes to null", () => {

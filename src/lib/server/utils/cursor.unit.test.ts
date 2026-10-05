@@ -14,7 +14,6 @@ describe("cursor utilities", () => {
     it.each([
       ["log_123"],
       ["log_with_underscores_123"],
-      ["log_456"],
       ["log-with-dashes-789"],
       ["Log_MixedCase_123"],
     ])("roundtrips id %s", (id) => {
