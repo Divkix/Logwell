@@ -62,7 +62,7 @@
     "@arethetypeswrong/cli": "^0.18.5",
     "@size-limit/preset-small-lib": "^14.1.0",
     "@vitest/coverage-v8": "catalog:",
-    "msw": "^2.15.0",
+    "msw": "^3.0.2",
     "size-limit": "^14.1.0",
     "typescript": "^7.0.2",
     "vite": "catalog:",
