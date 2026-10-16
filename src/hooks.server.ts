@@ -3,7 +3,7 @@ import { svelteKitHandler } from "better-auth/svelte-kit";
 import { building } from "$app/environment";
 import { auth, initAuth } from "$lib/server/auth";
 import { env } from "$lib/server/config/env";
-import { db } from "$lib/server/db";
+import { closeDb, db } from "$lib/server/db";
 import { handleError as buildErrorResponse } from "$lib/server/error-handler";
 import { startCleanupScheduler, stopCleanupScheduler } from "$lib/server/jobs/cleanup-scheduler";
 import { checkCsrfOrigin } from "$lib/server/utils/csrf";
@@ -21,15 +21,21 @@ async function ensureInitialized(): Promise<void> {
   }
 }
 
-function gracefulShutdown(signal: string) {
-  console.log(`[shutdown] ${signal} received`);
+async function gracefulShutdown(reason: string): Promise<void> {
+  console.log(`[shutdown] ${reason} received`);
   stopCleanupScheduler();
-  setTimeout(() => process.exit(0), 5000);
+  // Fallback only, past closeDb's 5s drain; unref'd so it never delays a clean exit.
+  setTimeout(() => process.exit(0), 6000).unref();
+
+  try {
+    await closeDb();
+  } catch (error) {
+    console.error("[shutdown] failed to close database pool", error);
+  }
 }
 
-process.once("SIGTERM", () => gracefulShutdown("SIGTERM"));
-
-process.once("SIGINT", () => gracefulShutdown("SIGINT"));
+// svelte-adapter-bun emits this on SIGTERM/SIGINT before it stops Bun.serve.
+process.once("sveltekit:shutdown", (reason: string) => void gracefulShutdown(reason));
 
 export const handle: Handle = async ({ event, resolve }) => {
   if (building) {

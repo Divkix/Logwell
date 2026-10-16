@@ -7,6 +7,8 @@ import { handle } from "./hooks.server";
 // assigns undefined, so the field's type must widen past the undefined literal.
 const mocks = vi.hoisted(() => ({
   db: { kind: "test-db" },
+  closeDb: vi.fn(async () => {}),
+  stopCleanupScheduler: vi.fn(),
   getSession: vi.fn(),
   authHandler: vi.fn(),
   // RATE_LIMIT_INGEST_IP_RPM is overridden in the /v1 throttle tests; the shipped
@@ -16,7 +18,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("$app/environment", () => ({ building: false }));
 
-vi.mock("$lib/server/db", () => ({ db: mocks.db }));
+vi.mock("$lib/server/db", () => ({ db: mocks.db, closeDb: mocks.closeDb }));
 
 vi.mock("$lib/server/config/env", () => ({ env: mocks.env }));
 
@@ -33,7 +35,7 @@ vi.mock("$lib/server/error-handler", () => ({ handleError: vi.fn() }));
 
 vi.mock("$lib/server/jobs/cleanup-scheduler", () => ({
   startCleanupScheduler: vi.fn(),
-  stopCleanupScheduler: vi.fn(),
+  stopCleanupScheduler: mocks.stopCleanupScheduler,
 }));
 
 // The unit project resolves no `$lib` runtime specifiers, so re-export the real modules
@@ -251,6 +253,25 @@ describe("hooks.server handle", () => {
       expect(await response.text()).toBe("resolved");
       expect(warn).toHaveBeenCalled();
       expect(warn.mock.calls[0]?.[0]).toContain("ORIGIN is not set");
+    });
+  });
+
+  describe("graceful shutdown", () => {
+    it("stops the scheduler and closes the DB pool on sveltekit:shutdown", async () => {
+      // Fake timers keep the unref'd process.exit fallback from firing in the worker.
+      vi.useFakeTimers();
+      vi.spyOn(console, "log").mockImplementation(() => {});
+
+      try {
+        // The hook registers with process.once, so this event fires it exactly once per module.
+        process.emit("sveltekit:shutdown", "SIGTERM");
+        expect(mocks.stopCleanupScheduler).toHaveBeenCalledTimes(1);
+        expect(mocks.closeDb).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.clearAllTimers();
+        vi.useRealTimers();
+        vi.restoreAllMocks();
+      }
     });
   });
 });

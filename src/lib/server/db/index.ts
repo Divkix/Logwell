@@ -12,3 +12,8 @@ const client = postgres(env.DATABASE_URL, {
 });
 
 export const db = drizzle(client, { schema });
+
+/** Drain in-flight queries (up to 5s) and close the pool before the process exits. */
+export async function closeDb(): Promise<void> {
+  await client.end({ timeout: 5 });
+}
