@@ -18,6 +18,9 @@ import type { RequestEvent } from "./$types";
  * - range: string ('15m' | '1h' | '24h' | '7d') - Time range, defaults to '24h'
  * - from: string (ISO 8601) - Optional start timestamp to sync with page server
  *
+ * The query only ever covers one range's worth of buckets from the start (at most 7 days for
+ * '7d'), ending no later than now, however old `from` is.
+ *
  * Response:
  * {
  *   buckets: [
@@ -44,17 +47,23 @@ export async function GET(event: RequestEvent): Promise<Response> {
 
   const fromParam = event.url.searchParams.get("from");
 
-  const rangeEnd = new Date();
+  const now = new Date();
 
   const rangeStart = fromParam
     ? (() => {
         const d = new Date(fromParam);
 
-        return Number.isNaN(d.getTime()) ? getTimeRangeStart(range, rangeEnd) : d;
+        return Number.isNaN(d.getTime()) ? getTimeRangeStart(range, now) : d;
       })()
-    : getTimeRangeStart(range, rangeEnd);
+    : getTimeRangeStart(range, now);
 
   const config = getTimeBucketConfig(range);
+
+  // Bound the scan to the buckets the response can hold: with an old `from` the query would
+  // otherwise aggregate everything from that point up to now and discard all but the first range.
+  const rangeEnd = new Date(
+    Math.min(now.getTime(), rangeStart.getTime() + config.expectedBuckets * config.intervalMs),
+  );
 
   const conditions: SQL[] = [
     eq(log.projectId, projectId),
