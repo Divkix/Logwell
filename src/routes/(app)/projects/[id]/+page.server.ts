@@ -1,4 +1,5 @@
-import { InvalidCursorError, queryLogs } from "#lib/server/utils/log-query.js";
+import { error } from "@sveltejs/kit";
+import { InvalidCursorError, OffsetTooLargeError, queryLogs } from "#lib/server/utils/log-query.js";
 import { requireOwnedProjectPage } from "#lib/server/utils/owned-project.js";
 import { parseLevelFilter } from "#lib/shared/schemas/log.js";
 import { env } from "#lib/server/config/env.js";
@@ -55,6 +56,8 @@ export const load: PageServerLoad = async (event) => {
   try {
     result = await queryLogs(db, filter);
   } catch (err) {
+    if (err instanceof OffsetTooLargeError) error(400, err.message);
+
     if (!(err instanceof InvalidCursorError)) throw err;
     console.error("[page/logs] invalid cursor, falling back to first page:", err);
     result = await queryLogs(db, { ...filter, cursor: null });

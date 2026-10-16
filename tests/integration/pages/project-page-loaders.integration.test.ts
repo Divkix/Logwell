@@ -204,6 +204,23 @@ describe("(app) page loaders — injected PGlite DB seam", () => {
       ]);
     });
 
+    it("throws SvelteKit 400 for an offset past 10000", async () => {
+      const proj = await seedProject(db, { name: "deep-offset", ownerId: owner.userId });
+
+      const event = createLoadEvent(
+        db,
+        { id: proj.id },
+        owner.locals,
+        `http://localhost:5173/projects/${proj.id}?offset=10001`,
+      );
+
+      // SAFETY: createLoadEvent builds every event member these load functions read (url, params, locals, cookies, fetch, setHeaders, getClientAddress, depends, parent); tracing stays null because no load function reads it.
+      await expect(loadProjectLogs(event as never)).rejects.toMatchObject({
+        status: 400,
+        body: { message: "offset must be at most 10000; use cursor pagination for deeper pages" },
+      });
+    });
+
     it("throws SvelteKit 404 for a non-owner (existence hidden)", async () => {
       const proj = await seedProject(db, { name: "other-proj", ownerId: owner.userId });
 
