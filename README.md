@@ -116,7 +116,7 @@ Logwell is a lightweight, self-hosted log aggregation platform for developers wh
 
 ## Prerequisites
 
-- [Node.js](https://nodejs.org) ^22.22.2, ^24.15.0, or >=26 (runtime, build, tests, and Vite+ hooks)
+- [Node.js](https://nodejs.org) ^22.22.2, ^24.15.0, or >=26 (runtime, build, tests, and Vite+ hooks). CI and the Docker image use Node 24 LTS.
 - [pnpm](https://pnpm.io) 12 (`packageManager` pins the exact version)
 - [Docker](https://docker.com) (for PostgreSQL)
 
@@ -177,8 +177,9 @@ Create a `.env` file with the following:
 # Database connection
 DATABASE_URL="postgres://root:mysecretpassword@localhost:5432/local"
 
-# Authentication secret (minimum 32 characters)
-BETTER_AUTH_SECRET="your-32-character-secret-key-here"
+# Authentication secret (minimum 32 characters): openssl rand -base64 32
+# Published placeholder values (e.g. the old example secret) are rejected at startup.
+BETTER_AUTH_SECRET=""
 
 # Admin user password (minimum 8 characters)
 ADMIN_PASSWORD="your-admin-password"
@@ -186,18 +187,38 @@ ADMIN_PASSWORD="your-admin-password"
 # Admin username (optional, defaults to "admin")
 # ADMIN_USERNAME="admin"
 
-# Public URL the browser uses (required: CSRF checks and sign-in/out compare against it)
+# Public URL the browser uses (required: CSRF checks and sign-in/out compare against it).
+# Production without it logs a startup warning; an https ORIGIN also turns on HSTS.
 ORIGIN="https://your-domain.com"
+
+# NODE_ENV: only "development" and "test" relax validation. Unset, "production",
+# "staging" and any other value get production rules (strict secret, Secure cookies).
 
 # Log retention (optional, defaults shown)
 # LOG_RETENTION_DAYS="30"        # 0 = never auto-delete
-# LOG_CLEANUP_INTERVAL_MS="3600000"  # Cleanup job interval (1 hour)
+# LOG_CLEANUP_INTERVAL_MS="3600000"  # Cleanup job interval (1 hour); also purges deleted projects
+# LOG_CLEANUP_BATCH_PAUSE_MS="100"   # Pause between retention/purge delete batches (0-60000)
 # INCIDENT_AUTO_RESOLVE_MINUTES="30" # Incident resolves after N quiet minutes
 
 # Rate limiting (optional, defaults shown)
 # RATE_LIMIT_INGEST_RPM="600"    # Max ingest requests per minute per API key
-# RATE_LIMIT_LOGIN_RPM="10"      # Max login attempts per minute per IP
+# RATE_LIMIT_INGEST_IP_RPM="60000" # Max pre-auth /v1 requests per minute per client IP
+# RATE_LIMIT_LOGIN_RPM="10"      # Max login attempts per minute per IP (IPv6 grouped by /64)
+# RATE_LIMIT_LOGIN_ACCOUNT_RPM="30" # Max FAILED logins per minute per account, from any address
+
+# Database timeouts (optional, defaults shown; whole ms, 0 = server default, max 3600000)
+# DB_STATEMENT_TIMEOUT_MS="30000"            # Longer queries are cancelled -> 503 query_timeout
+# DB_IDLE_IN_TRANSACTION_TIMEOUT_MS="60000"
+
+# Live streams and ingest (optional, defaults shown)
+# SSE_MAX_CONNECTIONS="200"          # Open live streams per process; over the cap -> 429
+# INGEST_MAX_FUTURE_SKEW_MS="300000" # Timestamps further ahead are clamped to receive time
 ```
+
+An invalid database timeout fails startup; other invalid numbers fall back to the default with a warning. `.env.example` documents every variable.
+The two database timeouts are sent as connection startup parameters: behind PgBouncer in
+transaction mode, add `ignore_startup_parameters = statement_timeout,idle_in_transaction_session_timeout`
+(and set the timeouts on the role or database instead), or connections fail.
 
 Generate a secure secret:
 
@@ -257,6 +278,14 @@ curl -X POST http://localhost:5173/v1/ingest \
 | `timestamp` | No       | ISO8601 string                                    | Defaults to current time   |
 | `service`   | No       | string                                            | Service name for filtering |
 | `metadata`  | No       | object                                            | Additional structured data |
+
+**Limits** (both APIs): a batch holds at most 100 logs. JSON nested deeper than 256 levels
+rejects the whole request (`400 validation_error`). A message (or OTLP string body) longer than
+98,304 characters is stored truncated with a `… [truncated, N characters]` marker. A record
+whose structured fields (metadata, attributes, resource, scope, non-string body) serialize to
+more than 65,536 characters is rejected on its own: the response is still `200` with
+`accepted`, `rejected` and `errors[]`. Timestamps more than `INGEST_MAX_FUTURE_SKEW_MS` (5
+minutes) ahead of the server clock, or before year 1, are replaced with the receive time.
 
 <details>
 <summary><strong>Node.js (no SDK needed)</strong></summary>
@@ -555,14 +584,14 @@ Logwell derives some UI fields from common OTLP log attributes (if present):
 
 ### Database
 
-| Command                | Description                                             |
-| ---------------------- | ------------------------------------------------------- |
-| `pnpm run db:start`    | Start PostgreSQL via Docker                             |
-| `pnpm run db:push`     | Push schema to database (dev only; prefer `db:migrate`) |
-| `pnpm run db:generate` | Generate migration files                                |
-| `pnpm run db:migrate`  | Run migrations                                          |
-| `pnpm run db:studio`   | Open Drizzle Studio                                     |
-| `pnpm run db:seed`     | Create admin user                                       |
+| Command                | Description                                                      |
+| ---------------------- | ---------------------------------------------------------------- |
+| `pnpm run db:start`    | Start PostgreSQL via Docker                                      |
+| `pnpm run db:push`     | Push schema to database (dev only; prefer `db:migrate`)          |
+| `pnpm run db:generate` | Generate migration files                                         |
+| `pnpm run db:migrate`  | Run migrations (under an advisory lock; loads `.env` if present) |
+| `pnpm run db:studio`   | Open Drizzle Studio                                              |
+| `pnpm run db:seed`     | Create admin user                                                |
 
 ### Testing
 
@@ -587,7 +616,7 @@ CI builds before Playwright tests and launches Vite+ preview directly; wrapping 
 
 **Fly.io:** Clone the repo and run `fly launch` (uses included `fly.toml`)
 
-> **Note:** PostgreSQL database required. Railway has $5/mo free credit. Render free tier expires after 30 days (paid plans from $7/mo). Fly.io offers 1GB free PostgreSQL.
+> **Note:** PostgreSQL database required. Railway has $5/mo free credit. The Render Blueprint asks for `ADMIN_PASSWORD` and uses a paid Postgres plan, because free Render Postgres expires after 30 days. On Fly.io run exactly one always-on machine (`fly.toml` sets `min_machines_running = 1` and turns auto-stop off): rate limits and live streams are per process.
 
 ### Docker Compose (Recommended)
 
@@ -597,9 +626,11 @@ The easiest way to deploy Logwell with PostgreSQL:
 # Set required environment variables
 export BETTER_AUTH_SECRET=$(openssl rand -base64 32)
 export ADMIN_PASSWORD="your-secure-admin-password"
+export DB_PASSWORD="$(openssl rand -base64 24)"
+export ORIGIN="https://logs.example.com"
 
-# Optional: Set custom DB password (only needed if exposing port 5432 for backups)
-# export DB_PASSWORD="your-db-password"
+# Optional: run a release other than the one compose.prod.yaml is pinned to
+# export LOGWELL_VERSION="v1.4.0"
 
 # Start the full stack
 docker compose -f compose.prod.yaml up -d
@@ -611,6 +642,26 @@ docker compose -f compose.prod.yaml logs -f app
 docker compose -f compose.prod.yaml down
 ```
 
+`compose.prod.yaml` pins the image to the release it shipped with, so a restart never pulls a
+new version (and its migrations) on its own. For backups, restores, upgrades and rollbacks, see
+[docs/operations.md](docs/operations.md).
+
+#### Upgrading a large install to the log index rework (migration 0013)
+
+Migration 0013 replaces the log indexes with a plain `CREATE INDEX`, which blocks writes to the
+`log` table while it builds (roughly 1-2 s per index per 2M rows). On a big table, build the new
+indexes online before deploying:
+
+```sql
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_log_project_timestamp_id ON log (project_id, timestamp, id);
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_log_project_level_timestamp_id ON log (project_id, level, timestamp, id);
+-- Any row here is an INVALID index: DROP INDEX CONCURRENTLY it and build it again.
+SELECT indexrelid::regclass FROM pg_index WHERE indrelid = 'log'::regclass AND NOT indisvalid;
+```
+
+The migration aborts with a hint if either index exists but is invalid. Boot migrations run
+under a Postgres advisory lock, so replicas starting together wait for one another.
+
 ### Docker (App Only)
 
 If you have an external PostgreSQL database:
@@ -618,17 +669,21 @@ If you have an external PostgreSQL database:
 #### Using Pre-built Image
 
 ```bash
-# Pull from GitHub Container Registry
-docker pull ghcr.io/divkix/logwell:latest
+# Pick a release tag (see GitHub Releases) and pull it from GitHub Container Registry
+export LOGWELL_VERSION="v1.4.0"
+docker pull "ghcr.io/divkix/logwell:$LOGWELL_VERSION"
+
+# Generate the secret once and keep it: a new one signs everyone out
+export BETTER_AUTH_SECRET="$(openssl rand -base64 32)"
 
 # Run the container
 docker run -p 3000:3000 \
   -e DATABASE_URL="postgresql://user:pass@host:5432/db" \
-  -e BETTER_AUTH_SECRET="your-32-char-secret" \
+  -e BETTER_AUTH_SECRET \
   -e ADMIN_PASSWORD="your-admin-password" \
   -e ORIGIN="http://localhost:3000" \
   -e NODE_ENV=production \
-  ghcr.io/divkix/logwell:latest
+  "ghcr.io/divkix/logwell:$LOGWELL_VERSION"
 ```
 
 #### Building Locally
@@ -637,10 +692,13 @@ docker run -p 3000:3000 \
 # Build the image
 docker build -t logwell .
 
+# Generate the secret once and keep it: a new one signs everyone out
+export BETTER_AUTH_SECRET="$(openssl rand -base64 32)"
+
 # Run the container
 docker run -p 3000:3000 \
   -e DATABASE_URL="postgresql://user:pass@host:5432/db" \
-  -e BETTER_AUTH_SECRET="your-32-char-secret" \
+  -e BETTER_AUTH_SECRET \
   -e ADMIN_PASSWORD="your-admin-password" \
   -e ORIGIN="http://localhost:3000" \
   -e NODE_ENV=production \
@@ -662,13 +720,14 @@ Response:
   "status": "healthy",
   "database": "connected",
   "timestamp": "2025-01-02T12:00:00.000Z",
-  "uptime": 3600,
-  "version": "0.1.2"
+  "uptime": 3600
 }
 ```
 
 - Returns `200 OK` when healthy
-- Returns `503 Service Unavailable` when database is down
+- Returns `503 Service Unavailable` (with `"status": "unhealthy"`) when the database is down or
+  the probe takes longer than 3 seconds
+- Reports no version or build detail: the endpoint is public
 
 ### Manual
 
@@ -696,22 +755,42 @@ The app runs on port 3000 by default.
 
 ### Project Management (Session Auth)
 
-| Endpoint                                             | Method | Description                                                  |
-| ---------------------------------------------------- | ------ | ------------------------------------------------------------ |
-| `/api/projects`                                      | GET    | List all projects                                            |
-| `/api/projects`                                      | POST   | Create project                                               |
-| `/api/projects/[id]`                                 | GET    | Get project details                                          |
-| `/api/projects/[id]`                                 | PATCH  | Update project (name, retention)                             |
-| `/api/projects/[id]`                                 | DELETE | Delete project                                               |
-| `/api/projects/[id]/regenerate`                      | POST   | Regenerate API key                                           |
-| `/api/projects/[id]/logs`                            | GET    | Query logs                                                   |
-| `/api/projects/[id]/logs/stream`                     | POST   | SSE stream                                                   |
-| `/api/projects/[id]/incidents`                       | GET    | List incidents (open/resolved, range filters)                |
-| `/api/projects/[id]/incidents/[incidentId]`          | GET    | Incident detail with root-cause candidates                   |
-| `/api/projects/[id]/incidents/[incidentId]/timeline` | GET    | Incident timeline buckets + peak                             |
-| `/api/projects/[id]/incidents/stream`                | POST   | SSE incident updates                                         |
-| `/api/projects/[id]/stats`                           | GET    | Level distribution                                           |
-| `/api/projects/[id]/logs/export`                     | GET    | Export logs as CSV or JSON (`?format=csv\|json`, max 10,000) |
+| Endpoint                                             | Method | Description                                                    |
+| ---------------------------------------------------- | ------ | -------------------------------------------------------------- |
+| `/api/projects`                                      | GET    | List projects (`logCount` capped at 10,000, `lastActivity`)    |
+| `/api/projects`                                      | POST   | Create project                                                 |
+| `/api/projects/[id]`                                 | GET    | Get project details                                            |
+| `/api/projects/[id]`                                 | PATCH  | Update project (name, retention)                               |
+| `/api/projects/[id]`                                 | DELETE | Delete project (hidden and key revoked now, data purged later) |
+| `/api/projects/[id]/regenerate`                      | POST   | Regenerate API key                                             |
+| `/api/projects/[id]/logs`                            | GET    | Query logs                                                     |
+| `/api/projects/[id]/logs/stream`                     | POST   | SSE stream                                                     |
+| `/api/projects/[id]/incidents`                       | GET    | List incidents (open/resolved, range filters)                  |
+| `/api/projects/[id]/incidents/[incidentId]`          | GET    | Incident detail with root-cause candidates                     |
+| `/api/projects/[id]/incidents/[incidentId]/timeline` | GET    | Incident timeline buckets + peak                               |
+| `/api/projects/[id]/incidents/stream`                | POST   | SSE incident updates                                           |
+| `/api/projects/[id]/stats`                           | GET    | Level distribution (`from`/`to`: default 24h, max 7 days)      |
+| `/api/projects/[id]/logs/export`                     | GET    | Export logs as CSV or JSON (`?format=csv\|json`, max 10,000)   |
+
+#### Query limits and errors
+
+Error responses are JSON `{error, message}`; the codes below are the `error` value.
+
+- **Capped counts:** `GET /api/projects` and `GET /api/projects/[id]` count at most 10,000 logs
+  per project (`logCountCapped` / `totalLogsCapped` say when the cap was hit; read a capped
+  value as "10,000+"). Once capped, the detail's `levelCounts` describe the newest 10,000 logs.
+- **Logs:** prefer `cursor` pagination. The deprecated `offset` is capped at 10,000, and a higher
+  value returns `400 offset_too_large`. A malformed or out-of-range cursor returns
+  `400 invalid_cursor`. A `search` longer than 256 characters returns `400 invalid_search`.
+- **Stats:** `/stats` defaults to the last 24 hours and accepts a window of at most 7 days.
+  A window over 7 days or `from` after `to` returns `400 invalid_range`. A malformed date
+  returns `400 invalid_date`. The response echoes the effective `from` and `to`.
+- **Incident detail:** root-cause candidates and correlations cover the incident's newest 10,000
+  events (`analyzedEvents`).
+- **Timeouts:** a query cancelled by `DB_STATEMENT_TIMEOUT_MS` returns
+  `503 {error: "query_timeout", message, id}`. Narrow the query and retry.
+- **Live streams:** past `SSE_MAX_CONNECTIONS` open streams, a stream request returns
+  `429 too_many_streams` with `Retry-After: 60`. The dashboard waits and reconnects.
 
 ## Current Limitations
 
@@ -726,15 +805,17 @@ The app runs on port 3000 by default.
 - **Always use TLS** — Run behind a reverse proxy (nginx, Caddy) with HTTPS in production
 - **Protect API keys** — Treat `lw_*` keys as secrets; they grant write access to your logs
 - **Network isolation** — Consider firewall rules to restrict `/v1/logs` access to known sources
+- **Behind a proxy** — Set `ADDRESS_HEADER` and `XFF_DEPTH`, or per-IP rate limits see the proxy's address
+- **Built-in hardening** — Every response sends `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` and `Referrer-Policy: same-origin` (plus HSTS when `ORIGIN` is https). Pages carry a nonce-based Content Security Policy. Logins are limited per client network and per account (failed attempts only; a network the account signed in from before is not locked out by failures from elsewhere).
 
 ## Troubleshooting
 
-| Issue                       | Solution                                                         |
-| --------------------------- | ---------------------------------------------------------------- |
-| Database connection refused | Ensure PostgreSQL is running: `docker compose up -d`             |
-| Admin seed fails            | Check `ADMIN_PASSWORD` is at least 8 characters                  |
-| Auth errors                 | Verify `BETTER_AUTH_SECRET` is at least 32 characters            |
-| Port 5432 in use            | Stop other PostgreSQL instances or change port in `compose.yaml` |
+| Issue                       | Solution                                                          |
+| --------------------------- | ----------------------------------------------------------------- |
+| Database connection refused | Ensure PostgreSQL is running: `docker compose up -d`              |
+| Admin seed fails            | Check `ADMIN_PASSWORD` is at least 8 characters                   |
+| Auth errors / startup fails | `BETTER_AUTH_SECRET` must be 32+ characters and not a placeholder |
+| Port 5432 in use            | Stop other PostgreSQL instances or change port in `compose.yaml`  |
 
 ## Badge
 
