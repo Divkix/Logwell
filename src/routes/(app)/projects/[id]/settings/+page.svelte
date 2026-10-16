@@ -9,6 +9,7 @@ import * as Select from '#lib/components/ui/select/index.js';
 import Separator from '#lib/components/ui/separator/separator.svelte';
 import { projectUpdatePayloadSchema } from '#lib/shared/schemas/project.js';
 import { announceToScreenReader } from '#lib/utils/focus-trap.js';
+import { formatLogCount } from '#lib/utils/format.js';
 import { toastError, toastSuccess } from '#lib/utils/toast.js';
 
 interface Props {
@@ -22,6 +23,7 @@ interface Props {
     };
     stats: {
       totalLogs: number;
+      totalLogsCapped: boolean;
       oldestLogDate: string | null;
     };
     systemDefault: {
@@ -477,7 +479,7 @@ function formatDate(isoDate: string | null): string {
           <div class="bg-muted mt-2 rounded-md p-3 text-sm">
             <div class="flex justify-between">
               <span class="text-muted-foreground">Total logs:</span>
-              <span class="font-medium">{data.stats.totalLogs.toLocaleString()}</span>
+              <span class="font-medium">{formatLogCount(data.stats.totalLogs, data.stats.totalLogsCapped)}</span>
             </div>
             <div class="mt-1 flex justify-between">
               <span class="text-muted-foreground">Oldest log:</span>

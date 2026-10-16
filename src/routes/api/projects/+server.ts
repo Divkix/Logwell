@@ -1,9 +1,10 @@
-import { and, count, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { getDbClient } from "#lib/server/db/db.js";
-import { log, project, type Project } from "#lib/server/db/schema.js";
+import { project, type Project } from "#lib/server/db/schema.js";
 import { apiError, isUniqueViolation } from "#lib/server/utils/api-error.js";
 import { generateApiKey, hashApiKey } from "#lib/server/utils/api-key.js";
+import { isCappedLogCount, projectLogStatsColumns } from "#lib/server/utils/capped-count.js";
 import { requireAuth } from "#lib/server/utils/owned-project.js";
 import { requireJsonContentType } from "#lib/server/utils/content-type.js";
 import { checkCsrfOrigin } from "#lib/server/utils/csrf.js";
@@ -16,12 +17,17 @@ import type { RequestEvent } from "./$types";
  * Returns all projects owned by the authenticated user with their log counts.
  * Requires session authentication.
  *
+ * Counts are capped at 10,000 (LOG_COUNT_CEILING): at the cap `logCount` is 10000 and
+ * `logCountCapped` is true, meaning "at least 10,000".
+ *
  * Response:
  * {
  *   projects: [{
  *     id: string,
  *     name: string,
- *     logCount: number,
+ *     logCount: number,             // capped at 10000
+ *     logCountCapped: boolean,
+ *     lastActivity: string | null,  // newest log timestamp
  *     createdAt: string,
  *     updatedAt: string
  *   }]
@@ -34,34 +40,26 @@ export async function GET(event: RequestEvent): Promise<Response> {
 
   const db = await getDbClient(event.locals);
 
+  // One bounded statement: each count stops at LOG_COUNT_CEILING (an index range + LIMIT)
+  // instead of a GROUP BY over every log the user's projects ever stored.
   const projects = await db
     .select({
       id: project.id,
       name: project.name,
       createdAt: project.createdAt,
       updatedAt: project.updatedAt,
+      ...projectLogStatsColumns(),
     })
     .from(project)
     .where(eq(project.ownerId, user.id))
     .orderBy(desc(project.createdAt));
 
-  const projectIds = projects.map((p) => p.id);
-
-  const logCounts =
-    projectIds.length > 0
-      ? await db
-          .select({ projectId: log.projectId, count: count() })
-          .from(log)
-          .where(inArray(log.projectId, projectIds))
-          .groupBy(log.projectId)
-      : [];
-
-  const logCountByProject = new Map(logCounts.map((c) => [c.projectId, c.count]));
-
   const projectsWithCounts = projects.map((p) => ({
     id: p.id,
     name: p.name,
-    logCount: logCountByProject.get(p.id) ?? 0,
+    logCount: p.logCount,
+    logCountCapped: isCappedLogCount(p.logCount),
+    lastActivity: p.lastActivity?.toISOString() ?? null,
     createdAt: p.createdAt?.toISOString(),
     updatedAt: p.updatedAt?.toISOString(),
   }));

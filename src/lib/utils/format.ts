@@ -7,6 +7,14 @@ export function formatTimestamp(date: Date): string {
   return `${hours}:${minutes}:${seconds}.${milliseconds}`;
 }
 
+/**
+ * Formats a log count, marking a capped count (one the server stopped counting at its
+ * ceiling) with a trailing "+" so "10,000+" never reads as an exact total.
+ */
+export function formatLogCount(count: number, capped = false): string {
+  return `${count.toLocaleString("en-US")}${capped ? "+" : ""}`;
+}
+
 export function formatRelativeTime(date: Date, referenceTime?: Date): string {
   const now = referenceTime ? referenceTime.getTime() : Date.now();
   const diffMs = now - date.getTime();

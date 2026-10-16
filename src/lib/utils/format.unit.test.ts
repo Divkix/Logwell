@@ -1,4 +1,10 @@
-import { formatFullDate, formatRelativeTime, formatTimestamp, getTimeRangeStart } from "./format";
+import {
+  formatFullDate,
+  formatLogCount,
+  formatRelativeTime,
+  formatTimestamp,
+  getTimeRangeStart,
+} from "./format";
 import type { TimeRange } from "./time-range";
 
 describe("formatTimestamp", () => {
@@ -127,5 +133,19 @@ describe("formatFullDate", () => {
   it("handles epoch start", () => {
     const date = new Date(0);
     expect(formatFullDate(date)).toBe("1970-01-01 00:00:00.000 UTC");
+  });
+});
+
+describe("formatLogCount", () => {
+  it.each([
+    [0, false, "0"],
+    [15420, false, "15,420"],
+    [10000, true, "10,000+"],
+  ])("formats %d (capped=%s) as %s", (count, capped, expected) => {
+    expect(formatLogCount(count, capped)).toBe(expected);
+  });
+
+  it("treats an omitted flag as an exact count", () => {
+    expect(formatLogCount(10000)).toBe("10,000");
   });
 });
