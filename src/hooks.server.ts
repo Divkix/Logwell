@@ -2,7 +2,7 @@ import type { Handle, HandleServerError } from "@sveltejs/kit/hooks";
 import { svelteKitHandler } from "better-auth/svelte-kit";
 import { z } from "zod";
 import { building } from "$app/env";
-import { auth, initAuth } from "#lib/server/auth.js";
+import { auth, CLIENT_IP_HEADER, initAuth } from "#lib/server/auth.js";
 import { env } from "#lib/server/config/env.js";
 import { closeDb, db } from "#lib/server/db/index.js";
 import { handleError as buildErrorResponse } from "#lib/server/error-handler.js";
@@ -148,6 +148,9 @@ export const handle: Handle = async ({ event, resolve }) => {
 
     if (csrfError) return csrfError;
   }
+
+  // Overwritten, never appended: a client-supplied value must not reach better-auth.
+  event.request.headers.set(CLIENT_IP_HEADER, event.getClientAddress());
 
   const response = await svelteKitHandler({ event, resolve, auth, building });
 

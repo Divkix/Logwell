@@ -24,6 +24,7 @@ vi.mock("#lib/server/db/index.js", () => ({ db: mocks.db, closeDb: mocks.closeDb
 vi.mock("#lib/server/config/env.js", () => ({ env: mocks.env }));
 
 vi.mock("#lib/server/auth.js", () => ({
+  CLIENT_IP_HEADER: "x-logwell-client-ip",
   initAuth: vi.fn(),
   auth: {
     options: { baseURL: "http://localhost", basePath: "/api/auth" },
@@ -236,6 +237,27 @@ describe("hooks.server handle", () => {
       expect(response.status).toBe(403);
       expect((await response.json()).error).toBe("csrf_error");
       expect(mocks.authHandler).not.toHaveBeenCalled();
+    });
+
+    it("hands better-auth the resolved client address, never a client-sent one", async () => {
+      const event = createEvent(
+        `${ORIGIN}/api/auth/sign-in/username`,
+        {
+          method: "POST",
+          headers: {
+            Origin: ORIGIN,
+            "x-logwell-client-ip": "198.18.0.1",
+            "x-forwarded-for": "198.18.0.2",
+          },
+        },
+        "203.0.113.99",
+      );
+
+      await handle({ event, resolve });
+
+      const [request] = mocks.authHandler.mock.lastCall ?? [];
+      expect(request).toBeInstanceOf(Request);
+      expect(request.headers.get("x-logwell-client-ip")).toBe("203.0.113.99");
     });
 
     it("delegates same-origin auth routes to the better-auth handler", async () => {
