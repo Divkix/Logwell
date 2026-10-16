@@ -278,7 +278,7 @@ async function updateFilters() {
       ? `/projects/${data.project.id}?${queryString}`
       : `/projects/${data.project.id}`;
 
-    await goto(url, { replaceState: true, noScroll: true });
+    await goto(url, { replace: true, reset: false });
   } finally {
     loading = false;
   }

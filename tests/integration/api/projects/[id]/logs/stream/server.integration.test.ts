@@ -44,6 +44,7 @@ function createRequestEvent(
       set: () => {},
       delete: () => {},
       serialize: () => "",
+      parse: () => ({ name: "", value: "" }),
     },
     fetch: globalThis.fetch,
     getClientAddress: () => "127.0.0.1",
@@ -212,7 +213,7 @@ describe("POST /api/projects/[id]/logs/stream", () => {
         expect.fail("Should have thrown HTTP error");
       } catch (e) {
         expect(e).toHaveProperty("status", 401);
-        expect(e).toHaveProperty("body", { message: "Unauthorized" });
+        expect(e).toHaveProperty("body", { status: 401, message: "Unauthorized" });
       }
     });
 

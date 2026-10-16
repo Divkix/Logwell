@@ -57,6 +57,7 @@ function createLoadEvent(
       set: () => {},
       delete: () => {},
       serialize: () => "",
+      parse: () => ({ name: "", value: "" }),
     },
     fetch: globalThis.fetch,
     getClientAddress: () => "127.0.0.1",
@@ -97,7 +98,7 @@ async function expectSvelteKit404(promise: Promise<unknown>): Promise<void> {
   } catch (err) {
     expect(err).toMatchObject({
       status: 404,
-      body: { message: "Project not found" },
+      body: { status: 404, message: "Project not found" },
     });
   }
 }

@@ -33,6 +33,7 @@ function createRequestEvent(
       set: () => {},
       delete: () => {},
       serialize: () => "",
+      parse: () => ({ name: "", value: "" }),
     },
     fetch: globalThis.fetch,
     getClientAddress: () => "127.0.0.1",
@@ -112,7 +113,7 @@ describe("GET /api/projects/[id]/stats", () => {
 
       const event = createRequestEvent(request, db, { id: testProject.id });
       // SAFETY: createRequestEvent supplies every RequestEvent field GET and requireOwnedProjectRoute read (request, url, params, route.id, locals, cookies); its tracing stays null because tests build no OTel Spans, so the event is passed as never.
-      await expectHttpError(GET(event as never), 401, { message: "Unauthorized" });
+      await expectHttpError(GET(event as never), 401, { status: 401, message: "Unauthorized" });
     });
   });
 

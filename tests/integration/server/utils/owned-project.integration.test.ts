@@ -68,8 +68,8 @@ describe("Auth Guard - requireAuth", () => {
   function mockEvent(
     request: Request,
     locals: Partial<App.Locals> = {},
-    params: LayoutParams<"/"> = {},
-    routeId: RouteId = "/",
+    params: LayoutParams<"/(app)"> = {},
+    routeId: RouteId = "/(app)",
   ): RequestEvent {
     return {
       request,
@@ -88,6 +88,7 @@ describe("Auth Guard - requireAuth", () => {
         set: () => {},
         delete: () => {},
         serialize: () => "",
+        parse: () => ({ name: "", value: "" }),
       },
       fetch: globalThis.fetch,
       getClientAddress: () => "127.0.0.1",
@@ -128,6 +129,7 @@ describe("Auth Guard - requireAuth", () => {
     );
 
     await expectHttpError(requireAuth(event), 401, {
+      status: 401,
       message: "Unauthorized",
     });
   });
@@ -143,6 +145,7 @@ describe("Auth Guard - requireAuth", () => {
     );
 
     await expectHttpError(requireAuth(event), 401, {
+      status: 401,
       message: "Unauthorized",
     });
   });
@@ -337,6 +340,7 @@ describe("Auth Guard - requireAuth", () => {
       );
 
       await expectHttpError(requireOwnedProjectPage(event, "does-not-exist"), 404, {
+        status: 404,
         message: "Project not found",
       });
     });

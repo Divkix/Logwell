@@ -37,6 +37,7 @@ function createRequestEvent(
       set: () => {},
       delete: () => {},
       serialize: () => "",
+      parse: () => ({ name: "", value: "" }),
     },
     fetch: globalThis.fetch,
     getClientAddress: () => "127.0.0.1",
@@ -107,7 +108,7 @@ describe("Incident APIs", () => {
     const event = createRequestEvent(request, db, { id: project.id });
 
     // SAFETY: the fixture event provides every RequestEvent member these handlers read (request, url, params, locals, cookies, fetch, getClientAddress, setHeaders); tracing stays null because no handler reads it.
-    await expectHttpError(GET_LIST(event as never), 401, { message: "Unauthorized" });
+    await expectHttpError(GET_LIST(event as never), 401, { status: 401, message: "Unauthorized" });
   });
 
   it("lists only open incidents by default", async () => {

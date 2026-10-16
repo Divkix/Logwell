@@ -37,6 +37,7 @@ function createRequestEvent(
       set: () => {},
       delete: () => {},
       serialize: () => "",
+      parse: () => ({ name: "", value: "" }),
     },
     fetch: globalThis.fetch,
     getClientAddress: () => "127.0.0.1",
@@ -117,7 +118,7 @@ describe("GET /api/projects/[id]/logs", () => {
       });
 
       const event = createRequestEvent(request, db, { id: testProject.id });
-      await expectHttpError(GET(event), 401, { message: "Unauthorized" });
+      await expectHttpError(GET(event), 401, { status: 401, message: "Unauthorized" });
     });
   });
 

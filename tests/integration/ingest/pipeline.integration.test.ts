@@ -161,7 +161,7 @@ describe("ingestLogs pipeline", () => {
         incoming.push(null);
 
         // The exact request adapter-node hands SvelteKit with BODY_SIZE_LIMIT=1K.
-        const request = await getRequest({
+        const request = getRequest({
           request: incoming,
           base: "http://localhost",
           bodySizeLimit: 1024,

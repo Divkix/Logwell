@@ -1,6 +1,6 @@
-import type { Handle, HandleServerError } from "@sveltejs/kit";
+import type { Handle, HandleServerError } from "@sveltejs/kit/hooks";
 import { svelteKitHandler } from "better-auth/svelte-kit";
-import { building } from "$app/environment";
+import { building } from "$app/env";
 import { auth, initAuth } from "#lib/server/auth.js";
 import { env } from "#lib/server/config/env.js";
 import { closeDb, db } from "#lib/server/db/index.js";
@@ -113,9 +113,18 @@ export const handle: Handle = async ({ event, resolve }) => {
   return svelteKitHandler({ event, resolve, auth, building });
 };
 
-export const handleError: HandleServerError = ({ error, event, status, message }) => {
+export const handleError: HandleServerError = (caught) => {
+  // Kit 3 also routes `error(status, message)` throws through this hook. Their body is
+  // already client-safe, so returning nothing keeps it — as Kit 2 did by never calling here.
+  if (caught.kind === "app") return;
+
+  const { event } = caught;
+
+  const { status, message } =
+    caught.kind === "unknown" ? { status: 500, message: "Internal Error" } : caught.error;
+
   return buildErrorResponse({
-    error,
+    error: caught.kind === "unknown" ? caught.error : message,
     url: event.url.href,
     method: event.request.method,
     route: event.route?.id ?? "unknown",

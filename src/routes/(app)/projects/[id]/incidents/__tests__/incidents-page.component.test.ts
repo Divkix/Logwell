@@ -195,7 +195,7 @@ describe("IncidentsPage", () => {
 
     expect(mockGoto).toHaveBeenCalledWith(
       "/projects/proj_1/incidents?status=open&range=24h&incident=inc_1",
-      expect.objectContaining({ replaceState: true, noScroll: true }),
+      expect.objectContaining({ replace: true, reset: false }),
     );
   });
 

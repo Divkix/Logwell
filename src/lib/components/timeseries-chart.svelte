@@ -1,5 +1,5 @@
 <script lang="ts">
-import { browser } from '$app/environment';
+import { browser } from '$app/env';
 import { cn } from '#lib/utils.js';
 import type { TimeSeriesBucket } from '#lib/utils/timeseries.js';
 import type { TimeRange } from '#lib/utils/time-range.js';

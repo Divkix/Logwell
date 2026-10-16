@@ -20,6 +20,6 @@
     "@types/d3-scale",
     "@typescript/native"
   ],
-  "ignoreUnresolved": ["\\$env/.+", "\\$\\{packageName\\}"],
+  "ignoreUnresolved": ["\\$\\{packageName\\}"],
   "drizzle": false
 }

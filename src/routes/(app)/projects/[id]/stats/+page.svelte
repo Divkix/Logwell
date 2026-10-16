@@ -88,7 +88,7 @@ async function updateFilters() {
   const url = `/projects/${data.project.id}/stats?${queryString}`;
 
   try {
-    await goto(url, { replaceState: true, noScroll: true });
+    await goto(url, { replace: true, reset: false });
   } finally {
     loading = false;
   }

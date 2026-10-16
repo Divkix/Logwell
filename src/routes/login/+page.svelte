@@ -1,5 +1,5 @@
 <script lang="ts">
-import { goto, invalidateAll } from '$app/navigation';
+import { goto, refreshAll } from '$app/navigation';
 import { authClient } from '#lib/auth-client.js';
 import Logo from '#lib/components/logo.svelte';
 import { Button } from '#lib/components/ui/button/index.js';
@@ -63,7 +63,7 @@ async function handleSubmit(event: Event) {
       },
       {
         onSuccess: async () => {
-          await invalidateAll();
+          await refreshAll();
           await goto('/');
         },
         onError: (ctx) => {
@@ -79,7 +79,7 @@ async function handleSubmit(event: Event) {
     }
 
     if (data?.user) {
-      await invalidateAll();
+      await refreshAll();
       await goto('/');
     }
   } catch (err) {

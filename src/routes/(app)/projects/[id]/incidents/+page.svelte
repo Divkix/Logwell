@@ -303,8 +303,8 @@ async function applyFilters() {
   params.set('status', selectedStatus);
   params.set('range', selectedRange);
   await goto(`/projects/${projectId}/incidents?${params.toString()}`, {
-    replaceState: true,
-    noScroll: true,
+    replace: true,
+    reset: false,
   });
 }
 
@@ -315,8 +315,8 @@ async function selectIncident(incidentId: string) {
   params.set('range', selectedRange);
   params.set('incident', incidentId);
   await goto(`/projects/${projectId}/incidents?${params.toString()}`, {
-    replaceState: true,
-    noScroll: true,
+    replace: true,
+    reset: false,
   });
 }
 
@@ -326,8 +326,8 @@ async function clearSelection() {
   params.set('status', selectedStatus);
   params.set('range', selectedRange);
   await goto(`/projects/${projectId}/incidents?${params.toString()}`, {
-    replaceState: true,
-    noScroll: true,
+    replace: true,
+    reset: false,
   });
 }
 
