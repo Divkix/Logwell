@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env tsx
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { createAuth } from "../src/lib/server/auth";
