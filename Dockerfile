@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.4
 
-# SECURITY: pinned to an exact version + digest for reproducible builds (Bun 1.4.2; matches the
+# SECURITY: pinned to an exact version + digest for reproducible builds (Bun 1.4.3; matches the
 # app runtime). Bun serves the built output and runs the TypeScript scripts; pnpm only installs
 # dependencies (see packageManager).
 FROM oven/bun:1.4.3-alpine@sha256:629e17411f1f129dbec3af78d5af9c9f2a937435c80349437206c6b0b7422373 AS base
