@@ -5,10 +5,13 @@
 # 2026-10-28 (nodejs/Release schedule.json), so dependabot is told to skip node majors until
 # image and CI move together. Node serves the built output and runs the TypeScript scripts
 # through tsx; pnpm only installs dependencies (see packageManager).
-FROM node:24.22.0-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS base
+FROM node:24.22.0-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS node
+
+# Build-only toolchain: curl fetches pnpm, pnpm installs dependencies. The release stage starts
+# again from the bare node stage, so neither ships in the runtime image.
+FROM node AS base
 WORKDIR /app
 
-# Install curl for healthcheck (alpine minimal doesn't include it)
 RUN apk add --no-cache curl
 
 # pnpm 12 ships a self-contained musl binary. Pinned to an exact release
@@ -70,7 +73,7 @@ RUN DATABASE_URL=postgresql://build:build@localhost/build \
     BETTER_AUTH_SECRET=build-time-placeholder-secret-32chars \
     pnpm run build
 
-FROM base AS release
+FROM node AS release
 WORKDIR /app
 
 RUN addgroup --system --gid 1001 logwell && \
@@ -115,7 +118,9 @@ ENV SHUTDOWN_TIMEOUT=8
 # Max request body (adapter default 512K) — bounds ingest batches, which can exceed 512K
 ENV BODY_SIZE_LIMIT=1M
 
+# Node's built-in fetch, so the image needs no curl/wget. 127.0.0.1 rather than localhost: musl
+# may resolve localhost to ::1 first, which HOST=0.0.0.0 does not listen on.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:3000/api/health || exit 1
+    CMD ["node", "-e", "fetch('http://127.0.0.1:' + (process.env.PORT || 3000) + '/api/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
 
 ENTRYPOINT ["./entrypoint.sh"]
