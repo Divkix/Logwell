@@ -1,14 +1,14 @@
 import { and, desc, eq, gte, inArray, lte, type SQL, sql } from "drizzle-orm";
-import type { DatabaseClient } from "$lib/server/db/db";
-import { log, type LogLevel } from "$lib/server/db/schema";
-import { cappedLogCount } from "$lib/server/utils/capped-count";
+import type { DatabaseClient } from "#lib/server/db/db.js";
+import { log, type LogLevel } from "#lib/server/db/schema.js";
+import { cappedLogCount } from "#lib/server/utils/capped-count.js";
 import {
   cursorRowLessThan,
   decodeCursor,
   encodeCursor,
   microsColumn,
-} from "$lib/server/utils/cursor";
-import { buildSearchQuery } from "$lib/server/utils/search";
+} from "#lib/server/utils/cursor.js";
+import { buildSearchQuery } from "#lib/server/utils/search.js";
 
 export class InvalidCursorError extends Error {
   constructor(message = "Invalid cursor") {

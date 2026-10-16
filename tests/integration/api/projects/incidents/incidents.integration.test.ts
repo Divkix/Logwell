@@ -2,12 +2,12 @@ import { sql } from "drizzle-orm";
 import type { SelectedFields } from "drizzle-orm/pg-core";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
-import { createAuth } from "$lib/server/auth";
-import type * as schema from "$lib/server/db/schema";
-import { incident } from "$lib/server/db/schema";
-import { setupTestDatabase } from "$lib/server/db/test-db";
-import { getSession } from "$lib/server/session";
-import type { JsonObject } from "$lib/shared/schemas/json";
+import { createAuth } from "#lib/server/auth.js";
+import type * as schema from "#lib/server/db/schema.js";
+import { incident } from "#lib/server/db/schema.js";
+import { setupTestDatabase } from "#lib/server/db/test-db.js";
+import { getSession } from "#lib/server/session.js";
+import type { JsonObject } from "#lib/shared/schemas/json.js";
 import { GET as GET_LIST } from "../../../../../src/routes/api/projects/[id]/incidents/+server";
 import { GET as GET_DETAIL } from "../../../../../src/routes/api/projects/[id]/incidents/[incidentId]/+server";
 import { GET as GET_TIMELINE } from "../../../../../src/routes/api/projects/[id]/incidents/[incidentId]/timeline/+server";
@@ -37,6 +37,7 @@ function createRequestEvent(
       set: () => {},
       delete: () => {},
       serialize: () => "",
+      parse: () => ({ name: "", value: "" }),
     },
     fetch: globalThis.fetch,
     getClientAddress: () => "127.0.0.1",
@@ -107,7 +108,7 @@ describe("Incident APIs", () => {
     const event = createRequestEvent(request, db, { id: project.id });
 
     // SAFETY: the fixture event provides every RequestEvent member these handlers read (request, url, params, locals, cookies, fetch, getClientAddress, setHeaders); tracing stays null because no handler reads it.
-    await expectHttpError(GET_LIST(event as never), 401, { message: "Unauthorized" });
+    await expectHttpError(GET_LIST(event as never), 401, { status: 401, message: "Unauthorized" });
   });
 
   it("lists only open incidents by default", async () => {

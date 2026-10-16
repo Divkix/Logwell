@@ -1,5 +1,5 @@
-import { createLogStreamResponse } from "$lib/server/live-stream";
-import { requireOwnedProjectRoute } from "$lib/server/utils/owned-project";
+import { createLogStreamResponse } from "#lib/server/live-stream.js";
+import { requireOwnedProjectRoute } from "#lib/server/utils/owned-project.js";
 import type { RequestEvent } from "./$types";
 
 /** POST /api/projects/[id]/logs/stream — guard + delegate (contract: createProjectStreamResponse). */

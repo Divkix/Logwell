@@ -1,6 +1,6 @@
 <script lang="ts">
 import XIcon from '@lucide/svelte/icons/x';
-import { Button } from '$lib/components/ui/button/index.js';
+import { Button } from '#lib/components/ui/button/index.js';
 
 interface Props {
   visible: boolean;

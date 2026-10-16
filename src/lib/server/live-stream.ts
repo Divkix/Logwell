@@ -1,7 +1,7 @@
 import { Deferred, Effect, Fiber, FiberHandle, Schedule } from "effect";
-import { SSE_CONFIG } from "$lib/server/config/performance";
-import type { Incident } from "$lib/server/db/schema";
-import { type Listener, logEventBus, type StreamLog } from "$lib/server/events";
+import { SSE_CONFIG } from "#lib/server/config/performance.js";
+import type { Incident } from "#lib/server/db/schema.js";
+import { type Listener, logEventBus, type StreamLog } from "#lib/server/events.js";
 
 const { BATCH_WINDOW_MS, MAX_BATCH_SIZE, HEARTBEAT_INTERVAL_MS } = SSE_CONFIG;
 

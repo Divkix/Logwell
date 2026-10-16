@@ -1,10 +1,10 @@
 import type { PgliteDatabase } from "drizzle-orm/pglite";
 import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
-import { createAuth } from "$lib/server/auth";
-import type * as schema from "$lib/server/db/schema";
-import { incident } from "$lib/server/db/schema";
-import { setupTestDatabase } from "$lib/server/db/test-db";
-import { getSession } from "$lib/server/session";
+import { createAuth } from "#lib/server/auth.js";
+import type * as schema from "#lib/server/db/schema.js";
+import { incident } from "#lib/server/db/schema.js";
+import { setupTestDatabase } from "#lib/server/db/test-db.js";
+import { getSession } from "#lib/server/session.js";
 import { GET as GET_DETAIL } from "../../../../../src/routes/api/projects/[id]/incidents/[incidentId]/+server";
 import { seedProject } from "../../../../fixtures/db";
 
@@ -31,6 +31,7 @@ function createRequestEvent(
       set: () => {},
       delete: () => {},
       serialize: () => "",
+      parse: () => ({ name: "", value: "" }),
     },
     fetch: globalThis.fetch,
     getClientAddress: () => "127.0.0.1",

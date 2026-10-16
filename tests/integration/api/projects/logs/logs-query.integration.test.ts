@@ -3,14 +3,14 @@ import { eq, sql } from "drizzle-orm";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
-import { createAuth } from "$lib/server/auth";
-import type * as schema from "$lib/server/db/schema";
-import { log } from "$lib/server/db/schema";
-import { setupTestDatabase } from "$lib/server/db/test-db";
-import { getSession } from "$lib/server/session";
-import { clearApiKeyCache } from "$lib/server/utils/api-key";
-import { cappedLogCount } from "$lib/server/utils/capped-count";
-import type { JsonObject } from "$lib/shared/schemas/json";
+import { createAuth } from "#lib/server/auth.js";
+import type * as schema from "#lib/server/db/schema.js";
+import { log } from "#lib/server/db/schema.js";
+import { setupTestDatabase } from "#lib/server/db/test-db.js";
+import { getSession } from "#lib/server/session.js";
+import { clearApiKeyCache } from "#lib/server/utils/api-key.js";
+import { cappedLogCount } from "#lib/server/utils/capped-count.js";
+import type { JsonObject } from "#lib/shared/schemas/json.js";
 import { GET } from "../../../../../src/routes/api/projects/[id]/logs/+server";
 import { seedLog, seedLogs, seedProject } from "../../../../fixtures/db";
 
@@ -37,6 +37,7 @@ function createRequestEvent(
       set: () => {},
       delete: () => {},
       serialize: () => "",
+      parse: () => ({ name: "", value: "" }),
     },
     fetch: globalThis.fetch,
     getClientAddress: () => "127.0.0.1",
@@ -117,7 +118,7 @@ describe("GET /api/projects/[id]/logs", () => {
       });
 
       const event = createRequestEvent(request, db, { id: testProject.id });
-      await expectHttpError(GET(event), 401, { message: "Unauthorized" });
+      await expectHttpError(GET(event), 401, { status: 401, message: "Unauthorized" });
     });
   });
 

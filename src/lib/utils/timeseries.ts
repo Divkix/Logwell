@@ -1,4 +1,4 @@
-import type { TimeRange } from "$lib/utils/time-range";
+import type { TimeRange } from "#lib/utils/time-range.js";
 
 export interface TimeBucketConfig {
   intervalMs: number;

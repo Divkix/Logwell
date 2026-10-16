@@ -1,7 +1,7 @@
 import type { RequestHandler } from "@sveltejs/kit";
-import { getDbClient } from "$lib/server/db/db";
-import { ingestLogs } from "$lib/server/utils/ingest";
-import { parseOtlpIngestBody } from "$lib/server/utils/otlp";
+import { getDbClient } from "#lib/server/db/db.js";
+import { ingestLogs } from "#lib/server/utils/ingest.js";
+import { parseOtlpIngestBody } from "#lib/server/utils/otlp.js";
 
 /**
  * POST /v1/logs (OTLP/HTTP JSON)

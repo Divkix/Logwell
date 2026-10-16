@@ -1,8 +1,8 @@
 <script lang="ts">
 import CopyIcon from '@lucide/svelte/icons/copy';
-import { cn } from '$lib/utils';
-import { announceToScreenReader } from '$lib/utils/focus-trap';
-import { toastError, toastSuccess } from '$lib/utils/toast';
+import { cn } from '#lib/utils.js';
+import { announceToScreenReader } from '#lib/utils/focus-trap.js';
+import { toastError, toastSuccess } from '#lib/utils/toast.js';
 import Button from './ui/button/button.svelte';
 import * as Select from './ui/select';
 

@@ -2,7 +2,7 @@ import { cleanup, render, screen } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import ProjectCard from "../project-card.svelte";
 
-vi.mock("$lib/utils/format", () => ({
+vi.mock("#lib/utils/format.js", () => ({
   formatRelativeTime: vi.fn((date: Date) => {
     const diffMs = Date.now() - date.getTime();
     const diffMinutes = Math.floor(diffMs / 60000);

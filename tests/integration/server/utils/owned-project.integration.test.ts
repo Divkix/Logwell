@@ -1,17 +1,17 @@
 import type { HttpError, Redirect, RequestEvent } from "@sveltejs/kit";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
-import { createAuth } from "$lib/server/auth";
-import type * as schema from "$lib/server/db/schema";
-import { setupTestDatabase } from "$lib/server/db/test-db";
-import { getSession } from "$lib/server/session";
+import { createAuth } from "#lib/server/auth.js";
+import type * as schema from "#lib/server/db/schema.js";
+import { setupTestDatabase } from "#lib/server/db/test-db.js";
+import { getSession } from "#lib/server/session.js";
 import {
   requireAuth,
   requireOwnedProjectPage,
   requireOwnedProjectRoute,
-} from "$lib/server/utils/owned-project";
+} from "#lib/server/utils/owned-project.js";
 import { seedProject } from "../../../fixtures/db";
-import type { JsonObject } from "$lib/shared/schemas/json";
+import type { JsonObject } from "#lib/shared/schemas/json.js";
 import type { LayoutParams, RouteId } from "$app/types";
 
 async function expectRedirect(
@@ -68,8 +68,8 @@ describe("Auth Guard - requireAuth", () => {
   function mockEvent(
     request: Request,
     locals: Partial<App.Locals> = {},
-    params: LayoutParams<"/"> = {},
-    routeId: RouteId = "/",
+    params: LayoutParams<"/(app)"> = {},
+    routeId: RouteId = "/(app)",
   ): RequestEvent {
     return {
       request,
@@ -88,6 +88,7 @@ describe("Auth Guard - requireAuth", () => {
         set: () => {},
         delete: () => {},
         serialize: () => "",
+        parse: () => ({ name: "", value: "" }),
       },
       fetch: globalThis.fetch,
       getClientAddress: () => "127.0.0.1",
@@ -128,6 +129,7 @@ describe("Auth Guard - requireAuth", () => {
     );
 
     await expectHttpError(requireAuth(event), 401, {
+      status: 401,
       message: "Unauthorized",
     });
   });
@@ -143,6 +145,7 @@ describe("Auth Guard - requireAuth", () => {
     );
 
     await expectHttpError(requireAuth(event), 401, {
+      status: 401,
       message: "Unauthorized",
     });
   });
@@ -337,6 +340,7 @@ describe("Auth Guard - requireAuth", () => {
       );
 
       await expectHttpError(requireOwnedProjectPage(event, "does-not-exist"), 404, {
+        status: 404,
         message: "Project not found",
       });
     });

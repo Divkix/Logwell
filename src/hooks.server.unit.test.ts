@@ -1,7 +1,8 @@
 import type { RequestEvent } from "@sveltejs/kit";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { handleError as buildErrorResponse } from "#lib/server/error-handler.js";
 import { LOGIN_RPM } from "./lib/server/utils/rate-limit";
-import { handle } from "./hooks.server";
+import { handle, handleError } from "./hooks.server";
 
 // SAFETY: beforeEach assigns ORIGIN a concrete origin string and the unset-origin test
 // assigns undefined, so the field's type must widen past the undefined literal.
@@ -16,13 +17,13 @@ const mocks = vi.hoisted(() => ({
   env: { ORIGIN: undefined as string | undefined, RATE_LIMIT_INGEST_IP_RPM: 3 },
 }));
 
-vi.mock("$app/environment", () => ({ building: false }));
+vi.mock("$app/env", () => ({ building: false }));
 
-vi.mock("$lib/server/db", () => ({ db: mocks.db, closeDb: mocks.closeDb }));
+vi.mock("#lib/server/db/index.js", () => ({ db: mocks.db, closeDb: mocks.closeDb }));
 
-vi.mock("$lib/server/config/env", () => ({ env: mocks.env }));
+vi.mock("#lib/server/config/env.js", () => ({ env: mocks.env }));
 
-vi.mock("$lib/server/auth", () => ({
+vi.mock("#lib/server/auth.js", () => ({
   initAuth: vi.fn(),
   auth: {
     options: { baseURL: "http://localhost", basePath: "/api/auth" },
@@ -31,18 +32,12 @@ vi.mock("$lib/server/auth", () => ({
   },
 }));
 
-vi.mock("$lib/server/error-handler", () => ({ handleError: vi.fn() }));
+vi.mock("#lib/server/error-handler.js", () => ({ handleError: vi.fn() }));
 
-vi.mock("$lib/server/jobs/cleanup-scheduler", () => ({
+vi.mock("#lib/server/jobs/cleanup-scheduler.js", () => ({
   startCleanupScheduler: vi.fn(),
   stopCleanupScheduler: mocks.stopCleanupScheduler,
 }));
-
-// The unit project resolves no `$lib` runtime specifiers, so re-export the real modules
-// under the specifiers the hook imports — the CSRF and rate-limit logic must run for real.
-vi.mock("$lib/server/utils/csrf", async () => await import("./lib/server/utils/csrf"));
-
-vi.mock("$lib/server/utils/rate-limit", async () => await import("./lib/server/utils/rate-limit"));
 
 const ORIGIN = "http://localhost";
 
@@ -56,10 +51,9 @@ function createEvent(url: string, init: RequestInit = {}, address = "203.0.113.1
     getClientAddress: () => address,
   };
 
-  // SAFETY: handle, checkCsrfOrigin and better-auth's svelteKitHandler read only request,
-  // url, locals and getClientAddress from the event — all set above — and no test reaches
-  // handleError, the sole reader of route.id, so the omitted members (cookies, fetch,
-  // tracing, setHeaders, platform, …) are never accessed.
+  // SAFETY: handle, handleError, checkCsrfOrigin and better-auth's svelteKitHandler read only
+  // request, url, locals, route and getClientAddress from the event — all set above — so the
+  // omitted members (cookies, fetch, tracing, setHeaders, platform, …) are never accessed.
   return event as RequestEvent;
 }
 
@@ -273,5 +267,49 @@ describe("hooks.server handle", () => {
         vi.restoreAllMocks();
       }
     });
+  });
+});
+
+describe("hooks.server handleError", () => {
+  const event = createEvent("http://localhost/projects/missing");
+
+  beforeEach(() => {
+    vi.mocked(buildErrorResponse)
+      .mockReset()
+      .mockReturnValue({ id: "err_1", message: "sanitized" });
+  });
+
+  it("keeps the body of an error() throw without logging it", async () => {
+    const result = await handleError({
+      kind: "app",
+      error: { status: 404, message: "Project not found" },
+      event,
+    });
+
+    expect(result).toBeUndefined();
+    expect(buildErrorResponse).not.toHaveBeenCalled();
+  });
+
+  it("logs a framework error with its own status and message", async () => {
+    const result = await handleError({
+      kind: "framework",
+      error: { status: 404, message: "Not Found" },
+      event,
+    });
+
+    expect(result).toEqual({ id: "err_1", message: "sanitized" });
+    expect(buildErrorResponse).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 404, message: "Not Found", route: "unknown" }),
+    );
+  });
+
+  it("logs an unknown throw as a 500 with the original error attached", async () => {
+    const thrown = new Error("db exploded");
+
+    await handleError({ kind: "unknown", error: thrown, event });
+
+    expect(buildErrorResponse).toHaveBeenCalledWith(
+      expect.objectContaining({ error: thrown, status: 500, message: "Internal Error" }),
+    );
   });
 });

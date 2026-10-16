@@ -1,10 +1,10 @@
 import { sql } from "drizzle-orm";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
 import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
-import { createAuth } from "$lib/server/auth";
-import type * as schema from "$lib/server/db/schema";
-import { setupTestDatabase } from "$lib/server/db/test-db";
-import { getSession } from "$lib/server/session";
+import { createAuth } from "#lib/server/auth.js";
+import type * as schema from "#lib/server/db/schema.js";
+import { setupTestDatabase } from "#lib/server/db/test-db.js";
+import { getSession } from "#lib/server/session.js";
 import { seedLog, seedProject } from "../../fixtures/db";
 
 // Import load functions as any to avoid the void | PageData union type issues
@@ -57,6 +57,7 @@ function createLoadEvent(
       set: () => {},
       delete: () => {},
       serialize: () => "",
+      parse: () => ({ name: "", value: "" }),
     },
     fetch: globalThis.fetch,
     getClientAddress: () => "127.0.0.1",
@@ -97,7 +98,7 @@ async function expectSvelteKit404(promise: Promise<unknown>): Promise<void> {
   } catch (err) {
     expect(err).toMatchObject({
       status: 404,
-      body: { message: "Project not found" },
+      body: { status: 404, message: "Project not found" },
     });
   }
 }

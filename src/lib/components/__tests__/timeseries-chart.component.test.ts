@@ -2,7 +2,7 @@ import { cleanup, render, screen } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import TimeseriesChart from "../timeseries-chart.svelte";
 
-vi.mock("$app/environment", () => ({
+vi.mock("$app/env", () => ({
   browser: false,
 }));
 

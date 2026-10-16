@@ -8,7 +8,9 @@ describe("Environment Configuration", () => {
   });
 
   afterEach(() => {
-    process.env = originalEnv;
+    // A fresh copy each time: restoring the snapshot object itself would let the next
+    // test's overrides write into it and leak into every test after.
+    process.env = { ...originalEnv };
     vi.resetModules();
   });
 
@@ -43,6 +45,7 @@ describe("Environment Configuration", () => {
       "short secret in production",
     ],
     [{ DATABASE_URL: "mysql://localhost/test" }, "PostgreSQL", "non-postgres URL"],
+    [{ ORIGIN: "logs.example.com" }, "absolute URL", "ORIGIN without a scheme"],
   ] as [Record<string, string | undefined>, string, string][])(
     "rejects %s (%s)",
     async (overrides, message) => {

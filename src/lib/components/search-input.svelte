@@ -1,6 +1,6 @@
 <script lang="ts">
 import { Search } from '@lucide/svelte';
-import { Input } from '$lib/components/ui/input/index.js';
+import { Input } from '#lib/components/ui/input/index.js';
 
 const DEBOUNCE_DELAY_MS = 300;
 

@@ -186,7 +186,7 @@ ADMIN_PASSWORD="your-admin-password"
 # Admin username (optional, defaults to "admin")
 # ADMIN_USERNAME="admin"
 
-# Production URL (required for auth behind reverse proxies)
+# Public URL the browser uses (required: CSRF checks and sign-in/out compare against it)
 ORIGIN="https://your-domain.com"
 
 # Log retention (optional, defaults shown)
@@ -626,6 +626,7 @@ docker run -p 3000:3000 \
   -e DATABASE_URL="postgresql://user:pass@host:5432/db" \
   -e BETTER_AUTH_SECRET="your-32-char-secret" \
   -e ADMIN_PASSWORD="your-admin-password" \
+  -e ORIGIN="http://localhost:3000" \
   -e NODE_ENV=production \
   ghcr.io/divkix/logwell:latest
 ```
@@ -641,6 +642,7 @@ docker run -p 3000:3000 \
   -e DATABASE_URL="postgresql://user:pass@host:5432/db" \
   -e BETTER_AUTH_SECRET="your-32-char-secret" \
   -e ADMIN_PASSWORD="your-admin-password" \
+  -e ORIGIN="http://localhost:3000" \
   -e NODE_ENV=production \
   logwell
 ```

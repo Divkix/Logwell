@@ -1,17 +1,17 @@
 import { and, count, desc, eq, getTableColumns, gte, lt, type SQL } from "drizzle-orm";
-import { INCIDENT_CONFIG } from "$lib/server/config/performance";
-import { incident } from "$lib/server/db/schema";
+import { INCIDENT_CONFIG } from "#lib/server/config/performance.js";
+import { incident } from "#lib/server/db/schema.js";
 import {
   cursorRowLessThan,
   decodeCursor,
   encodeCursor,
   microsColumn,
-} from "$lib/server/utils/cursor";
-import { requireOwnedProjectPage } from "$lib/server/utils/owned-project";
-import { getIncidentStatus } from "$lib/server/utils/incidents";
-import { INCIDENT_STATUSES, type IncidentRange, type IncidentStatus } from "$lib/shared/types";
-import { getTimeRangeStart } from "$lib/utils/format";
-import { parseTimeRange } from "$lib/utils/time-range";
+} from "#lib/server/utils/cursor.js";
+import { requireOwnedProjectPage } from "#lib/server/utils/owned-project.js";
+import { getIncidentStatus } from "#lib/server/utils/incidents.js";
+import { INCIDENT_STATUSES, type IncidentRange, type IncidentStatus } from "#lib/shared/types.js";
+import { getTimeRangeStart } from "#lib/utils/format.js";
+import { parseTimeRange } from "#lib/utils/time-range.js";
 import type { PageServerLoad } from "./$types";
 
 const DEFAULT_LIMIT = 50;

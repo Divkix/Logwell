@@ -1,9 +1,9 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
-import type { Log } from "$lib/server/db/schema";
+import type { Log } from "#lib/server/db/schema.js";
 import LogRow from "../log-row.svelte";
 
-vi.mock("$lib/utils/format", () => ({
+vi.mock("#lib/utils/format.js", () => ({
   formatTimestamp: vi.fn((date: Date) => {
     const hours = date.getUTCHours().toString().padStart(2, "0");
     const minutes = date.getUTCMinutes().toString().padStart(2, "0");

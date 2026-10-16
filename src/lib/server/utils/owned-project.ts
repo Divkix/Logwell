@@ -1,7 +1,7 @@
-import { error, json, redirect, type RequestEvent } from "@sveltejs/kit";
+import { error, redirect, type RequestEvent } from "@sveltejs/kit";
 import { and, eq } from "drizzle-orm";
-import { getDbClient, type DatabaseClient } from "$lib/server/db/db";
-import { type Project, project } from "$lib/server/db/schema";
+import { getDbClient, type DatabaseClient } from "#lib/server/db/db.js";
+import { type Project, project } from "#lib/server/db/schema.js";
 import type { Session, User } from "../auth";
 import { checkCsrfOrigin } from "./csrf";
 
@@ -19,7 +19,7 @@ export async function requireAuth(event: RequestEvent): Promise<AuthenticatedSes
 
   if (!user || !session) {
     if (isApiRoute(event.route.id)) {
-      throw error(401, { message: "Unauthorized" });
+      throw error(401, "Unauthorized");
     }
 
     throw redirect(303, "/login");
@@ -59,7 +59,7 @@ export async function requireOwnedProjectRoute(
   const { projectData, db } = await findOwnedProject(event, projectId);
 
   if (!projectData) {
-    return json({ error: "not_found", message: "Project not found" }, { status: 404 });
+    return Response.json({ error: "not_found", message: "Project not found" }, { status: 404 });
   }
 
   return { project: projectData, db };
@@ -72,7 +72,7 @@ export async function requireOwnedProjectPage(
   const { projectData, db } = await findOwnedProject(event, projectId);
 
   if (!projectData) {
-    throw error(404, { message: "Project not found" });
+    throw error(404, "Project not found");
   }
 
   return { project: projectData, db };

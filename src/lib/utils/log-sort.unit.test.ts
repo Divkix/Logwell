@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import type { Log } from "$lib/server/db/schema";
+import type { Log } from "#lib/server/db/schema.js";
 import { sortLogs, type SortDirection, type SortField } from "./log-sort";
 
 function createLog(overrides: Partial<Log> = {}): Log {

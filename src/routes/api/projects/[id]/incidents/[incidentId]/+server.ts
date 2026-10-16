@@ -1,10 +1,9 @@
-import { json } from "@sveltejs/kit";
 import { and, eq, sql } from "drizzle-orm";
-import { getQueryRows } from "$lib/server/db/db";
-import { incident, log } from "$lib/server/db/schema";
-import { apiError } from "$lib/server/utils/api-error";
-import { getIncidentStatus } from "$lib/server/utils/incidents";
-import { requireOwnedProjectRoute } from "$lib/server/utils/owned-project";
+import { getQueryRows } from "#lib/server/db/db.js";
+import { incident, log } from "#lib/server/db/schema.js";
+import { apiError } from "#lib/server/utils/api-error.js";
+import { getIncidentStatus } from "#lib/server/utils/incidents.js";
+import { requireOwnedProjectRoute } from "#lib/server/utils/owned-project.js";
 import type { RequestEvent } from "./$types";
 
 type SourceFrequencyRow = {
@@ -96,7 +95,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
     count: Number(row.count),
   }));
 
-  return json({
+  return Response.json({
     id: incidentRow.id,
     projectId: incidentRow.projectId,
     fingerprint: incidentRow.fingerprint,

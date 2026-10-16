@@ -1,9 +1,9 @@
-import { InvalidCursorError, queryLogs } from "$lib/server/utils/log-query";
-import { requireOwnedProjectPage } from "$lib/server/utils/owned-project";
-import { parseLevelFilter } from "$lib/shared/schemas/log";
-import { env } from "$lib/server/config/env";
-import { getTimeRangeStart } from "$lib/utils/format";
-import { parseTimeRange, type TimeRange } from "$lib/utils/time-range";
+import { InvalidCursorError, queryLogs } from "#lib/server/utils/log-query.js";
+import { requireOwnedProjectPage } from "#lib/server/utils/owned-project.js";
+import { parseLevelFilter } from "#lib/shared/schemas/log.js";
+import { env } from "#lib/server/config/env.js";
+import { getTimeRangeStart } from "#lib/utils/format.js";
+import { parseTimeRange, type TimeRange } from "#lib/utils/time-range.js";
 import type { PageServerLoad } from "./$types";
 
 const DEFAULT_LIMIT = 100;

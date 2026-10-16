@@ -1,8 +1,7 @@
-import { json } from "@sveltejs/kit";
-import { apiError } from "$lib/server/utils/api-error";
-import { InvalidCursorError, queryLogs } from "$lib/server/utils/log-query";
-import { requireOwnedProjectRoute } from "$lib/server/utils/owned-project";
-import { parseLevelFilter } from "$lib/shared/schemas/log";
+import { apiError } from "#lib/server/utils/api-error.js";
+import { InvalidCursorError, queryLogs } from "#lib/server/utils/log-query.js";
+import { requireOwnedProjectRoute } from "#lib/server/utils/owned-project.js";
+import { parseLevelFilter } from "#lib/shared/schemas/log.js";
 import type { RequestEvent } from "./$types";
 
 const DEFAULT_LIMIT = 100;
@@ -94,7 +93,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
     throw error;
   }
 
-  return json({
+  return Response.json({
     logs: result.logs.map((l) => ({
       id: l.id,
       projectId: l.projectId,

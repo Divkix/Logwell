@@ -1,3 +1,5 @@
+import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
+import adapter from "@sveltejs/adapter-node";
 import { sveltekit } from "@sveltejs/kit/vite";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite-plus";
@@ -64,8 +66,11 @@ export default defineConfig({
         options: { typeAware: true, typeCheck: true },
       }
     : { options: { typeAware: true, typeCheck: true } },
-  define: {
-    __APP_VERSION__: JSON.stringify(pkg.version),
-  },
-  plugins: isApp ? [tailwindcss(), sveltekit()] : [],
+  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
+  // tw-animate-css exports only a `style` condition. Externalized, the server build resolves it
+  // with Node's conditions and the CSS `@import` in layout.css fails, so it is bundled instead.
+  ssr: { noExternal: ["tw-animate-css"] },
+  plugins: isApp
+    ? [tailwindcss(), sveltekit({ preprocess: vitePreprocess(), adapter: adapter() })]
+    : [],
 });

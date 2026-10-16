@@ -1,5 +1,5 @@
 import { Effect, Fiber, Schedule } from "effect";
-import { RETENTION_CONFIG } from "$lib/server/config/performance";
+import { RETENTION_CONFIG } from "#lib/server/config/performance.js";
 import { cleanupOldLogs } from "./log-cleanup";
 
 let scheduler: Fiber.Fiber<number> | null = null;

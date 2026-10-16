@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
-import type { checkCsrfOrigin as CheckCsrfOrigin } from "$lib/server/utils/csrf";
+import type { checkCsrfOrigin as CheckCsrfOrigin } from "#lib/server/utils/csrf.js";
 
 function makeEvent(method: string, url: string, headers: Record<string, string> = {}) {
   const request = new Request(url, { method, headers });
@@ -18,7 +18,7 @@ function makeEvent(method: string, url: string, headers: Record<string, string> 
 async function loadCsrf(origin: string | undefined): Promise<typeof CheckCsrfOrigin> {
   vi.stubEnv("ORIGIN", origin);
   vi.resetModules();
-  const { checkCsrfOrigin } = await import("$lib/server/utils/csrf");
+  const { checkCsrfOrigin } = await import("#lib/server/utils/csrf.js");
 
   return checkCsrfOrigin;
 }
@@ -125,5 +125,44 @@ describe("checkCsrfOrigin with ORIGIN set (exact origin)", () => {
   it("does not warn about ORIGIN", async () => {
     checkCsrfOrigin(makeEvent("POST", URL, { Origin: ORIGIN }));
     expect(vi.mocked(console.warn)).not.toHaveBeenCalled();
+  });
+});
+
+// adapter-node 6 ignores ORIGIN, so event.url is still https://<Host> — the Host a proxy
+// forwards (often its upstream) on top of the https default — and must not decide the match.
+describe("checkCsrfOrigin with ORIGIN set and an adapter-synthesized event.url", () => {
+  let checkCsrfOrigin: typeof CheckCsrfOrigin;
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it("accepts the ORIGIN of a plain-HTTP deployment", async () => {
+    checkCsrfOrigin = await loadCsrf("http://localhost:3000");
+
+    expect(
+      checkCsrfOrigin(makeEvent("POST", ADAPTER_URL, { Origin: "http://localhost:3000" })),
+    ).toBeNull();
+    expect(
+      checkCsrfOrigin(makeEvent("POST", ADAPTER_URL, { Origin: "https://localhost:3000" }))?.status,
+    ).toBe(403);
+  });
+
+  it("accepts the public origin when the proxy forwards its upstream Host", async () => {
+    checkCsrfOrigin = await loadCsrf("https://logs.example.com/");
+    const upstreamUrl = "https://logwell:3000/api/projects";
+
+    expect(
+      checkCsrfOrigin(makeEvent("POST", upstreamUrl, { Origin: "https://logs.example.com" })),
+    ).toBeNull();
+    expect(
+      checkCsrfOrigin(
+        makeEvent("POST", upstreamUrl, { Referer: "https://logs.example.com/projects/p1" }),
+      ),
+    ).toBeNull();
+    expect(
+      checkCsrfOrigin(makeEvent("POST", upstreamUrl, { Origin: "https://logwell:3000" }))?.status,
+    ).toBe(403);
   });
 });

@@ -1,5 +1,5 @@
 import type { APIRequestContext, Page } from "@playwright/test";
-import type { JsonObject, JsonValue } from "$lib/shared/schemas/json";
+import type { JsonObject, JsonValue } from "#lib/shared/schemas/json.js";
 import { z } from "zod";
 
 type LogLevel = "debug" | "info" | "warn" | "error" | "fatal";

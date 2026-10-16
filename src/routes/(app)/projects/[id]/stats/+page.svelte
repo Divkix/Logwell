@@ -1,13 +1,14 @@
 <script lang="ts">
 import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
 import { goto } from '$app/navigation';
-import { navigating } from '$app/stores';
-import BottomNav from '$lib/components/bottom-nav.svelte';
-import LevelChart from '$lib/components/level-chart.svelte';
-import StatsSkeleton from '$lib/components/stats-skeleton.svelte';
-import TimeRangePicker, { type TimeRange } from '$lib/components/time-range-picker.svelte';
-import TimeseriesChart from '$lib/components/timeseries-chart.svelte';
-import type { TimeSeriesBucket } from '$lib/utils/timeseries';
+import { navigating } from '$app/state';
+import BottomNav from '#lib/components/bottom-nav.svelte';
+import LevelChart from '#lib/components/level-chart.svelte';
+import StatsSkeleton from '#lib/components/stats-skeleton.svelte';
+import TimeRangePicker from '#lib/components/time-range-picker.svelte';
+import type { TimeRange } from '#lib/utils/time-range.js';
+import TimeseriesChart from '#lib/components/timeseries-chart.svelte';
+import type { TimeSeriesBucket } from '#lib/utils/timeseries.js';
 import type { PageData } from './$types';
 
 const { data }: { data: PageData } = $props();
@@ -70,7 +71,7 @@ $effect(() => {
   };
 });
 
-const isNavigating = $derived($navigating?.to?.url.pathname.endsWith('/stats') ?? false);
+const isNavigating = $derived(navigating.to?.url.pathname.endsWith('/stats') ?? false);
 
 function handleTimeRangeChange(range: TimeRange) {
   selectedRange = range;
@@ -87,7 +88,7 @@ async function updateFilters() {
   const url = `/projects/${data.project.id}/stats?${queryString}`;
 
   try {
-    await goto(url, { replaceState: true, noScroll: true });
+    await goto(url, { replace: true, reset: false });
   } finally {
     loading = false;
   }

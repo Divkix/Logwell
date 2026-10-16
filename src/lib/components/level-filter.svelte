@@ -1,6 +1,6 @@
 <script lang="ts">
-import { Button } from '$lib/components/ui/button/index.js';
-import { LOG_LEVELS, type LogLevel } from '$lib/shared/types';
+import { Button } from '#lib/components/ui/button/index.js';
+import { LOG_LEVELS, type LogLevel } from '#lib/shared/types.js';
 
 interface Props {
   value?: LogLevel[];

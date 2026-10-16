@@ -5,29 +5,30 @@ import LoaderIcon from '@lucide/svelte/icons/loader';
 import SettingsIcon from '@lucide/svelte/icons/settings';
 import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 import { goto } from '$app/navigation';
-import { navigating } from '$app/stores';
-import ActiveFilterChips from '$lib/components/active-filter-chips.svelte';
-import BottomNav from '$lib/components/bottom-nav.svelte';
-import ClearFiltersButton from '$lib/components/clear-filters-button.svelte';
-import ConnectionStatus from '$lib/components/connection-status.svelte';
-import ExportButton from '$lib/components/export-button.svelte';
-import FilterPanel from '$lib/components/filter-panel.svelte';
-import KeyboardHelpModal from '$lib/components/keyboard-help-modal.svelte';
-import LevelFilter from '$lib/components/level-filter.svelte';
-import LiveToggle from '$lib/components/live-toggle.svelte';
-import LogDetailModal from '$lib/components/log-detail-modal.svelte';
-import LogStreamSkeleton from '$lib/components/log-stream-skeleton.svelte';
-import LogTable from '$lib/components/log-table.svelte';
-import SearchInput from '$lib/components/search-input.svelte';
-import TimeRangePicker, { type TimeRange } from '$lib/components/time-range-picker.svelte';
-import Button from '$lib/components/ui/button/button.svelte';
-import { useLogStream } from '$lib/hooks/use-log-stream.svelte';
-import type { Log, LogLevel, Project } from '$lib/server/db/schema';
-import type { ClientLog } from '$lib/stores/logs.svelte';
-import { announceToScreenReader } from '$lib/utils/focus-trap';
-import { shouldBlockShortcut } from '$lib/utils/keyboard';
-import { sortLogs, type SortField, type SortDirection } from '$lib/utils/log-sort';
-import { toastError } from '$lib/utils/toast';
+import { navigating } from '$app/state';
+import ActiveFilterChips from '#lib/components/active-filter-chips.svelte';
+import BottomNav from '#lib/components/bottom-nav.svelte';
+import ClearFiltersButton from '#lib/components/clear-filters-button.svelte';
+import ConnectionStatus from '#lib/components/connection-status.svelte';
+import ExportButton from '#lib/components/export-button.svelte';
+import FilterPanel from '#lib/components/filter-panel.svelte';
+import KeyboardHelpModal from '#lib/components/keyboard-help-modal.svelte';
+import LevelFilter from '#lib/components/level-filter.svelte';
+import LiveToggle from '#lib/components/live-toggle.svelte';
+import LogDetailModal from '#lib/components/log-detail-modal.svelte';
+import LogStreamSkeleton from '#lib/components/log-stream-skeleton.svelte';
+import LogTable from '#lib/components/log-table.svelte';
+import SearchInput from '#lib/components/search-input.svelte';
+import TimeRangePicker from '#lib/components/time-range-picker.svelte';
+import type { TimeRange } from '#lib/utils/time-range.js';
+import Button from '#lib/components/ui/button/button.svelte';
+import { useLogStream } from '#lib/hooks/use-log-stream.svelte.js';
+import type { Log, LogLevel, Project } from '#lib/server/db/schema.js';
+import type { ClientLog } from '#lib/stores/logs.svelte.js';
+import { announceToScreenReader } from '#lib/utils/focus-trap.js';
+import { shouldBlockShortcut } from '#lib/utils/keyboard.js';
+import { sortLogs, type SortField, type SortDirection } from '#lib/utils/log-sort.js';
+import { toastError } from '#lib/utils/toast.js';
 import type { PageData } from './$types';
 
 const { data }: { data: PageData } = $props();
@@ -35,7 +36,7 @@ const { data }: { data: PageData } = $props();
 const MAX_STREAMED_LOGS = 10000;
 
 const isNavigating = $derived.by(() => {
-  const navTo = $navigating?.to?.url.pathname;
+  const navTo = navigating.to?.url.pathname;
 
   return (
     !!navTo &&
@@ -277,7 +278,7 @@ async function updateFilters() {
       ? `/projects/${data.project.id}?${queryString}`
       : `/projects/${data.project.id}`;
 
-    await goto(url, { replaceState: true, noScroll: true });
+    await goto(url, { replace: true, reset: false });
   } finally {
     loading = false;
   }

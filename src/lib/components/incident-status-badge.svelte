@@ -1,6 +1,6 @@
 <script lang="ts">
-import type { IncidentStatus } from '$lib/shared/types';
-import { cn } from '$lib/utils';
+import type { IncidentStatus } from '#lib/shared/types.js';
+import { cn } from '#lib/utils.js';
 
 interface Props {
   status: IncidentStatus;

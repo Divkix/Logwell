@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
 const INTERVAL_MS = mocks.intervalMs;
 
 // The unit project resolves no `$lib` runtime specifiers, and the real cleanup needs a database.
-vi.mock("$lib/server/config/performance", () => ({
+vi.mock("#lib/server/config/performance.js", () => ({
   RETENTION_CONFIG: { LOG_CLEANUP_INTERVAL_MS: mocks.intervalMs, LOG_RETENTION_DAYS: 30 },
 }));
 

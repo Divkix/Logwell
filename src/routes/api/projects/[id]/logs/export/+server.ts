@@ -1,15 +1,15 @@
 import { and, eq, gte, inArray, lte, type SQL, sql } from "drizzle-orm";
-import { EXPORT_CONFIG } from "$lib/server/config/performance";
-import { log } from "$lib/server/db/schema";
-import { apiError } from "$lib/server/utils/api-error";
-import { cappedLogCount } from "$lib/server/utils/capped-count";
-import { escapeCSVField } from "$lib/server/utils/csv-serializer";
-import { type LogQueryResult, type QueriedLog, queryLogs } from "$lib/server/utils/log-query";
-import { requireOwnedProjectRoute } from "$lib/server/utils/owned-project";
-import { buildSearchQuery } from "$lib/server/utils/search";
-import { parseLevelFilter } from "$lib/shared/schemas/log";
-import type { JsonValue } from "$lib/shared/schemas/json";
-import type { ExportFormat } from "$lib/types/export";
+import { EXPORT_CONFIG } from "#lib/server/config/performance.js";
+import { log } from "#lib/server/db/schema.js";
+import { apiError } from "#lib/server/utils/api-error.js";
+import { cappedLogCount } from "#lib/server/utils/capped-count.js";
+import { escapeCSVField } from "#lib/server/utils/csv-serializer.js";
+import { type LogQueryResult, type QueriedLog, queryLogs } from "#lib/server/utils/log-query.js";
+import { requireOwnedProjectRoute } from "#lib/server/utils/owned-project.js";
+import { buildSearchQuery } from "#lib/server/utils/search.js";
+import { parseLevelFilter } from "#lib/shared/schemas/log.js";
+import type { JsonValue } from "#lib/shared/schemas/json.js";
+import type { ExportFormat } from "#lib/types/export.js";
 import type { RequestEvent } from "./$types";
 
 const EXPORT_BATCH_SIZE = 500;

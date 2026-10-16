@@ -1,7 +1,7 @@
 <script lang="ts">
-import type { Log } from '$lib/server/db/schema';
-import { cn } from '$lib/utils';
-import { formatTimestamp } from '$lib/utils/format';
+import type { Log } from '#lib/server/db/schema.js';
+import { cn } from '#lib/utils.js';
+import { formatTimestamp } from '#lib/utils/format.js';
 import LevelBadge from './level-badge.svelte';
 
 interface Props {

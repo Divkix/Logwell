@@ -1,11 +1,10 @@
-import { json } from "@sveltejs/kit";
 import { and, count, eq, ne } from "drizzle-orm";
-import { log, project, type Project } from "$lib/server/db/schema";
-import { apiError, isUniqueViolation } from "$lib/server/utils/api-error";
-import { invalidateApiKeyCacheByHash } from "$lib/server/utils/api-key";
-import { requireJsonContentType } from "$lib/server/utils/content-type";
-import { requireOwnedProjectRoute } from "$lib/server/utils/owned-project";
-import { projectUpdatePayloadSchema } from "$lib/shared/schemas/project";
+import { log, project, type Project } from "#lib/server/db/schema.js";
+import { apiError, isUniqueViolation } from "#lib/server/utils/api-error.js";
+import { invalidateApiKeyCacheByHash } from "#lib/server/utils/api-key.js";
+import { requireJsonContentType } from "#lib/server/utils/content-type.js";
+import { requireOwnedProjectRoute } from "#lib/server/utils/owned-project.js";
+import { projectUpdatePayloadSchema } from "#lib/shared/schemas/project.js";
 import type { RequestEvent } from "./$types";
 
 /**
@@ -66,7 +65,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
     }
   }
 
-  return json({
+  return Response.json({
     id: projectData.id,
     name: projectData.name,
     retentionDays: projectData.retentionDays,
@@ -122,7 +121,7 @@ export async function PATCH(event: RequestEvent): Promise<Response> {
   try {
     body = await event.request.json();
   } catch {
-    return json({ error: "invalid_json", message: "Invalid JSON body" }, { status: 400 });
+    return Response.json({ error: "invalid_json", message: "Invalid JSON body" }, { status: 400 });
   }
 
   const result = projectUpdatePayloadSchema.safeParse(body);
@@ -151,7 +150,7 @@ export async function PATCH(event: RequestEvent): Promise<Response> {
   }
 
   if (name === undefined && retentionDays === undefined) {
-    return json({
+    return Response.json({
       id: currentProject.id,
       name: currentProject.name,
       retentionDays: currentProject.retentionDays,
@@ -196,7 +195,7 @@ export async function PATCH(event: RequestEvent): Promise<Response> {
     return apiError(404, "not_found", "Project not found");
   }
 
-  return json({
+  return Response.json({
     id: updated.id,
     name: updated.name,
     retentionDays: updated.retentionDays,
@@ -233,7 +232,7 @@ export async function DELETE(event: RequestEvent): Promise<Response> {
 
   await db.delete(project).where(eq(project.id, projectId));
 
-  return json({
+  return Response.json({
     success: true,
     id: projectId,
   });

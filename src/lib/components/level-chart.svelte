@@ -1,7 +1,7 @@
 <script lang="ts">
-import type { LogLevel } from '$lib/server/db/schema';
-import { cn } from '$lib/utils';
-import { getLevelColor } from '$lib/utils/colors';
+import type { LogLevel } from '#lib/server/db/schema.js';
+import { cn } from '#lib/utils.js';
+import { getLevelColor } from '#lib/utils/colors.js';
 
 interface LevelData {
   levelCounts: Partial<Record<LogLevel, number>>;

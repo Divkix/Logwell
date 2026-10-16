@@ -1,5 +1,5 @@
 <script lang="ts">
-import { Skeleton } from '$lib/components/ui/skeleton/index.js';
+import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 
 const LEGEND_ITEM_COUNT = 5;
 </script>

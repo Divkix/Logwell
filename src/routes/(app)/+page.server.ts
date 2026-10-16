@@ -1,7 +1,7 @@
 import { count, desc, eq, max } from "drizzle-orm";
-import { getDbClient } from "$lib/server/db/db";
-import { log, project } from "$lib/server/db/schema";
-import { requireAuth } from "$lib/server/utils/owned-project";
+import { getDbClient } from "#lib/server/db/db.js";
+import { log, project } from "#lib/server/db/schema.js";
+import { requireAuth } from "#lib/server/utils/owned-project.js";
 import type { PageServerLoad } from "./$types";
 
 export const load: PageServerLoad = async (event) => {

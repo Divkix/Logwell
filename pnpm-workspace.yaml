@@ -13,6 +13,10 @@ allowBuilds:
 # Accepted peer mismatches, recorded so installs stay quiet:
 peerDependencyRules:
   allowedVersions:
+    # Optional Kit peers still declared as ^2. better-auth accepts ^3 from 1.7.8 (auth bump kept
+    # out of the Kit 3 migration); runed only touches $app/* in useSearchParams, which we don't use.
+    better-auth>@sveltejs/kit: "3"
+    runed>@sveltejs/kit: "3"
     vite: "*"
     vitest: "*"
   allowAny:
@@ -27,7 +31,6 @@ catalog:
   "@vitest/ui": 5.0.1
 overrides:
   "@esbuild-kit/core-utils>esbuild": ^0.25.12
-  "@sveltejs/kit>cookie": ^0.7.2
   defu: ^6.1.7
   kysely: ^0.29.5
   lodash: ^4.18.1

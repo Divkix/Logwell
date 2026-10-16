@@ -1,8 +1,8 @@
 <script lang="ts">
 import XIcon from '@lucide/svelte/icons/x';
-import { projectCreatePayloadSchema } from '$lib/shared/schemas/project';
-import { cn } from '$lib/utils';
-import { focusTrap } from '$lib/utils/focus-trap';
+import { projectCreatePayloadSchema } from '#lib/shared/schemas/project.js';
+import { cn } from '#lib/utils.js';
+import { focusTrap } from '#lib/utils/focus-trap.js';
 import Button from './ui/button/button.svelte';
 import Input from './ui/input/input.svelte';
 

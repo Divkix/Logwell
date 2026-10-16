@@ -3,7 +3,7 @@ import AlertTriangleIcon from '@lucide/svelte/icons/alert-triangle';
 import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
 import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
 import { page } from '$app/state';
-import { Button } from '$lib/components/ui/button/index.js';
+import { Button } from '#lib/components/ui/button/index.js';
 
 const errorCode = $derived(page.status);
 

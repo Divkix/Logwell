@@ -2,9 +2,9 @@
 import ArrowDownIcon from '@lucide/svelte/icons/arrow-down';
 import ArrowUpIcon from '@lucide/svelte/icons/arrow-up';
 import ArrowUpDownIcon from '@lucide/svelte/icons/arrow-up-down';
-import type { Log } from '$lib/server/db/schema';
-import { cn } from '$lib/utils';
-import { sortLogs, type SortField, type SortDirection } from '$lib/utils/log-sort';
+import type { Log } from '#lib/server/db/schema.js';
+import { cn } from '#lib/utils.js';
+import { sortLogs, type SortField, type SortDirection } from '#lib/utils/log-sort.js';
 import EmptyStateQuickstart from './empty-state-quickstart.svelte';
 import LogCard from './log-card.svelte';
 import LogRow from './log-row.svelte';

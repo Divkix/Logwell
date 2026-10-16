@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
-import type { DatabaseClient } from "$lib/server/db/db";
+import type { DatabaseClient } from "#lib/server/db/db.js";
 import { project } from "../db/schema";
 
 export class ApiKeyError extends Error {
@@ -129,7 +129,7 @@ export async function validateApiKey(request: Request, dbClient?: DatabaseClient
     return cached.projectId;
   }
 
-  const db = dbClient ?? (await import("$lib/server/db")).db;
+  const db = dbClient ?? (await import("#lib/server/db/index.js")).db;
 
   const generationOnRead = cacheGeneration;
 

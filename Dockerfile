@@ -51,7 +51,7 @@ RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
 FROM deps-dev AS build
 WORKDIR /app
 
-COPY package.json svelte.config.js tsconfig.json vite.config.ts ./
+COPY package.json tsconfig.json vite.config.ts ./
 COPY drizzle.config.ts ./
 
 COPY static ./static

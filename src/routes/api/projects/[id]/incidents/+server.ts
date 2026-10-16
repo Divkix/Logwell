@@ -1,19 +1,18 @@
-import { json } from "@sveltejs/kit";
 import { and, count, desc, eq, gte, lt, type SQL } from "drizzle-orm";
-import { INCIDENT_CONFIG } from "$lib/server/config/performance";
-import { incident } from "$lib/server/db/schema";
-import { apiError } from "$lib/server/utils/api-error";
+import { INCIDENT_CONFIG } from "#lib/server/config/performance.js";
+import { incident } from "#lib/server/db/schema.js";
+import { apiError } from "#lib/server/utils/api-error.js";
 import {
   decodeCursor,
   encodeCursor,
   cursorRowLessThan,
   microsColumn,
-} from "$lib/server/utils/cursor";
-import { getIncidentStatus } from "$lib/server/utils/incidents";
-import { requireOwnedProjectRoute } from "$lib/server/utils/owned-project";
-import { INCIDENT_STATUSES, type IncidentRange } from "$lib/shared/types";
-import { getTimeRangeStart } from "$lib/utils/format";
-import { parseTimeRange } from "$lib/utils/time-range";
+} from "#lib/server/utils/cursor.js";
+import { getIncidentStatus } from "#lib/server/utils/incidents.js";
+import { requireOwnedProjectRoute } from "#lib/server/utils/owned-project.js";
+import { INCIDENT_STATUSES, type IncidentRange } from "#lib/shared/types.js";
+import { getTimeRangeStart } from "#lib/utils/format.js";
+import { parseTimeRange } from "#lib/utils/time-range.js";
 import type { RequestEvent } from "./$types";
 
 const DEFAULT_LIMIT = 50;
@@ -116,7 +115,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
       ? encodeCursor(incidentsToReturn.at(-1)!.micros, incidentsToReturn.at(-1)!.id)
       : null;
 
-  return json({
+  return Response.json({
     incidents: incidentsToReturn.map((i) => ({
       id: i.id,
       projectId: i.projectId,

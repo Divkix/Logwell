@@ -4,8 +4,8 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/svelte";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from "vite-plus/test";
-import type { ClientIncident } from "$lib/hooks/use-incident-stream.svelte";
-import type { IncidentListItem } from "$lib/shared/types";
+import type { ClientIncident } from "#lib/hooks/use-incident-stream.svelte.js";
+import type { IncidentListItem } from "#lib/shared/types.js";
 import type { PageData } from "../$types";
 
 type IncidentStreamOptions = {
@@ -30,21 +30,17 @@ vi.mock("$app/navigation", () => ({
   goto: mockGoto,
 }));
 
-vi.mock("$lib/utils/toast", () => ({
+vi.mock("#lib/utils/toast.js", () => ({
   toastError: mockToastError,
   toastSuccess: vi.fn(),
 }));
 
-vi.mock("$app/stores", async () => {
-  const { writable } = await import("svelte/store");
+vi.mock(
+  "$app/state",
+  async () => await import("../../../../../../../tests/fixtures/app-state.svelte"),
+);
 
-  return {
-    navigating: writable(null),
-    page: writable({ url: { pathname: "/projects/proj_1/incidents" } }),
-  };
-});
-
-vi.mock("$lib/hooks/use-incident-stream.svelte", () => ({
+vi.mock("#lib/hooks/use-incident-stream.svelte.js", () => ({
   useIncidentStream: (options: {
     onIncidents?: (updates: ClientIncident[]) => void;
     onError?: (error: Error) => void;
@@ -199,7 +195,7 @@ describe("IncidentsPage", () => {
 
     expect(mockGoto).toHaveBeenCalledWith(
       "/projects/proj_1/incidents?status=open&range=24h&incident=inc_1",
-      expect.objectContaining({ replaceState: true, noScroll: true }),
+      expect.objectContaining({ replace: true, reset: false }),
     );
   });
 

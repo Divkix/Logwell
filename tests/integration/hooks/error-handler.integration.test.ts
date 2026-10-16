@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
-import { type ErrorContext, handleError } from "$lib/server/error-handler";
+import { type ErrorContext, handleError } from "#lib/server/error-handler.js";
 
 describe("Global Error Handler", () => {
   let consoleErrorSpy: ReturnType<typeof vi.spyOn>;

@@ -1,6 +1,6 @@
 <script lang="ts">
-import { Card, CardContent, CardFooter, CardHeader } from '$lib/components/ui/card/index.js';
-import { Skeleton } from '$lib/components/ui/skeleton/index.js';
+import { Card, CardContent, CardFooter, CardHeader } from '#lib/components/ui/card/index.js';
+import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 
 const SKELETON_CARD_COUNT = 8;
 </script>

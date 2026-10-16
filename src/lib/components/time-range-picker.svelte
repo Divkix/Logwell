@@ -1,12 +1,12 @@
 <script lang="ts" module>
-export type { TimeRange } from '$lib/utils/time-range';
+export type { TimeRange } from '#lib/utils/time-range.js';
 
-export { TIME_RANGES, TIME_RANGE_LABELS } from '$lib/utils/time-range';
+export { TIME_RANGES, TIME_RANGE_LABELS } from '#lib/utils/time-range.js';
 </script>
 
 <script lang="ts">
-import { Button } from '$lib/components/ui/button/index.js';
-import { TIME_RANGE_LABELS, TIME_RANGES, type TimeRange } from '$lib/utils/time-range';
+import { Button } from '#lib/components/ui/button/index.js';
+import { TIME_RANGE_LABELS, TIME_RANGES, type TimeRange } from '#lib/utils/time-range.js';
 
 interface Props {
   value?: TimeRange;

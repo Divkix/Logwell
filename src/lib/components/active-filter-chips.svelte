@@ -1,7 +1,7 @@
 <script lang="ts">
 import XIcon from '@lucide/svelte/icons/x';
-import type { LogLevel } from '$lib/server/db/schema';
-import { getLevelColor } from '$lib/utils/colors';
+import type { LogLevel } from '#lib/server/db/schema.js';
+import { getLevelColor } from '#lib/utils/colors.js';
 
 type TimeRange = '15m' | '1h' | '24h' | '7d';
 

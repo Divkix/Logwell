@@ -1,7 +1,7 @@
 import { count, eq, min } from "drizzle-orm";
-import { RETENTION_CONFIG } from "$lib/server/config/performance";
-import { log } from "$lib/server/db/schema";
-import { requireOwnedProjectPage } from "$lib/server/utils/owned-project";
+import { RETENTION_CONFIG } from "#lib/server/config/performance.js";
+import { log } from "#lib/server/db/schema.js";
+import { requireOwnedProjectPage } from "#lib/server/utils/owned-project.js";
 import type { PageServerLoad } from "./$types";
 
 export const load: PageServerLoad = async (event) => {

@@ -1,13 +1,13 @@
-import { json, type Handle, type HandleServerError } from "@sveltejs/kit";
+import type { Handle, HandleServerError } from "@sveltejs/kit/hooks";
 import { svelteKitHandler } from "better-auth/svelte-kit";
-import { building } from "$app/environment";
-import { auth, initAuth } from "$lib/server/auth";
-import { env } from "$lib/server/config/env";
-import { closeDb, db } from "$lib/server/db";
-import { handleError as buildErrorResponse } from "$lib/server/error-handler";
-import { startCleanupScheduler, stopCleanupScheduler } from "$lib/server/jobs/cleanup-scheduler";
-import { checkCsrfOrigin } from "$lib/server/utils/csrf";
-import { checkRateLimit, LOGIN_RPM } from "$lib/server/utils/rate-limit";
+import { building } from "$app/env";
+import { auth, initAuth } from "#lib/server/auth.js";
+import { env } from "#lib/server/config/env.js";
+import { closeDb, db } from "#lib/server/db/index.js";
+import { handleError as buildErrorResponse } from "#lib/server/error-handler.js";
+import { startCleanupScheduler, stopCleanupScheduler } from "#lib/server/jobs/cleanup-scheduler.js";
+import { checkCsrfOrigin } from "#lib/server/utils/csrf.js";
+import { checkRateLimit, LOGIN_RPM } from "#lib/server/utils/rate-limit.js";
 
 let initialized = false;
 
@@ -72,7 +72,7 @@ export const handle: Handle = async ({ event, resolve }) => {
     // Pre-auth throttle: every request with a fresh random key costs a DB lookup in
     // validateApiKey, so the per-IP bucket drains before the per-project one (ingest.ts).
     if (!checkRateLimit(`ingest-ip:${event.getClientAddress()}`, env.RATE_LIMIT_INGEST_IP_RPM)) {
-      return json(
+      return Response.json(
         { error: "rate_limited", message: "Rate limit exceeded. Retry in 60 seconds." },
         { status: 429, headers: { "Retry-After": "60" } },
       );
@@ -95,7 +95,7 @@ export const handle: Handle = async ({ event, resolve }) => {
   }
 
   if (event.request.method === "POST" && pathname.startsWith("/api/auth/sign-up")) {
-    return json(
+    return Response.json(
       { error: "sign_up_disabled", message: "Account sign-up is disabled." },
       { status: 403 },
     );
@@ -113,9 +113,18 @@ export const handle: Handle = async ({ event, resolve }) => {
   return svelteKitHandler({ event, resolve, auth, building });
 };
 
-export const handleError: HandleServerError = ({ error, event, status, message }) => {
+export const handleError: HandleServerError = (caught) => {
+  // Kit 3 also routes `error(status, message)` throws through this hook. Their body is
+  // already client-safe, so returning nothing keeps it — as Kit 2 did by never calling here.
+  if (caught.kind === "app") return;
+
+  const { event } = caught;
+
+  const { status, message } =
+    caught.kind === "unknown" ? { status: 500, message: "Internal Error" } : caught.error;
+
   return buildErrorResponse({
-    error,
+    error: caught.kind === "unknown" ? caught.error : message,
     url: event.url.href,
     method: event.request.method,
     route: event.route?.id ?? "unknown",
