@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
 import { nanoid } from "nanoid";
-import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type * as schema from "../../../src/lib/server/db/schema";
 import { project } from "../../../src/lib/server/db/schema";
 import { setupTestDatabase } from "../../../src/lib/server/db/test-db";
@@ -16,15 +16,19 @@ import { getOrCreateDefaultUser } from "../../fixtures/db";
 
 describe("API Key Validation with Database", () => {
   let db: PgliteDatabase<typeof schema>;
+  let cleanup: () => Promise<void>;
   let userId: string;
 
   beforeEach(async () => {
     const setup = await setupTestDatabase();
     db = setup.db;
+    cleanup = setup.cleanup;
     const user = await getOrCreateDefaultUser(db);
     userId = user.id;
     clearApiKeyCache();
   });
+
+  afterEach(() => cleanup());
 
   it("validateApiKey returns projectId for valid key", async () => {
     const projectId = nanoid();

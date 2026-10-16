@@ -68,8 +68,7 @@ pnpm run test:ui
 Integration tests use PGlite, an in-memory PostgreSQL database. The engine lives in `src/lib/server/db/test-db.ts`:
 
 - `createTestDatabase()` - Creates a fresh PGlite instance
-- `cleanDatabase()` - Truncates all tables
-- `setupTestDatabase()` - Returns db and cleanup function
+- `setupTestDatabase()` - Returns db and a `cleanup()` that closes it; call it in `afterEach` (each instance holds ~230MB until closed)
 
 Seeding helpers live in `tests/fixtures/db.ts` (`seedProject`, `seedLog`, `seedProjectWithApiKey`, `getOrCreateDefaultUser`).
 

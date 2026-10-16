@@ -1,5 +1,5 @@
 import type { PgliteDatabase } from "drizzle-orm/pglite";
-import { beforeEach, describe, expect, it } from "vite-plus/test";
+import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
 import { createAuth } from "../../../src/lib/server/auth";
 import type * as schema from "../../../src/lib/server/db/schema";
 import { setupTestDatabase } from "../../../src/lib/server/db/test-db";
@@ -38,11 +38,12 @@ function formSignIn(endpoint: string, fields: [string, string][]): Request {
 
 describe("loginAccountKey", () => {
   let db: PgliteDatabase<typeof schema>;
+  let cleanup: () => Promise<void>;
   let auth: ReturnType<typeof createAuth>;
   let adminKey: string;
 
   beforeEach(async () => {
-    ({ db } = await setupTestDatabase());
+    ({ db, cleanup } = await setupTestDatabase());
     auth = createAuth(db);
 
     const { user } = await auth.api.signUpEmail({
@@ -51,6 +52,8 @@ describe("loginAccountKey", () => {
 
     adminKey = `user:${user.id}`;
   });
+
+  afterEach(() => cleanup());
 
   const key = (request: Request) => loginAccountKey(db, request, new URL(request.url).pathname);
 

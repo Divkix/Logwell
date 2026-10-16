@@ -35,7 +35,7 @@ In-memory PGlite database for testing. **Do not use in production.**
 - **In-memory PostgreSQL**: Uses PGlite for fast, isolated tests
 - **Dynamic Schema Application**: Automatically creates all tables from Drizzle schema
 - **No Hardcoding**: Works with any schema without manual updates
-- **Cleanup Utilities**: Efficiently truncates all tables between tests
+- **Cleanup**: `cleanup()` closes the instance and frees its WASM heap
 
 #### API
 
@@ -50,17 +50,6 @@ const db = await createTestDatabase();
 // All schema tables are created automatically
 ```
 
-##### `cleanDatabase(db)`
-
-Truncates all tables and restarts identity sequences.
-
-```typescript
-import { cleanDatabase } from "./test-db";
-
-await cleanDatabase(db);
-// All tables are now empty, sequences reset to 1
-```
-
 ##### `setupTestDatabase()`
 
 Convenience function that creates a database and returns it with a cleanup function.
@@ -72,7 +61,7 @@ const { db, cleanup } = await setupTestDatabase();
 
 // Use db for testing
 
-await cleanup(); // Truncates all tables
+await cleanup(); // Closes the PGlite instance; call it in afterEach
 ```
 
 #### Usage in Tests

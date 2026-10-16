@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
-import { beforeEach, describe, expect, it } from "vite-plus/test";
+import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
 import type * as schema from "../../../src/lib/server/db/schema";
 import { log, project } from "../../../src/lib/server/db/schema";
 import { setupTestDatabase } from "../../../src/lib/server/db/test-db";
@@ -8,11 +8,15 @@ import { createLogFactory, seedProject } from "../../fixtures/db";
 
 describe("Log Table Schema", () => {
   let db: PgliteDatabase<typeof schema>;
+  let cleanup: () => Promise<void>;
 
   beforeEach(async () => {
     const setup = await setupTestDatabase();
     db = setup.db;
+    cleanup = setup.cleanup;
   });
+
+  afterEach(() => cleanup());
 
   it("cascade deletes logs when the project is deleted", async () => {
     const testProject = await seedProject(db);

@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { eq } from "drizzle-orm";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
 import { nanoid } from "nanoid";
-import { beforeEach, describe, expect, it } from "vite-plus/test";
+import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
 import * as schema from "../../../src/lib/server/db/schema";
 import { project } from "../../../src/lib/server/db/schema";
 import { setupTestDatabase } from "../../../src/lib/server/db/test-db";
@@ -18,14 +18,18 @@ function hashApiKey(key: string): string {
 
 describe("Project Table Schema", () => {
   let db: PgliteDatabase<typeof schema>;
+  let cleanup: () => Promise<void>;
   let userId: string;
 
   beforeEach(async () => {
     const setup = await setupTestDatabase();
     db = setup.db;
+    cleanup = setup.cleanup;
     const user = await getOrCreateDefaultUser(db);
     userId = user.id;
   });
+
+  afterEach(() => cleanup());
 
   it("should create a project with API key", async () => {
     const projectId = nanoid();
