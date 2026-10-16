@@ -11,10 +11,14 @@
 #
 # Optional Environment Variables:
 #   PORT               - App port (default: 3000)
+#   LOGWELL_VERSION    - Image tag to run (default: the release this file shipped with).
+#                        Upgrading? Back up first - see docs/operations.md.
 #
 # Usage:
 #   export BETTER_AUTH_SECRET=$(openssl rand -base64 32)
 #   export ADMIN_PASSWORD="your-secure-password"
+#   export DB_PASSWORD=$(openssl rand -hex 24)   # hex: it is embedded in DATABASE_URL
+#   export ORIGIN=https://logs.example.com
 #   docker compose -f compose.prod.yaml up -d
 # =============================================================================
 
@@ -23,7 +27,9 @@ services:
   # Application Service
   # ---------------------------------------------------------------------------
   app:
-    image: ghcr.io/divkix/logwell:latest
+    # Pinned so a restart never silently pulls a new release (and its migrations). CI fails
+    # unless this default equals package.json's version, so release commits bump it.
+    image: ghcr.io/divkix/logwell:${LOGWELL_VERSION:-v1.4.0}
     restart: unless-stopped
     ports:
       - "${PORT:-3000}:3000"

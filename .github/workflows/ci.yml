@@ -42,6 +42,16 @@ jobs:
       - name: Validate SDK CI gates
         run: python3 -m unittest discover -s scripts -p test_sdk_ci_gate.py
 
+      # compose.prod.yaml pins the image users run by default; a release commit that bumps
+      # package.json must bump it too, or self-hosters stay on the previous release.
+      - name: Check compose.prod.yaml pins the current version
+        run: |
+          version="v$(jq -r .version package.json)"
+          if ! grep -qF "ghcr.io/divkix/logwell:\${LOGWELL_VERSION:-${version}}" compose.prod.yaml; then
+            echo "::error file=compose.prod.yaml::default image tag must be ${version} (package.json version)"
+            exit 1
+          fi
+
       - name: Install pnpm and Node.js
         uses: pnpm/setup@a0881977cd8ea73b1ed212236c99ca10dcc80cf4 # v3.1.1
         with:
