@@ -5,6 +5,7 @@ import { createAuth } from "#lib/server/auth.js";
 import type * as schema from "#lib/server/db/schema.js";
 import { setupTestDatabase } from "#lib/server/db/test-db.js";
 import { getSession } from "#lib/server/session.js";
+import { MAX_SEARCH_LENGTH } from "#lib/shared/schemas/log.js";
 import { seedLog, seedProject } from "../../fixtures/db";
 
 // Import load functions as any to avoid the void | PageData union type issues
@@ -248,6 +249,24 @@ describe("(app) page loaders — injected PGlite DB seam", () => {
 
       expect(data.logs.map((entry: { message: string }) => entry.message)).toEqual(["first-page"]);
       expect(data.pagination.offset).toBe(0);
+    });
+
+    it("cuts an over-long search to the length the logs API accepts", async () => {
+      const proj = await seedProject(db, { name: "search-proj", ownerId: owner.userId });
+      await seedLog(db, proj.id, { message: "needle in the logs" });
+      const search = `needle${" x".repeat(MAX_SEARCH_LENGTH)}`;
+
+      const event = createLoadEvent(
+        db,
+        { id: proj.id },
+        owner.locals,
+        `http://localhost:5173/projects/${proj.id}?search=${encodeURIComponent(search)}`,
+      );
+
+      // SAFETY: createLoadEvent builds every event member these load functions read (url, params, locals, cookies, fetch, setHeaders, getClientAddress, depends, parent); tracing stays null because no load function reads it.
+      const data = await loadProjectLogs(event as never);
+
+      expect(data.filters.search).toBe(search.slice(0, MAX_SEARCH_LENGTH));
     });
 
     it("throws SvelteKit 404 for a non-owner (existence hidden)", async () => {

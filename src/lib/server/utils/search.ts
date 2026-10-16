@@ -17,8 +17,8 @@ export function buildSearchQuery(searchTerm: string): string {
     return "";
   }
 
-  // Routes reject longer input with searchLengthError; callers without that check (page
-  // loaders) still never send PostgreSQL an unbounded tsquery.
+  // Routes reject longer input with searchLengthError and the logs page loader cuts it; any
+  // other caller still never sends PostgreSQL an unbounded tsquery.
   const bounded = searchTerm.slice(0, MAX_SEARCH_LENGTH);
 
   const specialCharsRegex = /[&|!():*\\'"<>]/g;

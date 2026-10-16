@@ -1,7 +1,7 @@
 import { error } from "@sveltejs/kit";
 import { InvalidCursorError, OffsetTooLargeError, queryLogs } from "#lib/server/utils/log-query.js";
 import { requireOwnedProjectPage } from "#lib/server/utils/owned-project.js";
-import { parseLevelFilter } from "#lib/shared/schemas/log.js";
+import { MAX_SEARCH_LENGTH, parseLevelFilter } from "#lib/shared/schemas/log.js";
 import { env } from "#lib/server/config/env.js";
 import { getTimeRangeStart } from "#lib/utils/format.js";
 import { parseTimeRange, type TimeRange } from "#lib/utils/time-range.js";
@@ -26,7 +26,9 @@ export const load: PageServerLoad = async (event) => {
   const offsetParam = url.searchParams.get("offset");
   const cursorParam = url.searchParams.get("cursor");
   const levelParam = url.searchParams.get("level");
-  const searchParam = url.searchParams.get("search");
+  // Cut to the length the logs API accepts: the page echoes it back in filters.search, and
+  // "load more" and export send that value to routes that answer a longer one with 400.
+  const searchParam = url.searchParams.get("search")?.slice(0, MAX_SEARCH_LENGTH) ?? null;
   const range: TimeRange = parseTimeRange(url.searchParams.get("range")) ?? "1h";
 
   const limit = clamp(
