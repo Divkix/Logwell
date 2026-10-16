@@ -82,11 +82,17 @@ export class BatchQueue {
   /**
    * Flush all queued logs immediately
    *
-   * Sends in chunks bounded by batchSize.
+   * Sends in chunks bounded by batchSize. A call made while a flush is in
+   * flight joins it instead of resolving early: it settles when that send
+   * does. Logs added after the in-flight send started stay queued for the
+   * next flush.
    * @returns Last response from the server, or null if queue was empty
    */
   async flush(): Promise<IngestResponse | null> {
-    if (this.flushing || this.queue.length === 0) {
+    if (this.flushing && this._flushPromise) {
+      return this._flushPromise;
+    }
+    if (this.queue.length === 0) {
       return null;
     }
 

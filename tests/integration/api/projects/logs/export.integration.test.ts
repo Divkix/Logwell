@@ -1,12 +1,12 @@
 import type { PgliteDatabase } from "drizzle-orm/pglite";
-import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { createAuth } from "$lib/server/auth";
 import type * as schema from "$lib/server/db/schema";
 import { setupTestDatabase } from "$lib/server/db/test-db";
 import { getSession } from "$lib/server/session";
 import { clearApiKeyCache } from "$lib/server/utils/api-key";
 import { GET } from "../../../../../src/routes/api/projects/[id]/logs/export/+server";
-import { seedLog, seedProject } from "../../../../fixtures/db";
+import { seedLog, seedLogs, seedProject } from "../../../../fixtures/db";
 
 function createRequestEvent(
   request: Request,
@@ -156,5 +156,54 @@ describe("GET /api/projects/[id]/logs/export", () => {
     expect(response.status).toBe(400);
     const body = await response.json();
     expect(body).toHaveProperty("error", "invalid_format");
+  });
+
+  it("exports every log across multiple pages", async () => {
+    const testProject = await seedProject(db, { ownerId: userId });
+    await seedLogs(db, testProject.id, 1001);
+
+    const request = new Request(
+      `http://localhost/api/projects/${testProject.id}/logs/export?format=json`,
+      { method: "GET" },
+    );
+
+    const response = await GET(
+      createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals),
+    );
+
+    const body: { id: string }[] = await response.json();
+    expect(body).toHaveLength(1001);
+    expect(new Set(body.map((l) => l.id)).size).toBe(1001);
+  });
+
+  it("fetches pages only as fast as the client reads", async () => {
+    const testProject = await seedProject(db, { ownerId: userId });
+    await seedLogs(db, testProject.id, 1001);
+    const url = `http://localhost/api/projects/${testProject.id}/logs/export?format=csv`;
+    const selectSpy = vi.spyOn(db, "select");
+
+    const full = await GET(
+      createRequestEvent(new Request(url), db, { id: testProject.id }, authenticatedLocals),
+    );
+
+    await full.text();
+    const fullExportSelects = selectSpy.mock.calls.length;
+    selectSpy.mockClear();
+
+    const stalled = await GET(
+      createRequestEvent(new Request(url), db, { id: testProject.id }, authenticatedLocals),
+    );
+
+    const reader = stalled.body!.getReader();
+
+    try {
+      await reader.read(); // header only, then the client stops reading
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      expect(selectSpy.mock.calls.length).toBeLessThan(fullExportSelects);
+    } finally {
+      await reader.cancel();
+      selectSpy.mockRestore();
+    }
   });
 });

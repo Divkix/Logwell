@@ -147,7 +147,8 @@ describe("HttpTransport", () => {
     it("throws LogwellError on 429 rate limited", async () => {
       server.use(errorHandlers.rateLimited);
 
-      const transport = new HttpTransport(defaultConfig);
+      // No retries: the handler sends Retry-After: 5, which the transport honors.
+      const transport = new HttpTransport({ ...defaultConfig, maxRetries: 0 });
 
       await expect(transport.send([createLogFixture()])).rejects.toThrow(LogwellError);
       await expect(transport.send([createLogFixture()])).rejects.toMatchObject({

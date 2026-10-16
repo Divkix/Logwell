@@ -367,5 +367,29 @@ describe("BatchQueue", () => {
 
       expect(mockSendBatch).toHaveBeenCalledTimes(1);
     });
+
+    it("makes a concurrent flush wait for the in-flight send", async () => {
+      let resolveSend!: () => void;
+      const sending = new Promise<void>((resolve) => {
+        resolveSend = resolve;
+      });
+      mockSendBatch = vi.fn().mockImplementation(() => sending.then(() => ({ accepted: 1 })));
+
+      const queue = new BatchQueue(mockSendBatch, defaultConfig);
+      queue.add(createLogFixture());
+
+      void queue.flush();
+      let joinedSettled = false;
+      const joined = queue.flush().then((result) => {
+        joinedSettled = true;
+        return result;
+      });
+
+      await vi.advanceTimersByTimeAsync(0);
+      expect(joinedSettled).toBe(false);
+
+      resolveSend();
+      await expect(joined).resolves.toEqual({ accepted: 1 });
+    });
   });
 });

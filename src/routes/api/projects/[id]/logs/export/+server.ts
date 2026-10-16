@@ -4,7 +4,7 @@ import { log } from "$lib/server/db/schema";
 import { apiError } from "$lib/server/utils/api-error";
 import { cappedLogCount } from "$lib/server/utils/capped-count";
 import { escapeCSVField } from "$lib/server/utils/csv-serializer";
-import { queryLogs } from "$lib/server/utils/log-query";
+import { type LogQueryResult, type QueriedLog, queryLogs } from "$lib/server/utils/log-query";
 import { requireOwnedProjectRoute } from "$lib/server/utils/owned-project";
 import { buildSearchQuery } from "$lib/server/utils/search";
 import { parseLevelFilter } from "$lib/shared/schemas/log";
@@ -44,6 +44,72 @@ function generateFilename(projectName: string, format: ExportFormat): string {
   const sanitizedName = projectName.replace(/[^a-zA-Z0-9-_]/g, "-");
 
   return `logs-${sanitizedName}-${timestamp}.${format}`;
+}
+
+function parseValidDate(param: string | null): Date | null {
+  if (!param) return null;
+  const date = new Date(param);
+
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/**
+ * Pull-based export stream: one DB page per pull(), so paging follows the
+ * client's read rate and stops once the client cancels (disconnects).
+ */
+function createPagedExportStream(options: {
+  fetchPage: (cursor: string | null) => Promise<LogQueryResult>;
+  header: string;
+  footer?: string;
+  encodePage: (logs: QueriedLog[], isFirstPage: boolean) => string;
+}): ReadableStream<Uint8Array> {
+  const encoder = new TextEncoder();
+  let cursor: string | null = null;
+  let fetched = 0;
+  let cancelled = false;
+
+  const finish = (ctrl: ReadableStreamDefaultController<Uint8Array>) => {
+    if (options.footer) ctrl.enqueue(encoder.encode(options.footer));
+    ctrl.close();
+  };
+
+  return new ReadableStream<Uint8Array>(
+    {
+      start(ctrl) {
+        ctrl.enqueue(encoder.encode(options.header));
+      },
+      async pull(ctrl) {
+        if (fetched >= EXPORT_CONFIG.MAX_LOGS) {
+          finish(ctrl);
+
+          return;
+        }
+
+        const page = await options.fetchPage(cursor);
+
+        if (cancelled) return;
+
+        if (page.logs.length > 0) {
+          ctrl.enqueue(encoder.encode(options.encodePage(page.logs, fetched === 0)));
+          fetched += page.logs.length;
+        }
+
+        if (page.logs.length === 0 || !page.hasMore || !page.nextCursor) {
+          finish(ctrl);
+
+          return;
+        }
+
+        cursor = page.nextCursor;
+      },
+      cancel() {
+        cancelled = true;
+      },
+    },
+    // Hold at most one buffered chunk so the next page is fetched only after
+    // the client has read the previous one.
+    { highWaterMark: 1 },
+  );
 }
 
 /**
@@ -92,8 +158,8 @@ export async function GET(event: RequestEvent): Promise<Response> {
 
   const levels = parseLevelFilter(levelParam);
 
-  const fromDate = fromParam ? new Date(fromParam) : null;
-  const toDate = toParam ? new Date(toParam) : null;
+  const from = parseValidDate(fromParam);
+  const to = parseValidDate(toParam);
 
   const conditions: SQL[] = [eq(log.projectId, projectId)];
 
@@ -101,12 +167,12 @@ export async function GET(event: RequestEvent): Promise<Response> {
     conditions.push(inArray(log.level, levels));
   }
 
-  if (fromDate && !Number.isNaN(fromDate.getTime())) {
-    conditions.push(gte(log.timestamp, fromDate));
+  if (from) {
+    conditions.push(gte(log.timestamp, from));
   }
 
-  if (toDate && !Number.isNaN(toDate.getTime())) {
-    conditions.push(lte(log.timestamp, toDate));
+  if (to) {
+    conditions.push(lte(log.timestamp, to));
   }
 
   if (searchParam?.trim()) {
@@ -132,58 +198,40 @@ export async function GET(event: RequestEvent): Promise<Response> {
 
   const filename = generateFilename(projectData.name, format);
 
-  const encoder = new TextEncoder();
+  const fetchPage = (cursor: string | null) =>
+    queryLogs(db, {
+      projectId,
+      levels,
+      from,
+      to,
+      search: searchParam,
+      cursor,
+      limit: EXPORT_BATCH_SIZE,
+    });
 
   if (format === "csv") {
-    const stream = new ReadableStream({
-      async start(ctrl) {
-        try {
-          ctrl.enqueue(encoder.encode(`${CSV_HEADERS.join(",")}\n`));
+    const stream = createPagedExportStream({
+      fetchPage,
+      header: `${CSV_HEADERS.join(",")}\n`,
+      encodePage: (logs) =>
+        logs
+          .map((l) => {
+            const values: JsonValue[] = [
+              l.id,
+              l.timestamp?.toISOString() ?? "",
+              l.level,
+              l.message,
+              l.metadata ? JSON.stringify(l.metadata) : null,
+              l.sourceFile,
+              l.lineNumber,
+              l.requestId,
+              l.userId,
+              l.ipAddress,
+            ];
 
-          let cursor: string | null = null;
-          let fetched = 0;
-
-          while (fetched < EXPORT_CONFIG.MAX_LOGS) {
-            const page = await queryLogs(db, {
-              projectId,
-              levels,
-              from: fromDate && !Number.isNaN(fromDate.getTime()) ? fromDate : null,
-              to: toDate && !Number.isNaN(toDate.getTime()) ? toDate : null,
-              search: searchParam,
-              cursor,
-              limit: EXPORT_BATCH_SIZE,
-            });
-
-            if (page.logs.length === 0) break;
-
-            for (const l of page.logs) {
-              const values: JsonValue[] = [
-                l.id,
-                l.timestamp?.toISOString() ?? "",
-                l.level,
-                l.message,
-                l.metadata ? JSON.stringify(l.metadata) : null,
-                l.sourceFile,
-                l.lineNumber,
-                l.requestId,
-                l.userId,
-                l.ipAddress,
-              ];
-
-              ctrl.enqueue(encoder.encode(`${values.map(escapeCSVField).join(",")}\n`));
-            }
-
-            fetched += page.logs.length;
-
-            if (!page.hasMore || !page.nextCursor) break;
-            cursor = page.nextCursor;
-          }
-
-          ctrl.close();
-        } catch (err) {
-          ctrl.error(err);
-        }
-      },
+            return `${values.map(escapeCSVField).join(",")}\n`;
+          })
+          .join(""),
     });
 
     return new Response(stream, {
@@ -195,58 +243,30 @@ export async function GET(event: RequestEvent): Promise<Response> {
     });
   }
 
-  const stream = new ReadableStream({
-    async start(ctrl) {
-      try {
-        ctrl.enqueue(encoder.encode("["));
+  const stream = createPagedExportStream({
+    fetchPage,
+    header: "[",
+    footer: "]",
+    encodePage: (logs, isFirstPage) =>
+      (isFirstPage ? "" : ",") +
+      logs
+        .map((l) => {
+          const exportable = {
+            id: l.id,
+            level: l.level,
+            message: l.message,
+            timestamp: l.timestamp?.toISOString() ?? "",
+            metadata: l.metadata ?? null,
+            sourceFile: l.sourceFile,
+            lineNumber: l.lineNumber,
+            requestId: l.requestId,
+            userId: l.userId,
+            ipAddress: l.ipAddress,
+          };
 
-        let cursor: string | null = null;
-        let fetched = 0;
-        let first = true;
-
-        while (fetched < EXPORT_CONFIG.MAX_LOGS) {
-          const page = await queryLogs(db, {
-            projectId,
-            levels,
-            from: fromDate && !Number.isNaN(fromDate.getTime()) ? fromDate : null,
-            to: toDate && !Number.isNaN(toDate.getTime()) ? toDate : null,
-            search: searchParam,
-            cursor,
-            limit: EXPORT_BATCH_SIZE,
-          });
-
-          if (page.logs.length === 0) break;
-
-          for (const l of page.logs) {
-            const exportable = {
-              id: l.id,
-              level: l.level,
-              message: l.message,
-              timestamp: l.timestamp?.toISOString() ?? "",
-              metadata: l.metadata ?? null,
-              sourceFile: l.sourceFile,
-              lineNumber: l.lineNumber,
-              requestId: l.requestId,
-              userId: l.userId,
-              ipAddress: l.ipAddress,
-            };
-
-            ctrl.enqueue(encoder.encode(`${first ? "" : ","}${JSON.stringify(exportable)}`));
-            first = false;
-          }
-
-          fetched += page.logs.length;
-
-          if (!page.hasMore || !page.nextCursor) break;
-          cursor = page.nextCursor;
-        }
-
-        ctrl.enqueue(encoder.encode("]"));
-        ctrl.close();
-      } catch (err) {
-        ctrl.error(err);
-      }
-    },
+          return JSON.stringify(exportable);
+        })
+        .join(","),
   });
 
   return new Response(stream, {
