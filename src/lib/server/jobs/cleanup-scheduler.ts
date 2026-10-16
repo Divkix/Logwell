@@ -1,22 +1,21 @@
+import { Effect, Fiber, Schedule } from "effect";
 import { RETENTION_CONFIG } from "$lib/server/config/performance";
 import { cleanupOldLogs } from "./log-cleanup";
 
-let cleanupStarted = false;
-
-let cleanupIntervalId: ReturnType<typeof setInterval> | null = null;
-
-let isRunning = false;
+let scheduler: Fiber.Fiber<number> | null = null;
 
 export function startCleanupScheduler(): boolean {
-  if (cleanupStarted) {
+  if (scheduler) {
     return false;
   }
 
-  cleanupStarted = true;
-
-  void runCleanupWithGuard();
-
-  cleanupIntervalId = setInterval(runCleanupWithGuard, RETENTION_CONFIG.LOG_CLEANUP_INTERVAL_MS);
+  // Runs now, then one full interval after each run ends, so runs never overlap. `spaced`, not
+  // `fixed`: `fixed` fires immediately after a run that overruns a whole interval.
+  scheduler = Effect.runFork(
+    Effect.promise(runCleanup).pipe(
+      Effect.repeat(Schedule.spaced(RETENTION_CONFIG.LOG_CLEANUP_INTERVAL_MS)),
+    ),
+  );
 
   console.log(
     `[cleanup-scheduler] Started with interval: ${RETENTION_CONFIG.LOG_CLEANUP_INTERVAL_MS}ms, retention: ${RETENTION_CONFIG.LOG_RETENTION_DAYS} days`,
@@ -26,26 +25,14 @@ export function startCleanupScheduler(): boolean {
 }
 
 export function stopCleanupScheduler(): void {
-  if (cleanupIntervalId) {
-    clearInterval(cleanupIntervalId);
-    cleanupIntervalId = null;
-  }
+  if (!scheduler) return;
 
-  cleanupStarted = false;
-  isRunning = false;
+  // Abandons any in-flight run, which can't be cancelled; it finishes and logs on its own.
+  Effect.runFork(Fiber.interrupt(scheduler));
+  scheduler = null;
 }
 
-async function runCleanupWithGuard(): Promise<void> {
-  if (isRunning) return;
-  isRunning = true;
-
-  try {
-    await runCleanup();
-  } finally {
-    isRunning = false;
-  }
-}
-
+// Never rejects, so a failed run cannot end the repeat.
 async function runCleanup(): Promise<void> {
   try {
     const result = await cleanupOldLogs();
