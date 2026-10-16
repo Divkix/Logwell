@@ -215,7 +215,7 @@ jobs:
       # Applies the committed drizzle/ SQL to an empty Postgres the same way
       # entrypoint.sh migrates production, proving it applies from scratch.
       - name: Run database migrations
-        run: pnpm exec drizzle-kit migrate
+        run: pnpm run db:migrate
 
       - name: Seed admin user
         run: pnpm run db:seed

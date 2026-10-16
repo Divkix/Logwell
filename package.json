@@ -20,7 +20,7 @@
     "db:stop": "docker compose down -v",
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
+    "db:migrate": "tsx scripts/migrate.ts",
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx scripts/seed-admin.ts",
     "incidents:backfill": "tsx scripts/backfill-incidents.ts",

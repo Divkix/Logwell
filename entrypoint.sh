@@ -4,8 +4,8 @@ set -e
 echo "=== Logwell startup ==="
 
 echo "Running database migrations..."
-./node_modules/.bin/drizzle-kit migrate || { echo "Migration failed! Aborting startup."; exit 1; }
-echo "✓ Migrations completed successfully"
+# Runs drizzle's migrator under a Postgres advisory lock so replicas booting together don't race.
+./node_modules/.bin/tsx scripts/migrate.ts || { echo "Migration failed! Aborting startup."; exit 1; }
 
 if [ -n "$ADMIN_PASSWORD" ]; then
   echo "Seeding admin user..."

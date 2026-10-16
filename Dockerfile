@@ -96,7 +96,7 @@ COPY --from=build --chown=logwell:logwell /app/src/lib/shared ./src/lib/shared
 # instead of at container start if one of their imports is a devDependency. ESM links the whole
 # import graph before evaluating anything, so reaching the DATABASE_URL check (unset here) proves
 # every import resolved; a missing package fails earlier with ERR_MODULE_NOT_FOUND.
-RUN for script in seed-admin backfill-incidents; do \
+RUN for script in migrate seed-admin backfill-incidents; do \
       out=$(./node_modules/.bin/tsx "scripts/${script}.ts" 2>&1) || true; \
       echo "$out" | grep -q "DATABASE_URL" || { echo "$out"; exit 1; }; \
     done
