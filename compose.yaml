@@ -2,8 +2,9 @@ services:
   db:
     image: postgres:18-alpine
     restart: always
+    # Loopback only: the dev password is public, so never expose this on the LAN.
     ports:
-      - 5432:5432
+      - 127.0.0.1:5432:5432
     environment:
       POSTGRES_USER: root
       POSTGRES_PASSWORD: mysecretpassword
