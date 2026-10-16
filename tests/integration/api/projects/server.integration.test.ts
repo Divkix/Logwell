@@ -744,7 +744,7 @@ describe("PATCH /api/projects/[id] (canonical patch home)", () => {
     );
 
     expect(response.status).toBe(400);
-    expect(await response.json()).toMatchObject({ code: "duplicate_name" });
+    expect(await response.json()).toMatchObject({ error: "duplicate_name" });
   });
 
   it.each([
@@ -764,7 +764,7 @@ describe("PATCH /api/projects/[id] (canonical patch home)", () => {
     );
 
     expect(response.status).toBe(400);
-    expect(await response.json()).toMatchObject({ code: "validation_error" });
+    expect(await response.json()).toMatchObject({ error: "validation_error" });
   });
 
   it("updates retentionDays", async () => {
@@ -893,6 +893,6 @@ describe("PATCH /api/projects/[id] (canonical patch home)", () => {
     );
 
     expect(response.status).toBe(400);
-    expect(await response.json()).toMatchObject({ code: "validation_error" });
+    expect(await response.json()).toMatchObject({ error: "validation_error" });
   });
 });

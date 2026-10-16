@@ -1,7 +1,7 @@
 import { json } from "@sveltejs/kit";
 import { and, count, eq, ne } from "drizzle-orm";
 import { log, project, type Project } from "$lib/server/db/schema";
-import { isUniqueViolation } from "$lib/server/utils/api-error";
+import { apiError, isUniqueViolation } from "$lib/server/utils/api-error";
 import { invalidateApiKeyCacheByHash } from "$lib/server/utils/api-key";
 import { requireJsonContentType } from "$lib/server/utils/content-type";
 import { requireOwnedProjectRoute } from "$lib/server/utils/owned-project";
@@ -130,7 +130,7 @@ export async function PATCH(event: RequestEvent): Promise<Response> {
   if (!result.success) {
     const errorMessage = result.error.issues?.[0]?.message || "Validation failed";
 
-    return json({ code: "validation_error", message: errorMessage }, { status: 400 });
+    return apiError(400, "validation_error", errorMessage);
   }
 
   const { name, retentionDays } = result.data;
@@ -146,10 +146,7 @@ export async function PATCH(event: RequestEvent): Promise<Response> {
     });
 
     if (existing) {
-      return json(
-        { code: "duplicate_name", message: "A project with this name already exists" },
-        { status: 400 },
-      );
+      return apiError(400, "duplicate_name", "A project with this name already exists");
     }
   }
 
@@ -189,17 +186,14 @@ export async function PATCH(event: RequestEvent): Promise<Response> {
       .returning();
   } catch (error) {
     if (isUniqueViolation(error, "uq_project_name_owner")) {
-      return json(
-        { code: "duplicate_name", message: "A project with this name already exists" },
-        { status: 400 },
-      );
+      return apiError(400, "duplicate_name", "A project with this name already exists");
     }
 
     throw error;
   }
 
   if (!updated) {
-    return json({ code: "not_found", message: "Project not found" }, { status: 404 });
+    return apiError(404, "not_found", "Project not found");
   }
 
   return json({
