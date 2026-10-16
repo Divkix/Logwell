@@ -142,7 +142,8 @@ function createProjectStreamResponse<T>(
   subscribe: Subscribe<T>,
 ): Response {
   // Rejected before the stream exists, so nothing is subscribed and nothing needs releasing.
-  // The client's reconnect backoff retries; Retry-After is advisory for other consumers.
+  // The dashboard client (use-live-stream.ts) waits Retry-After and retries without spending its
+  // reconnect budget, so its stream resumes once a slot frees up.
   if (openStreams >= MAX_CONNECTIONS) {
     const response = apiError(429, "too_many_streams", "Too many live streams are open");
     response.headers.set("Retry-After", "60");
