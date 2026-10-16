@@ -64,6 +64,28 @@ jobs:
             exit 1
           fi
 
+          # The tag must name the version its commit ships. CI keeps compose.prod.yaml's default
+          # image equal to package.json's version but never runs on tags, so a tag pushed without
+          # the release bump would publish vX.Y.Z while compose.prod.yaml at that tag still runs
+          # the previous image. A prerelease (vX.Y.Z-rc.N) may also sit on the plain vX.Y.Z bump.
+          contents() {
+            gh api -H "Accept: application/vnd.github.raw+json" \
+              "repos/${GITHUB_REPOSITORY}/contents/$1?ref=${sha}"
+          }
+          if ! package_json=$(contents package.json) || ! compose=$(contents compose.prod.yaml); then
+            echo "::error::Could not read package.json and compose.prod.yaml at $TAG ($sha)"
+            exit 1
+          fi
+          version="v$(jq -r .version <<<"$package_json")"
+          if [[ "$version" != "$TAG" && "$version" != "${TAG%%-*}" ]]; then
+            echo "::error::$TAG is on a commit whose package.json version is $version; bump it (and compose.prod.yaml) before tagging"
+            exit 1
+          fi
+          if ! grep -qF "ghcr.io/divkix/logwell:\${LOGWELL_VERSION:-${version}}" <<<"$compose"; then
+            echo "::error::compose.prod.yaml at $TAG does not default to ghcr.io/divkix/logwell:${version}"
+            exit 1
+          fi
+
           # Prereleases (vX.Y.Z-rc.N) never move :latest or the repo's latest GitHub Release,
           # and neither does re-releasing an older tag: only the highest stable tag does.
           prerelease=false
