@@ -246,6 +246,22 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
+    # Empty database for the smoke test: the image must migrate it from scratch.
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: smoke_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -265,6 +281,42 @@ jobs:
           # Exporting a mode=max cache costs ~2 min; only main writes it, PRs
           # read main's layers.
           cache-to: ${{ github.event_name == 'push' && 'type=gha,mode=max,scope=main' || '' }}
+          # Keep the image in the local daemon for the smoke test below.
+          load: true
+
+      # Boots the built image the way users run it: entrypoint.sh migrates the empty
+      # database and seeds the admin, then the image's own HEALTHCHECK (probed every 2s
+      # instead of 30s) must report healthy and /api/health must see the database.
+      - name: Smoke test image
+        env:
+          IMAGE: logwell:ci-${{ github.sha }}
+        run: |
+          docker run -d --name logwell-smoke --network host \
+            --health-interval=2s --health-start-period=60s \
+            -e DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/smoke_db \
+            -e BETTER_AUTH_SECRET="$BETTER_AUTH_SECRET" \
+            -e ADMIN_PASSWORD=smoke-admin-pass \
+            -e ORIGIN=http://127.0.0.1:3000 \
+            "$IMAGE"
+
+          status=starting
+          for _ in $(seq 1 60); do
+            status=$(docker inspect --format '{{.State.Health.Status}}' logwell-smoke 2>/dev/null || echo exited)
+            [ "$status" = "healthy" ] && break
+            [ "$(docker inspect --format '{{.State.Running}}' logwell-smoke)" = "true" ] || break
+            sleep 2
+          done
+
+          docker logs logwell-smoke
+          if [ "$status" != "healthy" ]; then
+            echo "::error::Container never became healthy (last status: $status)"
+            exit 1
+          fi
+          curl -fsS http://127.0.0.1:3000/api/health | tee /dev/stderr | grep -q '"database":"connected"'
+
+      - name: Remove smoke container
+        if: always()
+        run: docker rm -f logwell-smoke || true
 
   # =============================================================================
   # Build Docker images for each platform (native runners)
