@@ -1,6 +1,7 @@
 import { error, redirect, type RequestEvent } from "@sveltejs/kit";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { getDbClient, type DatabaseClient } from "#lib/server/db/db.js";
+import { isActiveProject } from "#lib/server/db/predicates.js";
 import { type Project, project } from "#lib/server/db/schema.js";
 import type { Session, User } from "../auth";
 import { checkCsrfOrigin } from "./csrf";
@@ -27,12 +28,6 @@ export async function requireAuth(event: RequestEvent): Promise<AuthenticatedSes
 
   return { user, session };
 }
-
-/**
- * Excludes soft-deleted projects (DELETE /api/projects/[id] sets `deleted_at`; the purge job
- * removes the row later). Every query that lists or resolves a user's projects must apply it.
- */
-export const isActiveProject = isNull(project.deletedAt);
 
 export interface OwnedProject {
   project: Project;

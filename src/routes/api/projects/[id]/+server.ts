@@ -1,10 +1,11 @@
 import { and, eq, ne } from "drizzle-orm";
+import { isActiveProject } from "#lib/server/db/predicates.js";
 import { project, type Project } from "#lib/server/db/schema.js";
 import { apiError, isUniqueViolation } from "#lib/server/utils/api-error.js";
 import { invalidateApiKeyCacheByHash } from "#lib/server/utils/api-key.js";
 import { recentLevelCounts } from "#lib/server/utils/capped-count.js";
 import { requireJsonContentType } from "#lib/server/utils/content-type.js";
-import { isActiveProject, requireOwnedProjectRoute } from "#lib/server/utils/owned-project.js";
+import { requireOwnedProjectRoute } from "#lib/server/utils/owned-project.js";
 import { projectUpdatePayloadSchema } from "#lib/shared/schemas/project.js";
 import type { RequestEvent } from "./$types";
 

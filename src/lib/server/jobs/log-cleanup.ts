@@ -3,8 +3,8 @@ import { sql } from "drizzle-orm";
 import { RETENTION_CONFIG } from "#lib/server/config/performance.js";
 import type { DatabaseClient } from "#lib/server/db/db.js";
 import { getQueryRows } from "#lib/server/db/db.js";
+import { isActiveProject } from "#lib/server/db/predicates.js";
 import { project } from "#lib/server/db/schema.js";
-import { isActiveProject } from "#lib/server/utils/owned-project.js";
 import { OLDEST_FIRST, projectLogs } from "#lib/server/utils/capped-count.js";
 
 export interface CleanupResult {

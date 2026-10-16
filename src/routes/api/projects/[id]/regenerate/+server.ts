@@ -1,4 +1,5 @@
 import { and, eq } from "drizzle-orm";
+import { isActiveProject } from "#lib/server/db/predicates.js";
 import { project } from "#lib/server/db/schema.js";
 import { apiError } from "#lib/server/utils/api-error.js";
 import {
@@ -6,7 +7,7 @@ import {
   hashApiKey,
   invalidateApiKeyCacheByHash,
 } from "#lib/server/utils/api-key.js";
-import { isActiveProject, requireOwnedProjectRoute } from "#lib/server/utils/owned-project.js";
+import { requireOwnedProjectRoute } from "#lib/server/utils/owned-project.js";
 import type { RequestEvent } from "./$types";
 
 /**

@@ -4,6 +4,7 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import { API_CONFIG } from "#lib/server/config/performance.js";
 import type { DatabaseClient } from "#lib/server/db/db.js";
+import { isActiveProject } from "#lib/server/db/predicates.js";
 import { log, type NewLog, project } from "#lib/server/db/schema.js";
 import { logEventBus, type StreamLog } from "#lib/server/events.js";
 import { ApiKeyError, validateApiKey } from "#lib/server/utils/api-key.js";
@@ -14,7 +15,6 @@ import {
   upsertIncidentsForPreparedLogs,
 } from "#lib/server/utils/incidents.js";
 import { BatchTooLargeError, OtlpValidationError } from "#lib/server/utils/otlp.js";
-import { isActiveProject } from "#lib/server/utils/owned-project.js";
 import { checkRateLimit, INGEST_RPM } from "#lib/server/utils/rate-limit.js";
 import { SimpleIngestError } from "#lib/server/utils/simple-ingest.js";
 import { jsonObjectSchema, type JsonObject, type JsonValue } from "../../shared/schemas/json";

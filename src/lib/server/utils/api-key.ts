@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import type { DatabaseClient } from "#lib/server/db/db.js";
 import { project } from "../db/schema";
-import { isActiveProject } from "./owned-project";
+import { isActiveProject } from "../db/predicates";
 
 export class ApiKeyError extends Error {
   status: number;

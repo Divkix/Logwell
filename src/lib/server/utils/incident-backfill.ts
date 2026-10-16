@@ -1,8 +1,9 @@
-import { and, eq, gte, inArray, isNull, sql, type SQL } from "drizzle-orm";
+import { and, eq, gte, inArray, sql, type SQL } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { INCIDENT_GROUPED_LEVELS } from "../../shared/schemas/incident";
 import type { JsonValue } from "../../shared/schemas/json";
 import type { DatabaseClient } from "../db/db";
+import { isActiveProject } from "../db/predicates";
 import { type Incident, incident, type LogLevel, log, project } from "../db/schema";
 import { cursorRowGreaterThan, microsColumn } from "./cursor";
 import {
@@ -21,14 +22,10 @@ export interface BackfillProjectResult {
 /**
  * Projects the backfill should process: every project not soft-deleted. A deleted project is
  * waiting for the purge, and rebuilding its incidents would only recreate rows the purge has
- * already removed. (Same predicate as owned-project.ts's isActiveProject, which this module
- * can't import: it loads the app env, and the backfill script runs without it.)
+ * already removed.
  */
 export function listBackfillProjects(db: DatabaseClient) {
-  return db
-    .select({ id: project.id, name: project.name })
-    .from(project)
-    .where(isNull(project.deletedAt));
+  return db.select({ id: project.id, name: project.name }).from(project).where(isActiveProject);
 }
 
 // Logs are paged by keyset and written one batch per transaction, so a large window neither

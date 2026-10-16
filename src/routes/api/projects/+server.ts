@@ -1,11 +1,12 @@
 import { and, desc, eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { getDbClient } from "#lib/server/db/db.js";
+import { isActiveProject } from "#lib/server/db/predicates.js";
 import { project, type Project } from "#lib/server/db/schema.js";
 import { apiError, isUniqueViolation } from "#lib/server/utils/api-error.js";
 import { generateApiKey, hashApiKey } from "#lib/server/utils/api-key.js";
 import { isCappedLogCount, projectLogStatsColumns } from "#lib/server/utils/capped-count.js";
-import { isActiveProject, requireAuth } from "#lib/server/utils/owned-project.js";
+import { requireAuth } from "#lib/server/utils/owned-project.js";
 import { requireJsonContentType } from "#lib/server/utils/content-type.js";
 import { checkCsrfOrigin } from "#lib/server/utils/csrf.js";
 import { projectCreatePayloadSchema } from "#lib/shared/schemas/project.js";
