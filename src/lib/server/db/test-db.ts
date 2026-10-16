@@ -253,28 +253,12 @@ function getTemplateDataDir(): Promise<Blob> {
   return templateDataDir;
 }
 
-export async function createTestDatabase(): Promise<PgliteDatabase<typeof schema>> {
+export async function createTestDatabase(): Promise<
+  PgliteDatabase<typeof schema> & { $client: PGlite }
+> {
   const client = await PGlite.create({ loadDataDir: await getTemplateDataDir() });
 
   return drizzle(client, { schema });
-}
-
-export async function cleanDatabase(db: PgliteDatabase<typeof schema>): Promise<void> {
-  const tables = Object.values(schema).filter((item) => is(item, PgTable));
-
-  const tableNames = tables.map((table) => {
-    const config = getTableConfig(table);
-
-    return config.name;
-  });
-
-  for (const tableName of tableNames.reverse()) {
-    try {
-      await db.execute(sql.raw(`TRUNCATE TABLE "${tableName}" RESTART IDENTITY CASCADE`));
-    } catch (error) {
-      console.warn(`Could not truncate table ${tableName}:`, error);
-    }
-  }
 }
 
 export async function setupTestDatabase(): Promise<{
@@ -285,8 +269,8 @@ export async function setupTestDatabase(): Promise<{
 
   return {
     db,
-    cleanup: async () => {
-      await cleanDatabase(db);
-    },
+    // Each PGlite holds a ~230MB WASM heap until closed; leaking one per test
+    // pushes a long file past the CI runner's memory.
+    cleanup: () => db.$client.close(),
   };
 }
