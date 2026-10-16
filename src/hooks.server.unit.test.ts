@@ -267,6 +267,36 @@ describe("hooks.server handle", () => {
       );
     });
 
+    it("keeps letting the owner in from a network they signed in from before", async () => {
+      const home = "192.0.2.77";
+      const newPlace = "192.0.2.78";
+      const failedAt = "192.0.2.79";
+
+      expect((await handle({ event: signInAs("owner", home), resolve })).status).toBe(200);
+
+      mocks.authHandler.mockImplementation(() => new Response("bad credentials", { status: 401 }));
+
+      // A failed attempt does not make its network known.
+      expect((await handle({ event: signInAs("owner", failedAt), resolve })).status).toBe(401);
+
+      // Attackers on other networks drain the account bucket.
+      for (let i = 1; i < LOGIN_ACCOUNT_RPM; i++) {
+        expect((await handle({ event: signInAs("owner", freshAddress()), resolve })).status).toBe(
+          401,
+        );
+      }
+
+      expect((await handle({ event: signInAs("owner", freshAddress()), resolve })).status).toBe(
+        429,
+      );
+
+      mocks.authHandler.mockImplementation(() => new Response("signed in"));
+
+      expect((await handle({ event: signInAs("owner", home), resolve })).status).toBe(200);
+      expect((await handle({ event: signInAs("owner", failedAt), resolve })).status).toBe(429);
+      expect((await handle({ event: signInAs("owner", newPlace), resolve })).status).toBe(429);
+    });
+
     it("keys the account bucket by the resolved account of the request", async () => {
       const event = signInAs("someone", freshAddress());
 

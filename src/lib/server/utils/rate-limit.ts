@@ -80,13 +80,87 @@ export const loginIpLimiter = new RateLimitStore();
 /** Failed sign-in attempts per account (see `loginAccountKey`), across all client networks. */
 export const loginAccountLimiter = new RateLimitStore();
 
+// An owner who signs in from home or the office keeps doing so; a month outlasts a 7-day session.
+const KNOWN_NETWORK_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+const MAX_KNOWN_NETWORKS_PER_ACCOUNT = 32;
+
+const MAX_KNOWN_ACCOUNTS = 1_000;
+
+/**
+ * Client networks (see `clientNetworkKey`) each account has signed in from successfully.
+ *
+ * The account bucket is shared by every network, so anyone who can fail sign-ins faster than it
+ * refills keeps it empty, and a correct password is then refused too. A network the account has
+ * signed in from before skips that exhausted bucket (its per-network LOGIN_RPM still applies),
+ * so such an attack cannot lock the owner out of a network they have used. Only a successful
+ * sign-in adds an entry, so an attacker without the password cannot add their own networks.
+ * Kept in memory: after a restart the owner's first sign-in from each network needs a token.
+ */
+export class KnownLoginNetworks {
+  readonly #accounts = new Map<string, Map<string, number>>();
+
+  /** Records that `account` signed in from `network`. */
+  remember(account: string, network: string, now = Date.now()): void {
+    let networks = this.#accounts.get(account);
+
+    if (!networks) {
+      if (this.#accounts.size >= MAX_KNOWN_ACCOUNTS) {
+        const oldest = this.#accounts.keys().next().value;
+
+        if (oldest !== undefined) this.#accounts.delete(oldest);
+      }
+
+      networks = new Map();
+      this.#accounts.set(account, networks);
+    }
+
+    // Re-inserted so insertion order stays oldest-first for eviction.
+    networks.delete(network);
+
+    if (networks.size >= MAX_KNOWN_NETWORKS_PER_ACCOUNT) {
+      const oldest = networks.keys().next().value;
+
+      if (oldest !== undefined) networks.delete(oldest);
+    }
+
+    networks.set(network, now);
+  }
+
+  /** Whether `account` signed in from `network` within the last KNOWN_NETWORK_TTL_MS. */
+  has(account: string, network: string, now = Date.now()): boolean {
+    const seen = this.#accounts.get(account)?.get(network);
+
+    return seen !== undefined && now - seen <= KNOWN_NETWORK_TTL_MS;
+  }
+
+  sweep(now: number): void {
+    for (const [account, networks] of this.#accounts) {
+      for (const [network, seen] of networks) {
+        if (now - seen > KNOWN_NETWORK_TTL_MS) networks.delete(network);
+      }
+
+      if (networks.size === 0) this.#accounts.delete(account);
+    }
+  }
+}
+
+/** Networks each account has signed in from (hooks.server.ts). */
+export const knownLoginNetworks = new KnownLoginNetworks();
+
 /** Pre-auth /v1 requests per client network (hooks.server.ts). */
 export const ingestIpLimiter = new RateLimitStore();
 
 /** Authenticated ingest requests per project (ingest.ts). */
 export const ingestProjectLimiter = new RateLimitStore();
 
-const stores = [loginIpLimiter, loginAccountLimiter, ingestIpLimiter, ingestProjectLimiter];
+const stores = [
+  loginIpLimiter,
+  loginAccountLimiter,
+  ingestIpLimiter,
+  ingestProjectLimiter,
+  knownLoginNetworks,
+];
 
 setInterval(() => {
   const now = Date.now();
@@ -117,9 +191,11 @@ export const LOGIN_RPM = parsePositiveRpm("RATE_LIMIT_LOGIN_RPM", 10);
 
 /**
  * Failed sign-ins per minute for one account, from any address. Bounds a distributed guess rate
- * that the per-network limit cannot. The trade-off is lockout: whoever can sustain this many
- * failures a minute can keep the account's legitimate owner out too, so the default sits well
- * above LOGIN_RPM — denying the admin then takes several client networks, not one.
+ * that the per-network limit cannot. The trade-off is lockout: whoever sustains this many
+ * failures a minute keeps the bucket empty for everyone. That is cheap: LOGIN_ACCOUNT_RPM /
+ * LOGIN_RPM networks (3-4 by default), and one IPv6 subscriber's /56 or /48 delegation holds
+ * hundreds of /64s. So an exhausted bucket refuses only networks the account has never signed
+ * in from (see KnownLoginNetworks).
  */
 export const LOGIN_ACCOUNT_RPM = parsePositiveRpm("RATE_LIMIT_LOGIN_ACCOUNT_RPM", 30);
 

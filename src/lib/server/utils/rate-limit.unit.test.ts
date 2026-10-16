@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
-import { clientNetworkKey, RateLimitStore } from "./rate-limit";
+import { clientNetworkKey, KnownLoginNetworks, RateLimitStore } from "./rate-limit";
 
 describe("rate-limit env parsing", () => {
   const originalEnv = { ...process.env };
@@ -152,6 +152,43 @@ describe("RateLimitStore token bucket", () => {
     expect(other.take("shared-key", 1)).toBe(true);
     // The flood in `other` did not evict this store's spent bucket.
     expect(store.take("shared-key", 1)).toBe(false);
+  });
+});
+
+describe("KnownLoginNetworks", () => {
+  const DAY = 24 * 60 * 60 * 1000;
+
+  it("knows a network only for the account that signed in from it", () => {
+    const known = new KnownLoginNetworks();
+    known.remember("user:a", "192.0.2.1", 0);
+
+    expect(known.has("user:a", "192.0.2.1", 0)).toBe(true);
+    expect(known.has("user:a", "192.0.2.2", 0)).toBe(false);
+    expect(known.has("user:b", "192.0.2.1", 0)).toBe(false);
+  });
+
+  it("forgets a network 30 days after its last sign-in, and sweeps it", () => {
+    const known = new KnownLoginNetworks();
+    known.remember("user:a", "192.0.2.1", 0);
+    known.remember("user:a", "192.0.2.2", 0);
+    known.remember("user:a", "192.0.2.2", 20 * DAY);
+
+    expect(known.has("user:a", "192.0.2.1", 30 * DAY)).toBe(true);
+    expect(known.has("user:a", "192.0.2.1", 30 * DAY + 1)).toBe(false);
+
+    known.sweep(30 * DAY + 1);
+
+    expect(known.has("user:a", "192.0.2.1", 0)).toBe(false);
+    expect(known.has("user:a", "192.0.2.2", 30 * DAY + 1)).toBe(true);
+  });
+
+  it("keeps each account's most recent networks when it has signed in from many", () => {
+    const known = new KnownLoginNetworks();
+
+    for (let i = 0; i < 100; i++) known.remember("user:a", `10.0.0.${i}`, i);
+
+    expect(known.has("user:a", "10.0.0.0", 100)).toBe(false);
+    expect(known.has("user:a", "10.0.0.99", 100)).toBe(true);
   });
 });
 

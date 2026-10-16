@@ -12,6 +12,7 @@ import { securityHeadersFor, withSecurityHeaders } from "#lib/server/utils/secur
 import {
   clientNetworkKey,
   ingestIpLimiter,
+  knownLoginNetworks,
   LOGIN_ACCOUNT_RPM,
   LOGIN_RPM,
   loginAccountLimiter,
@@ -71,24 +72,28 @@ const app: Handle = async ({ event, resolve }) => {
 
   const pathname = event.url.pathname;
 
-  // Set for a sign-in that took a token from its account's bucket; the token is refunded
-  // unless the attempt fails on credentials, so only failed guesses count against an account.
-  let signInAccountKey: string | null = null;
+  // Set for a sign-in that passed both login limits. A token taken from the account's bucket
+  // is refunded unless the attempt fails on credentials, so only failed guesses count against
+  // an account.
+  let signIn: { account: string; network: string; charged: boolean } | null = null;
 
   if (event.request.method === "POST" && pathname.startsWith("/api/auth/sign-in")) {
     const csrfError = checkCsrfOrigin(event);
 
     if (csrfError) return csrfError;
 
-    if (!loginIpLimiter.take(clientNetworkKey(event.getClientAddress()), LOGIN_RPM)) {
-      return tooManyLogins();
-    }
+    const network = clientNetworkKey(event.getClientAddress());
+
+    if (!loginIpLimiter.take(network, LOGIN_RPM)) return tooManyLogins();
 
     const account = await loginAccountKey(db, event.request, pathname);
+    const charged = loginAccountLimiter.take(account, LOGIN_ACCOUNT_RPM);
 
-    if (!loginAccountLimiter.take(account, LOGIN_ACCOUNT_RPM)) return tooManyLogins();
+    // Failures from other networks can drain the account's bucket; they must not lock the
+    // owner out of a network they have signed in from before.
+    if (!charged && !knownLoginNetworks.has(account, network)) return tooManyLogins();
 
-    signInAccountKey = account;
+    signIn = { account, network, charged };
   }
 
   if (pathname.startsWith("/v1/")) {
@@ -140,9 +145,17 @@ const app: Handle = async ({ event, resolve }) => {
 
   const response = await svelteKitHandler({ event, resolve, auth, building });
 
-  // better-auth answers bad credentials with 401; anything else was not a password guess.
-  if (signInAccountKey && response.status !== 401) {
-    loginAccountLimiter.refund(signInAccountKey, LOGIN_ACCOUNT_RPM);
+  if (signIn) {
+    // better-auth answers bad credentials with 401; anything else was not a password guess.
+    if (signIn.charged && response.status !== 401) {
+      loginAccountLimiter.refund(signIn.account, LOGIN_ACCOUNT_RPM);
+    }
+
+    // Only a sign-in resolved to an existing account ("user:<id>", see loginAccountKey) is
+    // remembered; a 2xx means better-auth accepted its password.
+    if (response.ok && signIn.account.startsWith("user:")) {
+      knownLoginNetworks.remember(signIn.account, signIn.network);
+    }
   }
 
   return response;
