@@ -1,7 +1,7 @@
 import type { HttpError } from "@sveltejs/kit";
 import { eq } from "drizzle-orm";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
-import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { createAuth } from "#lib/server/auth.js";
 import type * as schema from "#lib/server/db/schema.js";
 import { project } from "#lib/server/db/schema.js";
@@ -106,6 +106,7 @@ describe("POST /api/projects/[id]/regenerate", () => {
   });
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     await cleanup();
   });
 
@@ -191,6 +192,44 @@ describe("POST /api/projects/[id]/regenerate", () => {
     expect(dbProject).toBeDefined();
     expect(dbProject!.apiKeyHash).toBe(hashApiKey(body.apiKey));
     expect(dbProject!.apiKeyHash).not.toBe(hashApiKey(testProject.apiKey));
+  });
+
+  it("returns 404 and writes no key when the project is deleted after the ownership check", async () => {
+    const testProject = await seedProjectWithApiKey(db, { ownerId: userId });
+    const deletedHash = `deleted:${testProject.id}`;
+
+    // A DELETE that commits right after the ownership guard reads the row: the guard's select
+    // runs with a data-modifying CTE that soft-deletes the project. Both share one snapshot, so
+    // the guard still sees the active row while the delete is committed before the UPDATE runs.
+    const softDelete = db
+      .$with("soft_delete")
+      .as(
+        db
+          .update(project)
+          .set({ deletedAt: new Date(), apiKeyHash: deletedHash })
+          .where(eq(project.id, testProject.id))
+          .returning({ id: project.id }),
+      );
+
+    vi.spyOn(db, "select").mockImplementationOnce(db.with(softDelete).select);
+
+    const request = new Request(`http://localhost/api/projects/${testProject.id}/regenerate`, {
+      method: "POST",
+      headers: { Origin: "http://localhost" },
+    });
+
+    const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+
+    const response = await POST_REGENERATE(event);
+
+    expect(response.status).toBe(404);
+
+    const [row] = await db
+      .select({ apiKeyHash: project.apiKeyHash })
+      .from(project)
+      .where(eq(project.id, testProject.id));
+
+    expect(row?.apiKeyHash).toBe(deletedHash);
   });
 
   it("rejects cross-origin request (CSRF)", async () => {

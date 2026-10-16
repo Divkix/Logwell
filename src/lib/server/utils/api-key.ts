@@ -1,8 +1,9 @@
 import { createHash } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import type { DatabaseClient } from "#lib/server/db/db.js";
 import { project } from "../db/schema";
+import { isActiveProject } from "./owned-project";
 
 export class ApiKeyError extends Error {
   status: number;
@@ -136,7 +137,7 @@ export async function validateApiKey(request: Request, dbClient?: DatabaseClient
   const [result] = await db
     .select({ id: project.id })
     .from(project)
-    .where(eq(project.apiKeyHash, keyHash));
+    .where(and(eq(project.apiKeyHash, keyHash), isActiveProject));
 
   if (!result) {
     setNegativeCache(keyHash);

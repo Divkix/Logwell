@@ -165,6 +165,28 @@ describe("DELETE /api/projects/[id] (soft delete + background purge)", () => {
     expect(await db.select().from(log).where(eq(log.projectId, doomed.id))).toHaveLength(1);
   });
 
+  it("rejects ingest validated from the cache just before the delete committed", async () => {
+    const doomed = await seedProjectWithApiKey(db, { ownerId: userId });
+
+    // Warm the API key cache.
+    expect((await ingest(db, doomed.apiKey)).status).toBe(200);
+
+    // The delete commits after this request's key was served from the cache: only deleted_at
+    // changes here, so the cached entry and the stored hash both still match the key.
+    await db.update(project).set({ deletedAt: new Date() }).where(eq(project.id, doomed.id));
+
+    expect((await ingest(db, doomed.apiKey)).status).toBe(401);
+    expect(await db.select().from(log).where(eq(log.projectId, doomed.id))).toHaveLength(1);
+  });
+
+  it("rejects a key whose hash still matches a deleted project's row", async () => {
+    const doomed = await seedProjectWithApiKey(db, { ownerId: userId });
+    await db.update(project).set({ deletedAt: new Date() }).where(eq(project.id, doomed.id));
+
+    expect((await ingest(db, doomed.apiKey)).status).toBe(401);
+    expect(await db.select().from(log).where(eq(log.projectId, doomed.id))).toHaveLength(0);
+  });
+
   it("purges logs, incidents and finally the row, leaving other projects alone", async () => {
     const doomed = await seedProject(db, { ownerId: userId });
     const kept = await seedProject(db, { ownerId: userId });

@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { Data, Effect } from "effect";
 import { nanoid } from "nanoid";
 import { z } from "zod";
@@ -14,6 +14,7 @@ import {
   upsertIncidentsForPreparedLogs,
 } from "#lib/server/utils/incidents.js";
 import { BatchTooLargeError, OtlpValidationError } from "#lib/server/utils/otlp.js";
+import { isActiveProject } from "#lib/server/utils/owned-project.js";
 import { checkRateLimit, INGEST_RPM } from "#lib/server/utils/rate-limit.js";
 import { SimpleIngestError } from "#lib/server/utils/simple-ingest.js";
 import { jsonObjectSchema, type JsonObject, type JsonValue } from "../../shared/schemas/json";
@@ -221,8 +222,13 @@ function ingest(request: Request, db: DatabaseClient, parse: IngestBodyParser) {
       },
     });
 
+    // A key validated from the cache just before its project was soft-deleted still resolves
+    // to the project id, so the re-verify must exclude deleted projects too.
     const [projectRow] = yield* Effect.promise(() =>
-      db.select({ id: project.id }).from(project).where(eq(project.id, projectId)),
+      db
+        .select({ id: project.id })
+        .from(project)
+        .where(and(eq(project.id, projectId), isActiveProject)),
     );
 
     if (!projectRow) return yield* new Unauthorized({ status: 401, message: "Invalid API key" });
