@@ -72,6 +72,49 @@ describe("hooks.server handle", () => {
     mocks.env.ORIGIN = ORIGIN;
   });
 
+  describe("security headers", () => {
+    const hardening = (response: Response) => ({
+      nosniff: response.headers.get("X-Content-Type-Options"),
+      frame: response.headers.get("X-Frame-Options"),
+      referrer: response.headers.get("Referrer-Policy"),
+      hsts: response.headers.get("Strict-Transport-Security"),
+    });
+
+    it("sets them on resolved responses and on the hook's own early returns", async () => {
+      const page = await handle({ event: createEvent(`${ORIGIN}/projects`), resolve });
+
+      const signUp = await handle({
+        event: createEvent(`${ORIGIN}/api/auth/sign-up/email`, {
+          method: "POST",
+          headers: { Origin: ORIGIN },
+        }),
+        resolve,
+      });
+
+      for (const response of [page, signUp]) {
+        expect(hardening(response)).toEqual({
+          nosniff: "nosniff",
+          frame: "DENY",
+          referrer: "same-origin",
+          hsts: null,
+        });
+      }
+
+      expect(signUp.status).toBe(403);
+    });
+
+    it("adds HSTS only when ORIGIN is https", async () => {
+      mocks.env.ORIGIN = "https://logs.example.com";
+
+      const response = await handle({
+        event: createEvent("https://logs.example.com/api/health"),
+        resolve,
+      });
+
+      expect(hardening(response).hsts).toBe("max-age=31536000");
+    });
+  });
+
   describe("session resolution", () => {
     it("populates locals.user, locals.session and locals.db for a valid session", async () => {
       const session = { id: "sess_1", userId: "user_1", expiresAt: new Date(Date.now() + 60_000) };

@@ -8,6 +8,7 @@ import { closeDb, db } from "#lib/server/db/index.js";
 import { handleError as buildErrorResponse, reportFatalError } from "#lib/server/error-handler.js";
 import { startCleanupScheduler, stopCleanupScheduler } from "#lib/server/jobs/cleanup-scheduler.js";
 import { checkCsrfOrigin } from "#lib/server/utils/csrf.js";
+import { securityHeadersFor, withSecurityHeaders } from "#lib/server/utils/security-headers.js";
 import {
   clientNetworkKey,
   ingestIpLimiter,
@@ -78,7 +79,7 @@ async function signInAccount(request: Request): Promise<string | null> {
   }
 }
 
-export const handle: Handle = async ({ event, resolve }) => {
+const app: Handle = async ({ event, resolve }) => {
   if (building) {
     return resolve(event);
   }
@@ -167,6 +168,11 @@ export const handle: Handle = async ({ event, resolve }) => {
 
   return response;
 };
+
+// Wraps `app` rather than going through Kit's sequence(), so its early returns (429s, 403s, CSRF
+// rejections) carry the headers too, and the hook stays callable outside Kit's request store.
+export const handle: Handle = async (input) =>
+  withSecurityHeaders(await app(input), securityHeadersFor(env.ORIGIN));
 
 export const handleError: HandleServerError = (caught) => {
   // Kit 3 also routes `error(status, message)` throws through this hook. Their body is
