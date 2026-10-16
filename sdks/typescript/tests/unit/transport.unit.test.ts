@@ -122,4 +122,36 @@ describe("HttpTransport - 4xx mapping", () => {
     expect(result.accepted).toBe(1);
     expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
+
+  it.each([
+    ["3", 3000],
+    ["60", 10000],
+  ])(
+    "waits Retry-After %ss (capped at the 10s ceiling) before retrying",
+    async (header, waitMs) => {
+      vi.useFakeTimers();
+      try {
+        const fetchSpy = vi
+          .spyOn(globalThis, "fetch")
+          .mockResolvedValueOnce(
+            new Response(JSON.stringify({ error: "rate_limited" }), {
+              status: 429,
+              headers: { "Content-Type": "application/json", "Retry-After": header },
+            }),
+          )
+          .mockResolvedValueOnce(jsonResponse(1));
+
+        const transport = new HttpTransport({ endpoint, apiKey, maxRetries: 2 });
+        const pending = transport.send([createLogFixture()]);
+
+        await vi.advanceTimersByTimeAsync(waitMs - 1);
+        expect(fetchSpy).toHaveBeenCalledTimes(1);
+        await vi.advanceTimersByTimeAsync(1);
+        await expect(pending).resolves.toMatchObject({ accepted: 1 });
+        expect(fetchSpy).toHaveBeenCalledTimes(2);
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
 });

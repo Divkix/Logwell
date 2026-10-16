@@ -94,7 +94,9 @@ export class HttpTransport {
 
         if (attempt < this.config.maxRetries) {
           if (lastError.retryAfterMs !== undefined) {
-            await sleep(Math.min(lastError.retryAfterMs, backoffMs(attempt)));
+            // Honor Retry-After up to the backoff ceiling; capping at the
+            // per-attempt backoff would retry a 60s rate limit after 100ms.
+            await sleep(Math.min(lastError.retryAfterMs, MAX_BACKOFF_MS));
           } else {
             await delay(attempt);
           }
