@@ -43,15 +43,16 @@ const logTimestamp = sql`${log}.${sql.identifier(log.timestamp.name)}`;
  * correlated subquery, a table whose stats have seen only one busy project) — walks the
  * single-column idx_log_timestamp across every project's rows looking for this one. For an
  * empty or quiet project that is a full index scan (measured on PG 18: 540k rows filtered for
- * an empty project, vs. an immediate stop with this form).
+ * an empty project, vs. an immediate stop with this form). An extra `timestamp` bound does
+ * not save the plain form, which is why retention cleanup uses this one too.
  */
-function projectLogs(projectId: SQL | string): SQL {
+export function projectLogs(projectId: SQL | string): SQL {
   return sql`${logProjectId} >= ${projectId} and ${logProjectId} <= ${projectId}`;
 }
 
 const NEWEST_FIRST = sql`${logProjectId} desc, ${logTimestamp} desc`;
 
-const OLDEST_FIRST = sql`${logProjectId} asc, ${logTimestamp} asc`;
+export const OLDEST_FIRST = sql`${logProjectId} asc, ${logTimestamp} asc`;
 
 function cappedProjectLogCount(projectId: SQL | string, ceiling: number): SQL<number> {
   return sql<number>`(
