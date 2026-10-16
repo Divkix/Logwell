@@ -140,8 +140,9 @@ export const log = pgTable(
     // Keyset order (timestamp DESC, id DESC) in full, so a page is an index range with no sort
     // step. Also serves retention cleanup and the per-project count/edge subqueries.
     index("idx_log_project_timestamp_id").on(table.projectId, table.timestamp, table.id),
-    // The same order behind a level equality, for a single-level filter ("errors only"), and
-    // per-level stats over a window (skip scan over the five levels).
+    // The same order behind a level equality, for a level filter ("errors only"; several levels
+    // are paged one level each, see queryLogs), and per-level stats over a window (skip scan
+    // over the five levels).
     index("idx_log_project_level_timestamp_id").on(
       table.projectId,
       table.level,

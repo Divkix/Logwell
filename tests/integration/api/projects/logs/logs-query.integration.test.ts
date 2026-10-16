@@ -377,6 +377,108 @@ describe("GET /api/projects/[id]/logs", () => {
     });
   });
 
+  describe("Multi-level Filter", () => {
+    async function seedInterleaved(projectId: string) {
+      const base = Date.UTC(2026, 0, 1);
+
+      const levels: schema.LogLevel[] = [
+        "error",
+        "info",
+        "fatal",
+        "error",
+        "warn",
+        "fatal",
+        "error",
+        "info",
+        "fatal",
+      ];
+
+      const seeded = await Promise.all(
+        levels.map((level, i) =>
+          seedLog(db, projectId, {
+            level,
+            // Two rows share each timestamp, across levels, so the id tie-break is exercised.
+            timestamp: new Date(base + Math.floor(i / 2) * 1000),
+          }),
+        ),
+      );
+
+      return seeded
+        .filter((row) => row.level === "error" || row.level === "fatal")
+        .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime() || (a.id < b.id ? 1 : -1))
+        .map((row) => row.id);
+    }
+
+    async function getPage(projectId: string, query: string) {
+      const request = new Request(`http://localhost/api/projects/${projectId}/logs?${query}`);
+
+      const response = await GET(
+        createRequestEvent(request, db, { id: projectId }, authenticatedLocals),
+      );
+
+      expect(response.status).toBe(200);
+
+      return response.json();
+    }
+
+    it("merges the selected levels newest first across cursor pages", async () => {
+      const testProject = await seedProject(db, { ownerId: userId });
+      const expected = await seedInterleaved(testProject.id);
+
+      const seen: string[] = [];
+      let cursor: string | null = null;
+
+      for (let pages = 0; pages < 10; pages++) {
+        const body = await getPage(
+          testProject.id,
+          `level=fatal,error,error&limit=2${cursor ? `&cursor=${cursor}` : ""}`,
+        );
+
+        seen.push(...body.logs.map((row: { id: string }) => row.id));
+
+        if (!body.has_more) break;
+        cursor = body.nextCursor;
+      }
+
+      expect(seen).toEqual(expected);
+    });
+
+    it("reports the total over every selected level on the first page", async () => {
+      const testProject = await seedProject(db, { ownerId: userId });
+      const expected = await seedInterleaved(testProject.id);
+
+      const body = await getPage(testProject.id, "level=error,fatal&limit=4");
+
+      expect(body.logs.map((row: { id: string }) => row.id)).toEqual(expected.slice(0, 4));
+      expect(body.total).toBe(expected.length);
+      expect(body.has_more).toBe(true);
+    });
+
+    it("applies the deprecated offset across the selected levels", async () => {
+      const testProject = await seedProject(db, { ownerId: userId });
+      const expected = await seedInterleaved(testProject.id);
+
+      const body = await getPage(testProject.id, "level=error,fatal&limit=2&offset=3");
+
+      expect(body.logs.map((row: { id: string }) => row.id)).toEqual(expected.slice(3, 5));
+    });
+
+    it("pages each selected level on its own (project, level, timestamp, id) range", async () => {
+      const testProject = await seedProject(db, { ownerId: userId });
+      await seedInterleaved(testProject.id);
+      const select = vi.spyOn(db, "select");
+
+      await getPage(testProject.id, "level=error&limit=2");
+      const singleLevel = select.mock.calls.length;
+      select.mockClear();
+
+      await getPage(testProject.id, "level=error,fatal,warn&limit=2");
+
+      // The same queries, with one page select per level (UNION ALL) in place of one.
+      expect(select.mock.calls.length).toBe(singleLevel + 2);
+    });
+  });
+
   describe("Time Range Filter", () => {
     it("filters by from timestamp", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
