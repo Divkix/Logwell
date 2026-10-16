@@ -1,6 +1,6 @@
 import { asc, eq } from "drizzle-orm";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
-import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type * as schema from "../../../src/lib/server/db/schema";
 import { log } from "../../../src/lib/server/db/schema";
 import { setupTestDatabase } from "../../../src/lib/server/db/test-db";
@@ -289,5 +289,48 @@ describe("cleanupOldLogs batch selection", () => {
 
     const p2Remaining = await db.select().from(log).where(eq(log.projectId, project2.id));
     expect(p2Remaining.map((l) => l.message)).toEqual(["p2-recent"]);
+  });
+});
+
+describe("cleanupOldLogs pacing", () => {
+  let db: PgliteDatabase<typeof schema>;
+
+  beforeEach(async () => {
+    ({ db } = await setupTestDatabase());
+  });
+
+  const tenDaysAgo = () => new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+
+  it("pauses between batches, not after the last one", async () => {
+    const project1 = await seedProject(db, { retentionDays: 7 });
+    await seedLogs(db, project1.id, 5, { timestamp: tenDaysAgo() });
+    const sleep = vi.fn(async () => {});
+
+    const result = await cleanupOldLogs(db, { batchSize: 2, batchPauseMs: 250, sleep });
+
+    expect(result.totalLogsDeleted).toBe(5);
+    // Batches of 2, 2, 1: the short third batch ends the loop without another pause.
+    expect(sleep.mock.calls).toEqual([[250], [250]]);
+  });
+
+  it("stops after a short batch instead of issuing an empty one", async () => {
+    const project1 = await seedProject(db, { retentionDays: 7 });
+    await seedLogs(db, project1.id, 3, { timestamp: tenDaysAgo() });
+    const executeSpy = vi.spyOn(db, "execute");
+
+    await cleanupOldLogs(db, { batchSize: 2, batchPauseMs: 0 });
+
+    expect(executeSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it("runs batches back-to-back when the pause is 0", async () => {
+    const project1 = await seedProject(db, { retentionDays: 7 });
+    await seedLogs(db, project1.id, 4, { timestamp: tenDaysAgo() });
+    const sleep = vi.fn(async () => {});
+
+    const result = await cleanupOldLogs(db, { batchSize: 2, batchPauseMs: 0, sleep });
+
+    expect(result.totalLogsDeleted).toBe(4);
+    expect(sleep).not.toHaveBeenCalled();
   });
 });

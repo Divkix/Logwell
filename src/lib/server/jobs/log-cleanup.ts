@@ -1,3 +1,4 @@
+import { setTimeout as sleep } from "node:timers/promises";
 import { sql } from "drizzle-orm";
 import { RETENTION_CONFIG } from "#lib/server/config/performance.js";
 import type { DatabaseClient } from "#lib/server/db/db.js";
@@ -12,9 +13,47 @@ export interface CleanupResult {
   errors: string[];
 }
 
-const BATCH_SIZE = 1000;
+export interface BatchOptions {
+  /** Rows per DELETE statement. */
+  batchSize?: number;
+  /** Pause between two batches (LOG_CLEANUP_BATCH_PAUSE_MS). */
+  batchPauseMs?: number;
+  /** Seam for tests; defaults to a real timer. */
+  sleep?: (ms: number) => Promise<void>;
+}
 
-export async function cleanupOldLogs(dbClient?: DatabaseClient): Promise<CleanupResult> {
+const DEFAULT_BATCH_SIZE = 1000;
+
+/**
+ * Runs `deleteBatch(limit)` until it deletes fewer than `limit` rows, pausing between batches so
+ * a large backlog is spread out instead of written to the WAL back-to-back. Returns the total.
+ */
+export async function deleteInBatches(
+  deleteBatch: (limit: number) => Promise<number>,
+  options: BatchOptions = {},
+): Promise<number> {
+  const {
+    batchSize = DEFAULT_BATCH_SIZE,
+    batchPauseMs = RETENTION_CONFIG.LOG_CLEANUP_BATCH_PAUSE_MS,
+    sleep: pause = sleep,
+  } = options;
+
+  let total = 0;
+
+  for (;;) {
+    const deleted = await deleteBatch(batchSize);
+    total += deleted;
+
+    if (deleted < batchSize) return total;
+
+    if (batchPauseMs > 0) await pause(batchPauseMs);
+  }
+}
+
+export async function cleanupOldLogs(
+  dbClient?: DatabaseClient,
+  options: BatchOptions = {},
+): Promise<CleanupResult> {
   const db = dbClient ?? (await import("#lib/server/db/index.js")).db;
 
   const result: CleanupResult = {
@@ -44,9 +83,7 @@ export async function cleanupOldLogs(dbClient?: DatabaseClient): Promise<Cleanup
         const cutoffDate = new Date();
         cutoffDate.setDate(cutoffDate.getDate() - effectiveRetention);
 
-        let deletedInProject = 0;
-
-        while (true) {
+        const deletedInProject = await deleteInBatches(async (limit) => {
           // Bind the cutoff as an ISO string: passing the Date object here is what broke cleanup.
           // projectLogs + OLDEST_FIRST keep each batch on idx_log_project_timestamp_id. With a plain
           // `project_id =` the planner may walk another index through every other project's
@@ -58,17 +95,14 @@ export async function cleanupOldLogs(dbClient?: DatabaseClient): Promise<Cleanup
               WHERE ${projectLogs(proj.id)}
                 AND timestamp < ${cutoffDate.toISOString()}
               ORDER BY ${OLDEST_FIRST}
-              LIMIT ${BATCH_SIZE}
+              LIMIT ${limit}
             )
             DELETE FROM "log" WHERE id IN (SELECT id FROM batch)
             RETURNING id
           `);
 
-          const rows = getQueryRows(raw);
-
-          if (rows.length === 0) break;
-          deletedInProject += rows.length;
-        }
+          return getQueryRows(raw).length;
+        }, options);
 
         if (deletedInProject > 0) {
           result.projectsProcessed++;

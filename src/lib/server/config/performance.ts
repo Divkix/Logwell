@@ -12,6 +12,7 @@
  * - LOG_STREAM_MAX_LOGS: Maximum logs in memory per client (default: 1000)
  * - LOG_RETENTION_DAYS: System default retention in days (default: 30, 0 = disabled)
  * - LOG_CLEANUP_INTERVAL_MS: Cleanup job interval in ms (default: 3600000 = 1 hour)
+ * - LOG_CLEANUP_BATCH_PAUSE_MS: Pause between cleanup delete batches in ms (default: 100)
  * - INCIDENT_AUTO_RESOLVE_MINUTES: Minutes before incident is considered resolved (default: 30)
  */
 
@@ -109,11 +110,13 @@ export const LOG_STREAM_CONFIG = {
 const RETENTION_DEFAULTS = {
   LOG_RETENTION_DAYS: 30,
   LOG_CLEANUP_INTERVAL_MS: 3600000, // 1 hour
+  LOG_CLEANUP_BATCH_PAUSE_MS: 100,
 } as const;
 
 const RETENTION_BOUNDS = {
   LOG_RETENTION_DAYS: { min: 0, max: 3650 }, // 0 = disabled, max 10 years
   LOG_CLEANUP_INTERVAL_MS: { min: 60000, max: 86400000 }, // 1 minute to 24 hours
+  LOG_CLEANUP_BATCH_PAUSE_MS: { min: 0, max: 60000 }, // 0 = back-to-back batches
 } as const;
 
 /**
@@ -142,6 +145,8 @@ function parseRetentionDays(): number {
  *
  * - LOG_RETENTION_DAYS: System default retention period in days (0 = disabled)
  * - LOG_CLEANUP_INTERVAL_MS: Cleanup job interval in milliseconds
+ * - LOG_CLEANUP_BATCH_PAUSE_MS: Pause between delete batches, so a large backlog is deleted at a
+ *   bounded rate instead of one WAL burst that replicas and backups must absorb at once
  */
 export const RETENTION_CONFIG = {
   LOG_RETENTION_DAYS: parseRetentionDays(),
@@ -149,6 +154,11 @@ export const RETENTION_CONFIG = {
     parseEnvInt("LOG_CLEANUP_INTERVAL_MS", RETENTION_DEFAULTS.LOG_CLEANUP_INTERVAL_MS),
     RETENTION_BOUNDS.LOG_CLEANUP_INTERVAL_MS.min,
     RETENTION_BOUNDS.LOG_CLEANUP_INTERVAL_MS.max,
+  ),
+  LOG_CLEANUP_BATCH_PAUSE_MS: clamp(
+    parseEnvInt("LOG_CLEANUP_BATCH_PAUSE_MS", RETENTION_DEFAULTS.LOG_CLEANUP_BATCH_PAUSE_MS),
+    RETENTION_BOUNDS.LOG_CLEANUP_BATCH_PAUSE_MS.min,
+    RETENTION_BOUNDS.LOG_CLEANUP_BATCH_PAUSE_MS.max,
   ),
 } as const;
 
