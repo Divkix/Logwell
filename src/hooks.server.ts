@@ -1,5 +1,6 @@
 import type { Handle, HandleServerError } from "@sveltejs/kit/hooks";
 import { svelteKitHandler } from "better-auth/svelte-kit";
+import { z } from "zod";
 import { building } from "$app/env";
 import { auth, initAuth } from "#lib/server/auth.js";
 import { env } from "#lib/server/config/env.js";
@@ -7,7 +8,14 @@ import { closeDb, db } from "#lib/server/db/index.js";
 import { handleError as buildErrorResponse } from "#lib/server/error-handler.js";
 import { startCleanupScheduler, stopCleanupScheduler } from "#lib/server/jobs/cleanup-scheduler.js";
 import { checkCsrfOrigin } from "#lib/server/utils/csrf.js";
-import { checkRateLimit, LOGIN_RPM } from "#lib/server/utils/rate-limit.js";
+import {
+  clientNetworkKey,
+  ingestIpLimiter,
+  LOGIN_ACCOUNT_RPM,
+  LOGIN_RPM,
+  loginAccountLimiter,
+  loginIpLimiter,
+} from "#lib/server/utils/rate-limit.js";
 
 let initialized = false;
 
@@ -38,6 +46,32 @@ async function gracefulShutdown(reason: string): Promise<void> {
 // hold that until SHUTDOWN_TIMEOUT, when the adapter force-closes them.
 process.once("sveltekit:shutdown", (reason: string) => void gracefulShutdown(reason));
 
+function tooManyLogins(): Response {
+  return Response.json(
+    { error: "rate_limited", message: "Too many login attempts. Retry in 60 seconds." },
+    { status: 429, headers: { "Retry-After": "60" } },
+  );
+}
+
+const signInBodySchema = z.object({
+  username: z.string().optional(),
+  email: z.string().optional(),
+});
+
+/** Account name a sign-in body targets, normalized the way the username plugin compares it. */
+async function signInAccount(request: Request): Promise<string | null> {
+  try {
+    const body = signInBodySchema.safeParse(await request.clone().json());
+    const name = body.success ? (body.data.username ?? body.data.email) : undefined;
+    // Sliced so an attacker-sized name cannot inflate the limiter's key memory.
+    const normalized = name?.trim().toLowerCase().slice(0, 256);
+
+    return normalized || null;
+  } catch {
+    return null;
+  }
+}
+
 export const handle: Handle = async ({ event, resolve }) => {
   if (building) {
     return resolve(event);
@@ -49,29 +83,34 @@ export const handle: Handle = async ({ event, resolve }) => {
 
   const pathname = event.url.pathname;
 
+  // Set for a sign-in that took a token from its account's bucket; the token is refunded
+  // unless the attempt fails on credentials, so only failed guesses count against an account.
+  let signInAccountKey: string | null = null;
+
   if (event.request.method === "POST" && pathname.startsWith("/api/auth/sign-in")) {
     const csrfError = checkCsrfOrigin(event);
 
     if (csrfError) return csrfError;
 
-    if (!checkRateLimit(`login:${event.getClientAddress()}`, LOGIN_RPM)) {
-      return new Response(
-        JSON.stringify({
-          error: "rate_limited",
-          message: "Too many login attempts. Retry in 60 seconds.",
-        }),
-        {
-          status: 429,
-          headers: { "Content-Type": "application/json", "Retry-After": "60" },
-        },
-      );
+    if (!loginIpLimiter.take(clientNetworkKey(event.getClientAddress()), LOGIN_RPM)) {
+      return tooManyLogins();
+    }
+
+    const account = await signInAccount(event.request);
+
+    if (account) {
+      if (!loginAccountLimiter.take(account, LOGIN_ACCOUNT_RPM)) return tooManyLogins();
+
+      signInAccountKey = account;
     }
   }
 
   if (pathname.startsWith("/v1/")) {
     // Pre-auth throttle: every request with a fresh random key costs a DB lookup in
     // validateApiKey, so the per-IP bucket drains before the per-project one (ingest.ts).
-    if (!checkRateLimit(`ingest-ip:${event.getClientAddress()}`, env.RATE_LIMIT_INGEST_IP_RPM)) {
+    const network = clientNetworkKey(event.getClientAddress());
+
+    if (!ingestIpLimiter.take(network, env.RATE_LIMIT_INGEST_IP_RPM)) {
       return Response.json(
         { error: "rate_limited", message: "Rate limit exceeded. Retry in 60 seconds." },
         { status: 429, headers: { "Retry-After": "60" } },
@@ -110,7 +149,14 @@ export const handle: Handle = async ({ event, resolve }) => {
     if (csrfError) return csrfError;
   }
 
-  return svelteKitHandler({ event, resolve, auth, building });
+  const response = await svelteKitHandler({ event, resolve, auth, building });
+
+  // better-auth answers bad credentials with 401; anything else was not a password guess.
+  if (signInAccountKey && response.status !== 401) {
+    loginAccountLimiter.refund(signInAccountKey, LOGIN_ACCOUNT_RPM);
+  }
+
+  return response;
 };
 
 export const handleError: HandleServerError = (caught) => {

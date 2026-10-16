@@ -15,7 +15,7 @@ import {
   upsertIncidentsForPreparedLogs,
 } from "#lib/server/utils/incidents.js";
 import { BatchTooLargeError, OtlpValidationError } from "#lib/server/utils/otlp.js";
-import { checkRateLimit, INGEST_RPM } from "#lib/server/utils/rate-limit.js";
+import { INGEST_RPM, ingestProjectLimiter } from "#lib/server/utils/rate-limit.js";
 import { SimpleIngestError } from "#lib/server/utils/simple-ingest.js";
 import { jsonObjectSchema, type JsonObject, type JsonValue } from "../../shared/schemas/json";
 
@@ -235,7 +235,7 @@ function ingest(request: Request, db: DatabaseClient, parse: IngestBodyParser) {
 
     if (!projectRow) return yield* new Unauthorized({ status: 401, message: "Invalid API key" });
 
-    if (!checkRateLimit(`ingest:${projectId}`, INGEST_RPM)) return yield* new RateLimited();
+    if (!ingestProjectLimiter.take(projectId, INGEST_RPM)) return yield* new RateLimited();
 
     const body = yield* Effect.tryPromise({
       try: (): Promise<JsonValue | undefined> => request.json(),

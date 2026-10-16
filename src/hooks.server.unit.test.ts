@@ -1,7 +1,7 @@
 import type { RequestEvent } from "@sveltejs/kit";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { handleError as buildErrorResponse } from "#lib/server/error-handler.js";
-import { LOGIN_RPM } from "./lib/server/utils/rate-limit";
+import { LOGIN_ACCOUNT_RPM, LOGIN_RPM } from "./lib/server/utils/rate-limit";
 import { handle, handleError } from "./hooks.server";
 
 // SAFETY: beforeEach assigns ORIGIN a concrete origin string and the unset-origin test
@@ -131,6 +131,77 @@ describe("hooks.server handle", () => {
       expect(blocked.headers.get("Retry-After")).toBe("60");
       expect((await blocked.json()).error).toBe("rate_limited");
       expect(mocks.authHandler).toHaveBeenCalledTimes(LOGIN_RPM);
+    });
+  });
+
+  describe("login rate limiting by network and account", () => {
+    const signInAs = (username: string, address: string) =>
+      createEvent(
+        `${ORIGIN}/api/auth/sign-in/username`,
+        {
+          method: "POST",
+          headers: { Origin: ORIGIN, "Content-Type": "application/json" },
+          body: JSON.stringify({ username, password: "guess" }),
+        },
+        address,
+      );
+
+    // One fresh IPv4 address per attempt, so only the account bucket can trip.
+    const freshAddress = (() => {
+      let next = 0;
+
+      return () => {
+        next += 1;
+
+        return `10.${Math.floor(next / 250)}.${next % 250}.1`;
+      };
+    })();
+
+    it("shares one bucket across every address in an IPv6 /64", async () => {
+      for (let i = 0; i < LOGIN_RPM; i++) {
+        const event = createEvent(
+          `${ORIGIN}/api/auth/sign-in/username`,
+          { method: "POST", headers: { Origin: ORIGIN } },
+          `2001:db8:77:1::${(i + 1).toString(16)}`,
+        );
+
+        expect((await handle({ event, resolve })).status).toBe(200);
+      }
+
+      const rotated = createEvent(
+        `${ORIGIN}/api/auth/sign-in/username`,
+        { method: "POST", headers: { Origin: ORIGIN } },
+        "2001:db8:77:1:ffff:ffff:ffff:fffe",
+      );
+
+      expect((await handle({ event: rotated, resolve })).status).toBe(429);
+    });
+
+    it("blocks an account after LOGIN_ACCOUNT_RPM failed attempts from any address", async () => {
+      mocks.authHandler.mockImplementation(() => new Response("bad credentials", { status: 401 }));
+
+      for (let i = 0; i < LOGIN_ACCOUNT_RPM; i++) {
+        const response = await handle({ event: signInAs("Victim", freshAddress()), resolve });
+        expect(response.status).toBe(401);
+      }
+
+      // Username matching is case- and whitespace-insensitive, like the username plugin's.
+      const blocked = await handle({ event: signInAs("  victim ", freshAddress()), resolve });
+      expect(blocked.status).toBe(429);
+      expect(blocked.headers.get("Retry-After")).toBe("60");
+      expect(mocks.authHandler).toHaveBeenCalledTimes(LOGIN_ACCOUNT_RPM);
+
+      // Other accounts are unaffected.
+      expect((await handle({ event: signInAs("bystander", freshAddress()), resolve })).status).toBe(
+        401,
+      );
+    });
+
+    it("does not count successful sign-ins against the account", async () => {
+      for (let i = 0; i < LOGIN_ACCOUNT_RPM + 5; i++) {
+        const response = await handle({ event: signInAs("regular", freshAddress()), resolve });
+        expect(response.status).toBe(200);
+      }
     });
   });
 

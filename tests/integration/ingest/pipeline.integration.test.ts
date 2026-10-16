@@ -17,7 +17,7 @@ import {
 } from "../../../src/lib/server/utils/api-key";
 import { ingestLogs, type IngestBodyParser } from "../../../src/lib/server/utils/ingest";
 import { parseOtlpIngestBody } from "../../../src/lib/server/utils/otlp";
-import { checkRateLimit, INGEST_RPM } from "../../../src/lib/server/utils/rate-limit";
+import { INGEST_RPM, ingestProjectLimiter } from "../../../src/lib/server/utils/rate-limit";
 import { parseSimpleIngestBody } from "../../../src/lib/server/utils/simple-ingest";
 import type { JsonValue } from "../../../src/lib/shared/schemas/json";
 import { seedProjectWithApiKey } from "../../fixtures/db";
@@ -114,7 +114,7 @@ describe("ingestLogs pipeline", () => {
       it("returns normalized 429 with Retry-After and writes no logs", async () => {
         const project = await seedProjectWithApiKey(db);
 
-        while (checkRateLimit(`ingest:${project.id}`, INGEST_RPM)) {}
+        while (ingestProjectLimiter.take(project.id, INGEST_RPM)) {}
 
         const response = await ingestLogs(post(validBody("limited"), project.apiKey), db, parse);
         expect(response.status).toBe(429);
@@ -132,7 +132,7 @@ describe("ingestLogs pipeline", () => {
         const projectA = await seedProjectWithApiKey(db);
         const projectB = await seedProjectWithApiKey(db);
 
-        while (checkRateLimit(`ingest:${projectA.id}`, INGEST_RPM)) {}
+        while (ingestProjectLimiter.take(projectA.id, INGEST_RPM)) {}
 
         const limited = await ingestLogs(post(validBody("A limited"), projectA.apiKey), db, parse);
         expect(limited.status).toBe(429);
