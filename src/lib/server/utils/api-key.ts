@@ -83,12 +83,18 @@ function evictCacheEntry(): void {
   }
 }
 
+// Every miss on a random key lands here, so this must stay O(1) amortized rather than walking
+// the whole cache. All entries share one TTL and are (re)inserted at the tail, so Map insertion
+// order is expiry order: expired entries are always a prefix, and the head is the oldest entry.
 function setNegativeCache(keyHash: string): void {
   const now = Date.now();
 
   for (const [k, v] of NEGATIVE_CACHE) {
-    if (v.expiresAt <= now) NEGATIVE_CACHE.delete(k);
+    if (v.expiresAt > now) break;
+    NEGATIVE_CACHE.delete(k);
   }
+
+  NEGATIVE_CACHE.delete(keyHash);
 
   if (NEGATIVE_CACHE.size >= MAX_NEGATIVE_CACHE_SIZE) {
     const oldest = NEGATIVE_CACHE.keys().next().value;

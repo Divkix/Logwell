@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vite-plus/test";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type { DatabaseClient } from "#lib/server/db/db.js";
 import {
   ApiKeyError,
@@ -94,6 +94,55 @@ describe("API key cache invalidation races", () => {
     );
 
     await expect(afterRotation).rejects.toBeInstanceOf(ApiKeyError);
+  });
+
+  describe("negative cache", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    const missKey = (i: number) => `lw_${i.toString().padStart(32, "0")}`;
+
+    async function miss(apiKey: string, reads: { count: number }) {
+      const lookup = validateApiKey(
+        request(apiKey),
+        stubDb(async () => {
+          reads.count += 1;
+
+          return [];
+        }),
+      );
+
+      await expect(lookup).rejects.toBeInstanceOf(ApiKeyError);
+    }
+
+    it("evicts the oldest entry once full, without rescanning on every miss", async () => {
+      const reads = { count: 0 };
+
+      for (let i = 0; i <= 5000; i++) await miss(missKey(i), reads);
+
+      expect(reads.count).toBe(5001);
+
+      // The newest miss is still cached (no DB read); the oldest was evicted (DB read).
+      await miss(missKey(5000), reads);
+      expect(reads.count).toBe(5001);
+
+      await miss(missKey(0), reads);
+      expect(reads.count).toBe(5002);
+    });
+
+    it("drops expired entries so a key is looked up again after the TTL", async () => {
+      vi.useFakeTimers();
+      const reads = { count: 0 };
+
+      await miss(missKey(1), reads);
+      await miss(missKey(1), reads);
+      expect(reads.count).toBe(1);
+
+      vi.advanceTimersByTime(30_001);
+      await miss(missKey(1), reads);
+      expect(reads.count).toBe(2);
+    });
   });
 
   // Plain cache-hit behavior (a second lookup skips the database) is asserted with a
