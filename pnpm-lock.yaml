@@ -213,6 +213,9 @@ importers:
       drizzle-orm:
         specifier: ^0.45.4
         version: 0.45.4(@electric-sql/pglite@0.5.10)(kysely@0.29.6)(postgres@3.4.9)
+      effect:
+        specifier: ^4.0.5
+        version: 4.0.5
       layerchart:
         specifier: ^2.7.0
         version: 2.8.0(@sveltejs/kit@2.70.3(@sveltejs/vite-plugin-svelte@7.3.1(@voidzero-dev/vite-plus-core@1.0.0-rc.0(@arethetypeswrong/core@0.18.5)(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(typescript@6.0.3)(yaml@2.9.1))(svelte@5.57.2))(@voidzero-dev/vite-plus-core@1.0.0-rc.0(@arethetypeswrong/core@0.18.5)(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(typescript@6.0.3)(yaml@2.9.1))(svelte@5.57.2)(typescript@6.0.3))(svelte@5.57.2)(zod@4.6.7)
@@ -2903,6 +2906,9 @@ packages:
         optional: true
       sqlite3:
         optional: true
+
+  effect@4.0.5:
+    resolution: {integrity: sha512-BY4/28NlpOd99yzmV741xbVGmp+1U7tks4oB7F/Png64bTa5tm5eCA6W0RiXsnuLDDoJpjfVSo4Dnq4BZb/89Q==}
 
   emoji-regex@10.6.0:
     resolution: {integrity: sha512-toUI84YS5YmxW219erniWD0CIVOo46xGKColeNQRgOzDorgBi1v4D71/OFzgD9GO2UGKIv1C3Sp8DAn0+j5w7A==}
@@ -5741,6 +5747,8 @@ snapshots:
       '@electric-sql/pglite': 0.5.10
       kysely: 0.29.6
       postgres: 3.4.9
+
+  effect@4.0.5: {}
 
   emoji-regex@10.6.0: {}
 
