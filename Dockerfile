@@ -3,7 +3,7 @@
 # SECURITY: pinned to an exact version + digest for reproducible builds (Bun 1.4.2; matches the
 # app runtime). Bun serves the built output and runs the TypeScript scripts; pnpm only installs
 # dependencies (see packageManager).
-FROM oven/bun:1.4.2-alpine@sha256:d888c0ae6c86d7866ff10c5aafdd9077b36aee6455b33dd270fb93c0dd5cef6f AS base
+FROM oven/bun:1.4.3-alpine@sha256:629e17411f1f129dbec3af78d5af9c9f2a937435c80349437206c6b0b7422373 AS base
 WORKDIR /app
 
 # Install curl for healthcheck (alpine minimal doesn't include it)
