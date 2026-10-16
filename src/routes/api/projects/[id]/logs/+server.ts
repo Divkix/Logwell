@@ -1,5 +1,5 @@
 import { apiError } from "#lib/server/utils/api-error.js";
-import { InvalidCursorError, queryLogs } from "#lib/server/utils/log-query.js";
+import { InvalidCursorError, OffsetTooLargeError, queryLogs } from "#lib/server/utils/log-query.js";
 import { requireOwnedProjectRoute } from "#lib/server/utils/owned-project.js";
 import { parseLevelFilter } from "#lib/shared/schemas/log.js";
 import type { RequestEvent } from "./$types";
@@ -22,7 +22,7 @@ function clamp(value: number, min: number, max: number): number {
  *
  * Query Parameters:
  * - limit: number (100-500, default 100) - Logs per page
- * - offset: number (default 0) - Pagination offset (deprecated, use cursor)
+ * - offset: number (0-10000, default 0) - Pagination offset (deprecated, use cursor)
  * - cursor: string - Cursor for pagination (preferred over offset)
  * - level: string - Filter by level (comma-separated, e.g., "error,fatal")
  * - search: string - Full-text search query
@@ -40,6 +40,7 @@ function clamp(value: number, min: number, max: number): number {
  * Error responses:
  * - 303 redirect to /login: Not authenticated
  * - 400 invalid_cursor: Cursor is malformed
+ * - 400 offset_too_large: offset exceeds 10000 (use cursor)
  * - 404 not_found: Project does not exist or not owned by user
  */
 export async function GET(event: RequestEvent): Promise<Response> {
@@ -88,6 +89,10 @@ export async function GET(event: RequestEvent): Promise<Response> {
   } catch (error) {
     if (error instanceof InvalidCursorError) {
       return apiError(400, "invalid_cursor", error.message);
+    }
+
+    if (error instanceof OffsetTooLargeError) {
+      return apiError(400, "offset_too_large", error.message);
     }
 
     throw error;

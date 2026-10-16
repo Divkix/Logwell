@@ -3,6 +3,7 @@ import { RETENTION_CONFIG } from "#lib/server/config/performance.js";
 import type { DatabaseClient } from "#lib/server/db/db.js";
 import { getQueryRows } from "#lib/server/db/db.js";
 import { project } from "#lib/server/db/schema.js";
+import { OLDEST_FIRST, projectLogs } from "#lib/server/utils/capped-count.js";
 
 export interface CleanupResult {
   projectsProcessed: number;
@@ -47,12 +48,16 @@ export async function cleanupOldLogs(dbClient?: DatabaseClient): Promise<Cleanup
 
         while (true) {
           // Bind the cutoff as an ISO string: passing the Date object here is what broke cleanup.
+          // projectLogs + OLDEST_FIRST keep each batch on idx_log_project_timestamp. With a plain
+          // `project_id =` the planner may walk idx_log_timestamp through every other project's
+          // expired rows (measured on PG 18: 300k rows filtered for one empty batch), which the
+          // pool's statement_timeout would cancel, stalling this project's retention for good.
           const raw = await db.execute(sql`
             WITH batch AS (
               SELECT id FROM "log"
-              WHERE project_id = ${proj.id}
+              WHERE ${projectLogs(proj.id)}
                 AND timestamp < ${cutoffDate.toISOString()}
-              ORDER BY timestamp ASC
+              ORDER BY ${OLDEST_FIRST}
               LIMIT ${BATCH_SIZE}
             )
             DELETE FROM "log" WHERE id IN (SELECT id FROM batch)

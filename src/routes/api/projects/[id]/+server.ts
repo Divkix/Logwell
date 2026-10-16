@@ -1,7 +1,8 @@
-import { and, count, eq, ne } from "drizzle-orm";
-import { log, project, type Project } from "#lib/server/db/schema.js";
+import { and, eq, ne } from "drizzle-orm";
+import { project, type Project } from "#lib/server/db/schema.js";
 import { apiError, isUniqueViolation } from "#lib/server/utils/api-error.js";
 import { invalidateApiKeyCacheByHash } from "#lib/server/utils/api-key.js";
+import { recentLevelCounts } from "#lib/server/utils/capped-count.js";
 import { requireJsonContentType } from "#lib/server/utils/content-type.js";
 import { requireOwnedProjectRoute } from "#lib/server/utils/owned-project.js";
 import { projectUpdatePayloadSchema } from "#lib/shared/schemas/project.js";
@@ -13,6 +14,10 @@ import type { RequestEvent } from "./$types";
  * Returns a single project with its stats including log count and level distribution.
  * Requires session authentication and project ownership.
  *
+ * Stats cover at most the project's 10,000 most recent logs (LOG_COUNT_CEILING): below that
+ * they are exact; at it `totalLogs` is 10000, `totalLogsCapped` is true and `levelCounts`
+ * describes those most recent logs. Use /stats with a time window for exact counts.
+ *
  * Response:
  * {
  *   id: string,
@@ -21,7 +26,8 @@ import type { RequestEvent } from "./$types";
  *   createdAt: string,
  *   updatedAt: string,
  *   stats: {
- *     totalLogs: number,
+ *     totalLogs: number,         // capped at 10000
+ *     totalLogsCapped: boolean,
  *     levelCounts: {
  *       debug?: number,
  *       info?: number,
@@ -43,27 +49,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
   const { project: projectData, db } = result;
   const projectId = event.params.id;
 
-  const [logCountResult] = await db
-    .select({ count: count() })
-    .from(log)
-    .where(eq(log.projectId, projectId));
-
-  const levelCounts = await db
-    .select({
-      level: log.level,
-      count: count(),
-    })
-    .from(log)
-    .where(eq(log.projectId, projectId))
-    .groupBy(log.level);
-
-  const levelCountsObj: Record<string, number> = {};
-
-  for (const { level, count: levelCount } of levelCounts) {
-    if (level) {
-      levelCountsObj[level] = levelCount;
-    }
-  }
+  const { total, capped, levelCounts } = await recentLevelCounts(db, projectId);
 
   return Response.json({
     id: projectData.id,
@@ -72,8 +58,9 @@ export async function GET(event: RequestEvent): Promise<Response> {
     createdAt: projectData.createdAt?.toISOString(),
     updatedAt: projectData.updatedAt?.toISOString(),
     stats: {
-      totalLogs: logCountResult?.count ?? 0,
-      levelCounts: levelCountsObj,
+      totalLogs: total,
+      totalLogsCapped: capped,
+      levelCounts,
     },
   });
 }

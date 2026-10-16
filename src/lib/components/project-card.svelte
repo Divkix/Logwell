@@ -7,12 +7,14 @@ import {
   CardHeader,
   CardTitle,
 } from '#lib/components/ui/card/index.js';
-import { formatRelativeTime } from '#lib/utils/format.js';
+import { formatLogCount, formatRelativeTime } from '#lib/utils/format.js';
 
 interface Project {
   id: string;
   name: string;
   logCount: number;
+  /** True when logCount is the server's count ceiling, not an exact total. */
+  logCountCapped?: boolean;
   lastActivity: Date | null;
 }
 
@@ -22,9 +24,9 @@ interface Props {
 
 const { project }: Props = $props();
 
-const formattedLogCount = $derived(project.logCount.toLocaleString('en-US'));
+const formattedLogCount = $derived(formatLogCount(project.logCount, project.logCountCapped));
 
-const logLabel = $derived(project.logCount === 1 ? 'log' : 'logs');
+const logLabel = $derived(project.logCount === 1 && !project.logCountCapped ? 'log' : 'logs');
 
 const lastActivityText = $derived(
   project.lastActivity ? `Last log: ${formatRelativeTime(project.lastActivity)}` : 'No logs yet',

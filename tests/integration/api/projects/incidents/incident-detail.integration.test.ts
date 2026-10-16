@@ -118,6 +118,7 @@ describe("GET /api/projects/[id]/incidents/[incidentId]", () => {
     const body = await response.json();
     expect(body.id).toBe(createdIncident!.id);
     expect(body.title).toBe("Test incident");
+    expect(body.analyzedEvents).toBe(0);
     expect(body).toHaveProperty("rootCauseCandidates");
     expect(body).toHaveProperty("correlations");
   });

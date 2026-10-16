@@ -17,6 +17,7 @@ const detail: IncidentDetail = {
   lastSeen: new Date().toISOString(),
   totalEvents: 5,
   status: "open",
+  analyzedEvents: 5,
   rootCauseCandidates: [{ sourceFile: "src/db.ts", lineNumber: 42, count: 5 }],
   correlations: {
     topRequestIds: [{ requestId: "req-1", count: 2 }],
@@ -46,5 +47,17 @@ describe("IncidentTimelinePanel", () => {
     expect(screen.queryByText(/Reopens:/i)).not.toBeInTheDocument();
     expect(screen.getByText("Root-Cause Candidates")).toBeInTheDocument();
     expect(screen.getByText("Correlated Request IDs")).toBeInTheDocument();
+  });
+
+  it("notes when the frequencies cover only the most recent events", () => {
+    render(IncidentTimelinePanel, {
+      props: { detail: { ...detail, totalEvents: 25_000, analyzedEvents: 10_000 }, timeline },
+    });
+    expect(screen.getByText("Based on the most recent 10,000 events.")).toBeInTheDocument();
+  });
+
+  it("omits the note when every event was analysed", () => {
+    render(IncidentTimelinePanel, { props: { detail, timeline } });
+    expect(screen.queryByText(/Based on the most recent/)).not.toBeInTheDocument();
   });
 });

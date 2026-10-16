@@ -29,18 +29,20 @@ export interface IncidentListItem {
   status: IncidentStatus;
 }
 
-interface IncidentSourceFrequency {
+export interface IncidentSourceFrequency {
   sourceFile: string | null;
   lineNumber: number | null;
   count: number;
 }
 
-interface IncidentCorrelationSummary {
+export interface IncidentCorrelationSummary {
   topRequestIds: Array<{ requestId: string; count: number }>;
   topTraceIds: Array<{ traceId: string; count: number }>;
 }
 
 export interface IncidentDetail extends IncidentListItem {
+  /** Most recent events the frequencies below were computed over (at most 10,000). */
+  analyzedEvents: number;
   rootCauseCandidates: IncidentSourceFrequency[];
   correlations: IncidentCorrelationSummary;
 }

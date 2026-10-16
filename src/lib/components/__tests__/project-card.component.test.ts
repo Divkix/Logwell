@@ -2,7 +2,8 @@ import { cleanup, render, screen } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import ProjectCard from "../project-card.svelte";
 
-vi.mock("#lib/utils/format.js", () => ({
+vi.mock("#lib/utils/format.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("#lib/utils/format.js")>()),
   formatRelativeTime: vi.fn((date: Date) => {
     const diffMs = Date.now() - date.getTime();
     const diffMinutes = Math.floor(diffMs / 60000);
@@ -48,6 +49,13 @@ describe("ProjectCard", () => {
     render(ProjectCard, { props: { project: baseProject } });
 
     expect(screen.getByText("15,420 logs")).toBeInTheDocument();
+  });
+
+  it("marks a capped count as a lower bound", () => {
+    const project = { ...baseProject, logCount: 10_000, logCountCapped: true };
+    render(ProjectCard, { props: { project } });
+
+    expect(screen.getByText("10,000+ logs")).toBeInTheDocument();
   });
 
   it("displays log count singular for 1 log", () => {

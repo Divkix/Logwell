@@ -57,6 +57,7 @@ async function handleCreateProject(name: string) {
       id: result.id,
       name: result.name,
       logCount: 0,
+      logCountCapped: false,
       lastActivity: null,
       createdAt: result.createdAt,
       updatedAt: result.updatedAt,
@@ -111,6 +112,7 @@ async function handleCreateProject(name: string) {
                 id: project.id,
                 name: project.name,
                 logCount: project.logCount,
+                logCountCapped: project.logCountCapped,
                 lastActivity: project.lastActivity ? new Date(project.lastActivity) : null,
               }}
             />

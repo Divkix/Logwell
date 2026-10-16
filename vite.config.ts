@@ -3,7 +3,6 @@ import adapter from "@sveltejs/adapter-node";
 import { sveltekit } from "@sveltejs/kit/vite";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite-plus";
-import pkg from "./package.json";
 
 // Agent tooling and vendored assets are not application source — never lint or
 // format them. Oxfmt does not honor .gitignore: .claude/workflows/*.js are
@@ -66,7 +65,6 @@ export default defineConfig({
         options: { typeAware: true, typeCheck: true },
       }
     : { options: { typeAware: true, typeCheck: true } },
-  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   // tw-animate-css exports only a `style` condition. Externalized, the server build resolves it
   // with Node's conditions and the CSS `@import` in layout.css fails, so it is bundled instead.
   ssr: { noExternal: ["tw-animate-css"] },

@@ -36,6 +36,7 @@ const incidentDetailSchema = z
     firstSeen: z.string(),
     lastSeen: z.string(),
     totalEvents: z.number(),
+    analyzedEvents: z.number(),
     rootCauseCandidates: z.array(
       z.object({
         sourceFile: z.string().nullable(),

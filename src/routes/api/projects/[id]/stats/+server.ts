@@ -1,6 +1,12 @@
-import { and, count, eq, gte, lte, type SQL } from "drizzle-orm";
+import { and, count, eq, gte, lte } from "drizzle-orm";
 import { log } from "#lib/server/db/schema.js";
+import { apiError } from "#lib/server/utils/api-error.js";
 import { requireOwnedProjectRoute } from "#lib/server/utils/owned-project.js";
+import {
+  InvalidTimeWindowError,
+  resolveStatsWindow,
+  type StatsWindow,
+} from "#lib/server/utils/time-window.js";
 import type { RequestEvent } from "./$types";
 
 /**
@@ -10,11 +16,16 @@ import type { RequestEvent } from "./$types";
  * Requires session authentication and project ownership.
  *
  * Query Parameters:
- * - from: string (ISO 8601) - Start timestamp filter
- * - to: string (ISO 8601) - End timestamp filter
+ * - from: string (ISO 8601) - Start timestamp, defaults to `to` minus 24 hours
+ * - to: string (ISO 8601) - End timestamp, defaults to now
+ *
+ * The window is capped at 7 days (MAX_STATS_WINDOW_DAYS), the stats page's widest range, so
+ * the aggregate reads at most a week of a project's logs rather than its whole retention.
  *
  * Response:
  * {
+ *   from: string,  // effective window start (ISO 8601)
+ *   to: string,    // effective window end (ISO 8601)
  *   totalLogs: number,
  *   levelCounts: {
  *     debug?: number,
@@ -33,6 +44,8 @@ import type { RequestEvent } from "./$types";
  * }
  *
  * Error responses:
+ * - 400 invalid_date: from/to is not a valid timestamp
+ * - 400 invalid_range: from is after to, or the window exceeds 7 days
  * - 303 redirect to /login: Not authenticated
  * - 404 not_found: Project does not exist or not owned by user
  */
@@ -44,24 +57,26 @@ export async function GET(event: RequestEvent): Promise<Response> {
   const { db } = authResult;
   const projectId = event.params.id;
 
-  const url = event.url;
-  const fromParam = url.searchParams.get("from");
-  const toParam = url.searchParams.get("to");
+  let window: StatsWindow;
 
-  const fromDate = fromParam ? new Date(fromParam) : null;
-  const toDate = toParam ? new Date(toParam) : null;
+  try {
+    window = resolveStatsWindow(
+      event.url.searchParams.get("from"),
+      event.url.searchParams.get("to"),
+    );
+  } catch (error) {
+    if (error instanceof InvalidTimeWindowError) {
+      return apiError(400, error.code, error.message);
+    }
 
-  const conditions: SQL[] = [eq(log.projectId, projectId)];
-
-  if (fromDate && !Number.isNaN(fromDate.getTime())) {
-    conditions.push(gte(log.timestamp, fromDate));
+    throw error;
   }
 
-  if (toDate && !Number.isNaN(toDate.getTime())) {
-    conditions.push(lte(log.timestamp, toDate));
-  }
-
-  const whereClause = and(...conditions);
+  const whereClause = and(
+    eq(log.projectId, projectId),
+    gte(log.timestamp, window.from),
+    lte(log.timestamp, window.to),
+  );
 
   const levelCounts = await db
     .select({
@@ -91,6 +106,8 @@ export async function GET(event: RequestEvent): Promise<Response> {
   }
 
   return Response.json({
+    from: window.from.toISOString(),
+    to: window.to.toISOString(),
     totalLogs,
     levelCounts: levelCountsObj,
     levelPercentages: levelPercentagesObj,

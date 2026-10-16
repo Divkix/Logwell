@@ -17,6 +17,20 @@ export class InvalidCursorError extends Error {
   }
 }
 
+/**
+ * Deepest page the deprecated `offset` parameter may reach. Postgres still reads and discards
+ * every skipped row, so an unbounded offset is a full scan on demand; deeper pages need the
+ * keyset `cursor`.
+ */
+export const MAX_LOG_OFFSET = 10_000;
+
+export class OffsetTooLargeError extends Error {
+  constructor() {
+    super(`offset must be at most ${MAX_LOG_OFFSET}; use cursor pagination for deeper pages`);
+    this.name = "OffsetTooLargeError";
+  }
+}
+
 export interface LogQueryFilter {
   projectId: string;
   levels?: LogLevel[] | null;
@@ -57,6 +71,12 @@ export async function queryLogs(
   db: DatabaseClient,
   filter: LogQueryFilter,
 ): Promise<LogQueryResult> {
+  const offset = filter.cursor ? 0 : (filter.offset ?? 0);
+
+  if (offset > MAX_LOG_OFFSET) {
+    throw new OffsetTooLargeError();
+  }
+
   const conditions: SQL[] = [eq(log.projectId, filter.projectId)];
 
   if (filter.cursor) {
@@ -118,7 +138,7 @@ export async function queryLogs(
     .where(whereClause)
     .orderBy(desc(log.timestamp), desc(log.id))
     .limit(filter.limit + 1)
-    .offset(filter.cursor ? 0 : (filter.offset ?? 0));
+    .offset(offset);
 
   const hasMore = rows.length > filter.limit;
   const page = hasMore ? rows.slice(0, filter.limit) : rows;

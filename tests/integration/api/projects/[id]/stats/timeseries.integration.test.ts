@@ -4,6 +4,7 @@ import type { PgliteDatabase } from "drizzle-orm/pglite";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { createAuth } from "#lib/server/auth.js";
 import type * as schema from "#lib/server/db/schema.js";
+import { type BucketCountRow, getQueryRows } from "#lib/server/db/db.js";
 import { setupTestDatabase } from "#lib/server/db/test-db.js";
 import { getSession } from "#lib/server/session.js";
 import { clearApiKeyCache } from "#lib/server/utils/api-key.js";
@@ -395,6 +396,36 @@ describe("GET /api/projects/[id]/stats/timeseries", () => {
   });
 
   describe("Time Range Boundary", () => {
+    it("only aggregates one range's worth of buckets after an old from", async () => {
+      const testProject = await seedProject(db, { ownerId: userId });
+      const from = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const hourMs = 60 * 60 * 1000;
+      await seedLogs(db, testProject.id, 3, { timestamp: new Date(from.getTime() + hourMs) });
+      await seedLogs(db, testProject.id, 4, {
+        timestamp: new Date(from.getTime() + 5 * 24 * hourMs),
+      });
+
+      const execute = vi.spyOn(db, "execute");
+
+      const request = new Request(
+        `http://localhost/api/projects/${testProject.id}/stats/timeseries?range=24h&from=${from.toISOString()}`,
+        { method: "GET" },
+      );
+
+      const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+      // SAFETY: createRequestEvent supplies every RequestEvent field GET and requireOwnedProjectRoute read (request, url, params, route.id, locals, cookies); its tracing stays null because tests build no OTel Spans, so the event is passed as never.
+      const response = await GET(event as never);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.totalCount).toBe(3);
+
+      // Re-running the route's own query shows the logs five days past `from` are never read.
+      expect(execute).toHaveBeenCalledTimes(1);
+      const rerun = await execute.mock.results[0]!.value;
+      expect(getQueryRows<BucketCountRow>(rerun).map((row) => row.bucketIndex)).toEqual([1]);
+    });
+
     it("excludes logs outside the time range", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
       const now = new Date();

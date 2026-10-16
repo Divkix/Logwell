@@ -2,7 +2,7 @@ import type { HttpError } from "@sveltejs/kit";
 import { eq, sql } from "drizzle-orm";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
 import { nanoid } from "nanoid";
-import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { createAuth } from "#lib/server/auth.js";
 import type * as schema from "#lib/server/db/schema.js";
 import { log } from "#lib/server/db/schema.js";
@@ -261,6 +261,72 @@ describe("GET /api/projects/[id]/logs", () => {
 
       expect(body.logs).toHaveLength(3);
       expect(body.logs[0]!.id).toBe(logs[2]!.id);
+    });
+
+    it("accepts an offset of exactly 10000", async () => {
+      const testProject = await seedProject(db, { ownerId: userId });
+
+      const request = new Request(
+        `http://localhost/api/projects/${testProject.id}/logs?offset=10000`,
+        { method: "GET" },
+      );
+
+      const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+      const response = await GET(event);
+
+      expect(response.status).toBe(200);
+      expect((await response.json()).logs).toEqual([]);
+    });
+
+    it("returns 400 offset_too_large past 10000 without querying", async () => {
+      const testProject = await seedProject(db, { ownerId: userId });
+      const select = vi.spyOn(db, "select");
+
+      const request = new Request(
+        `http://localhost/api/projects/${testProject.id}/logs?offset=10001`,
+        { method: "GET" },
+      );
+
+      const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+      const response = await GET(event);
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        error: "offset_too_large",
+        message: "offset must be at most 10000; use cursor pagination for deeper pages",
+      });
+      // Only the ownership lookup ran; the capped count and page query never did.
+      expect(select).toHaveBeenCalledTimes(1);
+    });
+
+    it("ignores a large offset when a cursor is given", async () => {
+      const testProject = await seedProject(db, { ownerId: userId });
+      await seedLogs(db, testProject.id, 3);
+
+      const first = await GET(
+        createRequestEvent(
+          new Request(`http://localhost/api/projects/${testProject.id}/logs?limit=1`),
+          db,
+          { id: testProject.id },
+          authenticatedLocals,
+        ),
+      );
+
+      const { nextCursor } = await first.json();
+
+      const response = await GET(
+        createRequestEvent(
+          new Request(
+            `http://localhost/api/projects/${testProject.id}/logs?limit=1&offset=50000&cursor=${nextCursor}`,
+          ),
+          db,
+          { id: testProject.id },
+          authenticatedLocals,
+        ),
+      );
+
+      expect(response.status).toBe(200);
+      expect((await response.json()).logs).toHaveLength(1);
     });
   });
 

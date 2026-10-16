@@ -1,6 +1,5 @@
 import type { HttpError } from "@sveltejs/kit";
 import { eq } from "drizzle-orm";
-import type { SelectedFields } from "drizzle-orm/pg-core";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { createAuth } from "#lib/server/auth.js";
@@ -193,12 +192,16 @@ describe("GET /api/projects", () => {
 
       expect(returnedProject1).toBeDefined();
       expect(returnedProject1.logCount).toBe(5);
+      expect(returnedProject1.logCountCapped).toBe(false);
+      expect(returnedProject1.lastActivity).toEqual(expect.any(String));
       expect(returnedProject1.name).toBe(project1!.name);
       expect(returnedProject1).toHaveProperty("createdAt");
       expect(returnedProject1).toHaveProperty("updatedAt");
 
       expect(returnedProject2).toBeDefined();
       expect(returnedProject2.logCount).toBe(0);
+      expect(returnedProject2.logCountCapped).toBe(false);
+      expect(returnedProject2.lastActivity).toBeNull();
     });
 
     it("returns projects ordered by createdAt descending", async () => {
@@ -220,22 +223,12 @@ describe("GET /api/projects", () => {
       expect(body.projects[1].id).toBe(oldProject.id);
     });
 
-    it("computes log counts with a single GROUP BY query (no per-project COUNT loop)", async () => {
+    it("loads projects and their bounded log counts in one statement", async () => {
       const [project1, project2] = await seedProjects(db, 2, { ownerId: userId });
       await seedLogs(db, project1!.id, 5);
 
-      const originalSelect = db.select.bind(db);
-      // SAFETY: drizzle's select is overloaded (no-arg full-table and generic field-map forms),
-      // which a single mock signature cannot express; the wrapper forwards `fields` unchanged
-      // to the bound original and only throws for the count-without-projectId projection this
-      // test forbids.
-      vi.spyOn(db, "select").mockImplementation(((fields?: SelectedFields) => {
-        if (fields && "count" in fields && !("projectId" in fields)) {
-          throw new Error("project list must aggregate log counts in SQL");
-        }
-
-        return fields ? originalSelect(fields) : originalSelect();
-      }) as typeof db.select);
+      const select = vi.spyOn(db, "select");
+      const execute = vi.spyOn(db, "execute");
 
       const request = new Request("http://localhost/api/projects", {
         method: "GET",
@@ -243,6 +236,10 @@ describe("GET /api/projects", () => {
 
       const event = createRequestEvent(request, db, authenticatedLocals);
       const response = await GET(event);
+
+      // No per-project COUNT loop and no unbounded GROUP BY over log: one select over project.
+      expect(select).toHaveBeenCalledTimes(1);
+      expect(execute).not.toHaveBeenCalled();
 
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -626,7 +623,8 @@ describe("GET /api/projects/[id] (canonical detail home)", () => {
     expect(body).toMatchObject({ id: testProject.id, name: "my-test-project" });
     expect(body).not.toHaveProperty("apiKey");
     expect(body.stats.totalLogs).toBe(5);
-    expect(body.stats.levelCounts).toMatchObject({ info: 3, error: 2 });
+    expect(body.stats.totalLogsCapped).toBe(false);
+    expect(body.stats.levelCounts).toEqual({ info: 3, error: 2 });
   });
 
   it("returns retentionDays as stored (null, 0, 365)", async () => {

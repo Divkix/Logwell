@@ -1,6 +1,11 @@
-import { count, eq, min } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { RETENTION_CONFIG } from "#lib/server/config/performance.js";
-import { log } from "#lib/server/db/schema.js";
+import { project } from "#lib/server/db/schema.js";
+import {
+  isCappedLogCount,
+  oldestLogColumn,
+  projectLogStatsColumns,
+} from "#lib/server/utils/capped-count.js";
 import { requireOwnedProjectPage } from "#lib/server/utils/owned-project.js";
 import type { PageServerLoad } from "./$types";
 
@@ -8,13 +13,15 @@ export const load: PageServerLoad = async (event) => {
   const projectId = event.params.id;
   const { project: projectData, db } = await requireOwnedProjectPage(event, projectId);
 
+  // Bounded: the count stops at LOG_COUNT_CEILING and the oldest timestamp is one index probe.
+  const { logCount } = projectLogStatsColumns();
+
   const [logStats] = await db
-    .select({
-      totalLogs: count(),
-      oldestLog: min(log.timestamp),
-    })
-    .from(log)
-    .where(eq(log.projectId, projectId));
+    .select({ totalLogs: logCount, oldestLog: oldestLogColumn() })
+    .from(project)
+    .where(eq(project.id, projectId));
+
+  const totalLogs = logStats?.totalLogs ?? 0;
 
   return {
     project: {
@@ -25,7 +32,8 @@ export const load: PageServerLoad = async (event) => {
       updatedAt: projectData.updatedAt?.toISOString() ?? null,
     },
     stats: {
-      totalLogs: logStats?.totalLogs ?? 0,
+      totalLogs,
+      totalLogsCapped: isCappedLogCount(totalLogs),
       oldestLogDate: logStats?.oldestLog?.toISOString() ?? null,
     },
     systemDefault: {

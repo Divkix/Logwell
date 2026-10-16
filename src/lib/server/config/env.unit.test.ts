@@ -83,6 +83,36 @@ describe("Environment Configuration", () => {
     expect(isDevelopment()).toBe(false);
   });
 
+  it("defaults the Postgres pool timeouts to 30s statement / 60s idle-in-transaction", async () => {
+    const { env } = await loadEnv({
+      DB_STATEMENT_TIMEOUT_MS: undefined,
+      DB_IDLE_IN_TRANSACTION_TIMEOUT_MS: "",
+    });
+
+    expect(env.DB_STATEMENT_TIMEOUT_MS).toBe(30_000);
+    expect(env.DB_IDLE_IN_TRANSACTION_TIMEOUT_MS).toBe(60_000);
+  });
+
+  it("accepts explicit pool timeouts, including 0 to disable", async () => {
+    const { env } = await loadEnv({
+      DB_STATEMENT_TIMEOUT_MS: " 5000 ",
+      DB_IDLE_IN_TRANSACTION_TIMEOUT_MS: "0",
+    });
+
+    expect(env.DB_STATEMENT_TIMEOUT_MS).toBe(5000);
+    expect(env.DB_IDLE_IN_TRANSACTION_TIMEOUT_MS).toBe(0);
+  });
+
+  it.each([
+    ["DB_STATEMENT_TIMEOUT_MS", "30s", "whole number"],
+    ["DB_STATEMENT_TIMEOUT_MS", "-1", "whole number"],
+    ["DB_IDLE_IN_TRANSACTION_TIMEOUT_MS", "1.5", "whole number"],
+    ["DB_IDLE_IN_TRANSACTION_TIMEOUT_MS", "3600001", "at most 3600000"],
+  ])("rejects %s=%s at startup", async (key, value, message) => {
+    await expect(loadEnv({ [key]: value })).rejects.toThrow(`${key} must be`);
+    await expect(loadEnv({ [key]: value })).rejects.toThrow(message);
+  });
+
   it.each([
     ["production", true, false],
     ["development", false, true],

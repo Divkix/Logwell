@@ -136,6 +136,32 @@ describe("(app) page loaders — injected PGlite DB seam", () => {
       expect(data.projects).toHaveLength(1);
       expect(data.projects[0]!.id).toBe(ownedProject.id);
     });
+
+    it("returns bounded log counts and the latest activity per project", async () => {
+      const busy = await seedProject(db, { name: "busy-project", ownerId: owner.userId });
+      await seedProject(db, { name: "empty-project", ownerId: owner.userId });
+      await seedLog(db, busy.id, { timestamp: new Date(Date.now() - 60_000) });
+      const latest = await seedLog(db, busy.id);
+
+      const event = createLoadEvent(db, {}, owner.locals);
+      // SAFETY: createLoadEvent builds every event member these load functions read (url, params, locals, cookies, fetch, setHeaders, getClientAddress, depends, parent); tracing stays null because no load function reads it.
+      const data = await loadDashboard(event as never);
+
+      const byName = Object.fromEntries(
+        data.projects.map((p: { name: string }) => [p.name, p] as const),
+      );
+
+      expect(byName["busy-project"]).toMatchObject({
+        logCount: 2,
+        logCountCapped: false,
+        lastActivity: latest.timestamp.toISOString(),
+      });
+      expect(byName["empty-project"]).toMatchObject({
+        logCount: 0,
+        logCountCapped: false,
+        lastActivity: null,
+      });
+    });
   });
 
   describe("(app)/projects/[id]/+page.server.ts — logs loader", () => {
@@ -176,6 +202,41 @@ describe("(app) page loaders — injected PGlite DB seam", () => {
       expect(data.logs.map((entry: { message: string }) => entry.message)).toEqual([
         "inside-window",
       ]);
+    });
+
+    it("throws SvelteKit 400 for an offset past 10000", async () => {
+      const proj = await seedProject(db, { name: "deep-offset", ownerId: owner.userId });
+
+      const event = createLoadEvent(
+        db,
+        { id: proj.id },
+        owner.locals,
+        `http://localhost:5173/projects/${proj.id}?offset=10001`,
+      );
+
+      // SAFETY: createLoadEvent builds every event member these load functions read (url, params, locals, cookies, fetch, setHeaders, getClientAddress, depends, parent); tracing stays null because no load function reads it.
+      await expect(loadProjectLogs(event as never)).rejects.toMatchObject({
+        status: 400,
+        body: { message: "offset must be at most 10000; use cursor pagination for deeper pages" },
+      });
+    });
+
+    it("falls back to the first page for an invalid cursor, whatever the offset", async () => {
+      const proj = await seedProject(db, { name: "bad-cursor", ownerId: owner.userId });
+      await seedLog(db, proj.id, { message: "first-page" });
+
+      const event = createLoadEvent(
+        db,
+        { id: proj.id },
+        owner.locals,
+        `http://localhost:5173/projects/${proj.id}?cursor=garbage&offset=10001`,
+      );
+
+      // SAFETY: createLoadEvent builds every event member these load functions read (url, params, locals, cookies, fetch, setHeaders, getClientAddress, depends, parent); tracing stays null because no load function reads it.
+      const data = await loadProjectLogs(event as never);
+
+      expect(data.logs.map((entry: { message: string }) => entry.message)).toEqual(["first-page"]);
+      expect(data.pagination.offset).toBe(0);
     });
 
     it("throws SvelteKit 404 for a non-owner (existence hidden)", async () => {
@@ -235,6 +296,22 @@ describe("(app) page loaders — injected PGlite DB seam", () => {
       const event = createLoadEvent(db, { id: proj.id }, nonOwner.locals);
       // SAFETY: createLoadEvent builds every event member these load functions read (url, params, locals, cookies, fetch, setHeaders, getClientAddress, depends, parent); tracing stays null because no load function reads it.
       await expectSvelteKit404(loadProjectSettings(event as never));
+    });
+
+    it("returns the bounded log total and the oldest log date", async () => {
+      const proj = await seedProject(db, { name: "settings-stats", ownerId: owner.userId });
+      const oldest = await seedLog(db, proj.id, { timestamp: new Date(Date.now() - 3_600_000) });
+      await seedLog(db, proj.id);
+
+      const event = createLoadEvent(db, { id: proj.id }, owner.locals);
+      // SAFETY: createLoadEvent builds every event member these load functions read (url, params, locals, cookies, fetch, setHeaders, getClientAddress, depends, parent); tracing stays null because no load function reads it.
+      const data = await loadProjectSettings(event as never);
+
+      expect(data.stats).toEqual({
+        totalLogs: 2,
+        totalLogsCapped: false,
+        oldestLogDate: oldest.timestamp.toISOString(),
+      });
     });
   });
 

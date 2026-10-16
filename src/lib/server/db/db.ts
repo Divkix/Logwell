@@ -24,3 +24,14 @@ export async function getDbClient(locals: App.Locals): Promise<DatabaseClient> {
 
   return db;
 }
+
+/**
+ * Client for the health probe: the dedicated single-connection `healthDb`, so a saturated app
+ * pool cannot fail it. hooks.server.ts puts the shared pool on every request's `locals.db`, so
+ * only a different (test-injected) client takes precedence.
+ */
+export async function getHealthDbClient(locals: App.Locals): Promise<DatabaseClient> {
+  const { db, healthDb } = await import("./index");
+
+  return locals.db && locals.db !== db ? locals.db : healthDb;
+}
