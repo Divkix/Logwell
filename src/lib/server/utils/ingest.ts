@@ -137,6 +137,35 @@ function sanitizeIngestInput(input: IngestInputRow): IngestInputRow {
   ) as IngestInputRow;
 }
 
+// Both parsers validate with zod's recursive z.json(), which overflows the call stack somewhere
+// past ~1-2k nesting levels — a ~20KB body. The deepest legitimate payload is OTLP's AnyValue
+// nesting, which parseOtlpAnyValue already truncates at 32 levels (~4 JSON levels each).
+export const MAX_INGEST_JSON_DEPTH = 256;
+
+function jsonChildren(node: JsonValue): JsonValue[] {
+  if (Array.isArray(node)) return node;
+
+  return node instanceof Object ? Object.values(node) : [];
+}
+
+/** Iterative, so measuring an attacker-nested body cannot itself overflow the stack. */
+function exceedsJsonDepth(value: JsonValue | undefined, maxDepth: number): boolean {
+  if (value === undefined) return false;
+
+  const pending: Array<[JsonValue, number]> = [[value, 1]];
+
+  for (let next = pending.pop(); next; next = pending.pop()) {
+    const [node, depth] = next;
+    const children = jsonChildren(node);
+
+    if (children.length > 0 && depth >= maxDepth) return true;
+
+    for (const child of children) pending.push([child, depth + 1]);
+  }
+
+  return false;
+}
+
 export function buildIngestResponse(accepted: number, rejected: number, errors: string[]) {
   if (rejected <= 0) return { accepted };
 
@@ -242,6 +271,12 @@ function ingest(request: Request, db: DatabaseClient, parse: IngestBodyParser) {
       catch: (err) =>
         payloadTooLargeSchema.safeParse(err).success ? new PayloadTooLarge() : new InvalidJson(),
     });
+
+    if (exceedsJsonDepth(body, MAX_INGEST_JSON_DEPTH)) {
+      return yield* new ValidationFailed({
+        message: `Request body nests deeper than ${MAX_INGEST_JSON_DEPTH} levels.`,
+      });
+    }
 
     const parsed = yield* Effect.try({
       try: () => parse(body),

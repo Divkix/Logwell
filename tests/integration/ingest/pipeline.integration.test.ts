@@ -15,7 +15,11 @@ import {
   generateApiKey,
   hashApiKey,
 } from "../../../src/lib/server/utils/api-key";
-import { ingestLogs, type IngestBodyParser } from "../../../src/lib/server/utils/ingest";
+import {
+  ingestLogs,
+  MAX_INGEST_JSON_DEPTH,
+  type IngestBodyParser,
+} from "../../../src/lib/server/utils/ingest";
 import { parseOtlpIngestBody } from "../../../src/lib/server/utils/otlp";
 import { INGEST_RPM, ingestProjectLimiter } from "../../../src/lib/server/utils/rate-limit";
 import { parseSimpleIngestBody } from "../../../src/lib/server/utils/simple-ingest";
@@ -456,6 +460,33 @@ describe("ingestLogs pipeline", () => {
         "Entry at index 0: invalid level 'bogus' (must be one of: debug, info, warn, error, fatal)",
       ],
     });
+  });
+
+  it("rejects pathologically nested bodies as validation_error, not a stack overflow", async () => {
+    const project = await seedProjectWithApiKey(db);
+    const nested = (levels: number) => '{"a":'.repeat(levels) + "1" + "}".repeat(levels);
+    const deep = nested(10_000);
+
+    const bodies: Array<[IngestBodyParser, string]> = [
+      [parseOtlpIngestBody, `{"resourceLogs":[${deep}]}`],
+      [parseSimpleIngestBody, `{"level":"info","message":"deep","metadata":${deep}}`],
+    ];
+
+    for (const [parse, body] of bodies) {
+      const response = await ingestLogs(post(body, project.apiKey), db, parse);
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        error: "validation_error",
+        message: `Request body nests deeper than ${MAX_INGEST_JSON_DEPTH} levels.`,
+      });
+    }
+
+    // Nesting under the cap still ingests.
+    const shallow = `{"level":"info","message":"ok","metadata":${nested(MAX_INGEST_JSON_DEPTH - 2)}}`;
+    const accepted = await ingestLogs(post(shallow, project.apiKey), db, parseSimpleIngestBody);
+    expect(accepted.status).toBe(200);
+    expect(await accepted.json()).toEqual({ accepted: 1 });
   });
 
   it("ingests partial batches with per-record errors as 200", async () => {
