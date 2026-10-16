@@ -10,6 +10,8 @@ export interface CleanupResult {
   projectsProcessed: number;
   projectsSkipped: number;
   totalLogsDeleted: number;
+  /** Incidents past retention whose logs are all gone (see pruneExpiredIncidents). */
+  totalIncidentsDeleted: number;
   errors: string[];
 }
 
@@ -50,6 +52,46 @@ export async function deleteInBatches(
   }
 }
 
+/**
+ * Deletes the project's incidents last seen before `cutoff` that no longer own any log, i.e.
+ * the ones retention has emptied. Without this the incident table grows forever and the
+ * incident list keeps showing groups whose events are gone.
+ *
+ * The NOT EXISTS guard keeps an incident that still owns a log (a late or back-dated event);
+ * the outer `last_seen` re-check runs against the row as committed, so an incident an ingest
+ * transaction bumps while this DELETE waits on its row lock survives. An event that lands on
+ * an incident after it was pruned simply opens a new one (log.incident_id is ON DELETE SET
+ * NULL, so a racing insert never fails).
+ */
+async function pruneExpiredIncidents(
+  db: DatabaseClient,
+  projectId: string,
+  cutoff: Date,
+  options: BatchOptions,
+): Promise<number> {
+  return deleteInBatches(async (limit) => {
+    const raw = await db.execute(sql`
+      DELETE FROM "incident"
+      WHERE id IN (
+        SELECT stale.id FROM "incident" AS stale
+        WHERE stale.project_id = ${projectId}
+          AND stale.last_seen < ${cutoff.toISOString()}
+          AND NOT EXISTS (
+            SELECT 1 FROM "log" AS owned
+            WHERE owned.project_id = stale.project_id AND owned.incident_id = stale.id
+          )
+        ORDER BY stale.last_seen
+        LIMIT ${limit}
+      )
+        AND project_id = ${projectId}
+        AND last_seen < ${cutoff.toISOString()}
+      RETURNING id
+    `);
+
+    return getQueryRows(raw).length;
+  }, options);
+}
+
 export async function cleanupOldLogs(
   dbClient?: DatabaseClient,
   options: BatchOptions = {},
@@ -60,6 +102,7 @@ export async function cleanupOldLogs(
     projectsProcessed: 0,
     projectsSkipped: 0,
     totalLogsDeleted: 0,
+    totalIncidentsDeleted: 0,
     errors: [],
   };
 
@@ -104,9 +147,12 @@ export async function cleanupOldLogs(
           return getQueryRows(raw).length;
         }, options);
 
-        if (deletedInProject > 0) {
+        const incidentsDeleted = await pruneExpiredIncidents(db, proj.id, cutoffDate, options);
+
+        if (deletedInProject > 0 || incidentsDeleted > 0) {
           result.projectsProcessed++;
           result.totalLogsDeleted += deletedInProject;
+          result.totalIncidentsDeleted += incidentsDeleted;
         }
       } catch (error) {
         const errorMessage = `Failed to cleanup logs for project ${proj.id}: ${error instanceof Error ? error.message : String(error)}`;

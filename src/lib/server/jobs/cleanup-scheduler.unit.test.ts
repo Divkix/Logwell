@@ -16,8 +16,18 @@ vi.mock("#lib/server/config/performance.js", () => ({
 
 vi.mock("./log-cleanup", () => ({ cleanupOldLogs: mocks.cleanupOldLogs }));
 
-function result(totalLogsDeleted = 0, errors: string[] = []): CleanupResult {
-  return { projectsProcessed: 1, projectsSkipped: 0, totalLogsDeleted, errors };
+function result(
+  totalLogsDeleted = 0,
+  errors: string[] = [],
+  totalIncidentsDeleted = 0,
+): CleanupResult {
+  return {
+    projectsProcessed: 1,
+    projectsSkipped: 0,
+    totalLogsDeleted,
+    totalIncidentsDeleted,
+    errors,
+  };
 }
 
 function deferred() {
@@ -106,11 +116,12 @@ describe("cleanup scheduler", () => {
     expect(calls()).toBe(2);
   });
 
-  it("logs a summary only when logs were deleted or errors occurred", async () => {
+  it("logs a summary only when rows were deleted or errors occurred", async () => {
     mocks.cleanupOldLogs
       .mockResolvedValueOnce(result())
       .mockResolvedValueOnce(result(5))
-      .mockResolvedValueOnce(result(0, ["project p1: boom"]));
+      .mockResolvedValueOnce(result(0, ["project p1: boom"]))
+      .mockResolvedValueOnce(result(0, [], 3));
 
     const summaries = () =>
       log.mock.calls.filter(([line]) => String(line).includes("Cleanup completed")).length;
@@ -122,7 +133,7 @@ describe("cleanup scheduler", () => {
     await vi.advanceTimersByTimeAsync(INTERVAL_MS);
     expect(summaries()).toBe(1);
     expect(log).toHaveBeenLastCalledWith(
-      "[cleanup-scheduler] Cleanup completed: 5 logs deleted, 1 projects processed, 0 skipped",
+      "[cleanup-scheduler] Cleanup completed: 5 logs deleted, 0 incidents deleted, 1 projects processed, 0 skipped",
     );
     expect(logError).not.toHaveBeenCalled();
 
@@ -131,6 +142,12 @@ describe("cleanup scheduler", () => {
     expect(logError).toHaveBeenCalledWith("[cleanup-scheduler] Errors during cleanup:", [
       "project p1: boom",
     ]);
+
+    await vi.advanceTimersByTimeAsync(INTERVAL_MS);
+    expect(summaries()).toBe(3);
+    expect(log).toHaveBeenLastCalledWith(
+      "[cleanup-scheduler] Cleanup completed: 0 logs deleted, 3 incidents deleted, 1 projects processed, 0 skipped",
+    );
   });
 
   it("stops future runs and can start again", async () => {

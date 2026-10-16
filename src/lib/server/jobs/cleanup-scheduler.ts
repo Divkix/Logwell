@@ -37,9 +37,14 @@ async function runCleanup(): Promise<void> {
   try {
     const result = await cleanupOldLogs();
 
-    if (result.totalLogsDeleted > 0 || result.errors.length > 0) {
+    if (
+      result.totalLogsDeleted > 0 ||
+      result.totalIncidentsDeleted > 0 ||
+      result.errors.length > 0
+    ) {
       console.log(
         `[cleanup-scheduler] Cleanup completed: ${result.totalLogsDeleted} logs deleted, ` +
+          `${result.totalIncidentsDeleted} incidents deleted, ` +
           `${result.projectsProcessed} projects processed, ${result.projectsSkipped} skipped`,
       );
     }
