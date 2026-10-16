@@ -1,25 +1,22 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "entry": [
-    "src/routes/**/+{page,server,page.server,error,layout,layout.server}{,@*}.{js,ts,svelte}",
-    "src/lib/server/db/index.ts",
-    "src/lib/server/auth.ts",
-    "src/lib/server/jobs/cleanup-scheduler.ts"
-  ],
-  "project": ["src/**/*.{js,ts,svelte}"],
+  "workspaces": {
+    ".": {
+      "entry": [
+        "src/routes/**/+{page,server,page.server,error,layout,layout.server}{,@*}.{js,ts,svelte}",
+        "src/lib/server/db/index.ts",
+        "src/lib/server/auth.ts",
+        "src/lib/server/jobs/cleanup-scheduler.ts"
+      ],
+      "project": ["src/**/*.{js,ts,svelte,css}"]
+    }
+  },
   "ignore": ["src/lib/components/ui/**"],
   "ignoreExportsUsedInFile": true,
   "ignoreIssues": {
     "src/lib/server/utils/simple-ingest.ts": ["types"]
   },
-  "ignoreDependencies": [
-    "tw-animate-css",
-    "@divkix/logwell",
-    "layerchart",
-    "d3-scale",
-    "@types/d3-scale",
-    "@typescript/native"
-  ],
+  "ignoreDependencies": ["@divkix/logwell", "@typescript/native"],
   "ignoreUnresolved": ["\\$\\{packageName\\}"],
   "drizzle": false
 }
