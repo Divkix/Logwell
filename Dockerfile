@@ -57,7 +57,6 @@ FROM deps-dev AS build
 WORKDIR /app
 
 COPY package.json tsconfig.json vite.config.ts ./
-COPY drizzle.config.ts ./
 
 COPY static ./static
 COPY drizzle ./drizzle
@@ -87,7 +86,6 @@ COPY --from=build --chown=logwell:logwell /app/build ./build
 COPY --from=build --chown=logwell:logwell /app/package.json ./
 
 COPY --from=build --chown=logwell:logwell /app/drizzle ./drizzle
-COPY --from=build --chown=logwell:logwell /app/drizzle.config.ts ./
 COPY --from=build --chown=logwell:logwell /app/scripts ./scripts
 COPY --from=build --chown=logwell:logwell /app/src/lib/server ./src/lib/server
 COPY --from=build --chown=logwell:logwell /app/src/lib/shared ./src/lib/shared
