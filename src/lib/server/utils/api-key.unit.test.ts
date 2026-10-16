@@ -86,7 +86,7 @@ describe("API key cache invalidation races", () => {
     invalidateApiKeyCacheByHash(hashApiKey(key));
     resolve([{ id: "project-1" }]);
 
-    await expect(inFlight).resolves.toBe("project-1");
+    await expect(inFlight).resolves.toMatchObject({ projectId: "project-1" });
 
     const afterRotation = validateApiKey(
       request(key),

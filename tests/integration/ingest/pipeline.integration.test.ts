@@ -10,7 +10,11 @@ import type * as schema from "../../../src/lib/server/db/schema";
 import { incident, log, project as projectTable } from "../../../src/lib/server/db/schema";
 import { setupTestDatabase } from "../../../src/lib/server/db/test-db";
 import { logEventBus } from "../../../src/lib/server/events";
-import { clearApiKeyCache } from "../../../src/lib/server/utils/api-key";
+import {
+  clearApiKeyCache,
+  generateApiKey,
+  hashApiKey,
+} from "../../../src/lib/server/utils/api-key";
 import { ingestLogs, type IngestBodyParser } from "../../../src/lib/server/utils/ingest";
 import { parseOtlpIngestBody } from "../../../src/lib/server/utils/otlp";
 import { checkRateLimit, INGEST_RPM } from "../../../src/lib/server/utils/rate-limit";
@@ -567,6 +571,28 @@ describe("ingestLogs pipeline", () => {
 
       // The key stays cached, so only the pipeline's own project-row check can reject it.
       await db.delete(projectTable).where(eq(projectTable.id, project.id));
+
+      const response = await ingestLogs(
+        post(otlpBody("x"), project.apiKey),
+        db,
+        parseOtlpIngestBody,
+      );
+
+      expect(response.status).toBe(401);
+      expect(await response.json()).toEqual({ error: "unauthorized", message: "Invalid API key" });
+    });
+
+    it("rejects a cached key once its rotation commits, without a cache invalidation", async () => {
+      const project = await seedProjectWithApiKey(db);
+      const warm = await ingestLogs(post(otlpBody("x"), project.apiKey), db, parseOtlpIngestBody);
+      expect(warm.status).toBe(200);
+
+      // Simulates a rotation committed on another replica (or racing this one's invalidation):
+      // the old key is still cached here, so only the per-request hash check can reject it.
+      await db
+        .update(projectTable)
+        .set({ apiKeyHash: hashApiKey(generateApiKey()) })
+        .where(eq(projectTable.id, project.id));
 
       const response = await ingestLogs(
         post(otlpBody("x"), project.apiKey),

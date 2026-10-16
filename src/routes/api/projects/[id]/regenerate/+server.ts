@@ -35,8 +35,6 @@ export async function POST(event: RequestEvent): Promise<Response> {
 
   const newApiKey = generateApiKey();
 
-  invalidateApiKeyCacheByHash(projectData.apiKeyHash);
-
   // isActiveProject is re-checked here, not only in the guard: a DELETE committing between the
   // guard and this UPDATE would otherwise get a fresh, valid key written onto the deleted row.
   const [updated] = await db
@@ -47,6 +45,11 @@ export async function POST(event: RequestEvent): Promise<Response> {
     })
     .where(and(eq(project.id, projectId), isActiveProject))
     .returning();
+
+  // After the commit, not before: a lookup landing between an early invalidation and the
+  // UPDATE would re-cache the old hash. Lookups still in flight here are kept out of the cache
+  // by the generation guard in validateApiKey, and ingest re-checks the hash per request.
+  invalidateApiKeyCacheByHash(projectData.apiKeyHash);
 
   if (!updated) {
     return apiError(404, "not_found", "Project not found");

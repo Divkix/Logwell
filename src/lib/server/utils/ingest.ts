@@ -211,7 +211,7 @@ function ingest(request: Request, db: DatabaseClient, parse: IngestBodyParser) {
     // Both `catch` mappers below (key validation, parse) re-throw what they don't recognise:
     // a throwing mapper makes the error a defect, which `Effect.runPromise` rejects with
     // unchanged, so unexpected errors reach SvelteKit's handleError exactly as thrown.
-    const projectId = yield* Effect.tryPromise({
+    const { projectId, keyHash } = yield* Effect.tryPromise({
       try: () => validateApiKey(request, db),
       catch: (err) => {
         if (err instanceof ApiKeyError) {
@@ -222,13 +222,15 @@ function ingest(request: Request, db: DatabaseClient, parse: IngestBodyParser) {
       },
     });
 
-    // A key validated from the cache just before its project was soft-deleted still resolves
-    // to the project id, so the re-verify must exclude deleted projects too.
+    // Two re-checks against the row: the presented hash (the key cache can lag a rotation on
+    // another replica, or a lookup racing the UPDATE, so a rotated key stops ingesting as soon as
+    // the rotation commits) and isActiveProject (a key validated from the cache just before its
+    // project was soft-deleted still resolves to the project id).
     const [projectRow] = yield* Effect.promise(() =>
       db
         .select({ id: project.id })
         .from(project)
-        .where(and(eq(project.id, projectId), isActiveProject)),
+        .where(and(eq(project.id, projectId), eq(project.apiKeyHash, keyHash), isActiveProject)),
     );
 
     if (!projectRow) return yield* new Unauthorized({ status: 401, message: "Invalid API key" });
