@@ -27,7 +27,7 @@ Self-hosted, single-tenant logging + incident-intelligence platform. Services sh
 
 ## Development Commands
 
-Always `pnpm run …` (`pnpm-lock.yaml`, `packageManager pnpm@12.6.0`). Bun 1.4.2 stays the runtime: it serves `build/index.js` and executes `scripts/*.ts`. Ports: dev **5173**, preview **4173**, prod **3000**.
+Always `pnpm run …` (`pnpm-lock.yaml`, `packageManager pnpm@12.6.0`). Bun 1.4.3 stays the runtime: it serves `build/index.js` and executes `scripts/*.ts`. Ports: dev **5173**, preview **4173**, prod **3000**.
 
 ```bash
 pnpm run dev / build / preview        # vp dev/build (svelte-adapter-bun → build/index.js, prod :3000)
@@ -71,7 +71,7 @@ Local build needs dummy env: `DATABASE_URL=postgres://… BETTER_AUTH_SECRET=<�
 
 ## Runtime/Tooling Preferences
 
-- **pnpm 12 + Bun.** pnpm manages dependencies (`packageManager pnpm@12.6.0`; the app and `sdks/typescript` share the root `pnpm-lock.yaml`). Settings live in `pnpm-workspace.yaml`, not `.npmrc`, and install scripts are denied unless listed under `allowBuilds` — an unreviewed one fails `pnpm install`, as does a `package.json` change (`pnpm install` is frozen by default; regenerate with `pnpm install --lockfile-only` first). Bun (`engines.bun >=1.2.0`, pinned 1.4.2 in the CI e2e jobs + Docker `oven/bun:1.4.2-alpine`) stays the runtime: it serves the built output and runs `scripts/*.ts`, which rely on bun's extensionless TS resolution. One-off CLIs: `pnpm dlx → bunx → npx`.
+- **pnpm 12 + Bun.** pnpm manages dependencies (`packageManager pnpm@12.6.0`; the app and `sdks/typescript` share the root `pnpm-lock.yaml`). Settings live in `pnpm-workspace.yaml`, not `.npmrc`, and install scripts are denied unless listed under `allowBuilds` — an unreviewed one fails `pnpm install`, as does a `package.json` change (`pnpm install` is frozen by default; regenerate with `pnpm install --lockfile-only` first). Bun (`engines.bun >=1.2.0`, pinned 1.4.3 in the CI e2e jobs + Docker `oven/bun:1.4.3-alpine`) stays the runtime: it serves the built output and runs `scripts/*.ts`, which rely on bun's extensionless TS resolution. One-off CLIs: `pnpm dlx → bunx → npx`.
 - **Vite+ (`vp`) 1.0.0-rc.0**, **Vitest 5.0.1** via the workspace catalog/overrides; `@vitest/coverage-v8` must match the runner (hard-fail otherwise). Root TS 6 + `@typescript/native` 7 for `--tsgo` (svelte-check 4.x rejects TS7 main). Upgrade the toolchain from the workspace root with the current global `vp migrate --full`, not one package at a time.
 - **Postgres 18-alpine** everywhere (PG19 beta — don't bump). `db:push` dev-only; prod/CI `db:migrate`. `db:generate` needs TTY; if it replays old migrations (meta snapshots cover 0000–0005, 0011, 0012), hand-write SQL.
 - Env: `DATABASE_URL` (must start `postgres`, required), `BETTER_AUTH_SECRET` (≥32, required unless dev/test), `ORIGIN` (prod proxies), `RATE_LIMIT_*_RPM`, `SSE_*`, `LOG_*`, `IDLE_TIMEOUT` (Bun.serve idle timeout in seconds; image ships 120, heartbeat clamped to half), `INCIDENT_AUTO_RESOLVE_MINUTES=30`. Behind proxy set `ADDRESS_HEADER` + `XFF_DEPTH` or IP limiting sees socket IP.
