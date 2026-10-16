@@ -176,8 +176,14 @@ function generateIndexSQL(table: PgTable): string[] {
       .join(", ");
 
     const unique = indexConfig.unique ? "UNIQUE " : "";
+
+    // Partial indexes: without the predicate a partial unique index would turn into a full one.
+    const where = indexConfig.where
+      ? ` WHERE ${new PgDialect().sqlToQuery(indexConfig.where).sql}`
+      : "";
+
     indexSQLs.push(
-      `CREATE ${unique}INDEX IF NOT EXISTS "${indexConfig.name}" ON "${tableName}" USING ${indexConfig.method ?? "btree"} (${columnNames})`,
+      `CREATE ${unique}INDEX IF NOT EXISTS "${indexConfig.name}" ON "${tableName}" USING ${indexConfig.method ?? "btree"} (${columnNames})${where}`,
     );
   }
 

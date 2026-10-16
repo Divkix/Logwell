@@ -1,8 +1,8 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { getDbClient } from "#lib/server/db/db.js";
 import { project } from "#lib/server/db/schema.js";
 import { isCappedLogCount, projectLogStatsColumns } from "#lib/server/utils/capped-count.js";
-import { requireAuth } from "#lib/server/utils/owned-project.js";
+import { isActiveProject, requireAuth } from "#lib/server/utils/owned-project.js";
 import type { PageServerLoad } from "./$types";
 
 export const load: PageServerLoad = async (event) => {
@@ -20,7 +20,7 @@ export const load: PageServerLoad = async (event) => {
       ...projectLogStatsColumns(),
     })
     .from(project)
-    .where(eq(project.ownerId, user.id))
+    .where(and(eq(project.ownerId, user.id), isActiveProject))
     .orderBy(desc(project.createdAt));
 
   return {

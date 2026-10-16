@@ -137,6 +137,17 @@ describe("(app) page loaders — injected PGlite DB seam", () => {
       expect(data.projects[0]!.id).toBe(ownedProject.id);
     });
 
+    it("omits soft-deleted projects", async () => {
+      const kept = await seedProject(db, { name: "kept", ownerId: owner.userId });
+      await seedProject(db, { name: "gone", ownerId: owner.userId, deletedAt: new Date() });
+
+      const event = createLoadEvent(db, {}, owner.locals);
+      // SAFETY: createLoadEvent builds every event member these load functions read (url, params, locals, cookies, fetch, setHeaders, getClientAddress, depends, parent); tracing stays null because no load function reads it.
+      const data = await loadDashboard(event as never);
+
+      expect(data.projects.map((p: { id: string }) => p.id)).toEqual([kept.id]);
+    });
+
     it("returns bounded log counts and the latest activity per project", async () => {
       const busy = await seedProject(db, { name: "busy-project", ownerId: owner.userId });
       await seedProject(db, { name: "empty-project", ownerId: owner.userId });
@@ -243,6 +254,14 @@ describe("(app) page loaders — injected PGlite DB seam", () => {
       const proj = await seedProject(db, { name: "other-proj", ownerId: owner.userId });
 
       const event = createLoadEvent(db, { id: proj.id }, nonOwner.locals);
+      // SAFETY: createLoadEvent builds every event member these load functions read (url, params, locals, cookies, fetch, setHeaders, getClientAddress, depends, parent); tracing stays null because no load function reads it.
+      await expectSvelteKit404(loadProjectLogs(event as never));
+    });
+
+    it("throws SvelteKit 404 for a soft-deleted project", async () => {
+      const proj = await seedProject(db, { ownerId: owner.userId, deletedAt: new Date() });
+
+      const event = createLoadEvent(db, { id: proj.id }, owner.locals);
       // SAFETY: createLoadEvent builds every event member these load functions read (url, params, locals, cookies, fetch, setHeaders, getClientAddress, depends, parent); tracing stays null because no load function reads it.
       await expectSvelteKit404(loadProjectLogs(event as never));
     });

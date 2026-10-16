@@ -26,10 +26,16 @@ export const project = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
       .$onUpdate(() => new Date()),
+    // Set by DELETE /api/projects/[id]: the project is hidden and its key revoked at once, and
+    // jobs/project-purge.ts deletes its logs in batches and finally the row itself.
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
   (table) => [
     index("idx_project_owner_id").on(table.ownerId),
-    uniqueIndex("uq_project_name_owner").on(table.name, table.ownerId),
+    // Partial, so a name frees up as soon as its project is deleted, not when the purge ends.
+    uniqueIndex("uq_project_name_owner")
+      .on(table.name, table.ownerId)
+      .where(sql`${table.deletedAt} IS NULL`),
   ],
 );
 

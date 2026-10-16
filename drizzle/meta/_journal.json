@@ -99,6 +99,13 @@
       "when": 1792142913521,
       "tag": "0013_log_index_rework",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1792143243322,
+      "tag": "0014_project_soft_delete",
+      "breakpoints": true
     }
   ]
 }

@@ -4,7 +4,7 @@ import { apiError, isUniqueViolation } from "#lib/server/utils/api-error.js";
 import { invalidateApiKeyCacheByHash } from "#lib/server/utils/api-key.js";
 import { recentLevelCounts } from "#lib/server/utils/capped-count.js";
 import { requireJsonContentType } from "#lib/server/utils/content-type.js";
-import { requireOwnedProjectRoute } from "#lib/server/utils/owned-project.js";
+import { isActiveProject, requireOwnedProjectRoute } from "#lib/server/utils/owned-project.js";
 import { projectUpdatePayloadSchema } from "#lib/shared/schemas/project.js";
 import type { RequestEvent } from "./$types";
 
@@ -128,6 +128,7 @@ export async function PATCH(event: RequestEvent): Promise<Response> {
         eq(project.name, name),
         ne(project.id, projectId),
         eq(project.ownerId, currentProject.ownerId),
+        isActiveProject,
       ),
     });
 
@@ -168,7 +169,7 @@ export async function PATCH(event: RequestEvent): Promise<Response> {
     [updated] = await db
       .update(project)
       .set(updateData)
-      .where(eq(project.id, projectId))
+      .where(and(eq(project.id, projectId), isActiveProject))
       .returning();
   } catch (error) {
     if (isUniqueViolation(error, "uq_project_name_owner")) {
@@ -194,9 +195,14 @@ export async function PATCH(event: RequestEvent): Promise<Response> {
 /**
  * DELETE /api/projects/[id]
  *
- * Deletes a project and all associated logs (via cascade).
- * Also invalidates the project's API key from cache.
- * Requires session authentication and project ownership.
+ * Deletes a project. Requires session authentication and project ownership.
+ *
+ * The project is soft-deleted in one single-row UPDATE: from that commit on it is hidden from
+ * every owned-project guard and project list (404), its name is free again, and its API key is
+ * revoked (the stored hash is replaced by a value no SHA-256 hex digest can equal). Its logs and
+ * incidents are purged in paced batches by the cleanup scheduler (jobs/project-purge.ts), which
+ * removes the row last — a single cascading DELETE over millions of logs would hold locks and
+ * write WAL for as long as it takes.
  *
  * Response:
  * {
@@ -205,7 +211,7 @@ export async function PATCH(event: RequestEvent): Promise<Response> {
  * }
  *
  * Error responses:
- * - 404 not_found: Project does not exist or not owned by user
+ * - 404 not_found: Project does not exist, is already deleted, or is not owned by user
  */
 export async function DELETE(event: RequestEvent): Promise<Response> {
   const authResult = await requireOwnedProjectRoute(event, event.params.id);
@@ -215,9 +221,21 @@ export async function DELETE(event: RequestEvent): Promise<Response> {
   const { project: projectData, db } = authResult;
   const projectId = event.params.id;
 
+  const [deleted] = await db
+    .update(project)
+    // Not hex, so no presented key can hash to it; the project id keeps it unique.
+    .set({ deletedAt: new Date(), apiKeyHash: `deleted:${projectId}` })
+    .where(and(eq(project.id, projectId), isActiveProject))
+    .returning();
+
+  // After the commit, not before: a key lookup landing between an early invalidation and the
+  // UPDATE would re-cache the old hash. Lookups still in flight are kept out of the cache by the
+  // generation guard in validateApiKey, and the old hash no longer matches any row.
   invalidateApiKeyCacheByHash(projectData.apiKeyHash);
 
-  await db.delete(project).where(eq(project.id, projectId));
+  if (!deleted) {
+    return apiError(404, "not_found", "Project not found");
+  }
 
   return Response.json({
     success: true,

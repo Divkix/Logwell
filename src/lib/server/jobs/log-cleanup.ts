@@ -4,6 +4,7 @@ import { RETENTION_CONFIG } from "#lib/server/config/performance.js";
 import type { DatabaseClient } from "#lib/server/db/db.js";
 import { getQueryRows } from "#lib/server/db/db.js";
 import { project } from "#lib/server/db/schema.js";
+import { isActiveProject } from "#lib/server/utils/owned-project.js";
 import { OLDEST_FIRST, projectLogs } from "#lib/server/utils/capped-count.js";
 
 export interface CleanupResult {
@@ -50,6 +51,38 @@ export async function deleteInBatches(
 
     if (batchPauseMs > 0) await pause(batchPauseMs);
   }
+}
+
+/**
+ * Deletes a project's logs older than `before` (all of them when omitted), oldest first, in
+ * paced batches. Returns how many were deleted.
+ */
+export async function deleteProjectLogs(
+  db: DatabaseClient,
+  projectId: string,
+  options: BatchOptions = {},
+  before?: Date,
+): Promise<number> {
+  return deleteInBatches(async (limit) => {
+    // Bind the cutoff as an ISO string: passing the Date object here is what broke cleanup.
+    // projectLogs + OLDEST_FIRST keep each batch on idx_log_project_timestamp_id. With a plain
+    // `project_id =` the planner may walk another index through every other project's expired
+    // rows (measured on PG 18: 300k rows filtered for one empty batch), which the pool's
+    // statement_timeout would cancel, stalling this project's retention for good.
+    const raw = await db.execute(sql`
+      WITH batch AS (
+        SELECT id FROM "log"
+        WHERE ${projectLogs(projectId)}
+          ${before ? sql`AND timestamp < ${before.toISOString()}` : sql``}
+        ORDER BY ${OLDEST_FIRST}
+        LIMIT ${limit}
+      )
+      DELETE FROM "log" WHERE id IN (SELECT id FROM batch)
+      RETURNING id
+    `);
+
+    return getQueryRows(raw).length;
+  }, options);
 }
 
 /**
@@ -107,7 +140,8 @@ export async function cleanupOldLogs(
   };
 
   try {
-    const projects = await db.select().from(project);
+    // Deleted projects are purged whole by project-purge.ts.
+    const projects = await db.select().from(project).where(isActiveProject);
 
     if (projects.length === 0) {
       return result;
@@ -126,26 +160,7 @@ export async function cleanupOldLogs(
         const cutoffDate = new Date();
         cutoffDate.setDate(cutoffDate.getDate() - effectiveRetention);
 
-        const deletedInProject = await deleteInBatches(async (limit) => {
-          // Bind the cutoff as an ISO string: passing the Date object here is what broke cleanup.
-          // projectLogs + OLDEST_FIRST keep each batch on idx_log_project_timestamp_id. With a plain
-          // `project_id =` the planner may walk another index through every other project's
-          // expired rows (measured on PG 18: 300k rows filtered for one empty batch), which the
-          // pool's statement_timeout would cancel, stalling this project's retention for good.
-          const raw = await db.execute(sql`
-            WITH batch AS (
-              SELECT id FROM "log"
-              WHERE ${projectLogs(proj.id)}
-                AND timestamp < ${cutoffDate.toISOString()}
-              ORDER BY ${OLDEST_FIRST}
-              LIMIT ${limit}
-            )
-            DELETE FROM "log" WHERE id IN (SELECT id FROM batch)
-            RETURNING id
-          `);
-
-          return getQueryRows(raw).length;
-        }, options);
+        const deletedInProject = await deleteProjectLogs(db, proj.id, options, cutoffDate);
 
         const incidentsDeleted = await pruneExpiredIncidents(db, proj.id, cutoffDate, options);
 

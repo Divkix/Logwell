@@ -644,7 +644,7 @@ describe("GET /api/projects/[id] (canonical detail home)", () => {
     }
   });
 
-  it("removes the project and its logs on DELETE", async () => {
+  it("hides the project on DELETE", async () => {
     const testProject = await seedProject(db, { ownerId: userId });
     await seedLogs(db, testProject.id, 5);
 

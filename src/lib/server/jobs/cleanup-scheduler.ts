@@ -1,6 +1,7 @@
 import { Effect, Fiber, Schedule } from "effect";
 import { RETENTION_CONFIG } from "#lib/server/config/performance.js";
 import { cleanupOldLogs } from "./log-cleanup";
+import { purgeDeletedProjects } from "./project-purge";
 
 let scheduler: Fiber.Fiber<number> | null = null;
 
@@ -34,6 +35,35 @@ export function stopCleanupScheduler(): void {
 
 // Never rejects, so a failed run cannot end the repeat.
 async function runCleanup(): Promise<void> {
+  // Deleted projects first: their rows are excluded from retention, and finishing a deletion
+  // frees more space than any retention pass.
+  await runPurge();
+  await runRetention();
+}
+
+async function runPurge(): Promise<void> {
+  try {
+    const result = await purgeDeletedProjects();
+
+    if (result.logsDeleted > 0 || result.incidentsDeleted > 0 || result.projectsPurged > 0) {
+      console.log(
+        `[cleanup-scheduler] Purge completed: ${result.projectsPurged} deleted projects removed, ` +
+          `${result.logsDeleted} logs and ${result.incidentsDeleted} incidents deleted`,
+      );
+    }
+
+    if (result.errors.length > 0) {
+      console.error("[cleanup-scheduler] Errors during purge:", result.errors);
+    }
+  } catch (error) {
+    console.error(
+      "[cleanup-scheduler] Fatal error during purge:",
+      error instanceof Error ? error.message : String(error),
+    );
+  }
+}
+
+async function runRetention(): Promise<void> {
   try {
     const result = await cleanupOldLogs();
 

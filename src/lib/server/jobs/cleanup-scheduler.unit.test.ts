@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from "vite-plus/test";
 import { startCleanupScheduler, stopCleanupScheduler } from "./cleanup-scheduler";
 import type { CleanupResult } from "./log-cleanup";
+import type { PurgeResult } from "./project-purge";
 
 const mocks = vi.hoisted(() => ({
   intervalMs: 60_000,
   cleanupOldLogs: vi.fn<() => Promise<CleanupResult>>(),
+  purgeDeletedProjects: vi.fn<() => Promise<PurgeResult>>(),
 }));
 
 const INTERVAL_MS = mocks.intervalMs;
@@ -15,6 +17,12 @@ vi.mock("#lib/server/config/performance.js", () => ({
 }));
 
 vi.mock("./log-cleanup", () => ({ cleanupOldLogs: mocks.cleanupOldLogs }));
+
+vi.mock("./project-purge", () => ({ purgeDeletedProjects: mocks.purgeDeletedProjects }));
+
+function purgeResult(overrides: Partial<PurgeResult> = {}): PurgeResult {
+  return { projectsPurged: 0, logsDeleted: 0, incidentsDeleted: 0, errors: [], ...overrides };
+}
 
 function result(
   totalLogsDeleted = 0,
@@ -50,6 +58,8 @@ describe("cleanup scheduler", () => {
     vi.useFakeTimers();
     mocks.cleanupOldLogs.mockReset();
     mocks.cleanupOldLogs.mockResolvedValue(result());
+    mocks.purgeDeletedProjects.mockReset();
+    mocks.purgeDeletedProjects.mockResolvedValue(purgeResult());
     log = vi.spyOn(console, "log").mockImplementation(() => {});
     logError = vi.spyOn(console, "error").mockImplementation(() => {});
   });
@@ -148,6 +158,41 @@ describe("cleanup scheduler", () => {
     expect(log).toHaveBeenLastCalledWith(
       "[cleanup-scheduler] Cleanup completed: 0 logs deleted, 3 incidents deleted, 1 projects processed, 0 skipped",
     );
+  });
+
+  it("purges deleted projects before each retention pass", async () => {
+    const order: string[] = [];
+    mocks.purgeDeletedProjects.mockImplementation(async () => {
+      order.push("purge");
+
+      return purgeResult({ projectsPurged: 1, logsDeleted: 7, incidentsDeleted: 2 });
+    });
+    mocks.cleanupOldLogs.mockImplementation(async () => {
+      order.push("retention");
+
+      return result();
+    });
+
+    startCleanupScheduler();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(order).toEqual(["purge", "retention"]);
+    expect(log).toHaveBeenCalledWith(
+      "[cleanup-scheduler] Purge completed: 1 deleted projects removed, 7 logs and 2 incidents deleted",
+    );
+  });
+
+  it("still runs retention when the purge throws", async () => {
+    mocks.purgeDeletedProjects.mockRejectedValueOnce(new Error("db down"));
+
+    startCleanupScheduler();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(logError).toHaveBeenCalledWith(
+      "[cleanup-scheduler] Fatal error during purge:",
+      "db down",
+    );
+    expect(calls()).toBe(1);
   });
 
   it("stops future runs and can start again", async () => {
