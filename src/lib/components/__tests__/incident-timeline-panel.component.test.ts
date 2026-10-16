@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/svelte";
 import { describe, expect, it } from "vite-plus/test";
-import type { IncidentDetail, IncidentTimelineResponse } from "$lib/shared/types";
+import type { IncidentDetail, IncidentTimelineResponse } from "#lib/shared/types.js";
 import IncidentTimelinePanel from "../incident-timeline-panel.svelte";
 
 const detail: IncidentDetail = {

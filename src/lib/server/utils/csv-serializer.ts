@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { JsonValue } from "$lib/shared/schemas/json";
+import type { JsonValue } from "#lib/shared/schemas/json.js";
 
 const jsonPrimitiveSchema = z.union([z.string(), z.number(), z.boolean()]);
 

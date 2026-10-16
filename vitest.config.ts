@@ -1,4 +1,3 @@
-import path from "node:path";
 import { sveltekit } from "@sveltejs/kit/vite";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite-plus";
@@ -6,11 +5,6 @@ import pkg from "./package.json";
 
 export default defineConfig({
   plugins: [tailwindcss(), sveltekit()],
-  resolve: {
-    alias: {
-      $lib: path.resolve(__dirname, "./src/lib"),
-    },
-  },
   test: {
     // Vitest v4 compatibility: preserve mock call history.
     // Remove after tests no longer rely on calls from setup or earlier tests.
@@ -59,11 +53,6 @@ export default defineConfig({
         define: {
           __APP_VERSION__: JSON.stringify(pkg.version),
         },
-        resolve: {
-          alias: {
-            $lib: path.resolve(__dirname, "./src/lib"),
-          },
-        },
         test: {
           // Vitest v4 compatibility: preserve mock call history.
           // Remove after tests no longer rely on calls from setup or earlier tests.
@@ -88,9 +77,6 @@ export default defineConfig({
         },
         plugins: [tailwindcss(), sveltekit()],
         resolve: {
-          alias: {
-            $lib: path.resolve(__dirname, "./src/lib"),
-          },
           conditions: ["browser"],
         },
         test: {

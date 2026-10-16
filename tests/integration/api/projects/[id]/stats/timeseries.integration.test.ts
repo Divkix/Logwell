@@ -2,12 +2,12 @@ import type { HttpError } from "@sveltejs/kit";
 import type { SelectedFields } from "drizzle-orm/pg-core";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
-import { createAuth } from "$lib/server/auth";
-import type * as schema from "$lib/server/db/schema";
-import { setupTestDatabase } from "$lib/server/db/test-db";
-import { getSession } from "$lib/server/session";
-import { clearApiKeyCache } from "$lib/server/utils/api-key";
-import type { JsonObject } from "$lib/shared/schemas/json";
+import { createAuth } from "#lib/server/auth.js";
+import type * as schema from "#lib/server/db/schema.js";
+import { setupTestDatabase } from "#lib/server/db/test-db.js";
+import { getSession } from "#lib/server/session.js";
+import { clearApiKeyCache } from "#lib/server/utils/api-key.js";
+import type { JsonObject } from "#lib/shared/schemas/json.js";
 import { GET } from "../../../../../../src/routes/api/projects/[id]/stats/timeseries/+server";
 import { seedLogs, seedProject } from "../../../../../fixtures/db";
 

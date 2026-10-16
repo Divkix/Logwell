@@ -1,7 +1,7 @@
 <script lang="ts">
 import XIcon from '@lucide/svelte/icons/x';
-import type { IncidentDetail, IncidentTimelineResponse } from '$lib/shared/types';
-import { formatFullDate } from '$lib/utils/format';
+import type { IncidentDetail, IncidentTimelineResponse } from '#lib/shared/types.js';
+import { formatFullDate } from '#lib/utils/format.js';
 import IncidentStatusBadge from './incident-status-badge.svelte';
 import LevelBadge from './level-badge.svelte';
 import Button from './ui/button/button.svelte';

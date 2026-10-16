@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
-import type { checkCsrfOrigin as CheckCsrfOrigin } from "$lib/server/utils/csrf";
+import type { checkCsrfOrigin as CheckCsrfOrigin } from "#lib/server/utils/csrf.js";
 
 function makeEvent(method: string, url: string, headers: Record<string, string> = {}) {
   const request = new Request(url, { method, headers });
@@ -18,7 +18,7 @@ function makeEvent(method: string, url: string, headers: Record<string, string> 
 async function loadCsrf(origin: string | undefined): Promise<typeof CheckCsrfOrigin> {
   vi.stubEnv("ORIGIN", origin);
   vi.resetModules();
-  const { checkCsrfOrigin } = await import("$lib/server/utils/csrf");
+  const { checkCsrfOrigin } = await import("#lib/server/utils/csrf.js");
 
   return checkCsrfOrigin;
 }

@@ -1,8 +1,12 @@
 import { json } from "@sveltejs/kit";
 import { eq } from "drizzle-orm";
-import { project } from "$lib/server/db/schema";
-import { generateApiKey, hashApiKey, invalidateApiKeyCacheByHash } from "$lib/server/utils/api-key";
-import { requireOwnedProjectRoute } from "$lib/server/utils/owned-project";
+import { project } from "#lib/server/db/schema.js";
+import {
+  generateApiKey,
+  hashApiKey,
+  invalidateApiKeyCacheByHash,
+} from "#lib/server/utils/api-key.js";
+import { requireOwnedProjectRoute } from "#lib/server/utils/owned-project.js";
 import type { RequestEvent } from "./$types";
 
 /**

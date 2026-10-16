@@ -2,10 +2,10 @@
 import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
 import CopyIcon from '@lucide/svelte/icons/copy';
 import XIcon from '@lucide/svelte/icons/x';
-import type { Log } from '$lib/server/db/schema';
-import { cn } from '$lib/utils';
-import { announceToScreenReader, focusTrap } from '$lib/utils/focus-trap';
-import { formatFullDate } from '$lib/utils/format';
+import type { Log } from '#lib/server/db/schema.js';
+import { cn } from '#lib/utils.js';
+import { announceToScreenReader, focusTrap } from '#lib/utils/focus-trap.js';
+import { formatFullDate } from '#lib/utils/format.js';
 import LevelBadge from './level-badge.svelte';
 
 interface Props {

@@ -1,12 +1,12 @@
 import { and, eq } from "drizzle-orm";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
 import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
-import * as schema from "$lib/server/db/schema";
-import { setupTestDatabase } from "$lib/server/db/test-db";
+import * as schema from "#lib/server/db/schema.js";
+import { setupTestDatabase } from "#lib/server/db/test-db.js";
 import {
   type PreparedIncidentLog,
   upsertIncidentsForPreparedLogs,
-} from "$lib/server/utils/incidents";
+} from "#lib/server/utils/incidents.js";
 import { seedProject } from "../../fixtures/db";
 
 describe("Incident upsert race condition", () => {

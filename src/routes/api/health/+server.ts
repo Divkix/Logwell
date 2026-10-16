@@ -1,6 +1,6 @@
 import { json } from "@sveltejs/kit";
 import { sql } from "drizzle-orm";
-import { type DatabaseClient, getDbClient } from "$lib/server/db/db";
+import { type DatabaseClient, getDbClient } from "#lib/server/db/db.js";
 import type { RequestEvent } from "./$types";
 
 const serverStartTime = Date.now();

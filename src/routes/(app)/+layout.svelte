@@ -1,11 +1,11 @@
 <script lang="ts">
 import LogOut from '@lucide/svelte/icons/log-out';
 import { goto } from '$app/navigation';
-import { authClient } from '$lib/auth-client';
-import Logo from '$lib/components/logo.svelte';
-import ThemeToggle from '$lib/components/theme-toggle.svelte';
-import { Button } from '$lib/components/ui/button/index.js';
-import { toastError } from '$lib/utils/toast';
+import { authClient } from '#lib/auth-client.js';
+import Logo from '#lib/components/logo.svelte';
+import ThemeToggle from '#lib/components/theme-toggle.svelte';
+import { Button } from '#lib/components/ui/button/index.js';
+import { toastError } from '#lib/utils/toast.js';
 
 const { data, children } = $props();
 

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { LogLevel } from "$lib/shared/types";
+import type { LogLevel } from "#lib/shared/types.js";
 import { jsonObjectSchema, type JsonObject, type JsonValue } from "../../shared/schemas/json";
 import { API_CONFIG } from "../config/performance";
 import type { ParsedIngest } from "./ingest";

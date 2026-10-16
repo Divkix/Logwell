@@ -1,4 +1,4 @@
-import type { LogLevel } from "$lib/server/db/schema";
+import type { LogLevel } from "#lib/server/db/schema.js";
 
 export function getLevelColor(level: LogLevel): string {
   switch (level) {

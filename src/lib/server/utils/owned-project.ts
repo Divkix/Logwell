@@ -1,7 +1,7 @@
 import { error, json, redirect, type RequestEvent } from "@sveltejs/kit";
 import { and, eq } from "drizzle-orm";
-import { getDbClient, type DatabaseClient } from "$lib/server/db/db";
-import { type Project, project } from "$lib/server/db/schema";
+import { getDbClient, type DatabaseClient } from "#lib/server/db/db.js";
+import { type Project, project } from "#lib/server/db/schema.js";
 import type { Session, User } from "../auth";
 import { checkCsrfOrigin } from "./csrf";
 

@@ -2,7 +2,7 @@
 import FilterIcon from '@lucide/svelte/icons/filter';
 import XIcon from '@lucide/svelte/icons/x';
 import type { Snippet } from 'svelte';
-import { Button } from '$lib/components/ui/button/index.js';
+import { Button } from '#lib/components/ui/button/index.js';
 
 interface Props {
   activeFilterCount?: number;

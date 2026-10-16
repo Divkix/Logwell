@@ -18,11 +18,11 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("$app/environment", () => ({ building: false }));
 
-vi.mock("$lib/server/db", () => ({ db: mocks.db, closeDb: mocks.closeDb }));
+vi.mock("#lib/server/db/index.js", () => ({ db: mocks.db, closeDb: mocks.closeDb }));
 
-vi.mock("$lib/server/config/env", () => ({ env: mocks.env }));
+vi.mock("#lib/server/config/env.js", () => ({ env: mocks.env }));
 
-vi.mock("$lib/server/auth", () => ({
+vi.mock("#lib/server/auth.js", () => ({
   initAuth: vi.fn(),
   auth: {
     options: { baseURL: "http://localhost", basePath: "/api/auth" },
@@ -31,18 +31,12 @@ vi.mock("$lib/server/auth", () => ({
   },
 }));
 
-vi.mock("$lib/server/error-handler", () => ({ handleError: vi.fn() }));
+vi.mock("#lib/server/error-handler.js", () => ({ handleError: vi.fn() }));
 
-vi.mock("$lib/server/jobs/cleanup-scheduler", () => ({
+vi.mock("#lib/server/jobs/cleanup-scheduler.js", () => ({
   startCleanupScheduler: vi.fn(),
   stopCleanupScheduler: mocks.stopCleanupScheduler,
 }));
-
-// The unit project resolves no `$lib` runtime specifiers, so re-export the real modules
-// under the specifiers the hook imports — the CSRF and rate-limit logic must run for real.
-vi.mock("$lib/server/utils/csrf", async () => await import("./lib/server/utils/csrf"));
-
-vi.mock("$lib/server/utils/rate-limit", async () => await import("./lib/server/utils/rate-limit"));
 
 const ORIGIN = "http://localhost";
 

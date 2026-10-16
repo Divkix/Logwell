@@ -1,8 +1,8 @@
 import { and, count, eq, gte } from "drizzle-orm";
-import { log } from "$lib/server/db/schema";
-import { requireOwnedProjectPage } from "$lib/server/utils/owned-project";
-import { getTimeRangeStart } from "$lib/utils/format";
-import { parseTimeRange, type TimeRange } from "$lib/utils/time-range";
+import { log } from "#lib/server/db/schema.js";
+import { requireOwnedProjectPage } from "#lib/server/utils/owned-project.js";
+import { getTimeRangeStart } from "#lib/utils/format.js";
+import { parseTimeRange, type TimeRange } from "#lib/utils/time-range.js";
 import type { PageServerLoad } from "./$types";
 
 export const load: PageServerLoad = async (event) => {

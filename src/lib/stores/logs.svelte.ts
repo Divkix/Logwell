@@ -1,4 +1,4 @@
-import type { LogLevel } from "$lib/shared/types";
+import type { LogLevel } from "#lib/shared/types.js";
 
 export interface ClientLog {
   id: string;

@@ -1,6 +1,6 @@
 import { type ExternalToast, toast } from "svelte-sonner";
 import { z } from "zod";
-import type { JsonValue } from "$lib/shared/schemas/json";
+import type { JsonValue } from "#lib/shared/schemas/json.js";
 
 export function toastSuccess(message: string, options?: ExternalToast): void {
   toast.success(message, options);

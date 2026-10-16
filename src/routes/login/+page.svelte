@@ -1,10 +1,10 @@
 <script lang="ts">
 import { goto, invalidateAll } from '$app/navigation';
-import { authClient } from '$lib/auth-client';
-import Logo from '$lib/components/logo.svelte';
-import { Button } from '$lib/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader } from '$lib/components/ui/card';
-import { Input } from '$lib/components/ui/input';
+import { authClient } from '#lib/auth-client.js';
+import Logo from '#lib/components/logo.svelte';
+import { Button } from '#lib/components/ui/button/index.js';
+import { Card, CardContent, CardDescription, CardHeader } from '#lib/components/ui/card/index.js';
+import { Input } from '#lib/components/ui/input/index.js';
 
 let username = $state('');
 

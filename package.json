@@ -3,6 +3,9 @@
   "version": "1.3.6",
   "private": true,
   "type": "module",
+  "imports": {
+    "#lib/*": "./src/lib/*"
+  },
   "scripts": {
     "dev": "vp -C . dev",
     "build": "vp -C . build",

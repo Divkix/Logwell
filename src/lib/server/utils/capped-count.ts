@@ -1,7 +1,7 @@
 import { count, type SQL } from "drizzle-orm";
 import { sql } from "drizzle-orm";
-import type { DatabaseClient } from "$lib/server/db/db";
-import { log } from "$lib/server/db/schema";
+import type { DatabaseClient } from "#lib/server/db/db.js";
+import { log } from "#lib/server/db/schema.js";
 
 export const LOG_COUNT_CEILING = 10_000;
 

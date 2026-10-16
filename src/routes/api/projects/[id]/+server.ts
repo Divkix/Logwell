@@ -1,11 +1,11 @@
 import { json } from "@sveltejs/kit";
 import { and, count, eq, ne } from "drizzle-orm";
-import { log, project, type Project } from "$lib/server/db/schema";
-import { apiError, isUniqueViolation } from "$lib/server/utils/api-error";
-import { invalidateApiKeyCacheByHash } from "$lib/server/utils/api-key";
-import { requireJsonContentType } from "$lib/server/utils/content-type";
-import { requireOwnedProjectRoute } from "$lib/server/utils/owned-project";
-import { projectUpdatePayloadSchema } from "$lib/shared/schemas/project";
+import { log, project, type Project } from "#lib/server/db/schema.js";
+import { apiError, isUniqueViolation } from "#lib/server/utils/api-error.js";
+import { invalidateApiKeyCacheByHash } from "#lib/server/utils/api-key.js";
+import { requireJsonContentType } from "#lib/server/utils/content-type.js";
+import { requireOwnedProjectRoute } from "#lib/server/utils/owned-project.js";
+import { projectUpdatePayloadSchema } from "#lib/shared/schemas/project.js";
 import type { RequestEvent } from "./$types";
 
 /**

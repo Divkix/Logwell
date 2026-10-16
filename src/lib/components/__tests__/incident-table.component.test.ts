@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/svelte";
 import { describe, expect, it, vi } from "vite-plus/test";
-import type { IncidentListItem } from "$lib/shared/types";
+import type { IncidentListItem } from "#lib/shared/types.js";
 import IncidentTable from "../incident-table.svelte";
 
 function sampleIncident(overrides: Partial<IncidentListItem> = {}): IncidentListItem {

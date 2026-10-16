@@ -1,7 +1,7 @@
 <script lang="ts">
-import type { IncidentListItem } from '$lib/shared/types';
-import { cn } from '$lib/utils';
-import { formatRelativeTime } from '$lib/utils/format';
+import type { IncidentListItem } from '#lib/shared/types.js';
+import { cn } from '#lib/utils.js';
+import { formatRelativeTime } from '#lib/utils/format.js';
 import IncidentStatusBadge from './incident-status-badge.svelte';
 import LevelBadge from './level-badge.svelte';
 

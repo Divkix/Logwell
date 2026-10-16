@@ -2,12 +2,12 @@
 import FolderPlusIcon from '@lucide/svelte/icons/folder-plus';
 import PlusIcon from '@lucide/svelte/icons/plus';
 import { navigating } from '$app/stores';
-import ApiKeyRevealModal from '$lib/components/api-key-reveal-modal.svelte';
-import CreateProjectModal from '$lib/components/create-project-modal.svelte';
-import DashboardSkeleton from '$lib/components/dashboard-skeleton.svelte';
-import ProjectCard from '$lib/components/project-card.svelte';
-import { Button } from '$lib/components/ui/button/index.js';
-import { toastError, toastSuccess } from '$lib/utils/toast';
+import ApiKeyRevealModal from '#lib/components/api-key-reveal-modal.svelte';
+import CreateProjectModal from '#lib/components/create-project-modal.svelte';
+import DashboardSkeleton from '#lib/components/dashboard-skeleton.svelte';
+import ProjectCard from '#lib/components/project-card.svelte';
+import { Button } from '#lib/components/ui/button/index.js';
+import { toastError, toastSuccess } from '#lib/utils/toast.js';
 import type { PageData } from './$types';
 
 const { data }: { data: PageData } = $props();

@@ -1,13 +1,13 @@
 import { json, type Handle, type HandleServerError } from "@sveltejs/kit";
 import { svelteKitHandler } from "better-auth/svelte-kit";
 import { building } from "$app/environment";
-import { auth, initAuth } from "$lib/server/auth";
-import { env } from "$lib/server/config/env";
-import { closeDb, db } from "$lib/server/db";
-import { handleError as buildErrorResponse } from "$lib/server/error-handler";
-import { startCleanupScheduler, stopCleanupScheduler } from "$lib/server/jobs/cleanup-scheduler";
-import { checkCsrfOrigin } from "$lib/server/utils/csrf";
-import { checkRateLimit, LOGIN_RPM } from "$lib/server/utils/rate-limit";
+import { auth, initAuth } from "#lib/server/auth.js";
+import { env } from "#lib/server/config/env.js";
+import { closeDb, db } from "#lib/server/db/index.js";
+import { handleError as buildErrorResponse } from "#lib/server/error-handler.js";
+import { startCleanupScheduler, stopCleanupScheduler } from "#lib/server/jobs/cleanup-scheduler.js";
+import { checkCsrfOrigin } from "#lib/server/utils/csrf.js";
+import { checkRateLimit, LOGIN_RPM } from "#lib/server/utils/rate-limit.js";
 
 let initialized = false;
 

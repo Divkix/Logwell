@@ -1,8 +1,8 @@
 <script lang="ts">
 import XIcon from '@lucide/svelte/icons/x';
-import { cn } from '$lib/utils';
-import { focusTrap } from '$lib/utils/focus-trap';
-import { SHORTCUTS } from '$lib/utils/keyboard';
+import { cn } from '#lib/utils.js';
+import { focusTrap } from '#lib/utils/focus-trap.js';
+import { SHORTCUTS } from '#lib/utils/keyboard.js';
 
 interface Props {
   open: boolean;

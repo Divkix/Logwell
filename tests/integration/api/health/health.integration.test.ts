@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
-import { setupTestDatabase } from "$lib/server/db/test-db";
+import { setupTestDatabase } from "#lib/server/db/test-db.js";
 import { GET } from "../../../../src/routes/api/health/+server";
 
 describe("GET /api/health", () => {

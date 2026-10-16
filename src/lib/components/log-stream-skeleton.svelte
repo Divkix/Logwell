@@ -1,5 +1,5 @@
 <script lang="ts">
-import { Skeleton } from '$lib/components/ui/skeleton/index.js';
+import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 
 const SKELETON_ROW_COUNT = 10;
 </script>

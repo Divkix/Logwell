@@ -1,8 +1,8 @@
 import { sql } from "drizzle-orm";
-import { RETENTION_CONFIG } from "$lib/server/config/performance";
-import type { DatabaseClient } from "$lib/server/db/db";
-import { getQueryRows } from "$lib/server/db/db";
-import { project } from "$lib/server/db/schema";
+import { RETENTION_CONFIG } from "#lib/server/config/performance.js";
+import type { DatabaseClient } from "#lib/server/db/db.js";
+import { getQueryRows } from "#lib/server/db/db.js";
+import { project } from "#lib/server/db/schema.js";
 
 export interface CleanupResult {
   projectsProcessed: number;
@@ -14,7 +14,7 @@ export interface CleanupResult {
 const BATCH_SIZE = 1000;
 
 export async function cleanupOldLogs(dbClient?: DatabaseClient): Promise<CleanupResult> {
-  const db = dbClient ?? (await import("$lib/server/db")).db;
+  const db = dbClient ?? (await import("#lib/server/db/index.js")).db;
 
   const result: CleanupResult = {
     projectsProcessed: 0,

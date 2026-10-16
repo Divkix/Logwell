@@ -1,13 +1,13 @@
 <script lang="ts">
-import { Button } from '$lib/components/ui/button/index.js';
+import { Button } from '#lib/components/ui/button/index.js';
 import {
   Card,
   CardContent,
   CardFooter,
   CardHeader,
   CardTitle,
-} from '$lib/components/ui/card/index.js';
-import { formatRelativeTime } from '$lib/utils/format';
+} from '#lib/components/ui/card/index.js';
+import { formatRelativeTime } from '#lib/utils/format.js';
 
 interface Project {
   id: string;

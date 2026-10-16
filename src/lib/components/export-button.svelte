@@ -1,11 +1,11 @@
 <script lang="ts">
 import DownloadIcon from '@lucide/svelte/icons/download';
-import type { TimeRange } from '$lib/components/time-range-picker.svelte';
-import { Button } from '$lib/components/ui/button';
-import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
-import type { LogLevel } from '$lib/shared/types';
-import { getTimeRangeStart } from '$lib/utils/format';
-import { toastError } from '$lib/utils/toast';
+import type { TimeRange } from '#lib/utils/time-range.js';
+import { Button } from '#lib/components/ui/button/index.js';
+import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
+import type { LogLevel } from '#lib/shared/types.js';
+import { getTimeRangeStart } from '#lib/utils/format.js';
+import { toastError } from '#lib/utils/toast.js';
 
 interface Props {
   projectId: string;

@@ -1,14 +1,14 @@
 import { json } from "@sveltejs/kit";
 import { and, count, desc, eq, inArray } from "drizzle-orm";
 import { nanoid } from "nanoid";
-import { getDbClient } from "$lib/server/db/db";
-import { log, project, type Project } from "$lib/server/db/schema";
-import { apiError, isUniqueViolation } from "$lib/server/utils/api-error";
-import { generateApiKey, hashApiKey } from "$lib/server/utils/api-key";
-import { requireAuth } from "$lib/server/utils/owned-project";
-import { requireJsonContentType } from "$lib/server/utils/content-type";
-import { checkCsrfOrigin } from "$lib/server/utils/csrf";
-import { projectCreatePayloadSchema } from "$lib/shared/schemas/project";
+import { getDbClient } from "#lib/server/db/db.js";
+import { log, project, type Project } from "#lib/server/db/schema.js";
+import { apiError, isUniqueViolation } from "#lib/server/utils/api-error.js";
+import { generateApiKey, hashApiKey } from "#lib/server/utils/api-key.js";
+import { requireAuth } from "#lib/server/utils/owned-project.js";
+import { requireJsonContentType } from "#lib/server/utils/content-type.js";
+import { checkCsrfOrigin } from "#lib/server/utils/csrf.js";
+import { projectCreatePayloadSchema } from "#lib/shared/schemas/project.js";
 import type { RequestEvent } from "./$types";
 
 /**

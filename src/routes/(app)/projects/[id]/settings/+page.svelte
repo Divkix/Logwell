@@ -4,12 +4,12 @@ import CopyIcon from '@lucide/svelte/icons/copy';
 import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
 import Trash2Icon from '@lucide/svelte/icons/trash-2';
 import { goto } from '$app/navigation';
-import Button from '$lib/components/ui/button/button.svelte';
-import * as Select from '$lib/components/ui/select';
-import Separator from '$lib/components/ui/separator/separator.svelte';
-import { projectUpdatePayloadSchema } from '$lib/shared/schemas/project';
-import { announceToScreenReader } from '$lib/utils/focus-trap';
-import { toastError, toastSuccess } from '$lib/utils/toast';
+import Button from '#lib/components/ui/button/button.svelte';
+import * as Select from '#lib/components/ui/select/index.js';
+import Separator from '#lib/components/ui/separator/separator.svelte';
+import { projectUpdatePayloadSchema } from '#lib/shared/schemas/project.js';
+import { announceToScreenReader } from '#lib/utils/focus-trap.js';
+import { toastError, toastSuccess } from '#lib/utils/toast.js';
 
 interface Props {
   data: {

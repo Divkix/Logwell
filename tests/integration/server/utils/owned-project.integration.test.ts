@@ -1,17 +1,17 @@
 import type { HttpError, Redirect, RequestEvent } from "@sveltejs/kit";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
-import { createAuth } from "$lib/server/auth";
-import type * as schema from "$lib/server/db/schema";
-import { setupTestDatabase } from "$lib/server/db/test-db";
-import { getSession } from "$lib/server/session";
+import { createAuth } from "#lib/server/auth.js";
+import type * as schema from "#lib/server/db/schema.js";
+import { setupTestDatabase } from "#lib/server/db/test-db.js";
+import { getSession } from "#lib/server/session.js";
 import {
   requireAuth,
   requireOwnedProjectPage,
   requireOwnedProjectRoute,
-} from "$lib/server/utils/owned-project";
+} from "#lib/server/utils/owned-project.js";
 import { seedProject } from "../../../fixtures/db";
-import type { JsonObject } from "$lib/shared/schemas/json";
+import type { JsonObject } from "#lib/shared/schemas/json.js";
 import type { LayoutParams, RouteId } from "$app/types";
 
 async function expectRedirect(

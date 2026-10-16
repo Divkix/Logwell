@@ -1,4 +1,4 @@
-import type { Log } from "$lib/server/db/schema";
+import type { Log } from "#lib/server/db/schema.js";
 
 export type SortField = "timestamp" | "level" | "message";
 

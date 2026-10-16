@@ -1,8 +1,8 @@
 <script lang="ts">
 import { browser } from '$app/environment';
-import { cn } from '$lib/utils';
-import type { TimeSeriesBucket } from '$lib/utils/timeseries';
-import type { TimeRange } from './time-range-picker.svelte';
+import { cn } from '#lib/utils.js';
+import type { TimeSeriesBucket } from '#lib/utils/timeseries.js';
+import type { TimeRange } from '#lib/utils/time-range.js';
 
 // CSS variables don't work in SVG/D3 context, so we use actual values
 const CHART_COLOR = 'hsl(210, 100%, 50%)';

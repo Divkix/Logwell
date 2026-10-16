@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
-import type { Log } from "$lib/server/db/schema";
+import type { Log } from "#lib/server/db/schema.js";
 import LogDetailModal from "../log-detail-modal.svelte";
 
 const mockClipboard = {
@@ -9,7 +9,7 @@ const mockClipboard = {
 
 Object.assign(navigator, { clipboard: mockClipboard });
 
-vi.mock("$lib/utils/format", () => ({
+vi.mock("#lib/utils/format.js", () => ({
   formatFullDate: vi.fn((date: Date) => {
     return date.toISOString().replace("T", " ").replace("Z", " UTC");
   }),

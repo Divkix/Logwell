@@ -1,12 +1,12 @@
 import { json } from "@sveltejs/kit";
 import { and, eq, gte, lte, type SQL, sql } from "drizzle-orm";
-import type { TimeRange } from "$lib/utils/time-range";
-import { type BucketCountRow, getQueryRows } from "$lib/server/db/db";
-import { log } from "$lib/server/db/schema";
-import { requireOwnedProjectRoute } from "$lib/server/utils/owned-project";
-import { getTimeRangeStart } from "$lib/utils/format";
-import { parseTimeRange } from "$lib/utils/time-range";
-import { fillMissingBuckets, getTimeBucketConfig } from "$lib/utils/timeseries";
+import type { TimeRange } from "#lib/utils/time-range.js";
+import { type BucketCountRow, getQueryRows } from "#lib/server/db/db.js";
+import { log } from "#lib/server/db/schema.js";
+import { requireOwnedProjectRoute } from "#lib/server/utils/owned-project.js";
+import { getTimeRangeStart } from "#lib/utils/format.js";
+import { parseTimeRange } from "#lib/utils/time-range.js";
+import { fillMissingBuckets, getTimeBucketConfig } from "#lib/utils/timeseries.js";
 import type { RequestEvent } from "./$types";
 
 /**

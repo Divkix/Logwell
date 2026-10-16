@@ -1,5 +1,5 @@
 import type { RequestEvent } from "@sveltejs/kit";
-import { env } from "$lib/server/config/env";
+import { env } from "#lib/server/config/env.js";
 import { apiError } from "./api-error";
 
 let warnedUnsetOrigin = false;

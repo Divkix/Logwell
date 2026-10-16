@@ -1,10 +1,10 @@
 import type { PgliteDatabase } from "drizzle-orm/pglite";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
-import { createAuth } from "$lib/server/auth";
-import type * as schema from "$lib/server/db/schema";
-import { setupTestDatabase } from "$lib/server/db/test-db";
-import { getSession } from "$lib/server/session";
-import { clearApiKeyCache } from "$lib/server/utils/api-key";
+import { createAuth } from "#lib/server/auth.js";
+import type * as schema from "#lib/server/db/schema.js";
+import { setupTestDatabase } from "#lib/server/db/test-db.js";
+import { getSession } from "#lib/server/session.js";
+import { clearApiKeyCache } from "#lib/server/utils/api-key.js";
 import { GET } from "../../../../../src/routes/api/projects/[id]/logs/export/+server";
 import { seedLog, seedLogs, seedProject } from "../../../../fixtures/db";
 

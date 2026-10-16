@@ -4,21 +4,21 @@ import LoaderIcon from '@lucide/svelte/icons/loader';
 import { z } from 'zod';
 import { goto } from '$app/navigation';
 import { navigating } from '$app/stores';
-import BottomNav from '$lib/components/bottom-nav.svelte';
-import ConnectionStatus from '$lib/components/connection-status.svelte';
-import IncidentTable from '$lib/components/incident-table.svelte';
-import IncidentTimelinePanel from '$lib/components/incident-timeline-panel.svelte';
-import Button from '$lib/components/ui/button/button.svelte';
-import { type ClientIncident, useIncidentStream } from '$lib/hooks/use-incident-stream.svelte';
+import BottomNav from '#lib/components/bottom-nav.svelte';
+import ConnectionStatus from '#lib/components/connection-status.svelte';
+import IncidentTable from '#lib/components/incident-table.svelte';
+import IncidentTimelinePanel from '#lib/components/incident-timeline-panel.svelte';
+import Button from '#lib/components/ui/button/button.svelte';
+import { type ClientIncident, useIncidentStream } from '#lib/hooks/use-incident-stream.svelte.js';
 import type {
   IncidentDetail,
   IncidentListItem,
   IncidentRange,
   IncidentStatus,
   IncidentTimelineResponse,
-} from '$lib/shared/types';
-import { INCIDENT_RANGES, INCIDENT_STATUSES } from '$lib/shared/types';
-import { toastError } from '$lib/utils/toast';
+} from '#lib/shared/types.js';
+import { INCIDENT_RANGES, INCIDENT_STATUSES } from '#lib/shared/types.js';
+import { toastError } from '#lib/utils/toast.js';
 import type { PageData } from './$types';
 
 const incidentDetailSchema = z

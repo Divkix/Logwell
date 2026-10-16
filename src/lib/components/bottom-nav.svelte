@@ -5,7 +5,7 @@ import ListIcon from '@lucide/svelte/icons/list';
 import SettingsIcon from '@lucide/svelte/icons/settings';
 import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 import { page } from '$app/stores';
-import { cn } from '$lib/utils';
+import { cn } from '#lib/utils.js';
 
 interface Props {
   projectId?: string;

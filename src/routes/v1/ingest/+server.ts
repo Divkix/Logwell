@@ -1,7 +1,7 @@
 import type { RequestHandler } from "@sveltejs/kit";
-import { getDbClient } from "$lib/server/db/db";
-import { ingestLogs } from "$lib/server/utils/ingest";
-import { parseSimpleIngestBody } from "$lib/server/utils/simple-ingest";
+import { getDbClient } from "#lib/server/db/db.js";
+import { ingestLogs } from "#lib/server/utils/ingest.js";
+import { parseSimpleIngestBody } from "#lib/server/utils/simple-ingest.js";
 
 /**
  * POST /v1/ingest (Simple JSON API)

@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
-import { SSE_CONFIG } from "$lib/server/config/performance";
-import type { Incident } from "$lib/server/db/schema";
-import { logEventBus, type StreamLog } from "$lib/server/events";
-import { createIncidentStreamResponse, createLogStreamResponse } from "$lib/server/live-stream";
+import { SSE_CONFIG } from "#lib/server/config/performance.js";
+import type { Incident } from "#lib/server/db/schema.js";
+import { logEventBus, type StreamLog } from "#lib/server/events.js";
+import { createIncidentStreamResponse, createLogStreamResponse } from "#lib/server/live-stream.js";
 
 const { BATCH_WINDOW_MS, MAX_BATCH_SIZE, HEARTBEAT_INTERVAL_MS } = SSE_CONFIG;
 

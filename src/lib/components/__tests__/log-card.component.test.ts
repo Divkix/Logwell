@@ -1,9 +1,9 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
-import type { Log } from "$lib/server/db/schema";
+import type { Log } from "#lib/server/db/schema.js";
 import LogCard from "../log-card.svelte";
 
-vi.mock("$lib/utils/format", () => ({
+vi.mock("#lib/utils/format.js", () => ({
   formatTimestamp: vi.fn(() => "14:30:45.123"),
 }));
 

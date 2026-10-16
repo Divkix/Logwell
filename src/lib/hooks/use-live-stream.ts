@@ -1,4 +1,4 @@
-import type { ClientLog } from "$lib/stores/logs.svelte";
+import type { ClientLog } from "#lib/stores/logs.svelte.js";
 
 export interface ClientIncident {
   id: string;

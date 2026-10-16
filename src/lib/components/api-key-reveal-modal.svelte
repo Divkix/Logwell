@@ -1,9 +1,9 @@
 <script lang="ts">
 import CopyIcon from '@lucide/svelte/icons/copy';
 import XIcon from '@lucide/svelte/icons/x';
-import { cn } from '$lib/utils';
-import { announceToScreenReader, focusTrap } from '$lib/utils/focus-trap';
-import { toastError, toastSuccess } from '$lib/utils/toast';
+import { cn } from '#lib/utils.js';
+import { announceToScreenReader, focusTrap } from '#lib/utils/focus-trap.js';
+import { toastError, toastSuccess } from '#lib/utils/toast.js';
 import Button from './ui/button/button.svelte';
 
 interface Props {

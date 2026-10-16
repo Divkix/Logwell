@@ -3,20 +3,20 @@ import { eq } from "drizzle-orm";
 import { Data, Effect } from "effect";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import { API_CONFIG } from "$lib/server/config/performance";
-import type { DatabaseClient } from "$lib/server/db/db";
-import { log, type NewLog, project } from "$lib/server/db/schema";
-import { logEventBus, type StreamLog } from "$lib/server/events";
-import { ApiKeyError, validateApiKey } from "$lib/server/utils/api-key";
-import { requireJsonContentType } from "$lib/server/utils/content-type";
+import { API_CONFIG } from "#lib/server/config/performance.js";
+import type { DatabaseClient } from "#lib/server/db/db.js";
+import { log, type NewLog, project } from "#lib/server/db/schema.js";
+import { logEventBus, type StreamLog } from "#lib/server/events.js";
+import { ApiKeyError, validateApiKey } from "#lib/server/utils/api-key.js";
+import { requireJsonContentType } from "#lib/server/utils/content-type.js";
 import {
   assignIncidentIds,
   prepareLogsForIncidents,
   upsertIncidentsForPreparedLogs,
-} from "$lib/server/utils/incidents";
-import { BatchTooLargeError, OtlpValidationError } from "$lib/server/utils/otlp";
-import { checkRateLimit, INGEST_RPM } from "$lib/server/utils/rate-limit";
-import { SimpleIngestError } from "$lib/server/utils/simple-ingest";
+} from "#lib/server/utils/incidents.js";
+import { BatchTooLargeError, OtlpValidationError } from "#lib/server/utils/otlp.js";
+import { checkRateLimit, INGEST_RPM } from "#lib/server/utils/rate-limit.js";
+import { SimpleIngestError } from "#lib/server/utils/simple-ingest.js";
 import { jsonObjectSchema, type JsonObject, type JsonValue } from "../../shared/schemas/json";
 
 export const LOG_RETURNING_COLUMNS = {

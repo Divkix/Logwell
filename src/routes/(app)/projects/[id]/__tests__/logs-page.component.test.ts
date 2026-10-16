@@ -4,7 +4,7 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/svelte";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
-import type { ClientLog } from "$lib/stores/logs.svelte";
+import type { ClientLog } from "#lib/stores/logs.svelte.js";
 import type { PageData } from "../$types";
 
 type NavigatingState = { to: { url: URL } | null; from: null; type: "goto" } | null;
@@ -35,12 +35,12 @@ vi.mock("$app/stores", async () => {
   };
 });
 
-vi.mock("$lib/utils/toast", () => ({
+vi.mock("#lib/utils/toast.js", () => ({
   toastError: mocks.toastError,
   toastSuccess: vi.fn(),
 }));
 
-vi.mock("$lib/hooks/use-log-stream.svelte", () => ({
+vi.mock("#lib/hooks/use-log-stream.svelte.js", () => ({
   useLogStream: (options: { onLogs: (logs: ClientLog[]) => void }) => {
     mocks.onLogs = options.onLogs;
 

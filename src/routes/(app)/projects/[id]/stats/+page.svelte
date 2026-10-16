@@ -2,12 +2,13 @@
 import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
 import { goto } from '$app/navigation';
 import { navigating } from '$app/stores';
-import BottomNav from '$lib/components/bottom-nav.svelte';
-import LevelChart from '$lib/components/level-chart.svelte';
-import StatsSkeleton from '$lib/components/stats-skeleton.svelte';
-import TimeRangePicker, { type TimeRange } from '$lib/components/time-range-picker.svelte';
-import TimeseriesChart from '$lib/components/timeseries-chart.svelte';
-import type { TimeSeriesBucket } from '$lib/utils/timeseries';
+import BottomNav from '#lib/components/bottom-nav.svelte';
+import LevelChart from '#lib/components/level-chart.svelte';
+import StatsSkeleton from '#lib/components/stats-skeleton.svelte';
+import TimeRangePicker from '#lib/components/time-range-picker.svelte';
+import type { TimeRange } from '#lib/utils/time-range.js';
+import TimeseriesChart from '#lib/components/timeseries-chart.svelte';
+import type { TimeSeriesBucket } from '#lib/utils/timeseries.js';
 import type { PageData } from './$types';
 
 const { data }: { data: PageData } = $props();

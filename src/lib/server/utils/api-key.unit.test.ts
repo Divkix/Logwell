@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vite-plus/test";
-import type { DatabaseClient } from "$lib/server/db/db";
+import type { DatabaseClient } from "#lib/server/db/db.js";
 import {
   ApiKeyError,
   clearApiKeyCache,

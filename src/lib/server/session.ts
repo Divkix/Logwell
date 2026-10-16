@@ -6,7 +6,7 @@
  */
 
 import { eq } from "drizzle-orm";
-import { session as sessionTable, user as userTable } from "$lib/server/db/schema";
+import { session as sessionTable, user as userTable } from "#lib/server/db/schema.js";
 import type { Session, User } from "./auth";
 import type { DatabaseClient } from "./db/db";
 
@@ -30,7 +30,7 @@ export async function getSession(
   headers: Headers,
   database?: DatabaseClient,
 ): Promise<{ user: User; session: Session } | null> {
-  const db = database || (await import("$lib/server/db")).db;
+  const db = database || (await import("#lib/server/db/index.js")).db;
 
   const token = getSessionToken(headers);
 

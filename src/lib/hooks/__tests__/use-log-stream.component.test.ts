@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from "vite-plus/test";
-import type { ClientLog } from "$lib/stores/logs.svelte";
+import type { ClientLog } from "#lib/stores/logs.svelte.js";
 
 function createMockSSEResponse(events: Array<{ event: string; data: string }>): Response {
   let eventIndex = 0;
