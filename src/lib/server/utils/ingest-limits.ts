@@ -66,11 +66,24 @@ export function logRecordJsonSizeError(jsonColumns: JsonValue[]): string | null 
 export const MAX_FUTURE_SKEW_MS = parseEnvInt("INGEST_MAX_FUTURE_SKEW_MS", 300_000);
 
 /**
- * Clamps a client-supplied timestamp that lies more than MAX_FUTURE_SKEW_MS ahead to `now`.
- *
- * A far-future record would otherwise sit at the top of every newest-first view, keep its
- * incident's time-derived status open until that date, and outlive retention cleanup.
+ * Earliest stored timestamp, 0001-01-01T00:00:00Z. PostgreSQL's timestamptz reaches back to
+ * 4713 BC, but drizzle binds a Date as `toISOString()`, whose expanded-year form for year 0 and
+ * earlier (`0000-…`, `-000001-…`) PostgreSQL rejects: one such record would fail the whole
+ * batch's INSERT with a 500.
  */
-export function clampFutureTimestamp(timestamp: Date, now = Date.now()): Date {
-  return timestamp.getTime() - now > MAX_FUTURE_SKEW_MS ? new Date(now) : timestamp;
+export const MIN_LOG_TIMESTAMP_MS = Date.parse("0001-01-01T00:00:00Z");
+
+/**
+ * Replaces a client-supplied timestamp outside the storable window with `now`, the receive time
+ * an unparseable timestamp also falls back to.
+ *
+ * - More than MAX_FUTURE_SKEW_MS ahead: a far-future record would otherwise sit at the top of
+ *   every newest-first view, keep its incident's time-derived status open until that date, and
+ *   outlive retention cleanup.
+ * - Before MIN_LOG_TIMESTAMP_MS: PostgreSQL would reject the whole batch.
+ */
+export function clampLogTimestamp(timestamp: Date, now = Date.now()): Date {
+  const time = timestamp.getTime();
+
+  return time < MIN_LOG_TIMESTAMP_MS || time - now > MAX_FUTURE_SKEW_MS ? new Date(now) : timestamp;
 }

@@ -273,6 +273,19 @@ describe("parseSimpleIngestRequest", () => {
       expect(kept!.timestamp.toISOString()).toBe(nearFuture);
     });
 
+    it("falls back to the receive time for a timestamp before year 1", () => {
+      const before = Date.now();
+
+      const [bc, kept] = parseSimpleIngestRequest([
+        entryWith({ timestamp: "-000001-01-01T00:00:00Z" }),
+        entryWith({ timestamp: "0001-01-01T00:00:00Z" }),
+      ]).records;
+
+      expect(bc!.timestamp.getTime()).toBeGreaterThanOrEqual(before);
+      expect(bc!.timestamp.getTime()).toBeLessThanOrEqual(Date.now());
+      expect(kept!.timestamp.toISOString()).toBe("0001-01-01T00:00:00.000Z");
+    });
+
     it("includes index in error messages", () => {
       const entries = [validEntry, validEntry, { level: "invalid", message: "bad" }];
       const result = parseSimpleIngestRequest(entries);

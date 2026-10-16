@@ -611,6 +611,34 @@ describe("ingestLogs pipeline", () => {
     expect(rows).toHaveLength(1);
   });
 
+  it("stores a timestamp before year 1 at the receive time instead of failing the batch", async () => {
+    const project = await seedProjectWithApiKey(db);
+    const before = Date.now();
+
+    const response = await ingestLogs(
+      post(
+        [
+          { level: "info", message: "ok" },
+          { level: "error", message: "bc", timestamp: "-000001-01-01T00:00:00Z" },
+          { level: "info", message: "year-zero", timestamp: "0000-01-01T00:00:00Z" },
+        ],
+        project.apiKey,
+      ),
+      db,
+      parseSimpleIngestBody,
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ accepted: 3 });
+
+    const rows = await db.select().from(log).where(eq(log.projectId, project.id));
+    expect(rows).toHaveLength(3);
+
+    for (const row of rows) {
+      expect(row.timestamp.getTime()).toBeGreaterThanOrEqual(before);
+    }
+  });
+
   it("groups error logs into incidents and broadcasts both", async () => {
     const project = await seedProjectWithApiKey(db);
     const emittedLogs: string[] = [];

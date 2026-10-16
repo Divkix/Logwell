@@ -8,7 +8,7 @@ import {
 import { LOG_LEVELS, logLevelSchema, type LogLevel } from "../../shared/schemas/log";
 import { API_CONFIG } from "../config/performance";
 import type { ParsedIngest } from "./ingest";
-import { clampFutureTimestamp, logRecordJsonSizeError, truncateLogText } from "./ingest-limits";
+import { clampLogTimestamp, logRecordJsonSizeError, truncateLogText } from "./ingest-limits";
 import { BatchTooLargeError, mapOtlpAttributesToLogColumns } from "./otlp";
 
 export interface SimpleLogInput {
@@ -79,7 +79,7 @@ function parseTimestamp(timestamp: JsonValue | undefined): Date {
     return new Date();
   }
 
-  return clampFutureTimestamp(parsed);
+  return clampLogTimestamp(parsed);
 }
 
 function validateLogEntry(
