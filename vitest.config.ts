@@ -1,7 +1,6 @@
 import { sveltekit } from "@sveltejs/kit/vite";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite-plus";
-import pkg from "./package.json";
 
 export default defineConfig({
   plugins: [tailwindcss(), sveltekit()],
@@ -28,9 +27,6 @@ export default defineConfig({
         // https://viteplus.dev/guide/vitest-v5#remove-unneeded-compatibility-settings
         // https://vitest.dev/guide/migration/#inline-projects-inherit-the-root-config-by-default
         extends: false,
-        define: {
-          __APP_VERSION__: JSON.stringify(pkg.version),
-        },
         test: {
           // Vitest v4 compatibility: preserve mock call history.
           // Remove after tests no longer rely on calls from setup or earlier tests.
@@ -50,9 +46,6 @@ export default defineConfig({
         // https://viteplus.dev/guide/vitest-v5#remove-unneeded-compatibility-settings
         // https://vitest.dev/guide/migration/#inline-projects-inherit-the-root-config-by-default
         extends: false,
-        define: {
-          __APP_VERSION__: JSON.stringify(pkg.version),
-        },
         test: {
           // Vitest v4 compatibility: preserve mock call history.
           // Remove after tests no longer rely on calls from setup or earlier tests.
@@ -72,9 +65,6 @@ export default defineConfig({
         // https://viteplus.dev/guide/vitest-v5#remove-unneeded-compatibility-settings
         // https://vitest.dev/guide/migration/#inline-projects-inherit-the-root-config-by-default
         extends: false,
-        define: {
-          __APP_VERSION__: JSON.stringify(pkg.version),
-        },
         plugins: [tailwindcss(), sveltekit()],
         resolve: {
           conditions: ["browser"],
