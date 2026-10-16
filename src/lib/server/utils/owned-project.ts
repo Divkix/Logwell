@@ -1,6 +1,7 @@
 import { error, redirect, type RequestEvent } from "@sveltejs/kit";
 import { and, eq } from "drizzle-orm";
 import { getDbClient, type DatabaseClient } from "#lib/server/db/db.js";
+import { isActiveProject } from "#lib/server/db/predicates.js";
 import { type Project, project } from "#lib/server/db/schema.js";
 import type { Session, User } from "../auth";
 import { checkCsrfOrigin } from "./csrf";
@@ -43,7 +44,7 @@ async function findOwnedProject(
   const [projectData] = await db
     .select()
     .from(project)
-    .where(and(eq(project.id, projectId), eq(project.ownerId, user.id)));
+    .where(and(eq(project.id, projectId), eq(project.ownerId, user.id), isActiveProject));
 
   return { projectData, db };
 }

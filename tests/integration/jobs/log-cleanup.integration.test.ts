@@ -1,8 +1,9 @@
 import { asc, eq } from "drizzle-orm";
+import { nanoid } from "nanoid";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
-import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type * as schema from "../../../src/lib/server/db/schema";
-import { log } from "../../../src/lib/server/db/schema";
+import { incident, log } from "../../../src/lib/server/db/schema";
 import { setupTestDatabase } from "../../../src/lib/server/db/test-db";
 import { cleanupOldLogs } from "../../../src/lib/server/jobs/log-cleanup";
 import { seedLog, seedLogs, seedProject } from "../../fixtures/db";
@@ -289,5 +290,148 @@ describe("cleanupOldLogs batch selection", () => {
 
     const p2Remaining = await db.select().from(log).where(eq(log.projectId, project2.id));
     expect(p2Remaining.map((l) => l.message)).toEqual(["p2-recent"]);
+  });
+});
+
+describe("cleanupOldLogs pacing", () => {
+  let db: PgliteDatabase<typeof schema>;
+
+  beforeEach(async () => {
+    ({ db } = await setupTestDatabase());
+  });
+
+  const tenDaysAgo = () => new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+
+  it("pauses between batches, not after the last one", async () => {
+    const project1 = await seedProject(db, { retentionDays: 7 });
+    await seedLogs(db, project1.id, 5, { timestamp: tenDaysAgo() });
+    const sleep = vi.fn(async () => {});
+
+    const result = await cleanupOldLogs(db, { batchSize: 2, batchPauseMs: 250, sleep });
+
+    expect(result.totalLogsDeleted).toBe(5);
+    // Batches of 2, 2, 1: the short third batch ends the loop without another pause.
+    expect(sleep.mock.calls).toEqual([[250], [250]]);
+  });
+
+  it("stops after a short batch instead of issuing an empty one", async () => {
+    const project1 = await seedProject(db, { retentionDays: 7 });
+    await seedLogs(db, project1.id, 3, { timestamp: tenDaysAgo() });
+    const executeSpy = vi.spyOn(db, "execute");
+
+    await cleanupOldLogs(db, { batchSize: 2, batchPauseMs: 0 });
+
+    // Two log batches (2, then a short 1), then one incident-prune batch.
+    expect(executeSpy).toHaveBeenCalledTimes(3);
+  });
+
+  it("runs batches back-to-back when the pause is 0", async () => {
+    const project1 = await seedProject(db, { retentionDays: 7 });
+    await seedLogs(db, project1.id, 4, { timestamp: tenDaysAgo() });
+    const sleep = vi.fn(async () => {});
+
+    const result = await cleanupOldLogs(db, { batchSize: 2, batchPauseMs: 0, sleep });
+
+    expect(result.totalLogsDeleted).toBe(4);
+    expect(sleep).not.toHaveBeenCalled();
+  });
+});
+
+describe("cleanupOldLogs incident pruning", () => {
+  let db: PgliteDatabase<typeof schema>;
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const daysAgo = (days: number) => new Date(Date.now() - days * DAY_MS);
+
+  beforeEach(async () => {
+    ({ db } = await setupTestDatabase());
+  });
+
+  async function seedIncident(projectId: string, lastSeen: Date): Promise<string> {
+    const id = nanoid();
+
+    await db.insert(incident).values({
+      id,
+      projectId,
+      fingerprint: `fp-${id}`,
+      title: "Database timeout",
+      normalizedMessage: "database timeout",
+      highestLevel: "error",
+      firstSeen: lastSeen,
+      lastSeen,
+      totalEvents: 1,
+    });
+
+    return id;
+  }
+
+  const remainingIncidentIds = async (projectId: string) =>
+    (await db.select({ id: incident.id }).from(incident).where(eq(incident.projectId, projectId)))
+      .map((row) => row.id)
+      .sort();
+
+  it("deletes incidents past retention once their logs are gone", async () => {
+    const proj = await seedProject(db, { retentionDays: 7 });
+    const expired = await seedIncident(proj.id, daysAgo(10));
+    const recent = await seedIncident(proj.id, daysAgo(1));
+    await seedLog(db, proj.id, { level: "error", incidentId: expired, timestamp: daysAgo(10) });
+    await seedLog(db, proj.id, { level: "error", incidentId: recent, timestamp: daysAgo(1) });
+
+    const result = await cleanupOldLogs(db);
+
+    expect(result.totalLogsDeleted).toBe(1);
+    expect(result.totalIncidentsDeleted).toBe(1);
+    expect(await remainingIncidentIds(proj.id)).toEqual([recent]);
+  });
+
+  it("keeps an expired incident that still owns a log", async () => {
+    const proj = await seedProject(db, { retentionDays: 7 });
+    const stale = await seedIncident(proj.id, daysAgo(10));
+    // A late event inside retention that never bumped last_seen (e.g. written by a backfill).
+    await seedLog(db, proj.id, { level: "error", incidentId: stale, timestamp: daysAgo(2) });
+
+    const result = await cleanupOldLogs(db);
+
+    expect(result.totalIncidentsDeleted).toBe(0);
+    expect(await remainingIncidentIds(proj.id)).toEqual([stale]);
+  });
+
+  it("never prunes incidents of a project that keeps logs forever", async () => {
+    const proj = await seedProject(db, { retentionDays: 0 });
+    const ancient = await seedIncident(proj.id, daysAgo(400));
+
+    const result = await cleanupOldLogs(db);
+
+    expect(result.totalIncidentsDeleted).toBe(0);
+    expect(await remainingIncidentIds(proj.id)).toEqual([ancient]);
+  });
+
+  it("applies the system default retention when the project has none", async () => {
+    // RETENTION_CONFIG.LOG_RETENTION_DAYS defaults to 30.
+    const proj = await seedProject(db, { retentionDays: null });
+    await seedIncident(proj.id, daysAgo(40));
+    const withinDefault = await seedIncident(proj.id, daysAgo(20));
+
+    const result = await cleanupOldLogs(db);
+
+    expect(result.totalIncidentsDeleted).toBe(1);
+    expect(result.projectsProcessed).toBe(1);
+    expect(await remainingIncidentIds(proj.id)).toEqual([withinDefault]);
+  });
+
+  it("prunes in batches and leaves other projects alone", async () => {
+    const proj = await seedProject(db, { retentionDays: 7 });
+    const other = await seedProject(db, { retentionDays: 0 });
+
+    for (let i = 0; i < 5; i++) await seedIncident(proj.id, daysAgo(10 + i));
+    const otherIncident = await seedIncident(other.id, daysAgo(10));
+    const sleep = vi.fn(async () => {});
+
+    const result = await cleanupOldLogs(db, { batchSize: 2, batchPauseMs: 10, sleep });
+
+    expect(result.totalIncidentsDeleted).toBe(5);
+    expect(await remainingIncidentIds(proj.id)).toEqual([]);
+    expect(await remainingIncidentIds(other.id)).toEqual([otherIncident]);
+    // Incident batches of 2, 2, 1 pause twice; the empty log pass never pauses.
+    expect(sleep).toHaveBeenCalledTimes(2);
   });
 });

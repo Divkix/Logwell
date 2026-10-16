@@ -280,8 +280,9 @@ describe("Project Authorization - Ownership Isolation", () => {
 
       expect(response.status).toBe(200);
 
-      const projects = await db.select().from(project).where(eq(project.id, projectA.id));
-      expect(projects).toHaveLength(0);
+      // Soft-deleted: hidden at once, the row itself goes with the background purge.
+      const [dbProject] = await db.select().from(project).where(eq(project.id, projectA.id));
+      expect(dbProject?.deletedAt).toBeInstanceOf(Date);
     });
   });
 

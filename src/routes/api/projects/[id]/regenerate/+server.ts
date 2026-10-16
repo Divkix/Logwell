@@ -1,5 +1,7 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
+import { isActiveProject } from "#lib/server/db/predicates.js";
 import { project } from "#lib/server/db/schema.js";
+import { apiError } from "#lib/server/utils/api-error.js";
 import {
   generateApiKey,
   hashApiKey,
@@ -21,7 +23,7 @@ import type { RequestEvent } from "./$types";
  * }
  *
  * Error responses:
- * - 404 not_found: Project does not exist or not owned by user
+ * - 404 not_found: Project does not exist, is deleted, or is not owned by user
  */
 export async function POST(event: RequestEvent): Promise<Response> {
   const authResult = await requireOwnedProjectRoute(event, event.params.id);
@@ -35,13 +37,20 @@ export async function POST(event: RequestEvent): Promise<Response> {
 
   invalidateApiKeyCacheByHash(projectData.apiKeyHash);
 
-  await db
+  // isActiveProject is re-checked here, not only in the guard: a DELETE committing between the
+  // guard and this UPDATE would otherwise get a fresh, valid key written onto the deleted row.
+  const [updated] = await db
     .update(project)
     .set({
       apiKeyHash: hashApiKey(newApiKey),
       updatedAt: new Date(),
     })
-    .where(eq(project.id, projectId));
+    .where(and(eq(project.id, projectId), isActiveProject))
+    .returning();
+
+  if (!updated) {
+    return apiError(404, "not_found", "Project not found");
+  }
 
   return Response.json({
     apiKey: newApiKey,

@@ -1,6 +1,7 @@
 import { and, desc, eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { getDbClient } from "#lib/server/db/db.js";
+import { isActiveProject } from "#lib/server/db/predicates.js";
 import { project, type Project } from "#lib/server/db/schema.js";
 import { apiError, isUniqueViolation } from "#lib/server/utils/api-error.js";
 import { generateApiKey, hashApiKey } from "#lib/server/utils/api-key.js";
@@ -51,7 +52,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
       ...projectLogStatsColumns(),
     })
     .from(project)
-    .where(eq(project.ownerId, user.id))
+    .where(and(eq(project.ownerId, user.id), isActiveProject))
     .orderBy(desc(project.createdAt));
 
   const projectsWithCounts = projects.map((p) => ({
@@ -129,7 +130,7 @@ export async function POST(event: RequestEvent): Promise<Response> {
   const [existing] = await db
     .select({ id: project.id })
     .from(project)
-    .where(and(eq(project.name, name), eq(project.ownerId, user.id)));
+    .where(and(eq(project.name, name), eq(project.ownerId, user.id), isActiveProject));
 
   if (existing) {
     return apiError(400, "duplicate_name", "A project with this name already exists");

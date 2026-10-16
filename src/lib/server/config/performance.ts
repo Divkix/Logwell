@@ -9,9 +9,11 @@
  * - SSE_BATCH_WINDOW_MS: Time window for batching SSE events (default: 1500ms)
  * - SSE_MAX_BATCH_SIZE: Maximum logs per batch before flush (default: 50)
  * - SSE_HEARTBEAT_INTERVAL_MS: Heartbeat interval (default: 30000ms)
+ * - SSE_MAX_CONNECTIONS: Live streams open at once across all projects (default: 200)
  * - LOG_STREAM_MAX_LOGS: Maximum logs in memory per client (default: 1000)
  * - LOG_RETENTION_DAYS: System default retention in days (default: 30, 0 = disabled)
  * - LOG_CLEANUP_INTERVAL_MS: Cleanup job interval in ms (default: 3600000 = 1 hour)
+ * - LOG_CLEANUP_BATCH_PAUSE_MS: Pause between cleanup delete batches in ms (default: 100)
  * - INCIDENT_AUTO_RESOLVE_MINUTES: Minutes before incident is considered resolved (default: 30)
  */
 
@@ -50,12 +52,14 @@ const SSE_DEFAULTS = {
   BATCH_WINDOW_MS: 1500,
   MAX_BATCH_SIZE: 50,
   HEARTBEAT_INTERVAL_MS: 30000,
+  MAX_CONNECTIONS: 200,
 } as const;
 
 const SSE_BOUNDS = {
   BATCH_WINDOW_MS: { min: 100, max: 10000 },
   MAX_BATCH_SIZE: { min: 1, max: 500 },
   HEARTBEAT_INTERVAL_MS: { min: 5000, max: 300000 },
+  MAX_CONNECTIONS: { min: 1, max: 10000 },
 } as const;
 
 /**
@@ -65,6 +69,9 @@ const SSE_BOUNDS = {
  * - MAX_BATCH_SIZE: Maximum logs per batch (flush immediately when reached)
  * - HEARTBEAT_INTERVAL_MS: Keep-alive ping interval. Node never times out a response that is
  *   still being written, so this only has to beat reverse-proxy read timeouts (nginx: 60s).
+ * - MAX_CONNECTIONS: Live streams (log + incident) the process holds open at once. Each one pins
+ *   a socket, a bus listener, timers and up to 256 KiB of buffered frames; past the cap a new
+ *   stream gets 429 and the client's reconnect backoff retries later.
  */
 export const SSE_CONFIG = {
   BATCH_WINDOW_MS: clamp(
@@ -81,6 +88,11 @@ export const SSE_CONFIG = {
     parseEnvInt("SSE_HEARTBEAT_INTERVAL_MS", SSE_DEFAULTS.HEARTBEAT_INTERVAL_MS),
     SSE_BOUNDS.HEARTBEAT_INTERVAL_MS.min,
     SSE_BOUNDS.HEARTBEAT_INTERVAL_MS.max,
+  ),
+  MAX_CONNECTIONS: clamp(
+    parseEnvInt("SSE_MAX_CONNECTIONS", SSE_DEFAULTS.MAX_CONNECTIONS),
+    SSE_BOUNDS.MAX_CONNECTIONS.min,
+    SSE_BOUNDS.MAX_CONNECTIONS.max,
   ),
 } as const;
 
@@ -109,11 +121,13 @@ export const LOG_STREAM_CONFIG = {
 const RETENTION_DEFAULTS = {
   LOG_RETENTION_DAYS: 30,
   LOG_CLEANUP_INTERVAL_MS: 3600000, // 1 hour
+  LOG_CLEANUP_BATCH_PAUSE_MS: 100,
 } as const;
 
 const RETENTION_BOUNDS = {
   LOG_RETENTION_DAYS: { min: 0, max: 3650 }, // 0 = disabled, max 10 years
   LOG_CLEANUP_INTERVAL_MS: { min: 60000, max: 86400000 }, // 1 minute to 24 hours
+  LOG_CLEANUP_BATCH_PAUSE_MS: { min: 0, max: 60000 }, // 0 = back-to-back batches
 } as const;
 
 /**
@@ -142,6 +156,8 @@ function parseRetentionDays(): number {
  *
  * - LOG_RETENTION_DAYS: System default retention period in days (0 = disabled)
  * - LOG_CLEANUP_INTERVAL_MS: Cleanup job interval in milliseconds
+ * - LOG_CLEANUP_BATCH_PAUSE_MS: Pause between delete batches, so a large backlog is deleted at a
+ *   bounded rate instead of one WAL burst that replicas and backups must absorb at once
  */
 export const RETENTION_CONFIG = {
   LOG_RETENTION_DAYS: parseRetentionDays(),
@@ -149,6 +165,11 @@ export const RETENTION_CONFIG = {
     parseEnvInt("LOG_CLEANUP_INTERVAL_MS", RETENTION_DEFAULTS.LOG_CLEANUP_INTERVAL_MS),
     RETENTION_BOUNDS.LOG_CLEANUP_INTERVAL_MS.min,
     RETENTION_BOUNDS.LOG_CLEANUP_INTERVAL_MS.max,
+  ),
+  LOG_CLEANUP_BATCH_PAUSE_MS: clamp(
+    parseEnvInt("LOG_CLEANUP_BATCH_PAUSE_MS", RETENTION_DEFAULTS.LOG_CLEANUP_BATCH_PAUSE_MS),
+    RETENTION_BOUNDS.LOG_CLEANUP_BATCH_PAUSE_MS.min,
+    RETENTION_BOUNDS.LOG_CLEANUP_BATCH_PAUSE_MS.max,
   ),
 } as const;
 

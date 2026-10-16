@@ -2,8 +2,14 @@ import { Deferred, Effect, Fiber, FiberHandle, Schedule } from "effect";
 import { SSE_CONFIG } from "#lib/server/config/performance.js";
 import type { Incident } from "#lib/server/db/schema.js";
 import { type Listener, logEventBus, type StreamLog } from "#lib/server/events.js";
+import { apiError } from "#lib/server/utils/api-error.js";
 
-const { BATCH_WINDOW_MS, MAX_BATCH_SIZE, HEARTBEAT_INTERVAL_MS } = SSE_CONFIG;
+const { BATCH_WINDOW_MS, MAX_BATCH_SIZE, HEARTBEAT_INTERVAL_MS, MAX_CONNECTIONS } = SSE_CONFIG;
+
+// Streams open in this process, across projects and both channels. Every stream holds a
+// socket, a bus listener, timers and up to MAX_BUFFERED_BYTES of frames for as long as the
+// client keeps it, so this bounds what a reconnect loop or a pile of tabs can pin.
+let openStreams = 0;
 
 // Bytes of undelivered SSE frames a slow consumer may accumulate before batches are dropped.
 const MAX_BUFFERED_BYTES = 256 * 1024;
@@ -135,13 +141,34 @@ function createProjectStreamResponse<T>(
   eventName: string,
   subscribe: Subscribe<T>,
 ): Response {
+  // Rejected before the stream exists, so nothing is subscribed and nothing needs releasing.
+  // The dashboard client (use-live-stream.ts) waits Retry-After and retries without spending its
+  // reconnect budget, so its stream resumes once a slot frees up.
+  if (openStreams >= MAX_CONNECTIONS) {
+    const response = apiError(429, "too_many_streams", "Too many live streams are open");
+    response.headers.set("Retry-After", "60");
+
+    return response;
+  }
+
+  openStreams += 1;
+
   // Assigned by `start`, which the ReadableStream constructor calls synchronously.
   let session!: Fiber.Fiber<void>;
 
   const stream = new ReadableStream<Uint8Array>(
     {
       start(controller) {
-        session = Effect.runFork(streamSession(controller, projectId, eventName, subscribe));
+        session = Effect.runFork(
+          streamSession(controller, projectId, eventName, subscribe).pipe(
+            // Runs once on every exit — client cancel, stall, defect — freeing the slot.
+            Effect.ensuring(
+              Effect.sync(() => {
+                openStreams -= 1;
+              }),
+            ),
+          ),
+        );
       },
       cancel: () => Effect.runPromise(Fiber.interrupt(session)),
     },

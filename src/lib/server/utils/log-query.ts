@@ -1,4 +1,5 @@
 import { and, desc, eq, gte, inArray, lte, type SQL, sql } from "drizzle-orm";
+import { unionAll } from "drizzle-orm/pg-core";
 import type { DatabaseClient } from "#lib/server/db/db.js";
 import { log, type LogLevel } from "#lib/server/db/schema.js";
 import { cappedLogCount } from "#lib/server/utils/capped-count.js";
@@ -92,10 +93,6 @@ export async function queryLogs(
     conditions.push(cursorRowLessThan(log.timestamp, log.id, cursorMicros, cursorId));
   }
 
-  if (filter.levels && filter.levels.length > 0) {
-    conditions.push(inArray(log.level, filter.levels));
-  }
-
   if (filter.from) {
     conditions.push(gte(log.timestamp, filter.from));
   }
@@ -112,33 +109,57 @@ export async function queryLogs(
     }
   }
 
-  const whereClause = and(...conditions);
+  // Deduplicated: each level below gets its own page, and `level=error,error` must not double it.
+  const levels = [...new Set(filter.levels ?? [])];
+
+  const whereClause = and(
+    ...conditions,
+    ...(levels.length > 0 ? [inArray(log.level, levels)] : []),
+  );
 
   const countResult = filter.cursor ? undefined : await cappedLogCount(db, whereClause);
 
-  const rows = await db
-    .select({
-      id: log.id,
-      projectId: log.projectId,
-      incidentId: log.incidentId,
-      fingerprint: log.fingerprint,
-      serviceName: log.serviceName,
-      level: log.level,
-      message: log.message,
-      metadata: log.metadata,
-      sourceFile: log.sourceFile,
-      lineNumber: log.lineNumber,
-      requestId: log.requestId,
-      userId: log.userId,
-      ipAddress: log.ipAddress,
-      timestamp: log.timestamp,
-      micros: microsColumn(log.timestamp),
-    })
-    .from(log)
-    .where(whereClause)
-    .orderBy(desc(log.timestamp), desc(log.id))
-    .limit(filter.limit + 1)
-    .offset(offset);
+  const pageOf = (where: SQL | undefined) =>
+    db
+      .select({
+        id: log.id,
+        projectId: log.projectId,
+        incidentId: log.incidentId,
+        fingerprint: log.fingerprint,
+        serviceName: log.serviceName,
+        level: log.level,
+        message: log.message,
+        metadata: log.metadata,
+        sourceFile: log.sourceFile,
+        lineNumber: log.lineNumber,
+        requestId: log.requestId,
+        userId: log.userId,
+        ipAddress: log.ipAddress,
+        timestamp: log.timestamp,
+        micros: microsColumn(log.timestamp),
+      })
+      .from(log)
+      .where(where)
+      .orderBy(desc(log.timestamp), desc(log.id))
+      .limit(filter.limit + 1);
+
+  const [firstLevel, secondLevel, ...otherLevels] = levels;
+
+  // idx_log_project_level_timestamp_id returns one level in (timestamp, id) order, but not
+  // `level = ANY(...)`: for several levels the planner walks the project's whole
+  // idx_log_project_timestamp_id range backward and filters, a full scan of a large project
+  // whose selected levels are rare. Each level is paged on its own index range instead and the
+  // per-level pages merged. The deprecated offset keeps the single query.
+  const rows =
+    firstLevel && secondLevel && offset === 0
+      ? await unionAll(
+          pageOf(and(...conditions, eq(log.level, firstLevel))),
+          pageOf(and(...conditions, eq(log.level, secondLevel))),
+          ...otherLevels.map((level) => pageOf(and(...conditions, eq(log.level, level)))),
+        )
+          .orderBy(desc(log.timestamp), desc(log.id))
+          .limit(filter.limit + 1)
+      : await pageOf(whereClause).offset(offset);
 
   const hasMore = rows.length > filter.limit;
   const page = hasMore ? rows.slice(0, filter.limit) : rows;

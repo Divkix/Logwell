@@ -66,7 +66,7 @@ function parseClientLog(log: ClientLog): Log {
   } as Log;
 }
 
-const projectData = $derived<Omit<Project, 'ownerId' | 'apiKeyHash'>>({
+const projectData = $derived<Omit<Project, 'ownerId' | 'apiKeyHash' | 'deletedAt'>>({
   id: data.project.id,
   name: data.project.name,
   retentionDays: data.project.retentionDays ?? null,

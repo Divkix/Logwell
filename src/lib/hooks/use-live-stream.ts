@@ -62,6 +62,32 @@ const DEFAULT_MAX_RECONNECT_ATTEMPTS = 5;
 
 const DEFAULT_RECONNECT_BASE_DELAY = 3000;
 
+// Used when a 429 carries no usable Retry-After; matches what the server sends.
+const DEFAULT_RETRY_AFTER_MS = 60_000;
+
+const MAX_RETRY_AFTER_MS = 300_000;
+
+class StreamHttpError extends Error {
+  readonly status: number;
+  readonly retryAfterMs: number;
+
+  constructor(response: Response) {
+    super(`HTTP ${response.status}: ${response.statusText}`);
+    this.name = "StreamHttpError";
+    this.status = response.status;
+    this.retryAfterMs = parseRetryAfterMs(response.headers.get("Retry-After"));
+  }
+}
+
+/** Delta-seconds form only (what the server sends); anything else falls back to the default. */
+function parseRetryAfterMs(header: string | null): number {
+  const seconds = header === null ? Number.NaN : Number(header.trim());
+
+  if (!Number.isInteger(seconds) || seconds < 0) return DEFAULT_RETRY_AFTER_MS;
+
+  return Math.min(seconds * 1000, MAX_RETRY_AFTER_MS);
+}
+
 export function useLiveStream<T>(options: LiveStreamOptions<T>): LiveStreamReturn {
   const {
     projectId,
@@ -131,6 +157,14 @@ export function useLiveStream<T>(options: LiveStreamOptions<T>): LiveStreamRetur
     return buffer;
   }
 
+  function scheduleConnect(delay: number): void {
+    _reconnectTimeoutId = setTimeout(() => {
+      if (!_isDisconnected) {
+        connect();
+      }
+    }, delay);
+  }
+
   function scheduleReconnect(): void {
     if (_isDisconnected) return;
 
@@ -139,11 +173,7 @@ export function useLiveStream<T>(options: LiveStreamOptions<T>): LiveStreamRetur
     const delay = reconnectBaseDelay * 2 ** _reconnectAttempts;
     _reconnectAttempts++;
 
-    _reconnectTimeoutId = setTimeout(() => {
-      if (!_isDisconnected) {
-        connect();
-      }
-    }, delay);
+    scheduleConnect(delay);
   }
 
   function connect(): void {
@@ -167,7 +197,7 @@ export function useLiveStream<T>(options: LiveStreamOptions<T>): LiveStreamRetur
         if (myEpoch !== _epoch) return;
 
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          throw new StreamHttpError(response);
         }
 
         if (!response.body) {
@@ -219,7 +249,15 @@ export function useLiveStream<T>(options: LiveStreamOptions<T>): LiveStreamRetur
         onError?.(_error);
         setConnected(false);
 
-        if (_error.message.startsWith("HTTP 404:")) return;
+        if (error instanceof StreamHttpError && error.status === 404) return;
+
+        // The server is at its live-stream cap: a capacity wait, not a failure, so it does not
+        // spend the reconnect budget and the stream resumes once a slot frees up.
+        if (error instanceof StreamHttpError && error.status === 429) {
+          scheduleConnect(error.retryAfterMs);
+
+          return;
+        }
 
         scheduleReconnect();
       });

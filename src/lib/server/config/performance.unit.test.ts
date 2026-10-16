@@ -24,10 +24,11 @@ describe("Performance Configuration", () => {
     it.each([
       ["BATCH_WINDOW_MS", 1500],
       ["MAX_BATCH_SIZE", 50],
+      ["MAX_CONNECTIONS", 200],
     ])("exports %s with default value of %d", async (key, expected) => {
       vi.resetModules();
       const { SSE_CONFIG } = await import("./performance");
-      // SAFETY: BATCH_WINDOW_MS and MAX_BATCH_SIZE are real SSE_CONFIG members; any other
+      // SAFETY: BATCH_WINDOW_MS, MAX_BATCH_SIZE and MAX_CONNECTIONS are real SSE_CONFIG members; any other
       // key would read undefined and fail the toBe below.
       expect(SSE_CONFIG[key as keyof typeof SSE_CONFIG]).toBe(expected);
     });
@@ -35,11 +36,12 @@ describe("Performance Configuration", () => {
     it.each([
       ["SSE_BATCH_WINDOW_MS", "BATCH_WINDOW_MS", "2000", 2000],
       ["SSE_MAX_BATCH_SIZE", "MAX_BATCH_SIZE", "100", 100],
+      ["SSE_MAX_CONNECTIONS", "MAX_CONNECTIONS", "50", 50],
     ])("respects %s environment variable", async (envKey, configKey, envValue, expected) => {
       vi.resetModules();
       process.env[envKey] = envValue;
       const { SSE_CONFIG } = await import("./performance");
-      // SAFETY: both rows' config keys (BATCH_WINDOW_MS, MAX_BATCH_SIZE) are real SSE_CONFIG
+      // SAFETY: the rows' config keys (BATCH_WINDOW_MS, MAX_BATCH_SIZE, MAX_CONNECTIONS) are real SSE_CONFIG
       // members; a typo would read undefined and fail the toBe below.
       expect(SSE_CONFIG[configKey as keyof typeof SSE_CONFIG]).toBe(expected);
     });
@@ -55,11 +57,12 @@ describe("Performance Configuration", () => {
       ["SSE_BATCH_WINDOW_MS", "BATCH_WINDOW_MS", "50", 100],
       ["SSE_MAX_BATCH_SIZE", "MAX_BATCH_SIZE", "0", 1],
       ["SSE_HEARTBEAT_INTERVAL_MS", "HEARTBEAT_INTERVAL_MS", "1000", 5000],
+      ["SSE_MAX_CONNECTIONS", "MAX_CONNECTIONS", "0", 1],
     ])("clamps %s to minimum", async (envKey, configKey, envValue, expected) => {
       vi.resetModules();
       process.env[envKey] = envValue;
       const { SSE_CONFIG } = await import("./performance");
-      // SAFETY: the rows' config keys (BATCH_WINDOW_MS, MAX_BATCH_SIZE, HEARTBEAT_INTERVAL_MS)
+      // SAFETY: the rows' config keys (BATCH_WINDOW_MS, MAX_BATCH_SIZE, HEARTBEAT_INTERVAL_MS, MAX_CONNECTIONS)
       // are all real SSE_CONFIG members; a typo would read undefined and fail the toBe below.
       expect(SSE_CONFIG[configKey as keyof typeof SSE_CONFIG]).toBe(expected);
     });

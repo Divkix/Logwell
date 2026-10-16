@@ -464,6 +464,111 @@ describe("useLogStream", () => {
     });
   });
 
+  describe("stream cap (429)", () => {
+    function createTooManyStreamsResponse(retryAfter?: string): Response {
+      const headers = new Headers({ "Content-Type": "application/json" });
+
+      if (retryAfter !== undefined) headers.set("Retry-After", retryAfter);
+
+      return new Response(JSON.stringify({ error: "too_many_streams" }), { status: 429, headers });
+    }
+
+    it("waits Retry-After and keeps retrying past maxReconnectAttempts", async () => {
+      vi.useFakeTimers();
+
+      fetchMock
+        .mockResolvedValueOnce(createTooManyStreamsResponse("60"))
+        .mockResolvedValueOnce(createTooManyStreamsResponse("60"))
+        .mockResolvedValueOnce(createTooManyStreamsResponse("60"))
+        .mockResolvedValueOnce(
+          createMockSSEResponse([{ event: "heartbeat", data: JSON.stringify({ ts: Date.now() }) }]),
+        );
+
+      const onError = vi.fn();
+      const onConnectionChange = vi.fn();
+
+      const stream = useLogStream({
+        projectId: "test-project",
+        enabled: true,
+        onLogs: vi.fn(),
+        onError,
+        onConnectionChange,
+        maxReconnectAttempts: 1,
+      });
+
+      await vi.advanceTimersByTimeAsync(0);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(onError).toHaveBeenCalledWith(expect.objectContaining({ message: "HTTP 429: " }));
+
+      // Not the 3s backoff: the server asked for 60s.
+      await vi.advanceTimersByTimeAsync(59_999);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(1);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+
+      // Three 429s against a budget of one reconnect: none of them spent it.
+      await vi.advanceTimersByTimeAsync(120_000);
+      expect(fetchMock).toHaveBeenCalledTimes(4);
+      expect(onConnectionChange).toHaveBeenCalledWith(true);
+
+      stream.disconnect();
+      vi.useRealTimers();
+    });
+
+    it("falls back to 60s when Retry-After is missing or not delta-seconds", async () => {
+      vi.useFakeTimers();
+
+      fetchMock
+        .mockResolvedValueOnce(createTooManyStreamsResponse())
+        .mockResolvedValueOnce(createTooManyStreamsResponse("Wed, 21 Oct 2015 07:28:00 GMT"))
+        .mockResolvedValue(createTooManyStreamsResponse("5"));
+
+      const stream = useLogStream({
+        projectId: "test-project",
+        enabled: true,
+        onLogs: vi.fn(),
+      });
+
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(59_999);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(1);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+
+      // A usable header is honoured.
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(fetchMock).toHaveBeenCalledTimes(4);
+
+      stream.disconnect();
+      vi.useRealTimers();
+    });
+
+    it("stops waiting on disconnect", async () => {
+      vi.useFakeTimers();
+
+      fetchMock.mockResolvedValue(createTooManyStreamsResponse("60"));
+
+      const stream = useLogStream({
+        projectId: "test-project",
+        enabled: true,
+        onLogs: vi.fn(),
+      });
+
+      await vi.advanceTimersByTimeAsync(0);
+      stream.disconnect();
+      await vi.advanceTimersByTimeAsync(120_000);
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      vi.useRealTimers();
+    });
+  });
+
   describe("cleanup", () => {
     it("disconnects when calling disconnect()", async () => {
       const abortSpy = vi.spyOn(AbortController.prototype, "abort");

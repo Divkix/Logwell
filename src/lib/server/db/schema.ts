@@ -26,10 +26,16 @@ export const project = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
       .$onUpdate(() => new Date()),
+    // Set by DELETE /api/projects/[id]: the project is hidden and its key revoked at once, and
+    // jobs/project-purge.ts deletes its logs in batches and finally the row itself.
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
   (table) => [
     index("idx_project_owner_id").on(table.ownerId),
-    uniqueIndex("uq_project_name_owner").on(table.name, table.ownerId),
+    // Partial, so a name frees up as soon as its project is deleted, not when the purge ends.
+    uniqueIndex("uq_project_name_owner")
+      .on(table.name, table.ownerId)
+      .where(sql`${table.deletedAt} IS NULL`),
   ],
 );
 
@@ -131,15 +137,18 @@ export const log = pgTable(
       table.incidentId,
       table.timestamp,
     ),
-    index("idx_log_project_fingerprint_timestamp").on(
+    // Keyset order (timestamp DESC, id DESC) in full, so a page is an index range with no sort
+    // step. Also serves retention cleanup and the per-project count/edge subqueries.
+    index("idx_log_project_timestamp_id").on(table.projectId, table.timestamp, table.id),
+    // The same order behind a level equality, for a level filter ("errors only"; several levels
+    // are paged one level each, see queryLogs), and per-level stats over a window (skip scan
+    // over the five levels).
+    index("idx_log_project_level_timestamp_id").on(
       table.projectId,
-      table.fingerprint,
+      table.level,
       table.timestamp,
+      table.id,
     ),
-    index("idx_log_project_service_name").on(table.projectId, table.serviceName),
-    index("idx_log_timestamp").on(table.timestamp),
-    index("idx_log_level").on(table.level),
-    index("idx_log_project_timestamp").on(table.projectId, table.timestamp),
     index("idx_log_search").using("gin", table.search),
   ],
 );

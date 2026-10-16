@@ -3,7 +3,8 @@ import { nanoid } from "nanoid";
 import { INCIDENT_GROUPED_LEVELS } from "../../shared/schemas/incident";
 import type { JsonValue } from "../../shared/schemas/json";
 import type { DatabaseClient } from "../db/db";
-import { type Incident, incident, type LogLevel, log } from "../db/schema";
+import { isActiveProject } from "../db/predicates";
+import { type Incident, incident, type LogLevel, log, project } from "../db/schema";
 import { cursorRowGreaterThan, microsColumn } from "./cursor";
 import {
   assignIncidentIds,
@@ -16,6 +17,15 @@ export interface BackfillProjectResult {
   processedLogs: number;
   updatedLogs: number;
   touchedIncidents: number;
+}
+
+/**
+ * Projects the backfill should process: every project not soft-deleted. A deleted project is
+ * waiting for the purge, and rebuilding its incidents would only recreate rows the purge has
+ * already removed.
+ */
+export function listBackfillProjects(db: DatabaseClient) {
+  return db.select({ id: project.id, name: project.name }).from(project).where(isActiveProject);
 }
 
 // Logs are paged by keyset and written one batch per transaction, so a large window neither
