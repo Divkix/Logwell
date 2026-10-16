@@ -133,6 +133,7 @@ describe("useLogStream", () => {
         expect.objectContaining({
           method: "POST",
           credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
         }),
       );
 

@@ -84,6 +84,16 @@ if (!isDevExplicit) {
   }
 }
 
+// Validate ORIGIN: the CSRF guard parses it on every mutation, so a typo fails here instead.
+const rawOrigin = process.env.ORIGIN;
+
+if (rawOrigin && !URL.canParse(rawOrigin)) {
+  validationErrors.push({
+    variable: "ORIGIN",
+    message: "ORIGIN must be an absolute URL such as https://logs.example.com",
+  });
+}
+
 // Throw aggregated error if validation failed
 if (validationErrors.length > 0) {
   const errorMessages = validationErrors.map((e) => `- ${e.variable}: ${e.message}`).join("\n");

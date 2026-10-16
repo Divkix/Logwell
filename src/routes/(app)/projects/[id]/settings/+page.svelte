@@ -209,8 +209,11 @@ async function handleRetentionChange(value: string | undefined) {
 
 async function handleRegenerateApiKey() {
   try {
+    // Bodiless requests carry a JSON Content-Type so SvelteKit's form-CSRF check skips them;
+    // the /api CSRF guard in hooks.server.ts still validates their Origin against ORIGIN.
     const response = await fetch(`/api/projects/${data.project.id}/regenerate`, {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
     });
 
     if (!response.ok) {
@@ -234,6 +237,7 @@ async function handleDeleteProject() {
   try {
     const response = await fetch(`/api/projects/${data.project.id}`, {
       method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
     });
 
     if (!response.ok) {

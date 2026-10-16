@@ -27,11 +27,10 @@ export function checkCsrfOrigin(event: RequestEvent): Response | null {
   const origin = event.request.headers.get("Origin");
   const referer = event.request.headers.get("Referer");
 
-  // With ORIGIN set the adapter pins event.url.origin to it, so the exact-origin
-  // comparison stays authoritative. Without it the adapter synthesizes `https://<Host>`
-  // (get_origin defaults the protocol to https), which would reject every mutation on a
+  // ORIGIN is the authoritative public origin when set. Without it adapter-node synthesizes
+  // `https://<Host>` (the protocol defaults to https), which would reject every mutation on a
   // plain-HTTP deployment; only the protocol is unreliable, so compare the authority.
-  const expectedOrigin = env.ORIGIN ? event.url.origin : null;
+  const expectedOrigin = env.ORIGIN ? new URL(env.ORIGIN).origin : null;
   const expectedHost = event.url.host.toLowerCase();
 
   if (expectedOrigin === null && !warnedUnsetOrigin) {

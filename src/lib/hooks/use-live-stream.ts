@@ -158,6 +158,9 @@ export function useLiveStream<T>(options: LiveStreamOptions<T>): LiveStreamRetur
     fetch(`/api/projects/${_projectId}/${streamPath}`, {
       method: "POST",
       credentials: "same-origin",
+      // SvelteKit treats a bodiless POST as a form submission and rejects it unless the
+      // browser Origin matches the origin it derives from Host — `https://` on plain HTTP.
+      headers: { "Content-Type": "application/json" },
       signal: _abortController.signal,
     })
       .then(async (response) => {
