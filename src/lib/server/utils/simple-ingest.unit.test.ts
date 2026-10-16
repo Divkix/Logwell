@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import type { JsonValue } from "../../shared/schemas/json";
+import { MAX_FUTURE_SKEW_MS, MAX_LOG_JSON_LENGTH, MAX_LOG_MESSAGE_LENGTH } from "./ingest-limits";
 import { parseSimpleIngestRequest, SimpleIngestError } from "./simple-ingest";
 
 describe("parseSimpleIngestRequest", () => {
@@ -228,6 +229,61 @@ describe("parseSimpleIngestRequest", () => {
       expect(result.records).toHaveLength(2);
       expect(result.records[0]!.message).toBe("test message");
       expect(result.records[1]!.message).toBe("good");
+    });
+
+    it("truncates a message over MAX_LOG_MESSAGE_LENGTH instead of rejecting it", () => {
+      const length = MAX_LOG_MESSAGE_LENGTH + 1;
+
+      const result = parseSimpleIngestRequest([
+        entryWith({ message: "x".repeat(MAX_LOG_MESSAGE_LENGTH) }),
+        entryWith({ message: "x".repeat(length) }),
+      ]);
+
+      expect(result.accepted).toBe(2);
+      expect(result.errors).toEqual([]);
+      expect(result.records[0]!.message).toBe("x".repeat(MAX_LOG_MESSAGE_LENGTH));
+      expect(result.records[1]!.message).toHaveLength(MAX_LOG_MESSAGE_LENGTH);
+      expect(result.records[1]!.message.endsWith(`… [truncated, ${length} characters]`)).toBe(true);
+    });
+
+    it.each([
+      ["metadata", { metadata: { blob: "x".repeat(MAX_LOG_JSON_LENGTH) } }],
+      ["service", { service: "x".repeat(MAX_LOG_JSON_LENGTH) }],
+    ])("rejects an entry whose serialized %s exceeds MAX_LOG_JSON_LENGTH", (_field, overrides) => {
+      const result = parseSimpleIngestRequest([validEntry, entryWith(overrides)]);
+
+      expect(result.accepted).toBe(1);
+      expect(result.errors).toEqual([
+        `Entry at index 1: body and attributes exceed ${MAX_LOG_JSON_LENGTH} characters when serialized`,
+      ]);
+    });
+
+    it("clamps a timestamp beyond the future skew to the receive time", () => {
+      const before = Date.now();
+      const farFuture = new Date(before + MAX_FUTURE_SKEW_MS + 60_000).toISOString();
+      const nearFuture = new Date(before + MAX_FUTURE_SKEW_MS - 60_000).toISOString();
+
+      const [clamped, kept] = parseSimpleIngestRequest([
+        entryWith({ timestamp: farFuture }),
+        entryWith({ timestamp: nearFuture }),
+      ]).records;
+
+      expect(clamped!.timestamp.getTime()).toBeGreaterThanOrEqual(before);
+      expect(clamped!.timestamp.getTime()).toBeLessThanOrEqual(Date.now());
+      expect(kept!.timestamp.toISOString()).toBe(nearFuture);
+    });
+
+    it("falls back to the receive time for a timestamp before year 1", () => {
+      const before = Date.now();
+
+      const [bc, kept] = parseSimpleIngestRequest([
+        entryWith({ timestamp: "-000001-01-01T00:00:00Z" }),
+        entryWith({ timestamp: "0001-01-01T00:00:00Z" }),
+      ]).records;
+
+      expect(bc!.timestamp.getTime()).toBeGreaterThanOrEqual(before);
+      expect(bc!.timestamp.getTime()).toBeLessThanOrEqual(Date.now());
+      expect(kept!.timestamp.toISOString()).toBe("0001-01-01T00:00:00.000Z");
     });
 
     it("includes index in error messages", () => {

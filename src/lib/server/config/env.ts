@@ -16,7 +16,8 @@
  * - DB_STATEMENT_TIMEOUT_MS: Postgres statement_timeout for the app pool (default 30000, 0 = off)
  * - DB_IDLE_IN_TRANSACTION_TIMEOUT_MS: Postgres idle_in_transaction_session_timeout
  *   for the app pool (default 60000, 0 = off)
- * - NODE_ENV: Environment mode (development/production)
+ * - NODE_ENV: "development" or "test" relaxes validation; any other value (unset, "production",
+ *   "staging", …) runs with production rules
  */
 
 import { z } from "zod";
@@ -41,6 +42,8 @@ export class EnvValidationError extends Error {
 // secret validation and issuing non-Secure session cookies.
 const nodeEnv = globalThis.process?.env?.NODE_ENV ?? "production";
 
+// Allow-list, not deny-list: an unexpected value such as "staging" must not quietly drop
+// production safeguards (secret validation, Secure cookies, better-auth's rate limiter).
 const isDevExplicit = nodeEnv === "development" || nodeEnv === "test";
 
 // Collect validation errors
@@ -72,13 +75,29 @@ function getDatabaseUrl(): string {
 }
 
 // Validate BETTER_AUTH_SECRET
-const authSecret = process.env.BETTER_AUTH_SECRET;
+// Empty counts as unset: .env.example ships the key with an empty value.
+const authSecret = process.env.BETTER_AUTH_SECRET || undefined;
+
+// Publicly known values that pass the length check: shipped example/placeholder values and the
+// dev-only fallback. Signing sessions with one lets anyone who has read the repo forge a login.
+// (The Dockerfile's build-time placeholder is deliberately absent: the image build runs with
+// NODE_ENV=production, and that value never reaches the runtime environment.)
+const PLACEHOLDER_AUTH_SECRETS = new Set([
+  "your-32-character-secret-key-here",
+  "default-secret-for-development-only",
+]);
 
 if (!isDevExplicit) {
   if (!authSecret) {
     validationErrors.push({
       variable: "BETTER_AUTH_SECRET",
       message: "BETTER_AUTH_SECRET is required unless NODE_ENV=development",
+    });
+  } else if (PLACEHOLDER_AUTH_SECRETS.has(authSecret.trim().toLowerCase())) {
+    validationErrors.push({
+      variable: "BETTER_AUTH_SECRET",
+      message:
+        "BETTER_AUTH_SECRET is a published placeholder value; generate a real one with `openssl rand -base64 32`",
     });
   } else if (authSecret.length < 32) {
     validationErrors.push({
@@ -182,15 +201,30 @@ export const env = {
 } as const;
 
 /**
- * Check if running in production mode
+ * Production rules apply unless NODE_ENV is explicitly "development" or "test".
  */
 export function isProduction(): boolean {
-  return env.NODE_ENV === "production";
+  return !isDevExplicit;
 }
 
 /**
- * Check if running in development mode
+ * True only for an explicit NODE_ENV of "development" or "test".
  */
 export function isDevelopment(): boolean {
-  return env.NODE_ENV !== "production";
+  return isDevExplicit;
+}
+
+/**
+ * Logs, once at server start, when production runs without ORIGIN. Not a hard failure: existing
+ * deployments that never set it keep starting. Without it the CSRF guard falls back to matching
+ * the request Host, and better-auth has no trusted origin, so sign-out fails on plain HTTP.
+ */
+export function warnIfOriginUnset(): void {
+  if (env.ORIGIN || isDevExplicit) return;
+
+  console.warn(
+    "[config] WARNING: ORIGIN is not set. Set it to the public URL users load " +
+      "(e.g. https://logs.example.com): without it the CSRF guard only compares the request " +
+      "Host header and sign-out fails over plain HTTP.",
+  );
 }

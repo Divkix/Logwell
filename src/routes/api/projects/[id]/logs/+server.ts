@@ -1,6 +1,7 @@
 import { apiError } from "#lib/server/utils/api-error.js";
 import { InvalidCursorError, OffsetTooLargeError, queryLogs } from "#lib/server/utils/log-query.js";
 import { requireOwnedProjectRoute } from "#lib/server/utils/owned-project.js";
+import { searchLengthError } from "#lib/server/utils/search.js";
 import { parseLevelFilter } from "#lib/shared/schemas/log.js";
 import type { RequestEvent } from "./$types";
 
@@ -67,6 +68,10 @@ export async function GET(event: RequestEvent): Promise<Response> {
   );
 
   const offset = offsetParam ? Math.max(0, Number.parseInt(offsetParam, 10) || 0) : 0;
+
+  const searchError = searchLengthError(searchParam);
+
+  if (searchError) return searchError;
 
   const levels = parseLevelFilter(levelParam);
 

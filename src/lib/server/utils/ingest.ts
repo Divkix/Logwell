@@ -15,7 +15,7 @@ import {
   upsertIncidentsForPreparedLogs,
 } from "#lib/server/utils/incidents.js";
 import { BatchTooLargeError, OtlpValidationError } from "#lib/server/utils/otlp.js";
-import { checkRateLimit, INGEST_RPM } from "#lib/server/utils/rate-limit.js";
+import { INGEST_RPM, ingestProjectLimiter } from "#lib/server/utils/rate-limit.js";
 import { SimpleIngestError } from "#lib/server/utils/simple-ingest.js";
 import { jsonObjectSchema, type JsonObject, type JsonValue } from "../../shared/schemas/json";
 
@@ -94,11 +94,18 @@ export interface ParsedIngest {
 export type IngestBodyParser = (body: JsonValue | undefined) => ParsedIngest;
 
 // Postgres rejects U+0000 in both text and jsonb columns, so NUL characters are
-// stripped from every string bound for a column. The walk is depth-bounded
+// stripped from every string bound for a column. Its json parser also rejects a
+// lone UTF-16 surrogate, which JSON.parse accepts (`"\ud800"`) and drizzle's jsonb
+// mapper writes back out as that escape, so unpaired surrogates become U+FFFD.
+// Either would otherwise fail the whole batch's INSERT. The walk is depth-bounded
 // because the payload is attacker-controlled; deeper levels are dropped.
 const MAX_NUL_STRIP_DEPTH = 32;
 
-const nulStrippedString = z.string().transform((text) => text.replaceAll("\u0000", ""));
+function columnSafe(text: string): string {
+  return text.replaceAll("\u0000", "").toWellFormed();
+}
+
+const nulStrippedString = z.string().transform(columnSafe);
 
 function stripNulStrings(value: JsonValue, depth = 0): JsonValue {
   const text = nulStrippedString.safeParse(value);
@@ -117,7 +124,7 @@ function stripNulStrings(value: JsonValue, depth = 0): JsonValue {
 
   return Object.fromEntries(
     Object.entries(record.data).map(([key, entry]) => [
-      key.replaceAll("\u0000", ""),
+      columnSafe(key),
       stripNulStrings(entry, depth + 1),
     ]),
   );
@@ -125,9 +132,9 @@ function stripNulStrings(value: JsonValue, depth = 0): JsonValue {
 
 function sanitizeIngestInput(input: IngestInputRow): IngestInputRow {
   // SAFETY: Object.entries keeps every own enumerable key of `input` (including
-  // `message`, which is passed through untouched); only NUL bytes are stripped
-  // from the other values, so the rebuilt object has IngestInputRow's exact
-  // runtime shape.
+  // `message`, which is passed through untouched); only NUL bytes and lone
+  // surrogates are replaced in the other values, so the rebuilt object has
+  // IngestInputRow's exact runtime shape.
   return Object.fromEntries(
     Object.entries(input).map(([key, value]) =>
       // A NUL in `message` is a per-record rejection in both parsers, never a strip.
@@ -135,6 +142,35 @@ function sanitizeIngestInput(input: IngestInputRow): IngestInputRow {
       key === "message" || value instanceof Date ? [key, value] : [key, stripNulStrings(value)],
     ),
   ) as IngestInputRow;
+}
+
+// Both parsers validate with zod's recursive z.json(), which overflows the call stack somewhere
+// past ~1-2k nesting levels — a ~20KB body. The deepest legitimate payload is OTLP's AnyValue
+// nesting, which parseOtlpAnyValue already truncates at 32 levels (~4 JSON levels each).
+export const MAX_INGEST_JSON_DEPTH = 256;
+
+function jsonChildren(node: JsonValue): JsonValue[] {
+  if (Array.isArray(node)) return node;
+
+  return node instanceof Object ? Object.values(node) : [];
+}
+
+/** Iterative, so measuring an attacker-nested body cannot itself overflow the stack. */
+function exceedsJsonDepth(value: JsonValue | undefined, maxDepth: number): boolean {
+  if (value === undefined) return false;
+
+  const pending: Array<[JsonValue, number]> = [[value, 1]];
+
+  for (let next = pending.pop(); next; next = pending.pop()) {
+    const [node, depth] = next;
+    const children = jsonChildren(node);
+
+    if (children.length > 0 && depth >= maxDepth) return true;
+
+    for (const child of children) pending.push([child, depth + 1]);
+  }
+
+  return false;
 }
 
 export function buildIngestResponse(accepted: number, rejected: number, errors: string[]) {
@@ -211,7 +247,7 @@ function ingest(request: Request, db: DatabaseClient, parse: IngestBodyParser) {
     // Both `catch` mappers below (key validation, parse) re-throw what they don't recognise:
     // a throwing mapper makes the error a defect, which `Effect.runPromise` rejects with
     // unchanged, so unexpected errors reach SvelteKit's handleError exactly as thrown.
-    const projectId = yield* Effect.tryPromise({
+    const { projectId, keyHash } = yield* Effect.tryPromise({
       try: () => validateApiKey(request, db),
       catch: (err) => {
         if (err instanceof ApiKeyError) {
@@ -222,24 +258,32 @@ function ingest(request: Request, db: DatabaseClient, parse: IngestBodyParser) {
       },
     });
 
-    // A key validated from the cache just before its project was soft-deleted still resolves
-    // to the project id, so the re-verify must exclude deleted projects too.
+    // Two re-checks against the row: the presented hash (the key cache can lag a rotation on
+    // another replica, or a lookup racing the UPDATE, so a rotated key stops ingesting as soon as
+    // the rotation commits) and isActiveProject (a key validated from the cache just before its
+    // project was soft-deleted still resolves to the project id).
     const [projectRow] = yield* Effect.promise(() =>
       db
         .select({ id: project.id })
         .from(project)
-        .where(and(eq(project.id, projectId), isActiveProject)),
+        .where(and(eq(project.id, projectId), eq(project.apiKeyHash, keyHash), isActiveProject)),
     );
 
     if (!projectRow) return yield* new Unauthorized({ status: 401, message: "Invalid API key" });
 
-    if (!checkRateLimit(`ingest:${projectId}`, INGEST_RPM)) return yield* new RateLimited();
+    if (!ingestProjectLimiter.take(projectId, INGEST_RPM)) return yield* new RateLimited();
 
     const body = yield* Effect.tryPromise({
       try: (): Promise<JsonValue | undefined> => request.json(),
       catch: (err) =>
         payloadTooLargeSchema.safeParse(err).success ? new PayloadTooLarge() : new InvalidJson(),
     });
+
+    if (exceedsJsonDepth(body, MAX_INGEST_JSON_DEPTH)) {
+      return yield* new ValidationFailed({
+        message: `Request body nests deeper than ${MAX_INGEST_JSON_DEPTH} levels.`,
+      });
+    }
 
     const parsed = yield* Effect.try({
       try: () => parse(body),

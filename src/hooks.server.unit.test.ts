@@ -1,7 +1,9 @@
 import type { RequestEvent } from "@sveltejs/kit";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { z } from "zod";
+import type { DatabaseClient } from "#lib/server/db/db.js";
 import { handleError as buildErrorResponse } from "#lib/server/error-handler.js";
-import { LOGIN_RPM } from "./lib/server/utils/rate-limit";
+import { LOGIN_ACCOUNT_RPM, LOGIN_RPM } from "./lib/server/utils/rate-limit";
 import { handle, handleError } from "./hooks.server";
 
 // SAFETY: beforeEach assigns ORIGIN a concrete origin string and the unset-origin test
@@ -10,8 +12,10 @@ const mocks = vi.hoisted(() => ({
   db: { kind: "test-db" },
   closeDb: vi.fn(async () => {}),
   stopCleanupScheduler: vi.fn(),
+  reportFatalError: vi.fn(),
   getSession: vi.fn(),
   authHandler: vi.fn(),
+  loginAccountKey: vi.fn(),
   // RATE_LIMIT_INGEST_IP_RPM is overridden in the /v1 throttle tests; the shipped
   // default is 60000/min, too high to reach in a unit test.
   env: { ORIGIN: undefined as string | undefined, RATE_LIMIT_INGEST_IP_RPM: 3 },
@@ -21,9 +25,10 @@ vi.mock("$app/env", () => ({ building: false }));
 
 vi.mock("#lib/server/db/index.js", () => ({ db: mocks.db, closeDb: mocks.closeDb }));
 
-vi.mock("#lib/server/config/env.js", () => ({ env: mocks.env }));
+vi.mock("#lib/server/config/env.js", () => ({ env: mocks.env, warnIfOriginUnset: vi.fn() }));
 
 vi.mock("#lib/server/auth.js", () => ({
+  CLIENT_IP_HEADER: "x-logwell-client-ip",
   initAuth: vi.fn(),
   auth: {
     options: { baseURL: "http://localhost", basePath: "/api/auth" },
@@ -32,7 +37,29 @@ vi.mock("#lib/server/auth.js", () => ({
   },
 }));
 
-vi.mock("#lib/server/error-handler.js", () => ({ handleError: vi.fn() }));
+// Account resolution (body parsing, user lookup) is covered against better-auth in
+// tests/integration/auth/login-account.integration.test.ts; here it maps a JSON username to a key.
+vi.mock("#lib/server/utils/login-account.js", () => ({
+  loginAccountKey: mocks.loginAccountKey,
+}));
+
+const usernameBody = z.object({ username: z.string() });
+
+async function keyFromJsonUsername(_db: DatabaseClient, request: Request): Promise<string> {
+  const body = usernameBody.safeParse(
+    await request
+      .clone()
+      .json()
+      .catch(() => null),
+  );
+
+  return body.success ? `user:${body.data.username}` : "unattributed";
+}
+
+vi.mock("#lib/server/error-handler.js", () => ({
+  handleError: vi.fn(),
+  reportFatalError: mocks.reportFatalError,
+}));
 
 vi.mock("#lib/server/jobs/cleanup-scheduler.js", () => ({
   startCleanupScheduler: vi.fn(),
@@ -64,7 +91,51 @@ describe("hooks.server handle", () => {
     resolve.mockClear();
     mocks.getSession.mockReset().mockResolvedValue(null);
     mocks.authHandler.mockReset().mockImplementation(() => new Response("auth-handler"));
+    mocks.loginAccountKey.mockReset().mockImplementation(keyFromJsonUsername);
     mocks.env.ORIGIN = ORIGIN;
+  });
+
+  describe("security headers", () => {
+    const hardening = (response: Response) => ({
+      nosniff: response.headers.get("X-Content-Type-Options"),
+      frame: response.headers.get("X-Frame-Options"),
+      referrer: response.headers.get("Referrer-Policy"),
+      hsts: response.headers.get("Strict-Transport-Security"),
+    });
+
+    it("sets them on resolved responses and on the hook's own early returns", async () => {
+      const page = await handle({ event: createEvent(`${ORIGIN}/projects`), resolve });
+
+      const signUp = await handle({
+        event: createEvent(`${ORIGIN}/api/auth/sign-up/email`, {
+          method: "POST",
+          headers: { Origin: ORIGIN },
+        }),
+        resolve,
+      });
+
+      for (const response of [page, signUp]) {
+        expect(hardening(response)).toEqual({
+          nosniff: "nosniff",
+          frame: "DENY",
+          referrer: "same-origin",
+          hsts: null,
+        });
+      }
+
+      expect(signUp.status).toBe(403);
+    });
+
+    it("adds HSTS only when ORIGIN is https", async () => {
+      mocks.env.ORIGIN = "https://logs.example.com";
+
+      const response = await handle({
+        event: createEvent("https://logs.example.com/api/health"),
+        resolve,
+      });
+
+      expect(hardening(response).hsts).toBe("max-age=31536000");
+    });
   });
 
   describe("session resolution", () => {
@@ -134,6 +205,142 @@ describe("hooks.server handle", () => {
     });
   });
 
+  describe("login rate limiting by network and account", () => {
+    const signInAs = (username: string, address: string) =>
+      createEvent(
+        `${ORIGIN}/api/auth/sign-in/username`,
+        {
+          method: "POST",
+          headers: { Origin: ORIGIN, "Content-Type": "application/json" },
+          body: JSON.stringify({ username, password: "guess" }),
+        },
+        address,
+      );
+
+    // One fresh IPv4 address per attempt, so only the account bucket can trip.
+    const freshAddress = (() => {
+      let next = 0;
+
+      return () => {
+        next += 1;
+
+        return `10.${Math.floor(next / 250)}.${next % 250}.1`;
+      };
+    })();
+
+    it("shares one bucket across every address in an IPv6 /64", async () => {
+      for (let i = 0; i < LOGIN_RPM; i++) {
+        const event = createEvent(
+          `${ORIGIN}/api/auth/sign-in/username`,
+          { method: "POST", headers: { Origin: ORIGIN } },
+          `2001:db8:77:1::${(i + 1).toString(16)}`,
+        );
+
+        expect((await handle({ event, resolve })).status).toBe(200);
+      }
+
+      const rotated = createEvent(
+        `${ORIGIN}/api/auth/sign-in/username`,
+        { method: "POST", headers: { Origin: ORIGIN } },
+        "2001:db8:77:1:ffff:ffff:ffff:fffe",
+      );
+
+      expect((await handle({ event: rotated, resolve })).status).toBe(429);
+    });
+
+    it("blocks an account after LOGIN_ACCOUNT_RPM failed attempts from any address", async () => {
+      mocks.authHandler.mockImplementation(() => new Response("bad credentials", { status: 401 }));
+
+      for (let i = 0; i < LOGIN_ACCOUNT_RPM; i++) {
+        const response = await handle({ event: signInAs("Victim", freshAddress()), resolve });
+        expect(response.status).toBe(401);
+      }
+
+      const blocked = await handle({ event: signInAs("Victim", freshAddress()), resolve });
+      expect(blocked.status).toBe(429);
+      expect(blocked.headers.get("Retry-After")).toBe("60");
+      expect(mocks.authHandler).toHaveBeenCalledTimes(LOGIN_ACCOUNT_RPM);
+
+      // Other accounts are unaffected.
+      expect((await handle({ event: signInAs("bystander", freshAddress()), resolve })).status).toBe(
+        401,
+      );
+    });
+
+    it("keeps letting the owner in from a network they signed in from before", async () => {
+      const home = "192.0.2.77";
+      const newPlace = "192.0.2.78";
+      const failedAt = "192.0.2.79";
+
+      expect((await handle({ event: signInAs("owner", home), resolve })).status).toBe(200);
+
+      mocks.authHandler.mockImplementation(() => new Response("bad credentials", { status: 401 }));
+
+      // A failed attempt does not make its network known.
+      expect((await handle({ event: signInAs("owner", failedAt), resolve })).status).toBe(401);
+
+      // Attackers on other networks drain the account bucket.
+      for (let i = 1; i < LOGIN_ACCOUNT_RPM; i++) {
+        expect((await handle({ event: signInAs("owner", freshAddress()), resolve })).status).toBe(
+          401,
+        );
+      }
+
+      expect((await handle({ event: signInAs("owner", freshAddress()), resolve })).status).toBe(
+        429,
+      );
+
+      mocks.authHandler.mockImplementation(() => new Response("signed in"));
+
+      expect((await handle({ event: signInAs("owner", home), resolve })).status).toBe(200);
+      expect((await handle({ event: signInAs("owner", failedAt), resolve })).status).toBe(429);
+      expect((await handle({ event: signInAs("owner", newPlace), resolve })).status).toBe(429);
+    });
+
+    it("keys the account bucket by the resolved account of the request", async () => {
+      const event = signInAs("someone", freshAddress());
+
+      await handle({ event, resolve });
+
+      expect(mocks.loginAccountKey).toHaveBeenCalledWith(
+        mocks.db,
+        event.request,
+        "/api/auth/sign-in/username",
+      );
+    });
+
+    it("never skips the account bucket, whatever the body looks like", async () => {
+      mocks.authHandler.mockImplementation(() => new Response("bad credentials", { status: 401 }));
+      // Stands in for loginAccountKey's shared fallback bucket for unreadable bodies.
+      mocks.loginAccountKey.mockResolvedValue("unattributed-hooks-test");
+
+      const formSignIn = () =>
+        createEvent(
+          `${ORIGIN}/api/auth/sign-in/email`,
+          {
+            method: "POST",
+            headers: { Origin: ORIGIN, "Content-Type": "application/x-www-form-urlencoded" },
+            body: "email=admin%40logwell.local&password=guess",
+          },
+          freshAddress(),
+        );
+
+      for (let i = 0; i < LOGIN_ACCOUNT_RPM; i++) {
+        expect((await handle({ event: formSignIn(), resolve })).status).toBe(401);
+      }
+
+      expect((await handle({ event: formSignIn(), resolve })).status).toBe(429);
+      expect(mocks.authHandler).toHaveBeenCalledTimes(LOGIN_ACCOUNT_RPM);
+    });
+
+    it("does not count successful sign-ins against the account", async () => {
+      for (let i = 0; i < LOGIN_ACCOUNT_RPM + 5; i++) {
+        const response = await handle({ event: signInAs("regular", freshAddress()), resolve });
+        expect(response.status).toBe(200);
+      }
+    });
+  });
+
   describe("sign-up kill switch", () => {
     it("returns 403 sign_up_disabled for POST /api/auth/sign-up", async () => {
       const event = createEvent(`${ORIGIN}/api/auth/sign-up/email`, {
@@ -165,6 +372,27 @@ describe("hooks.server handle", () => {
       expect(response.status).toBe(403);
       expect((await response.json()).error).toBe("csrf_error");
       expect(mocks.authHandler).not.toHaveBeenCalled();
+    });
+
+    it("hands better-auth the resolved client address, never a client-sent one", async () => {
+      const event = createEvent(
+        `${ORIGIN}/api/auth/sign-in/username`,
+        {
+          method: "POST",
+          headers: {
+            Origin: ORIGIN,
+            "x-logwell-client-ip": "198.18.0.1",
+            "x-forwarded-for": "198.18.0.2",
+          },
+        },
+        "203.0.113.99",
+      );
+
+      await handle({ event, resolve });
+
+      const [request] = mocks.authHandler.mock.lastCall ?? [];
+      expect(request).toBeInstanceOf(Request);
+      expect(request.headers.get("x-logwell-client-ip")).toBe("203.0.113.99");
     });
 
     it("delegates same-origin auth routes to the better-auth handler", async () => {
@@ -267,6 +495,45 @@ describe("hooks.server handle", () => {
         vi.restoreAllMocks();
       }
     });
+  });
+});
+
+describe("hooks.server process-level faults", () => {
+  it("reports uncaught errors with their origin", () => {
+    const fault = new Error("boom");
+
+    process.emit("uncaughtExceptionMonitor", fault, "unhandledRejection");
+
+    expect(mocks.reportFatalError).toHaveBeenCalledWith(fault, "unhandledRejection");
+  });
+
+  it("only observes faults, registering no listener that would stop Node from crashing", async () => {
+    const counts = () =>
+      ["uncaughtException", "unhandledRejection", "uncaughtExceptionMonitor"].map((event) =>
+        process.listenerCount(event),
+      );
+
+    const before = counts();
+    const shutdownListeners = process.listeners("sveltekit:shutdown");
+    const monitors = process.listeners("uncaughtExceptionMonitor");
+
+    vi.resetModules();
+    await import("./hooks.server");
+
+    try {
+      expect(counts()).toEqual([before[0], before[1], before[2]! + 1]);
+    } finally {
+      // Drop the re-imported module's listeners so they never fire in later tests.
+      for (const listener of process.listeners("sveltekit:shutdown")) {
+        if (!shutdownListeners.includes(listener))
+          process.removeListener("sveltekit:shutdown", listener);
+      }
+
+      for (const listener of process.listeners("uncaughtExceptionMonitor")) {
+        if (!monitors.includes(listener))
+          process.removeListener("uncaughtExceptionMonitor", listener);
+      }
+    }
   });
 });
 

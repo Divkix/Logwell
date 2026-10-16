@@ -44,6 +44,16 @@ describe("Environment Configuration", () => {
       "32 characters",
       "short secret in production",
     ],
+    [
+      { NODE_ENV: "production", BETTER_AUTH_SECRET: "your-32-character-secret-key-here" },
+      "placeholder",
+      ".env.example placeholder secret in production",
+    ],
+    [
+      { NODE_ENV: undefined, BETTER_AUTH_SECRET: "default-secret-for-development-only" },
+      "placeholder",
+      "dev fallback secret with NODE_ENV unset",
+    ],
     [{ DATABASE_URL: "mysql://localhost/test" }, "PostgreSQL", "non-postgres URL"],
     [{ ORIGIN: "logs.example.com" }, "absolute URL", "ORIGIN without a scheme"],
   ] as [Record<string, string | undefined>, string, string][])(
@@ -52,6 +62,40 @@ describe("Environment Configuration", () => {
       await expect(loadEnv(overrides)).rejects.toThrow(message);
     },
   );
+
+  it("enforces the secret rules for an unrecognised NODE_ENV", async () => {
+    await expect(loadEnv({ NODE_ENV: "staging", BETTER_AUTH_SECRET: "too-short" })).rejects.toThrow(
+      "32 characters",
+    );
+  });
+
+  it("treats the empty .env.example secret as unset", async () => {
+    await expect(loadEnv({ NODE_ENV: "production", BETTER_AUTH_SECRET: "" })).rejects.toThrow(
+      "BETTER_AUTH_SECRET is required",
+    );
+
+    vi.resetModules();
+    const { env } = await loadEnv({ NODE_ENV: "development", BETTER_AUTH_SECRET: "" });
+    expect(env.BETTER_AUTH_SECRET).toBe("default-secret-for-development-only");
+  });
+
+  it.each([
+    ["production", undefined, true],
+    ["staging", undefined, true],
+    ["production", "https://logs.example.com", false],
+    ["development", undefined, false],
+  ])("NODE_ENV=%s ORIGIN=%s → startup warning %s", async (nodeEnv, origin, warns) => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    try {
+      const { warnIfOriginUnset } = await loadEnv({ NODE_ENV: nodeEnv, ORIGIN: origin });
+      warnIfOriginUnset();
+
+      expect(warn.mock.calls.some(([message]) => String(message).includes("ORIGIN"))).toBe(warns);
+    } finally {
+      warn.mockRestore();
+    }
+  });
 
   it("allows missing BETTER_AUTH_SECRET in development", async () => {
     const { env } = await loadEnv({ NODE_ENV: "development", BETTER_AUTH_SECRET: undefined });
@@ -116,6 +160,9 @@ describe("Environment Configuration", () => {
   it.each([
     ["production", true, false],
     ["development", false, true],
+    ["test", false, true],
+    ["staging", true, false],
+    ["Production", true, false],
   ])("NODE_ENV=%s → isProduction=%s isDevelopment=%s", async (nodeEnv, prod, dev) => {
     const { isProduction, isDevelopment } = await loadEnv({ NODE_ENV: nodeEnv });
 

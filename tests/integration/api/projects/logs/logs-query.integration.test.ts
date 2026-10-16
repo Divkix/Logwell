@@ -11,6 +11,7 @@ import { getSession } from "#lib/server/session.js";
 import { clearApiKeyCache } from "#lib/server/utils/api-key.js";
 import { cappedLogCount } from "#lib/server/utils/capped-count.js";
 import type { JsonObject } from "#lib/shared/schemas/json.js";
+import { MAX_SEARCH_LENGTH } from "#lib/shared/schemas/log.js";
 import { GET } from "../../../../../src/routes/api/projects/[id]/logs/+server";
 import { seedLog, seedLogs, seedProject } from "../../../../fixtures/db";
 
@@ -989,6 +990,50 @@ describe("GET /api/projects/[id]/logs", () => {
 
       expect(response.status).toBe(400);
       expect(await response.json()).toMatchObject({ error: "invalid_cursor" });
+    });
+
+    it("returns 400 invalid_cursor, not a database error, for out-of-range micros", async () => {
+      const testProject = await seedProject(db, { ownerId: userId });
+      await seedLogs(db, testProject.id, 2);
+      const cursor = Buffer.from(`${"9".repeat(30)}_log_1`).toString("base64url");
+
+      const request = new Request(
+        `http://localhost/api/projects/${testProject.id}/logs?cursor=${cursor}`,
+        { method: "GET" },
+      );
+
+      const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+      const response = await GET(event);
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ error: "invalid_cursor" });
+    });
+
+    it("returns 400 invalid_search for a search longer than MAX_SEARCH_LENGTH", async () => {
+      const testProject = await seedProject(db, { ownerId: userId });
+      const search = "a".repeat(MAX_SEARCH_LENGTH + 1);
+
+      const request = new Request(
+        `http://localhost/api/projects/${testProject.id}/logs?search=${search}`,
+        { method: "GET" },
+      );
+
+      const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+      const response = await GET(event);
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ error: "invalid_search" });
+
+      const atLimit = new Request(
+        `http://localhost/api/projects/${testProject.id}/logs?search=${"a".repeat(MAX_SEARCH_LENGTH)}`,
+        { method: "GET" },
+      );
+
+      const ok = await GET(
+        createRequestEvent(atLimit, db, { id: testProject.id }, authenticatedLocals),
+      );
+
+      expect(ok.status).toBe(200);
     });
 
     it("keeps the level filter when paginating with a cursor", async () => {

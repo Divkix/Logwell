@@ -7,7 +7,12 @@ import type * as schema from "#lib/server/db/schema.js";
 import { project } from "#lib/server/db/schema.js";
 import { setupTestDatabase } from "#lib/server/db/test-db.js";
 import { getSession } from "#lib/server/session.js";
-import { hashApiKey } from "#lib/server/utils/api-key.js";
+import {
+  ApiKeyError,
+  clearApiKeyCache,
+  hashApiKey,
+  validateApiKey,
+} from "#lib/server/utils/api-key.js";
 import { POST as POST_REGENERATE } from "../../../../src/routes/api/projects/[id]/regenerate/+server";
 import { seedProject, seedProjectWithApiKey } from "../../../fixtures/db";
 
@@ -246,5 +251,37 @@ describe("POST /api/projects/[id]/regenerate", () => {
     expect(response.status).toBe(403);
     const body = await response.json();
     expect(body.error).toBe("csrf_error");
+  });
+
+  it("does not leave the old key cached when a lookup races the rotation", async () => {
+    clearApiKeyCache();
+    const testProject = await seedProjectWithApiKey(db, { ownerId: userId });
+
+    const oldKeyRequest = () =>
+      new Request("http://localhost/v1/logs", {
+        headers: { Authorization: `Bearer ${testProject.apiKey}` },
+      });
+
+    // An ingest lookup issued just before the UPDATE reads the old row and caches it; the
+    // rotation must still evict that entry once it commits.
+    let racingLookup: Promise<unknown> | undefined;
+    const update = db.update.bind(db);
+
+    vi.spyOn(db, "update").mockImplementationOnce((table) => {
+      racingLookup = validateApiKey(oldKeyRequest(), db);
+
+      return update(table);
+    });
+
+    const request = new Request(`http://localhost/api/projects/${testProject.id}/regenerate`, {
+      method: "POST",
+      headers: { Origin: "http://localhost" },
+    });
+
+    const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+    expect((await POST_REGENERATE(event)).status).toBe(200);
+    await expect(racingLookup).resolves.toMatchObject({ projectId: testProject.id });
+
+    await expect(validateApiKey(oldKeyRequest(), db)).rejects.toBeInstanceOf(ApiKeyError);
   });
 });

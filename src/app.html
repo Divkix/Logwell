@@ -35,6 +35,30 @@
       content="Self-hosted logging platform with real-time streaming, full-text search, and per-project API keys."
     />
 
+    <!--
+      Applies the saved light/dark mode before first paint (no flash of the wrong theme).
+      Mirrors mode-watcher's setInitialMode with ModeWatcher's default options; it lives here
+      rather than in ModeWatcher's injected copy because only app.html can carry the CSP nonce.
+      src/lib/theme-init.component.test.ts keeps the two in step.
+    -->
+    <script nonce="%sveltekit.nonce%" id="theme-init">
+      (function () {
+        var root = document.documentElement;
+        var mode = localStorage.getItem("mode-watcher-mode") ?? "system";
+        var theme = localStorage.getItem("mode-watcher-theme") ?? "";
+        var light =
+          mode === "light" ||
+          (mode === "system" && window.matchMedia("(prefers-color-scheme: light)").matches);
+        root.classList.toggle("dark", !light);
+        root.style.colorScheme = light ? "light" : "dark";
+        if (theme) {
+          root.setAttribute("data-theme", theme);
+          localStorage.setItem("mode-watcher-theme", theme);
+        }
+        localStorage.setItem("mode-watcher-mode", mode);
+      })();
+    </script>
+
     %sveltekit.head%
   </head>
   <body data-sveltekit-preload-data="hover">

@@ -46,7 +46,7 @@ describe("API Key Validation with Database", () => {
 
     const validatedProjectId = await validateApiKey(request, db);
 
-    expect(validatedProjectId).toBe(projectId);
+    expect(validatedProjectId.projectId).toBe(projectId);
   });
 
   it("validateApiKey throws 401 for missing Authorization header", async () => {
@@ -114,7 +114,7 @@ describe("API Key Validation with Database", () => {
     });
 
     const result1 = await validateApiKey(request1, db);
-    expect(result1).toBe(projectId);
+    expect(result1.projectId).toBe(projectId);
 
     await db.delete(project).where(eq(project.id, projectId));
 
@@ -125,7 +125,7 @@ describe("API Key Validation with Database", () => {
     });
 
     const result2 = await validateApiKey(request2, db);
-    expect(result2).toBe(projectId);
+    expect(result2.projectId).toBe(projectId);
   });
 
   it("validateApiKey returns cached result without DB query", async () => {
@@ -157,7 +157,7 @@ describe("API Key Validation with Database", () => {
     });
 
     const result = await validateApiKey(request2, db);
-    expect(result).toBe(projectId);
+    expect(result.projectId).toBe(projectId);
 
     expect(selectSpy).not.toHaveBeenCalled();
 
@@ -190,7 +190,7 @@ describe("API Key Validation with Database", () => {
 
     currentTime += 4 * 60 * 1000;
     const result1 = await validateApiKey(request, db);
-    expect(result1).toBe(projectId);
+    expect(result1.projectId).toBe(projectId);
 
     await db.delete(project).where(eq(project.id, projectId));
 

@@ -5,6 +5,14 @@ const DECIMAL_INTEGER = /^-?\d+$/;
 
 const MISSING_TIMESTAMP_ERROR = "Cannot encode cursor for log without timestamp";
 
+// Epoch-microsecond bounds of timestamps a stored row can hold: PostgreSQL's timestamptz floor
+// (4713-01-01 BC) and the JS Date ceiling (+275760-09-13, 8.64e15 ms), since every row timestamp
+// is written from a Date. A decoded cursor outside them could only make to_timestamp() raise
+// "timestamp out of range" (a 500), so it is rejected as malformed instead.
+const MIN_CURSOR_MICROS = -210_866_803_200_000_000n;
+
+const MAX_CURSOR_MICROS = 8_640_000_000_000_000_000n;
+
 export function microsColumn(col: Column): SQL<string> {
   return sql<string>`(extract(epoch from ${col}) * 1000000)::bigint::text`;
 }
@@ -85,6 +93,12 @@ export function decodeCursor(cursor: string): DecodedCursor {
 
     if (!DECIMAL_INTEGER.test(micros)) {
       throw new Error("Invalid cursor format: invalid micros");
+    }
+
+    const value = BigInt(micros);
+
+    if (value < MIN_CURSOR_MICROS || value > MAX_CURSOR_MICROS) {
+      throw new Error("Invalid cursor format: micros out of range");
     }
 
     return { micros, id, timestamp: new Date(Math.floor(Number(micros) / 1000)) };

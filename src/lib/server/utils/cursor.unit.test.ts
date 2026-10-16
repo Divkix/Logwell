@@ -66,6 +66,21 @@ describe("cursor utilities", () => {
         "Invalid cursor format",
         "invalid timestamp",
       ],
+      [
+        Buffer.from(`${"9".repeat(40)}_log_123`).toString("base64url"),
+        "out of range",
+        "micros past any storable timestamp",
+      ],
+      [
+        Buffer.from("8640000000000000001_log_123").toString("base64url"),
+        "out of range",
+        "one microsecond past the JS Date ceiling",
+      ],
+      [
+        Buffer.from("-210866803200000001_log_123").toString("base64url"),
+        "out of range",
+        "before PostgreSQL's timestamptz floor",
+      ],
     ])("throws on %s (%s)", (cursor, message) => {
       expect(() => decodeCursor(cursor)).toThrow(message);
     });
@@ -97,10 +112,11 @@ describe("cursor utilities", () => {
     });
 
     it("keeps every digit of micros that no JS number can represent", () => {
-      const micros = "32503680000000000000";
+      // Just under the JS Date ceiling (8.64e18 µs), far past Number.MAX_SAFE_INTEGER.
+      const micros = "8639999999999999000";
       expect(decodeCursor(encodeCursor(micros, "log_far")).micros).toBe(micros);
 
-      const odd = "32503680000000000001";
+      const odd = "8639999999999999997";
       expect(decodeCursor(encodeCursor(odd, "log_far")).micros).toBe(odd);
       expect(decodeCursor(encodeCursor(odd, "log_far")).micros).not.toBe(String(Number(odd)));
     });

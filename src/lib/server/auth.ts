@@ -4,6 +4,13 @@ import { username } from "better-auth/plugins";
 import { env, isProduction } from "./config/env";
 import type { DatabaseClient } from "./db/db";
 
+/**
+ * Request header carrying the client address SvelteKit resolved (`event.getClientAddress()`,
+ * which honors adapter-node's ADDRESS_HEADER/XFF_DEPTH). hooks.server.ts overwrites it on every
+ * request before better-auth sees it, so a client-sent value never survives.
+ */
+export const CLIENT_IP_HEADER = "x-logwell-client-ip";
+
 export function createAuth(database: DatabaseClient) {
   return betterAuth({
     database: drizzleAdapter(database, {
@@ -19,12 +26,20 @@ export function createAuth(database: DatabaseClient) {
       updateAge: 60 * 60 * 24,
     },
     secret: env.BETTER_AUTH_SECRET,
+    // better-auth enables its limiter only for NODE_ENV === "production"; follow the app's own
+    // rule instead, so e.g. NODE_ENV=staging keeps sign-in throttling on.
+    rateLimit: { enabled: isProduction() },
     trustedOrigins: [process.env.ORIGIN].filter((origin): origin is string => Boolean(origin)),
     advanced: {
       // better-auth infers Secure (and the __Secure- name prefix) from NODE_ENV === "production",
-      // but this app treats an unset NODE_ENV as production (see config/env.ts). Without this,
+      // but this app treats any NODE_ENV but development/test as production (see config/env.ts). Without this,
       // such a deployment would enforce production secret rules yet issue non-Secure session cookies.
       useSecureCookies: isProduction(),
+      // better-auth's own rate limiter (and session IP) reads x-forwarded-for by default: behind
+      // no proxy every client lands in one shared "no-trusted-ip" bucket (3 sign-ins / 10s, so
+      // anyone can lock the admin out), and a spoofed single-value XFF buys a fresh bucket.
+      // Reading the address the app already trusts keys it per client like the hooks limiter.
+      ipAddress: { ipAddressHeaders: [CLIENT_IP_HEADER] },
     },
   });
 }

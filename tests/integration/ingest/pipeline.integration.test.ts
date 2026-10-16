@@ -10,10 +10,22 @@ import type * as schema from "../../../src/lib/server/db/schema";
 import { incident, log, project as projectTable } from "../../../src/lib/server/db/schema";
 import { setupTestDatabase } from "../../../src/lib/server/db/test-db";
 import { logEventBus } from "../../../src/lib/server/events";
-import { clearApiKeyCache } from "../../../src/lib/server/utils/api-key";
-import { ingestLogs, type IngestBodyParser } from "../../../src/lib/server/utils/ingest";
+import {
+  clearApiKeyCache,
+  generateApiKey,
+  hashApiKey,
+} from "../../../src/lib/server/utils/api-key";
+import {
+  ingestLogs,
+  MAX_INGEST_JSON_DEPTH,
+  type IngestBodyParser,
+} from "../../../src/lib/server/utils/ingest";
+import {
+  MAX_LOG_JSON_LENGTH,
+  MAX_LOG_MESSAGE_LENGTH,
+} from "../../../src/lib/server/utils/ingest-limits";
 import { parseOtlpIngestBody } from "../../../src/lib/server/utils/otlp";
-import { checkRateLimit, INGEST_RPM } from "../../../src/lib/server/utils/rate-limit";
+import { INGEST_RPM, ingestProjectLimiter } from "../../../src/lib/server/utils/rate-limit";
 import { parseSimpleIngestBody } from "../../../src/lib/server/utils/simple-ingest";
 import type { JsonValue } from "../../../src/lib/shared/schemas/json";
 import { seedProjectWithApiKey } from "../../fixtures/db";
@@ -110,7 +122,7 @@ describe("ingestLogs pipeline", () => {
       it("returns normalized 429 with Retry-After and writes no logs", async () => {
         const project = await seedProjectWithApiKey(db);
 
-        while (checkRateLimit(`ingest:${project.id}`, INGEST_RPM)) {}
+        while (ingestProjectLimiter.take(project.id, INGEST_RPM)) {}
 
         const response = await ingestLogs(post(validBody("limited"), project.apiKey), db, parse);
         expect(response.status).toBe(429);
@@ -128,7 +140,7 @@ describe("ingestLogs pipeline", () => {
         const projectA = await seedProjectWithApiKey(db);
         const projectB = await seedProjectWithApiKey(db);
 
-        while (checkRateLimit(`ingest:${projectA.id}`, INGEST_RPM)) {}
+        while (ingestProjectLimiter.take(projectA.id, INGEST_RPM)) {}
 
         const limited = await ingestLogs(post(validBody("A limited"), projectA.apiKey), db, parse);
         expect(limited.status).toBe(429);
@@ -426,6 +438,67 @@ describe("ingestLogs pipeline", () => {
     expect(jsonbColumns).not.toContain("\\u0000");
   });
 
+  it("replaces lone surrogates in stored JSON instead of failing the batch", async () => {
+    const project = await seedProjectWithApiKey(db);
+
+    // JSON.stringify keeps a lone surrogate as the `\ud800` escape, which JSON.parse accepts.
+    const simpleResponse = await ingestLogs(
+      post(
+        [
+          { level: "info", message: "ok" },
+          {
+            level: "info",
+            message: "simple",
+            metadata: { "k\ud800": "v\udc00", list: ["\ud800"] },
+          },
+        ],
+        project.apiKey,
+      ),
+      db,
+      parseSimpleIngestBody,
+    );
+
+    expect(simpleResponse.status).toBe(200);
+    expect(await simpleResponse.json()).toEqual({ accepted: 2 });
+
+    const otlpResponse = await ingestLogs(
+      post(
+        {
+          resourceLogs: [
+            {
+              scopeLogs: [
+                {
+                  logRecords: [
+                    {
+                      body: { stringValue: "body\ud800" },
+                      attributes: [{ key: "a", value: { stringValue: "\udfff" } }],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+        project.apiKey,
+      ),
+      db,
+      parseOtlpIngestBody,
+    );
+
+    expect(otlpResponse.status).toBe(200);
+    expect(await otlpResponse.json()).toEqual({ accepted: 1 });
+
+    const rows = await db.select().from(log).where(eq(log.projectId, project.id));
+    expect(rows).toHaveLength(3);
+
+    const simple = rows.find((row) => row.message === "simple")!;
+    expect(simple.metadata).toEqual({ "k\ufffd": "v\ufffd", list: ["\ufffd"] });
+
+    const otlp = rows.find((row) => row.message.startsWith("body"))!;
+    expect(otlp.body).toBe("body\ufffd");
+    expect(otlp.metadata).toEqual({ a: "\ufffd" });
+  });
+
   it("maps validation failures to 400 validation_error per parser", async () => {
     const project = await seedProjectWithApiKey(db);
 
@@ -454,6 +527,126 @@ describe("ingestLogs pipeline", () => {
     });
   });
 
+  it("rejects pathologically nested bodies as validation_error, not a stack overflow", async () => {
+    const project = await seedProjectWithApiKey(db);
+    const nested = (levels: number) => '{"a":'.repeat(levels) + "1" + "}".repeat(levels);
+    const deep = nested(10_000);
+
+    const bodies: Array<[IngestBodyParser, string]> = [
+      [parseOtlpIngestBody, `{"resourceLogs":[${deep}]}`],
+      [parseSimpleIngestBody, `{"level":"info","message":"deep","metadata":${deep}}`],
+    ];
+
+    for (const [parse, body] of bodies) {
+      const response = await ingestLogs(post(body, project.apiKey), db, parse);
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        error: "validation_error",
+        message: `Request body nests deeper than ${MAX_INGEST_JSON_DEPTH} levels.`,
+      });
+    }
+
+    // Nesting under the cap still ingests.
+    const shallow = `{"level":"info","message":"ok","metadata":${nested(MAX_INGEST_JSON_DEPTH - 2)}}`;
+    const accepted = await ingestLogs(post(shallow, project.apiKey), db, parseSimpleIngestBody);
+    expect(accepted.status).toBe(200);
+    expect(await accepted.json()).toEqual({ accepted: 1 });
+  });
+
+  it.each([
+    {
+      name: "otlp",
+      parse: parseOtlpIngestBody,
+      batch: (messages: string[]): JsonValue => ({
+        resourceLogs: [
+          {
+            scopeLogs: [
+              { logRecords: messages.map((message) => ({ body: { stringValue: message } })) },
+            ],
+          },
+        ],
+      }),
+    },
+    {
+      name: "simple",
+      parse: parseSimpleIngestBody,
+      batch: (messages: string[]): JsonValue => messages.map(simpleBody),
+    },
+  ])("$name: stores long messages, truncating past the limit", async ({ parse, batch }) => {
+    const project = await seedProjectWithApiKey(db);
+    const stackTrace = "at com.example.Service.handle(Service.java:42)\n".repeat(1000);
+    const huge = "x".repeat(MAX_LOG_MESSAGE_LENGTH * 3);
+
+    const response = await ingestLogs(post(batch([stackTrace, huge]), project.apiKey), db, parse);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ accepted: 2 });
+
+    const messages = (await db.select({ message: log.message }).from(log)).map(
+      (row) => row.message,
+    );
+
+    expect(messages).toContain(stackTrace);
+    expect(messages).toContainEqual(
+      expect.stringMatching(new RegExp(`… \\[truncated, ${huge.length} characters\\]$`)),
+    );
+  });
+
+  // Distinct two-character CJK words: the input that yields the most tsvector bytes per character.
+  function distinctWords(length: number, offset: number): string {
+    const words: string[] = [];
+
+    for (let i = offset; words.length * 3 < length; i++) {
+      words.push(String.fromCharCode(0x4e00 + (i % 2000), 0x4e00 + (Math.floor(i / 2000) % 2000)));
+    }
+
+    return words.join(" ").slice(0, length);
+  }
+
+  it.each([
+    {
+      name: "otlp",
+      parse: parseOtlpIngestBody,
+      body: (message: string, blob: string): JsonValue => ({
+        resourceLogs: [
+          {
+            scopeLogs: [
+              {
+                logRecords: [
+                  {
+                    body: { stringValue: message },
+                    attributes: [{ key: "blob", value: { stringValue: blob } }],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      }),
+    },
+    {
+      name: "simple",
+      parse: parseSimpleIngestBody,
+      body: (message: string, blob: string): JsonValue => [
+        { level: "info", message, metadata: { blob } },
+      ],
+    },
+  ])("$name: a record at every size limit still fits the search tsvector", async (input) => {
+    const project = await seedProjectWithApiKey(db);
+    const message = distinctWords(MAX_LOG_MESSAGE_LENGTH * 2, 0);
+    const blob = distinctWords(MAX_LOG_JSON_LENGTH - 100, 1_000_000);
+
+    const response = await ingestLogs(
+      post(input.body(message, blob), project.apiKey),
+      db,
+      input.parse,
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ accepted: 1 });
+  });
+
   it("ingests partial batches with per-record errors as 200", async () => {
     const project = await seedProjectWithApiKey(db);
 
@@ -477,6 +670,34 @@ describe("ingestLogs pipeline", () => {
 
     const rows = await db.select().from(log).where(eq(log.projectId, project.id));
     expect(rows).toHaveLength(1);
+  });
+
+  it("stores a timestamp before year 1 at the receive time instead of failing the batch", async () => {
+    const project = await seedProjectWithApiKey(db);
+    const before = Date.now();
+
+    const response = await ingestLogs(
+      post(
+        [
+          { level: "info", message: "ok" },
+          { level: "error", message: "bc", timestamp: "-000001-01-01T00:00:00Z" },
+          { level: "info", message: "year-zero", timestamp: "0000-01-01T00:00:00Z" },
+        ],
+        project.apiKey,
+      ),
+      db,
+      parseSimpleIngestBody,
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ accepted: 3 });
+
+    const rows = await db.select().from(log).where(eq(log.projectId, project.id));
+    expect(rows).toHaveLength(3);
+
+    for (const row of rows) {
+      expect(row.timestamp.getTime()).toBeGreaterThanOrEqual(before);
+    }
   });
 
   it("groups error logs into incidents and broadcasts both", async () => {
@@ -567,6 +788,28 @@ describe("ingestLogs pipeline", () => {
 
       // The key stays cached, so only the pipeline's own project-row check can reject it.
       await db.delete(projectTable).where(eq(projectTable.id, project.id));
+
+      const response = await ingestLogs(
+        post(otlpBody("x"), project.apiKey),
+        db,
+        parseOtlpIngestBody,
+      );
+
+      expect(response.status).toBe(401);
+      expect(await response.json()).toEqual({ error: "unauthorized", message: "Invalid API key" });
+    });
+
+    it("rejects a cached key once its rotation commits, without a cache invalidation", async () => {
+      const project = await seedProjectWithApiKey(db);
+      const warm = await ingestLogs(post(otlpBody("x"), project.apiKey), db, parseOtlpIngestBody);
+      expect(warm.status).toBe(200);
+
+      // Simulates a rotation committed on another replica (or racing this one's invalidation):
+      // the old key is still cached here, so only the per-request hash check can reject it.
+      await db
+        .update(projectTable)
+        .set({ apiKeyHash: hashApiKey(generateApiKey()) })
+        .where(eq(projectTable.id, project.id));
 
       const response = await ingestLogs(
         post(otlpBody("x"), project.apiKey),

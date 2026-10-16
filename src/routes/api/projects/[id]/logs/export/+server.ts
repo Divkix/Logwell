@@ -6,7 +6,7 @@ import { cappedLogCount } from "#lib/server/utils/capped-count.js";
 import { escapeCSVField } from "#lib/server/utils/csv-serializer.js";
 import { type LogQueryResult, type QueriedLog, queryLogs } from "#lib/server/utils/log-query.js";
 import { requireOwnedProjectRoute } from "#lib/server/utils/owned-project.js";
-import { buildSearchQuery } from "#lib/server/utils/search.js";
+import { buildSearchQuery, searchLengthError } from "#lib/server/utils/search.js";
 import { parseLevelFilter } from "#lib/shared/schemas/log.js";
 import type { JsonValue } from "#lib/shared/schemas/json.js";
 import type { ExportFormat } from "#lib/types/export.js";
@@ -155,6 +155,10 @@ export async function GET(event: RequestEvent): Promise<Response> {
   if (!format) {
     return apiError(400, "invalid_format", 'Invalid format parameter. Must be "csv" or "json".');
   }
+
+  const searchError = searchLengthError(searchParam);
+
+  if (searchError) return searchError;
 
   const levels = parseLevelFilter(levelParam);
 

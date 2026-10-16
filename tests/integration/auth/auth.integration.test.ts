@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
-import { createAuth } from "../../../src/lib/server/auth";
+import { CLIENT_IP_HEADER, createAuth } from "../../../src/lib/server/auth";
 import type * as schema from "../../../src/lib/server/db/schema";
 import { session, user } from "../../../src/lib/server/db/schema";
 import { setupTestDatabase } from "../../../src/lib/server/db/test-db";
@@ -262,6 +262,53 @@ describe("better-auth Integration", () => {
         .where(eq(session.userId, result.user.id));
 
       expect(sessionsAfterDelete.length).toBe(0);
+    });
+  });
+
+  describe("better-auth rate limiter client address", () => {
+    // better-auth only enables its limiter when NODE_ENV=production; the test flips the
+    // resolved context flag so the real limiter runs against the configured IP header.
+    async function enableRateLimit() {
+      const context = await auth.$context;
+      context.rateLimit.enabled = true;
+    }
+
+    const signIn = (clientIp: string, headers: Record<string, string> = {}) =>
+      auth.handler(
+        new Request("http://localhost:3000/api/auth/sign-in/username", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Origin: "http://localhost:3000",
+            [CLIENT_IP_HEADER]: clientIp,
+            ...headers,
+          },
+          body: JSON.stringify({ username: "nobody", password: "wrong-password" }),
+        }),
+      );
+
+    it("keys sign-in attempts by the app-resolved client address", async () => {
+      await enableRateLimit();
+
+      // better-auth allows 3 sign-ins per 10s per key.
+      for (let i = 0; i < 3; i++) {
+        expect((await signIn("203.0.113.1")).status).not.toBe(429);
+      }
+
+      expect((await signIn("203.0.113.1")).status).toBe(429);
+      // A different client is not caught in the first one's bucket.
+      expect((await signIn("203.0.113.2")).status).not.toBe(429);
+    });
+
+    it("ignores a spoofed X-Forwarded-For", async () => {
+      await enableRateLimit();
+
+      for (let i = 0; i < 3; i++) {
+        await signIn("203.0.113.3", { "X-Forwarded-For": `198.51.100.${i}` });
+      }
+
+      const spoofed = await signIn("203.0.113.3", { "X-Forwarded-For": "198.51.100.200" });
+      expect(spoofed.status).toBe(429);
     });
   });
 });

@@ -83,12 +83,18 @@ function evictCacheEntry(): void {
   }
 }
 
+// Every miss on a random key lands here, so this must stay O(1) amortized rather than walking
+// the whole cache. All entries share one TTL and are (re)inserted at the tail, so Map insertion
+// order is expiry order: expired entries are always a prefix, and the head is the oldest entry.
 function setNegativeCache(keyHash: string): void {
   const now = Date.now();
 
   for (const [k, v] of NEGATIVE_CACHE) {
-    if (v.expiresAt <= now) NEGATIVE_CACHE.delete(k);
+    if (v.expiresAt > now) break;
+    NEGATIVE_CACHE.delete(k);
   }
+
+  NEGATIVE_CACHE.delete(keyHash);
 
   if (NEGATIVE_CACHE.size >= MAX_NEGATIVE_CACHE_SIZE) {
     const oldest = NEGATIVE_CACHE.keys().next().value;
@@ -99,7 +105,21 @@ function setNegativeCache(keyHash: string): void {
   NEGATIVE_CACHE.set(keyHash, { expiresAt: now + NEGATIVE_CACHE_TTL_MS });
 }
 
-export async function validateApiKey(request: Request, dbClient?: DatabaseClient): Promise<string> {
+export interface ValidatedApiKey {
+  projectId: string;
+  /** SHA-256 hex of the presented key, so callers can re-verify it against the row. */
+  keyHash: string;
+}
+
+/**
+ * Resolves a Bearer API key to its project. A hit may be served from a cache that lags a
+ * rotation by up to CACHE_TTL_MS on another replica, so callers that act on the result must
+ * re-check `keyHash` against the project row (see ingest.ts).
+ */
+export async function validateApiKey(
+  request: Request,
+  dbClient?: DatabaseClient,
+): Promise<ValidatedApiKey> {
   const authHeader = request.headers.get("Authorization");
 
   if (!authHeader?.startsWith("Bearer ")) {
@@ -127,7 +147,7 @@ export async function validateApiKey(request: Request, dbClient?: DatabaseClient
   const cached = API_KEY_CACHE.get(keyHash);
 
   if (cached && cached.expiresAt > Date.now() && cached.keyHash === keyHash) {
-    return cached.projectId;
+    return { projectId: cached.projectId, keyHash };
   }
 
   const db = dbClient ?? (await import("#lib/server/db/index.js")).db;
@@ -161,7 +181,7 @@ export async function validateApiKey(request: Request, dbClient?: DatabaseClient
 
   NEGATIVE_CACHE.delete(keyHash);
 
-  return result.id;
+  return { projectId: result.id, keyHash };
 }
 
 export function invalidateApiKeyCacheByHash(keyHash: string): void {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
-import { buildSearchQuery } from "./search";
+import { MAX_SEARCH_LENGTH } from "#lib/shared/schemas/log.js";
+import { buildSearchQuery, searchLengthError } from "./search";
 
 describe("buildSearchQuery", () => {
   it.each([
@@ -25,5 +26,22 @@ describe("buildSearchQuery", () => {
     ["user_ID error_CODE", "user_ID & error_CODE", "underscores and case kept"],
   ])("buildSearchQuery(%s) returns %s (%s)", (input, expected) => {
     expect(buildSearchQuery(input)).toBe(expected);
+  });
+});
+
+describe("search length cap", () => {
+  it("bounds the tsquery even when a caller skips the length check", () => {
+    const query = buildSearchQuery("ab ".repeat(MAX_SEARCH_LENGTH));
+
+    expect(query.split(" & ").length).toBeLessThanOrEqual(Math.ceil(MAX_SEARCH_LENGTH / 3));
+  });
+
+  it.each([
+    [null, null],
+    ["", null],
+    ["x".repeat(MAX_SEARCH_LENGTH), null],
+    ["x".repeat(MAX_SEARCH_LENGTH + 1), 400],
+  ])("searchLengthError(%#) → %s", (input, status) => {
+    expect(searchLengthError(input)?.status ?? null).toBe(status);
   });
 });

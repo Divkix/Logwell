@@ -22,6 +22,8 @@ test.describe("Theme Toggle", () => {
     await login(page);
     await page.evaluate(() => localStorage.removeItem("mode-watcher-mode"));
     await page.reload();
+    // The toggle is server-rendered; a click before hydration has no handler and is lost.
+    await page.waitForLoadState("networkidle");
   });
 
   test("toggles between light and dark mode", async ({ page }) => {

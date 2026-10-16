@@ -1,6 +1,7 @@
 <script lang="ts">
 import { Search } from '@lucide/svelte';
 import { Input } from '#lib/components/ui/input/index.js';
+import { MAX_SEARCH_LENGTH } from '#lib/shared/schemas/log.js';
 
 const DEBOUNCE_DELAY_MS = 300;
 
@@ -65,6 +66,7 @@ $effect(() => {
   />
   <Input
     type="text"
+    maxlength={MAX_SEARCH_LENGTH}
     {placeholder}
     {disabled}
     {value}

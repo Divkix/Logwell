@@ -69,6 +69,30 @@ export default defineConfig({
   // with Node's conditions and the CSS `@import` in layout.css fails, so it is bundled instead.
   ssr: { noExternal: ["tw-animate-css"] },
   plugins: isApp
-    ? [tailwindcss(), sveltekit({ preprocess: vitePreprocess(), adapter: adapter() })]
+    ? [
+        tailwindcss(),
+        sveltekit({
+          preprocess: vitePreprocess(),
+          adapter: adapter(),
+          // Kit adds a per-response nonce to script-src for its own inline scripts and app.html's
+          // %sveltekit.nonce% theme script; anything else inline is refused. Styles keep
+          // 'unsafe-inline' (style attributes from Svelte and the UI kit); Kit then skips style nonces.
+          csp: {
+            mode: "auto",
+            directives: {
+              "default-src": ["self"],
+              "script-src": ["self"],
+              "style-src": ["self", "unsafe-inline"],
+              "img-src": ["self", "data:", "blob:"],
+              "font-src": ["self", "data:"],
+              "connect-src": ["self"],
+              "object-src": ["none"],
+              "base-uri": ["self"],
+              "form-action": ["self"],
+              "frame-ancestors": ["none"],
+            },
+          },
+        }),
+      ]
     : [],
 });
