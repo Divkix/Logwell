@@ -97,6 +97,11 @@ const maxBucketCount = $derived(
 
       <section class="space-y-2">
         <h4 class="text-sm font-medium">Root-Cause Candidates</h4>
+        {#if detail.analyzedEvents < detail.totalEvents}
+          <p class="text-xs text-muted-foreground">
+            Based on the most recent {detail.analyzedEvents.toLocaleString()} events.
+          </p>
+        {/if}
         {#if detail.rootCauseCandidates.length === 0}
           <p class="text-xs text-muted-foreground">No source candidates found.</p>
         {:else}
