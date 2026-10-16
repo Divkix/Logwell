@@ -14,9 +14,10 @@ permissions:
   contents: write
   packages: write
 
-# Do not cancel in-progress releases — partial releases can leave inconsistent state
+# Do not cancel in-progress releases — partial releases can leave inconsistent state.
+# Keyed on the tag being released: a dispatch runs from a branch ref, not the tag.
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
 env:
@@ -29,17 +30,54 @@ env:
 
 jobs:
   # =============================================================================
+  # Resolve the release tag to the commit every later job checks out
+  # =============================================================================
+  # A tag push already runs on the tag; a manual dispatch runs on the branch it was
+  # started from, so without this every checkout would build that branch's HEAD and
+  # publish it under the requested version (and :latest). Resolving once also keeps
+  # all jobs on the same commit even if the tag were moved mid-run.
+  resolve:
+    name: Resolve Release Tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+      sha: ${{ steps.resolve.outputs.sha }}
+
+    steps:
+      - name: Resolve tag to commit
+        id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: |
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::'$TAG' is not a release tag (expected vX.Y.Z)"
+            exit 1
+          fi
+          # The commits endpoint peels annotated tags to their commit and fails (422) on a missing tag.
+          if ! sha=$(gh api "repos/${GITHUB_REPOSITORY}/commits/refs/tags/${TAG}" --jq .sha); then
+            echo "::error::Tag '$TAG' does not exist in ${GITHUB_REPOSITORY}"
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "Releasing $TAG at $sha"
+
+  # =============================================================================
   # Linting and Type Checking
   # =============================================================================
   lint:
     name: Lint & Type Check
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    needs: [resolve]
 
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ needs.resolve.outputs.sha }}
           persist-credentials: false
 
       - name: Install pnpm and Node.js
@@ -65,11 +103,13 @@ jobs:
     name: Unit Tests
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    needs: [resolve]
 
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ needs.resolve.outputs.sha }}
           persist-credentials: false
 
       - name: Install pnpm and Node.js
@@ -92,11 +132,13 @@ jobs:
     name: Integration Tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    needs: [resolve]
 
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ needs.resolve.outputs.sha }}
           persist-credentials: false
 
       - name: Install pnpm and Node.js
@@ -119,6 +161,7 @@ jobs:
     name: E2E Tests (${{ matrix.browser }} ${{ matrix.shard }}/${{ matrix.total }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    needs: [resolve]
 
     strategy:
       fail-fast: false
@@ -152,6 +195,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ needs.resolve.outputs.sha }}
           persist-credentials: false
 
       - name: Install pnpm and Node.js
@@ -215,11 +259,13 @@ jobs:
     name: Build Verification
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    needs: [resolve]
 
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ needs.resolve.outputs.sha }}
           persist-credentials: false
 
       - name: Install pnpm and Node.js
@@ -242,7 +288,7 @@ jobs:
     name: Build ${{ matrix.platform }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 20
-    needs: [lint, test-unit, test-integration, test-e2e, build]
+    needs: [resolve, lint, test-unit, test-integration, test-e2e, build]
     strategy:
       fail-fast: false
       matrix:
@@ -256,6 +302,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ needs.resolve.outputs.sha }}
           persist-credentials: false
 
       - name: Set up Docker Buildx
@@ -311,7 +358,7 @@ jobs:
     name: Create Multi-Platform Manifest
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: [docker-publish]
+    needs: [resolve, docker-publish]
     outputs:
       image-tags: ${{ steps.meta.outputs.tags }}
       image-digest: ${{ steps.digest.outputs.digest }}
@@ -337,12 +384,7 @@ jobs:
 
       - name: Determine version tag
         id: version
-        run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "tag=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
-          else
-            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-          fi
+        run: echo "tag=${{ needs.resolve.outputs.tag }}" >> $GITHUB_OUTPUT
 
       - name: Set image name
         id: image
@@ -393,12 +435,13 @@ jobs:
     name: Create GitHub Release
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [docker-merge]
+    needs: [resolve, docker-merge]
 
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ needs.resolve.outputs.sha }}
           persist-credentials: false
 
       - name: Set image name
@@ -433,6 +476,7 @@ jobs:
     timeout-minutes: 5
     needs:
       [
+        resolve,
         lint,
         test-unit,
         test-integration,
@@ -447,7 +491,8 @@ jobs:
     steps:
       - name: Check all jobs status
         run: |
-          if [[ "${{ needs.lint.result }}" != "success" ]] || \
+          if [[ "${{ needs.resolve.result }}" != "success" ]] || \
+             [[ "${{ needs.lint.result }}" != "success" ]] || \
              [[ "${{ needs.test-unit.result }}" != "success" ]] || \
              [[ "${{ needs.test-integration.result }}" != "success" ]] || \
              [[ "${{ needs.test-e2e.result }}" != "success" ]] || \
