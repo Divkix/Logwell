@@ -221,6 +221,24 @@ describe("(app) page loaders — injected PGlite DB seam", () => {
       });
     });
 
+    it("falls back to the first page for an invalid cursor, whatever the offset", async () => {
+      const proj = await seedProject(db, { name: "bad-cursor", ownerId: owner.userId });
+      await seedLog(db, proj.id, { message: "first-page" });
+
+      const event = createLoadEvent(
+        db,
+        { id: proj.id },
+        owner.locals,
+        `http://localhost:5173/projects/${proj.id}?cursor=garbage&offset=10001`,
+      );
+
+      // SAFETY: createLoadEvent builds every event member these load functions read (url, params, locals, cookies, fetch, setHeaders, getClientAddress, depends, parent); tracing stays null because no load function reads it.
+      const data = await loadProjectLogs(event as never);
+
+      expect(data.logs.map((entry: { message: string }) => entry.message)).toEqual(["first-page"]);
+      expect(data.pagination.offset).toBe(0);
+    });
+
     it("throws SvelteKit 404 for a non-owner (existence hidden)", async () => {
       const proj = await seedProject(db, { name: "other-proj", ownerId: owner.userId });
 

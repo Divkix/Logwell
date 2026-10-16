@@ -40,7 +40,7 @@ export const load: PageServerLoad = async (event) => {
   const levels = parseLevelFilter(levelParam);
   const fromDate = getTimeRangeStart(range);
 
-  const filter = {
+  let filter = {
     projectId,
     levels,
     from: fromDate,
@@ -60,7 +60,10 @@ export const load: PageServerLoad = async (event) => {
 
     if (!(err instanceof InvalidCursorError)) throw err;
     console.error("[page/logs] invalid cursor, falling back to first page:", err);
-    result = await queryLogs(db, { ...filter, cursor: null });
+    // Offset 0 too: queryLogs ignored the URL offset while the cursor was set, and re-applying
+    // it here could throw OffsetTooLargeError outside the 400 mapping above.
+    filter = { ...filter, cursor: null, offset: 0 };
+    result = await queryLogs(db, filter);
   }
 
   const total = result.total ?? 0;
@@ -82,7 +85,7 @@ export const load: PageServerLoad = async (event) => {
       totalIsCapped: result.totalIsCapped,
       hasMore: result.hasMore,
       limit,
-      offset,
+      offset: filter.offset,
       nextCursor: result.nextCursor,
     },
     filters: {
