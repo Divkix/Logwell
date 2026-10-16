@@ -9,6 +9,7 @@
  * - SSE_BATCH_WINDOW_MS: Time window for batching SSE events (default: 1500ms)
  * - SSE_MAX_BATCH_SIZE: Maximum logs per batch before flush (default: 50)
  * - SSE_HEARTBEAT_INTERVAL_MS: Heartbeat interval (default: 30000ms)
+ * - SSE_MAX_CONNECTIONS: Live streams open at once across all projects (default: 200)
  * - LOG_STREAM_MAX_LOGS: Maximum logs in memory per client (default: 1000)
  * - LOG_RETENTION_DAYS: System default retention in days (default: 30, 0 = disabled)
  * - LOG_CLEANUP_INTERVAL_MS: Cleanup job interval in ms (default: 3600000 = 1 hour)
@@ -51,12 +52,14 @@ const SSE_DEFAULTS = {
   BATCH_WINDOW_MS: 1500,
   MAX_BATCH_SIZE: 50,
   HEARTBEAT_INTERVAL_MS: 30000,
+  MAX_CONNECTIONS: 200,
 } as const;
 
 const SSE_BOUNDS = {
   BATCH_WINDOW_MS: { min: 100, max: 10000 },
   MAX_BATCH_SIZE: { min: 1, max: 500 },
   HEARTBEAT_INTERVAL_MS: { min: 5000, max: 300000 },
+  MAX_CONNECTIONS: { min: 1, max: 10000 },
 } as const;
 
 /**
@@ -66,6 +69,9 @@ const SSE_BOUNDS = {
  * - MAX_BATCH_SIZE: Maximum logs per batch (flush immediately when reached)
  * - HEARTBEAT_INTERVAL_MS: Keep-alive ping interval. Node never times out a response that is
  *   still being written, so this only has to beat reverse-proxy read timeouts (nginx: 60s).
+ * - MAX_CONNECTIONS: Live streams (log + incident) the process holds open at once. Each one pins
+ *   a socket, a bus listener, timers and up to 256 KiB of buffered frames; past the cap a new
+ *   stream gets 429 and the client's reconnect backoff retries later.
  */
 export const SSE_CONFIG = {
   BATCH_WINDOW_MS: clamp(
@@ -82,6 +88,11 @@ export const SSE_CONFIG = {
     parseEnvInt("SSE_HEARTBEAT_INTERVAL_MS", SSE_DEFAULTS.HEARTBEAT_INTERVAL_MS),
     SSE_BOUNDS.HEARTBEAT_INTERVAL_MS.min,
     SSE_BOUNDS.HEARTBEAT_INTERVAL_MS.max,
+  ),
+  MAX_CONNECTIONS: clamp(
+    parseEnvInt("SSE_MAX_CONNECTIONS", SSE_DEFAULTS.MAX_CONNECTIONS),
+    SSE_BOUNDS.MAX_CONNECTIONS.min,
+    SSE_BOUNDS.MAX_CONNECTIONS.max,
   ),
 } as const;
 

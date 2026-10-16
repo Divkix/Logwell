@@ -121,3 +121,73 @@ describe("live stream session", () => {
     expect(logEventBus.getIncidentListenerCount("p1")).toBe(0);
   });
 });
+
+describe("live stream connection cap", () => {
+  const originalCap = process.env.SSE_MAX_CONNECTIONS;
+
+  // Fresh modules so SSE_CONFIG re-reads the env and the open-stream count starts at zero.
+  async function loadWithCap(cap: number) {
+    process.env.SSE_MAX_CONNECTIONS = String(cap);
+    vi.resetModules();
+
+    const [{ logEventBus: bus }, stream] = await Promise.all([
+      import("#lib/server/events.js"),
+      import("#lib/server/live-stream.js"),
+    ]);
+
+    return { bus, ...stream };
+  }
+
+  afterEach(() => {
+    if (originalCap === undefined) delete process.env.SSE_MAX_CONNECTIONS;
+    else process.env.SSE_MAX_CONNECTIONS = originalCap;
+
+    vi.resetModules();
+  });
+
+  it("rejects streams past the cap with 429 without subscribing them", async () => {
+    const {
+      bus,
+      createLogStreamResponse: logs,
+      createIncidentStreamResponse: incidents,
+    } = await loadWithCap(2);
+
+    const first = readFrames(logs("p1"));
+    const second = readFrames(incidents("p2"));
+
+    const rejected = logs("p3");
+
+    expect(rejected.status).toBe(429);
+    expect(rejected.headers.get("Retry-After")).toBe("60");
+    expect(await rejected.json()).toEqual({
+      error: "too_many_streams",
+      message: "Too many live streams are open",
+    });
+    expect(bus.getListenerCount("p3")).toBe(0);
+    expect(bus.getIncidentListenerCount("p3")).toBe(0);
+    expect(incidents("p3").status).toBe(429);
+
+    await first.cancel();
+    await second.cancel();
+  });
+
+  it("frees a slot when a stream ends", async () => {
+    const { bus, createLogStreamResponse: logs } = await loadWithCap(1);
+
+    const first = readFrames(logs("p1"));
+
+    expect(logs("p1").status).toBe(429);
+
+    await first.cancel();
+
+    const next = logs("p1");
+
+    expect(next.status).toBe(200);
+
+    const reopened = readFrames(next);
+
+    expect(bus.getListenerCount("p1")).toBe(1);
+
+    await reopened.cancel();
+  });
+});
