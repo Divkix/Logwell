@@ -27,6 +27,10 @@ updates:
       - dependency-name: "vitest"
       - dependency-name: "@vitest/*"
       - dependency-name: "@voidzero-dev/vite-plus-core"
+      # SvelteKit 3 needs a planned migration: svelte-adapter-bun 1.0.1 still calls the removed
+      # builder.config.kit / generateManifest adapter API, so the build fails until it ships Kit 3 support.
+      - dependency-name: "@sveltejs/kit"
+        update-types: ["version-update:semver-major"]
     groups:
       # Group all minor and patch updates together
       minor-and-patch:
