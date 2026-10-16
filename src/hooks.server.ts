@@ -5,7 +5,7 @@ import { building } from "$app/env";
 import { auth, CLIENT_IP_HEADER, initAuth } from "#lib/server/auth.js";
 import { env, warnIfOriginUnset } from "#lib/server/config/env.js";
 import { closeDb, db } from "#lib/server/db/index.js";
-import { handleError as buildErrorResponse } from "#lib/server/error-handler.js";
+import { handleError as buildErrorResponse, reportFatalError } from "#lib/server/error-handler.js";
 import { startCleanupScheduler, stopCleanupScheduler } from "#lib/server/jobs/cleanup-scheduler.js";
 import { checkCsrfOrigin } from "#lib/server/utils/csrf.js";
 import {
@@ -47,6 +47,10 @@ async function gracefulShutdown(reason: string): Promise<void> {
 // adapter-node emits this on SIGTERM/SIGINT once the HTTP server has closed — open SSE streams
 // hold that until SHUTDOWN_TIMEOUT, when the adapter force-closes them.
 process.once("sveltekit:shutdown", (reason: string) => void gracefulShutdown(reason));
+
+// Uncaught exceptions and unhandled rejections get an error ID and context in the log. A monitor,
+// unlike an `uncaughtException`/`unhandledRejection` listener, leaves Node's crash (exit 1) intact.
+process.on("uncaughtExceptionMonitor", (error, origin) => void reportFatalError(error, origin));
 
 function tooManyLogins(): Response {
   return Response.json(

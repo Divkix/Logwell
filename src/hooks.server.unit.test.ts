@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   db: { kind: "test-db" },
   closeDb: vi.fn(async () => {}),
   stopCleanupScheduler: vi.fn(),
+  reportFatalError: vi.fn(),
   getSession: vi.fn(),
   authHandler: vi.fn(),
   // RATE_LIMIT_INGEST_IP_RPM is overridden in the /v1 throttle tests; the shipped
@@ -33,7 +34,10 @@ vi.mock("#lib/server/auth.js", () => ({
   },
 }));
 
-vi.mock("#lib/server/error-handler.js", () => ({ handleError: vi.fn() }));
+vi.mock("#lib/server/error-handler.js", () => ({
+  handleError: vi.fn(),
+  reportFatalError: mocks.reportFatalError,
+}));
 
 vi.mock("#lib/server/jobs/cleanup-scheduler.js", () => ({
   startCleanupScheduler: vi.fn(),
@@ -360,6 +364,45 @@ describe("hooks.server handle", () => {
         vi.restoreAllMocks();
       }
     });
+  });
+});
+
+describe("hooks.server process-level faults", () => {
+  it("reports uncaught errors with their origin", () => {
+    const fault = new Error("boom");
+
+    process.emit("uncaughtExceptionMonitor", fault, "unhandledRejection");
+
+    expect(mocks.reportFatalError).toHaveBeenCalledWith(fault, "unhandledRejection");
+  });
+
+  it("only observes faults, registering no listener that would stop Node from crashing", async () => {
+    const counts = () =>
+      ["uncaughtException", "unhandledRejection", "uncaughtExceptionMonitor"].map((event) =>
+        process.listenerCount(event),
+      );
+
+    const before = counts();
+    const shutdownListeners = process.listeners("sveltekit:shutdown");
+    const monitors = process.listeners("uncaughtExceptionMonitor");
+
+    vi.resetModules();
+    await import("./hooks.server");
+
+    try {
+      expect(counts()).toEqual([before[0], before[1], before[2]! + 1]);
+    } finally {
+      // Drop the re-imported module's listeners so they never fire in later tests.
+      for (const listener of process.listeners("sveltekit:shutdown")) {
+        if (!shutdownListeners.includes(listener))
+          process.removeListener("sveltekit:shutdown", listener);
+      }
+
+      for (const listener of process.listeners("uncaughtExceptionMonitor")) {
+        if (!monitors.includes(listener))
+          process.removeListener("uncaughtExceptionMonitor", listener);
+      }
+    }
   });
 });
 

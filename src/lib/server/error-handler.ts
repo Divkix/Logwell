@@ -59,3 +59,28 @@ export function handleError(context: ErrorContext): ErrorResponse {
     message: clientMessage,
   };
 }
+
+/**
+ * Logs an error that is about to crash the process, with an error ID to correlate it.
+ *
+ * Registered as Node's `uncaughtExceptionMonitor`, which sees both uncaught exceptions and
+ * unhandled rejections (`origin` says which) before Node's default crash. A monitor only
+ * observes: the process still exits with code 1, so state after the fault is never trusted.
+ */
+export function reportFatalError(error: Error, origin: NodeJS.UncaughtExceptionOrigin): string {
+  const errorId = nanoid(12);
+  // Typed as Error by Node, but a thrown non-Error (`throw "text"`) reaches the monitor as is.
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  const errorStack = error instanceof Error ? error.stack : undefined;
+
+  console.error(`[FATAL] ${errorId} | ${origin} | ${errorMessage}`, {
+    id: errorId,
+    origin,
+    pid: process.pid,
+    uptimeSeconds: Math.round(process.uptime()),
+    error: errorMessage,
+    stack: errorStack,
+  });
+
+  return errorId;
+}
