@@ -200,8 +200,7 @@ async function createEnumTypes(db: PgliteDatabase<typeof schema>): Promise<void>
   }
 }
 
-export async function createTestDatabase(): Promise<PgliteDatabase<typeof schema>> {
-  const client = new PGlite();
+async function buildSchema(client: PGlite): Promise<void> {
   const db = drizzle(client, { schema });
 
   await createEnumTypes(db);
@@ -228,8 +227,30 @@ export async function createTestDatabase(): Promise<PgliteDatabase<typeof schema
       }
     }
   }
+}
 
-  return db;
+// Booting a fresh PGlite runs initdb (~450ms); restoring a dumped data dir is
+// ~5x faster. Build the schema once per worker, then hand every test its own
+// copy so isolation stays one-database-per-test.
+let templateDataDir: Promise<Blob> | undefined;
+
+function getTemplateDataDir(): Promise<Blob> {
+  templateDataDir ??= (async () => {
+    const client = new PGlite();
+    await buildSchema(client);
+    const dump = await client.dumpDataDir("none");
+    await client.close();
+
+    return dump;
+  })();
+
+  return templateDataDir;
+}
+
+export async function createTestDatabase(): Promise<PgliteDatabase<typeof schema>> {
+  const client = await PGlite.create({ loadDataDir: await getTemplateDataDir() });
+
+  return drizzle(client, { schema });
 }
 
 export async function cleanDatabase(db: PgliteDatabase<typeof schema>): Promise<void> {
