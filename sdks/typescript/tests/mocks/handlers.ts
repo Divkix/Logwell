@@ -1,4 +1,5 @@
-import { delay, HttpResponse, http } from "msw";
+import { delay } from "msw";
+import { HttpResponse, http } from "msw/http";
 
 const BASE_URL = "https://test.logwell.io";
 

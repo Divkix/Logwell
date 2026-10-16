@@ -1,4 +1,4 @@
-import { HttpResponse, http } from "msw";
+import { HttpResponse, http } from "msw/http";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { Logwell } from "../../src/client";
 import { LogwellError } from "../../src/errors";
