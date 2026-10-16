@@ -26,10 +26,13 @@ export function createAuth(database: DatabaseClient) {
       updateAge: 60 * 60 * 24,
     },
     secret: env.BETTER_AUTH_SECRET,
+    // better-auth enables its limiter only for NODE_ENV === "production"; follow the app's own
+    // rule instead, so e.g. NODE_ENV=staging keeps sign-in throttling on.
+    rateLimit: { enabled: isProduction() },
     trustedOrigins: [process.env.ORIGIN].filter((origin): origin is string => Boolean(origin)),
     advanced: {
       // better-auth infers Secure (and the __Secure- name prefix) from NODE_ENV === "production",
-      // but this app treats an unset NODE_ENV as production (see config/env.ts). Without this,
+      // but this app treats any NODE_ENV but development/test as production (see config/env.ts). Without this,
       // such a deployment would enforce production secret rules yet issue non-Secure session cookies.
       useSecureCookies: isProduction(),
       // better-auth's own rate limiter (and session IP) reads x-forwarded-for by default: behind

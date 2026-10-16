@@ -53,6 +53,12 @@ describe("Environment Configuration", () => {
     },
   );
 
+  it("enforces the secret rules for an unrecognised NODE_ENV", async () => {
+    await expect(loadEnv({ NODE_ENV: "staging", BETTER_AUTH_SECRET: "too-short" })).rejects.toThrow(
+      "32 characters",
+    );
+  });
+
   it("allows missing BETTER_AUTH_SECRET in development", async () => {
     const { env } = await loadEnv({ NODE_ENV: "development", BETTER_AUTH_SECRET: undefined });
     expect(env.BETTER_AUTH_SECRET).toBeDefined();
@@ -116,6 +122,9 @@ describe("Environment Configuration", () => {
   it.each([
     ["production", true, false],
     ["development", false, true],
+    ["test", false, true],
+    ["staging", true, false],
+    ["Production", true, false],
   ])("NODE_ENV=%s → isProduction=%s isDevelopment=%s", async (nodeEnv, prod, dev) => {
     const { isProduction, isDevelopment } = await loadEnv({ NODE_ENV: nodeEnv });
 

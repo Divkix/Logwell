@@ -16,7 +16,8 @@
  * - DB_STATEMENT_TIMEOUT_MS: Postgres statement_timeout for the app pool (default 30000, 0 = off)
  * - DB_IDLE_IN_TRANSACTION_TIMEOUT_MS: Postgres idle_in_transaction_session_timeout
  *   for the app pool (default 60000, 0 = off)
- * - NODE_ENV: Environment mode (development/production)
+ * - NODE_ENV: "development" or "test" relaxes validation; any other value (unset, "production",
+ *   "staging", …) runs with production rules
  */
 
 import { z } from "zod";
@@ -41,6 +42,8 @@ export class EnvValidationError extends Error {
 // secret validation and issuing non-Secure session cookies.
 const nodeEnv = globalThis.process?.env?.NODE_ENV ?? "production";
 
+// Allow-list, not deny-list: an unexpected value such as "staging" must not quietly drop
+// production safeguards (secret validation, Secure cookies, better-auth's rate limiter).
 const isDevExplicit = nodeEnv === "development" || nodeEnv === "test";
 
 // Collect validation errors
@@ -182,15 +185,15 @@ export const env = {
 } as const;
 
 /**
- * Check if running in production mode
+ * Production rules apply unless NODE_ENV is explicitly "development" or "test".
  */
 export function isProduction(): boolean {
-  return env.NODE_ENV === "production";
+  return !isDevExplicit;
 }
 
 /**
- * Check if running in development mode
+ * True only for an explicit NODE_ENV of "development" or "test".
  */
 export function isDevelopment(): boolean {
-  return env.NODE_ENV !== "production";
+  return isDevExplicit;
 }
