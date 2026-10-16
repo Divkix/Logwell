@@ -1,4 +1,3 @@
-import { json } from "@sveltejs/kit";
 import { and, eq, sql } from "drizzle-orm";
 import { getQueryRows } from "#lib/server/db/db.js";
 import { incident, log } from "#lib/server/db/schema.js";
@@ -96,7 +95,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
     count: Number(row.count),
   }));
 
-  return json({
+  return Response.json({
     id: incidentRow.id,
     projectId: incidentRow.projectId,
     fingerprint: incidentRow.fingerprint,

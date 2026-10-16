@@ -1,4 +1,3 @@
-import { json } from "@sveltejs/kit";
 import { sql } from "drizzle-orm";
 import { type DatabaseClient, getDbClient } from "#lib/server/db/db.js";
 import type { RequestEvent } from "./$types";
@@ -82,7 +81,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
     "Cache-Control": "no-cache, no-store, must-revalidate",
   });
 
-  return json(responseBody, {
+  return Response.json(responseBody, {
     status: isHealthy ? 200 : 503,
     headers,
   });

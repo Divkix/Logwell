@@ -1,4 +1,3 @@
-import { json } from "@sveltejs/kit";
 import { eq } from "drizzle-orm";
 import { Data, Effect } from "effect";
 import { nanoid } from "nanoid";
@@ -270,12 +269,12 @@ function ingest(request: Request, db: DatabaseClient, parse: IngestBodyParser) {
       logEventBus.emitIncident(touchedIncident);
     }
 
-    return json(buildIngestResponse(parsed.accepted, parsed.rejected, parsed.errors));
+    return Response.json(buildIngestResponse(parsed.accepted, parsed.rejected, parsed.errors));
   });
 }
 
 const errorResponse = (error: string, message: string, init: ResponseInit = { status: 400 }) =>
-  Effect.succeed(json({ error, message }, init));
+  Effect.succeed(Response.json({ error, message }, init));
 
 export async function ingestLogs(
   request: Request,

@@ -1,4 +1,3 @@
-import { json } from "@sveltejs/kit";
 import { eq } from "drizzle-orm";
 import { project } from "#lib/server/db/schema.js";
 import {
@@ -44,7 +43,7 @@ export async function POST(event: RequestEvent): Promise<Response> {
     })
     .where(eq(project.id, projectId));
 
-  return json({
+  return Response.json({
     apiKey: newApiKey,
   });
 }

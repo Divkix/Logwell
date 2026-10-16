@@ -1,4 +1,3 @@
-import { json } from "@sveltejs/kit";
 import { and, eq, gte, lte, type SQL, sql } from "drizzle-orm";
 import type { TimeRange } from "#lib/utils/time-range.js";
 import { type BucketCountRow, getQueryRows } from "#lib/server/db/db.js";
@@ -94,7 +93,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
 
   const buckets = fillMissingBuckets(bucketCounts, config, rangeStart, rangeEnd);
 
-  return json({
+  return Response.json({
     buckets,
     range,
     totalCount,

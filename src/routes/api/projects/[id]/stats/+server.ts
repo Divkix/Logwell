@@ -1,4 +1,3 @@
-import { json } from "@sveltejs/kit";
 import { and, count, eq, gte, lte, type SQL } from "drizzle-orm";
 import { log } from "#lib/server/db/schema.js";
 import { requireOwnedProjectRoute } from "#lib/server/utils/owned-project.js";
@@ -91,7 +90,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
     }
   }
 
-  return json({
+  return Response.json({
     totalLogs,
     levelCounts: levelCountsObj,
     levelPercentages: levelPercentagesObj,

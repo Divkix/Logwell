@@ -46,7 +46,7 @@ async function handleExport(format: 'csv' | 'json') {
 
       try {
         // SAFETY: API failures answer with a { message } JSON envelope (handlers return
-        // json({ code, message })); the optional read tolerates any other JSON shape, and a
+        // Response.json({ code, message })); the optional read tolerates any other JSON shape, and a
         // null or non-JSON body throws into this inner catch, keeping the status-line default.
         const data = (await response.json()) as { message?: string };
 

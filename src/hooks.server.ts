@@ -1,4 +1,4 @@
-import { json, type Handle, type HandleServerError } from "@sveltejs/kit";
+import type { Handle, HandleServerError } from "@sveltejs/kit";
 import { svelteKitHandler } from "better-auth/svelte-kit";
 import { building } from "$app/environment";
 import { auth, initAuth } from "#lib/server/auth.js";
@@ -72,7 +72,7 @@ export const handle: Handle = async ({ event, resolve }) => {
     // Pre-auth throttle: every request with a fresh random key costs a DB lookup in
     // validateApiKey, so the per-IP bucket drains before the per-project one (ingest.ts).
     if (!checkRateLimit(`ingest-ip:${event.getClientAddress()}`, env.RATE_LIMIT_INGEST_IP_RPM)) {
-      return json(
+      return Response.json(
         { error: "rate_limited", message: "Rate limit exceeded. Retry in 60 seconds." },
         { status: 429, headers: { "Retry-After": "60" } },
       );
@@ -95,7 +95,7 @@ export const handle: Handle = async ({ event, resolve }) => {
   }
 
   if (event.request.method === "POST" && pathname.startsWith("/api/auth/sign-up")) {
-    return json(
+    return Response.json(
       { error: "sign_up_disabled", message: "Account sign-up is disabled." },
       { status: 403 },
     );

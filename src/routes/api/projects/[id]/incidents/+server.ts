@@ -1,4 +1,3 @@
-import { json } from "@sveltejs/kit";
 import { and, count, desc, eq, gte, lt, type SQL } from "drizzle-orm";
 import { INCIDENT_CONFIG } from "#lib/server/config/performance.js";
 import { incident } from "#lib/server/db/schema.js";
@@ -116,7 +115,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
       ? encodeCursor(incidentsToReturn.at(-1)!.micros, incidentsToReturn.at(-1)!.id)
       : null;
 
-  return json({
+  return Response.json({
     incidents: incidentsToReturn.map((i) => ({
       id: i.id,
       projectId: i.projectId,

@@ -1,4 +1,3 @@
-import { json } from "@sveltejs/kit";
 import { apiError } from "#lib/server/utils/api-error.js";
 import { InvalidCursorError, queryLogs } from "#lib/server/utils/log-query.js";
 import { requireOwnedProjectRoute } from "#lib/server/utils/owned-project.js";
@@ -94,7 +93,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
     throw error;
   }
 
-  return json({
+  return Response.json({
     logs: result.logs.map((l) => ({
       id: l.id,
       projectId: l.projectId,

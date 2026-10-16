@@ -1,4 +1,3 @@
-import { json } from "@sveltejs/kit";
 import { and, count, desc, eq, inArray } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { getDbClient } from "#lib/server/db/db.js";
@@ -67,7 +66,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
     updatedAt: p.updatedAt?.toISOString(),
   }));
 
-  return json({ projects: projectsWithCounts });
+  return Response.json({ projects: projectsWithCounts });
 }
 
 /**
@@ -161,7 +160,7 @@ export async function POST(event: RequestEvent): Promise<Response> {
 
   if (!created) return apiError(500, "internal_error", "Failed to create project");
 
-  return json(
+  return Response.json(
     {
       id: created.id,
       name: created.name,

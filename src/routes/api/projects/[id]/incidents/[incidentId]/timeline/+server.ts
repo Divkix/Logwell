@@ -1,4 +1,3 @@
-import { json } from "@sveltejs/kit";
 import { and, eq, gte, lte, type SQL, sql } from "drizzle-orm";
 import { type BucketCountRow, getQueryRows } from "#lib/server/db/db.js";
 import { incident, log } from "#lib/server/db/schema.js";
@@ -83,7 +82,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
     return bucket.count > peak.count ? bucket : peak;
   }, null);
 
-  return json({
+  return Response.json({
     incidentId: incidentRow.id,
     range,
     buckets,
