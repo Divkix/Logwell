@@ -94,11 +94,18 @@ export interface ParsedIngest {
 export type IngestBodyParser = (body: JsonValue | undefined) => ParsedIngest;
 
 // Postgres rejects U+0000 in both text and jsonb columns, so NUL characters are
-// stripped from every string bound for a column. The walk is depth-bounded
+// stripped from every string bound for a column. Its json parser also rejects a
+// lone UTF-16 surrogate, which JSON.parse accepts (`"\ud800"`) and drizzle's jsonb
+// mapper writes back out as that escape, so unpaired surrogates become U+FFFD.
+// Either would otherwise fail the whole batch's INSERT. The walk is depth-bounded
 // because the payload is attacker-controlled; deeper levels are dropped.
 const MAX_NUL_STRIP_DEPTH = 32;
 
-const nulStrippedString = z.string().transform((text) => text.replaceAll("\u0000", ""));
+function columnSafe(text: string): string {
+  return text.replaceAll("\u0000", "").toWellFormed();
+}
+
+const nulStrippedString = z.string().transform(columnSafe);
 
 function stripNulStrings(value: JsonValue, depth = 0): JsonValue {
   const text = nulStrippedString.safeParse(value);
@@ -117,7 +124,7 @@ function stripNulStrings(value: JsonValue, depth = 0): JsonValue {
 
   return Object.fromEntries(
     Object.entries(record.data).map(([key, entry]) => [
-      key.replaceAll("\u0000", ""),
+      columnSafe(key),
       stripNulStrings(entry, depth + 1),
     ]),
   );
@@ -125,9 +132,9 @@ function stripNulStrings(value: JsonValue, depth = 0): JsonValue {
 
 function sanitizeIngestInput(input: IngestInputRow): IngestInputRow {
   // SAFETY: Object.entries keeps every own enumerable key of `input` (including
-  // `message`, which is passed through untouched); only NUL bytes are stripped
-  // from the other values, so the rebuilt object has IngestInputRow's exact
-  // runtime shape.
+  // `message`, which is passed through untouched); only NUL bytes and lone
+  // surrogates are replaced in the other values, so the rebuilt object has
+  // IngestInputRow's exact runtime shape.
   return Object.fromEntries(
     Object.entries(input).map(([key, value]) =>
       // A NUL in `message` is a per-record rejection in both parsers, never a strip.

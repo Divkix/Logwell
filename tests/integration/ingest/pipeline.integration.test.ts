@@ -438,6 +438,67 @@ describe("ingestLogs pipeline", () => {
     expect(jsonbColumns).not.toContain("\\u0000");
   });
 
+  it("replaces lone surrogates in stored JSON instead of failing the batch", async () => {
+    const project = await seedProjectWithApiKey(db);
+
+    // JSON.stringify keeps a lone surrogate as the `\ud800` escape, which JSON.parse accepts.
+    const simpleResponse = await ingestLogs(
+      post(
+        [
+          { level: "info", message: "ok" },
+          {
+            level: "info",
+            message: "simple",
+            metadata: { "k\ud800": "v\udc00", list: ["\ud800"] },
+          },
+        ],
+        project.apiKey,
+      ),
+      db,
+      parseSimpleIngestBody,
+    );
+
+    expect(simpleResponse.status).toBe(200);
+    expect(await simpleResponse.json()).toEqual({ accepted: 2 });
+
+    const otlpResponse = await ingestLogs(
+      post(
+        {
+          resourceLogs: [
+            {
+              scopeLogs: [
+                {
+                  logRecords: [
+                    {
+                      body: { stringValue: "body\ud800" },
+                      attributes: [{ key: "a", value: { stringValue: "\udfff" } }],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+        project.apiKey,
+      ),
+      db,
+      parseOtlpIngestBody,
+    );
+
+    expect(otlpResponse.status).toBe(200);
+    expect(await otlpResponse.json()).toEqual({ accepted: 1 });
+
+    const rows = await db.select().from(log).where(eq(log.projectId, project.id));
+    expect(rows).toHaveLength(3);
+
+    const simple = rows.find((row) => row.message === "simple")!;
+    expect(simple.metadata).toEqual({ "k\ufffd": "v\ufffd", list: ["\ufffd"] });
+
+    const otlp = rows.find((row) => row.message.startsWith("body"))!;
+    expect(otlp.body).toBe("body\ufffd");
+    expect(otlp.metadata).toEqual({ a: "\ufffd" });
+  });
+
   it("maps validation failures to 400 validation_error per parser", async () => {
     const project = await seedProjectWithApiKey(db);
 
