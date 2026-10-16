@@ -2,7 +2,10 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "../src/lib/server/db/schema";
-import { backfillProjectIncidents } from "../src/lib/server/utils/incident-backfill";
+import {
+  backfillProjectIncidents,
+  listBackfillProjects,
+} from "../src/lib/server/utils/incident-backfill";
 
 function parseDaysArg(defaultDays: number): number {
   const arg = process.argv.find((value) => value.startsWith("--days="));
@@ -31,9 +34,7 @@ async function runBackfill() {
   const db = drizzle(client, { schema });
 
   try {
-    const projects = await db
-      .select({ id: schema.project.id, name: schema.project.name })
-      .from(schema.project);
+    const projects = await listBackfillProjects(db);
 
     if (projects.length === 0) {
       console.log("No projects found. Nothing to backfill.");

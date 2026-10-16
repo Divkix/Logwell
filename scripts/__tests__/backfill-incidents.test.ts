@@ -2,9 +2,12 @@ import { and, eq, gte } from "drizzle-orm";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
 import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
 import type * as schema from "../../src/lib/server/db/schema";
-import { incident, log } from "../../src/lib/server/db/schema";
+import { incident, log, project as projectTable } from "../../src/lib/server/db/schema";
 import { setupTestDatabase } from "../../src/lib/server/db/test-db";
-import { backfillProjectIncidents } from "../../src/lib/server/utils/incident-backfill";
+import {
+  backfillProjectIncidents,
+  listBackfillProjects,
+} from "../../src/lib/server/utils/incident-backfill";
 import { seedLog, seedProject } from "../../tests/fixtures/db";
 
 describe("backfill-incidents", () => {
@@ -19,6 +22,18 @@ describe("backfill-incidents", () => {
 
   afterEach(async () => {
     await cleanup();
+  });
+
+  it("lists only projects that are not soft-deleted", async () => {
+    const active = await seedProject(db, { name: "active" });
+    const deleted = await seedProject(db, { name: "deleted" });
+
+    await db
+      .update(projectTable)
+      .set({ deletedAt: new Date() })
+      .where(eq(projectTable.id, deleted.id));
+
+    expect(await listBackfillProjects(db)).toEqual([{ id: active.id, name: "active" }]);
   });
 
   it("backfills only grouped levels within the selected window", async () => {
