@@ -1,6 +1,5 @@
 import type { Handle, HandleServerError } from "@sveltejs/kit/hooks";
 import { svelteKitHandler } from "better-auth/svelte-kit";
-import { z } from "zod";
 import { building } from "$app/env";
 import { auth, CLIENT_IP_HEADER, initAuth } from "#lib/server/auth.js";
 import { env, warnIfOriginUnset } from "#lib/server/config/env.js";
@@ -8,6 +7,7 @@ import { closeDb, db } from "#lib/server/db/index.js";
 import { handleError as buildErrorResponse, reportFatalError } from "#lib/server/error-handler.js";
 import { startCleanupScheduler, stopCleanupScheduler } from "#lib/server/jobs/cleanup-scheduler.js";
 import { checkCsrfOrigin } from "#lib/server/utils/csrf.js";
+import { loginAccountKey } from "#lib/server/utils/login-account.js";
 import { securityHeadersFor, withSecurityHeaders } from "#lib/server/utils/security-headers.js";
 import {
   clientNetworkKey,
@@ -60,25 +60,6 @@ function tooManyLogins(): Response {
   );
 }
 
-const signInBodySchema = z.object({
-  username: z.string().optional(),
-  email: z.string().optional(),
-});
-
-/** Account name a sign-in body targets, normalized the way the username plugin compares it. */
-async function signInAccount(request: Request): Promise<string | null> {
-  try {
-    const body = signInBodySchema.safeParse(await request.clone().json());
-    const name = body.success ? (body.data.username ?? body.data.email) : undefined;
-    // Sliced so an attacker-sized name cannot inflate the limiter's key memory.
-    const normalized = name?.trim().toLowerCase().slice(0, 256);
-
-    return normalized || null;
-  } catch {
-    return null;
-  }
-}
-
 const app: Handle = async ({ event, resolve }) => {
   if (building) {
     return resolve(event);
@@ -103,13 +84,11 @@ const app: Handle = async ({ event, resolve }) => {
       return tooManyLogins();
     }
 
-    const account = await signInAccount(event.request);
+    const account = await loginAccountKey(db, event.request, pathname);
 
-    if (account) {
-      if (!loginAccountLimiter.take(account, LOGIN_ACCOUNT_RPM)) return tooManyLogins();
+    if (!loginAccountLimiter.take(account, LOGIN_ACCOUNT_RPM)) return tooManyLogins();
 
-      signInAccountKey = account;
-    }
+    signInAccountKey = account;
   }
 
   if (pathname.startsWith("/v1/")) {

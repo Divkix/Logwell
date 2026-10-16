@@ -1,5 +1,7 @@
 import type { RequestEvent } from "@sveltejs/kit";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { z } from "zod";
+import type { DatabaseClient } from "#lib/server/db/db.js";
 import { handleError as buildErrorResponse } from "#lib/server/error-handler.js";
 import { LOGIN_ACCOUNT_RPM, LOGIN_RPM } from "./lib/server/utils/rate-limit";
 import { handle, handleError } from "./hooks.server";
@@ -13,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   reportFatalError: vi.fn(),
   getSession: vi.fn(),
   authHandler: vi.fn(),
+  loginAccountKey: vi.fn(),
   // RATE_LIMIT_INGEST_IP_RPM is overridden in the /v1 throttle tests; the shipped
   // default is 60000/min, too high to reach in a unit test.
   env: { ORIGIN: undefined as string | undefined, RATE_LIMIT_INGEST_IP_RPM: 3 },
@@ -33,6 +36,25 @@ vi.mock("#lib/server/auth.js", () => ({
     handler: mocks.authHandler,
   },
 }));
+
+// Account resolution (body parsing, user lookup) is covered against better-auth in
+// tests/integration/auth/login-account.integration.test.ts; here it maps a JSON username to a key.
+vi.mock("#lib/server/utils/login-account.js", () => ({
+  loginAccountKey: mocks.loginAccountKey,
+}));
+
+const usernameBody = z.object({ username: z.string() });
+
+async function keyFromJsonUsername(_db: DatabaseClient, request: Request): Promise<string> {
+  const body = usernameBody.safeParse(
+    await request
+      .clone()
+      .json()
+      .catch(() => null),
+  );
+
+  return body.success ? `user:${body.data.username}` : "unattributed";
+}
 
 vi.mock("#lib/server/error-handler.js", () => ({
   handleError: vi.fn(),
@@ -69,6 +91,7 @@ describe("hooks.server handle", () => {
     resolve.mockClear();
     mocks.getSession.mockReset().mockResolvedValue(null);
     mocks.authHandler.mockReset().mockImplementation(() => new Response("auth-handler"));
+    mocks.loginAccountKey.mockReset().mockImplementation(keyFromJsonUsername);
     mocks.env.ORIGIN = ORIGIN;
   });
 
@@ -233,8 +256,7 @@ describe("hooks.server handle", () => {
         expect(response.status).toBe(401);
       }
 
-      // Username matching is case- and whitespace-insensitive, like the username plugin's.
-      const blocked = await handle({ event: signInAs("  victim ", freshAddress()), resolve });
+      const blocked = await handle({ event: signInAs("Victim", freshAddress()), resolve });
       expect(blocked.status).toBe(429);
       expect(blocked.headers.get("Retry-After")).toBe("60");
       expect(mocks.authHandler).toHaveBeenCalledTimes(LOGIN_ACCOUNT_RPM);
@@ -243,6 +265,42 @@ describe("hooks.server handle", () => {
       expect((await handle({ event: signInAs("bystander", freshAddress()), resolve })).status).toBe(
         401,
       );
+    });
+
+    it("keys the account bucket by the resolved account of the request", async () => {
+      const event = signInAs("someone", freshAddress());
+
+      await handle({ event, resolve });
+
+      expect(mocks.loginAccountKey).toHaveBeenCalledWith(
+        mocks.db,
+        event.request,
+        "/api/auth/sign-in/username",
+      );
+    });
+
+    it("never skips the account bucket, whatever the body looks like", async () => {
+      mocks.authHandler.mockImplementation(() => new Response("bad credentials", { status: 401 }));
+      // Stands in for loginAccountKey's shared fallback bucket for unreadable bodies.
+      mocks.loginAccountKey.mockResolvedValue("unattributed-hooks-test");
+
+      const formSignIn = () =>
+        createEvent(
+          `${ORIGIN}/api/auth/sign-in/email`,
+          {
+            method: "POST",
+            headers: { Origin: ORIGIN, "Content-Type": "application/x-www-form-urlencoded" },
+            body: "email=admin%40logwell.local&password=guess",
+          },
+          freshAddress(),
+        );
+
+      for (let i = 0; i < LOGIN_ACCOUNT_RPM; i++) {
+        expect((await handle({ event: formSignIn(), resolve })).status).toBe(401);
+      }
+
+      expect((await handle({ event: formSignIn(), resolve })).status).toBe(429);
+      expect(mocks.authHandler).toHaveBeenCalledTimes(LOGIN_ACCOUNT_RPM);
     });
 
     it("does not count successful sign-ins against the account", async () => {

@@ -77,7 +77,7 @@ export class RateLimitStore {
 /** Sign-in attempts per client network (see `clientNetworkKey`). */
 export const loginIpLimiter = new RateLimitStore();
 
-/** Failed sign-in attempts per account name, across all client networks. */
+/** Failed sign-in attempts per account (see `loginAccountKey`), across all client networks. */
 export const loginAccountLimiter = new RateLimitStore();
 
 /** Pre-auth /v1 requests per client network (hooks.server.ts). */
