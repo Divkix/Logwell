@@ -356,6 +356,76 @@ describe("GET /api/projects/[id]/stats", () => {
     });
   });
 
+  describe("Window Limits", () => {
+    const DAY_MS = 24 * 60 * 60 * 1000;
+
+    async function getStats(projectId: string, query: string) {
+      const request = new Request(`http://localhost/api/projects/${projectId}/stats${query}`, {
+        method: "GET",
+      });
+
+      const event = createRequestEvent(request, db, { id: projectId }, authenticatedLocals);
+
+      // SAFETY: createRequestEvent supplies every RequestEvent field GET and requireOwnedProjectRoute read (request, url, params, route.id, locals, cookies); its tracing stays null because tests build no OTel Spans, so the event is passed as never.
+      return GET(event as never);
+    }
+
+    it("defaults to the last 90 days and reports the effective window", async () => {
+      const testProject = await seedProject(db, { ownerId: userId });
+      const now = Date.now();
+      await seedLogs(db, testProject.id, 4, {
+        level: "debug",
+        timestamp: new Date(now - 91 * DAY_MS),
+      });
+      await seedLogs(db, testProject.id, 2, { level: "info", timestamp: new Date(now - DAY_MS) });
+
+      const response = await getStats(testProject.id, "");
+
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.totalLogs).toBe(2);
+      expect(body.levelCounts).toEqual({ info: 2 });
+      expect(Date.parse(body.to) - Date.parse(body.from)).toBe(90 * DAY_MS);
+    });
+
+    it("returns 400 invalid_range for a window wider than 90 days", async () => {
+      const testProject = await seedProject(db, { ownerId: userId });
+      const from = new Date(Date.now() - 91 * DAY_MS).toISOString();
+
+      const response = await getStats(testProject.id, `?from=${from}`);
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        error: "invalid_range",
+        message: "The time window cannot exceed 90 days",
+      });
+    });
+
+    it("returns 400 invalid_range when from is after to", async () => {
+      const testProject = await seedProject(db, { ownerId: userId });
+
+      const response = await getStats(
+        testProject.id,
+        "?from=2026-05-02T00:00:00.000Z&to=2026-05-01T00:00:00.000Z",
+      );
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toHaveProperty("error", "invalid_range");
+    });
+
+    it("returns 400 invalid_date for an unparseable timestamp", async () => {
+      const testProject = await seedProject(db, { ownerId: userId });
+
+      const response = await getStats(testProject.id, "?to=not-a-date");
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        error: "invalid_date",
+        message: "to must be an ISO 8601 timestamp",
+      });
+    });
+  });
+
   describe("Project Validation", () => {
     it("returns 404 for non-existent project", async () => {
       const request = new Request("http://localhost/api/projects/non-existent-id/stats", {
