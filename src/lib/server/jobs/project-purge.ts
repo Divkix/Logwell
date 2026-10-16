@@ -1,7 +1,8 @@
-import { and, asc, eq, isNotNull, sql } from "drizzle-orm";
+import { and, asc, eq, isNotNull, type SQL, sql } from "drizzle-orm";
 import type { DatabaseClient } from "#lib/server/db/db.js";
 import { getQueryRows } from "#lib/server/db/db.js";
 import { project } from "#lib/server/db/schema.js";
+import { projectLogs } from "#lib/server/utils/capped-count.js";
 import { type BatchOptions, deleteInBatches, deleteProjectLogs } from "./log-cleanup";
 
 export interface PurgeResult {
@@ -13,13 +14,24 @@ export interface PurgeResult {
 
 const isDeletedProject = isNotNull(project.deletedAt);
 
+function logsRemain(projectId: string): SQL<boolean> {
+  return sql<boolean>`EXISTS (SELECT 1 FROM "log" WHERE ${projectLogs(projectId)})`;
+}
+
 /**
  * Finishes the deletion of every soft-deleted project: its logs, then its incidents, in paced
  * batches, then the row itself (whose cascade has nothing left to do).
  *
  * Each step is idempotent and `deleted_at` is the only state, so a run cut short by a restart,
- * a statement timeout or a failure resumes on the next run, and two concurrent runs merely
- * share the work. One project failing does not stop the others.
+ * a statement timeout or a failure resumes on the next run. One project failing does not stop
+ * the others.
+ *
+ * Two runs can overlap (an old instance still purging while its replacement starts one). Both
+ * pick the same oldest batch, so the one that waits on the other's row locks finds those rows
+ * gone and gets a short batch while most logs remain. A short log batch therefore never leads
+ * straight to the next step: the project is left to the other run (or the next one) unless no
+ * log remains, and the row is deleted only once neither logs nor incidents do, so its cascade
+ * never turns into the single large DELETE these batches exist to avoid.
  */
 export async function purgeDeletedProjects(
   dbClient?: DatabaseClient,
@@ -53,11 +65,26 @@ export async function purgeDeletedProjects(
   for (const { id } of deleted) {
     try {
       result.logsDeleted += await deleteProjectLogs(db, id, options);
+
+      // Another run is still deleting them; incident deletion would SET NULL on each one left.
+      const [logs] = getQueryRows<{ remaining: boolean }>(
+        await db.execute(sql`SELECT ${logsRemain(id)} AS remaining`),
+      );
+
+      if (logs?.remaining) continue;
+
       result.incidentsDeleted += await deleteProjectIncidents(db, id, options);
 
       const removed = await db
         .delete(project)
-        .where(and(eq(project.id, id), isDeletedProject))
+        .where(
+          and(
+            eq(project.id, id),
+            isDeletedProject,
+            sql`NOT ${logsRemain(id)}`,
+            sql`NOT EXISTS (SELECT 1 FROM "incident" WHERE "incident"."project_id" = ${id})`,
+          ),
+        )
         .returning();
 
       result.projectsPurged += removed.length;

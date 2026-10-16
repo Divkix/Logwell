@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
 import { nanoid } from "nanoid";
-import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { createAuth } from "#lib/server/auth.js";
 import type * as schema from "#lib/server/db/schema.js";
 import { incident, log, project } from "#lib/server/db/schema.js";
@@ -227,6 +227,37 @@ describe("DELETE /api/projects/[id] (soft delete + background purge)", () => {
     const resumed = await purgeDeletedProjects(db, { batchSize: 2, batchPauseMs: 0 });
 
     expect(resumed).toMatchObject({ projectsPurged: 1, logsDeleted: 3, errors: [] });
+    expect(await db.select().from(project).where(eq(project.id, doomed.id))).toHaveLength(0);
+  });
+
+  it("leaves a project to an overlapping run that took its oldest batch", async () => {
+    const doomed = await seedProject(db, { ownerId: userId });
+    await seedLogs(db, doomed.id, 5);
+    const doomedIncident = await seedIncident(doomed.id);
+    await db.update(log).set({ incidentId: doomedIncident }).where(eq(log.projectId, doomed.id));
+    await deleteProject(doomed.id);
+
+    // The other run committed the batch this one picked while it waited on the row locks, so
+    // the first DELETE comes back empty although most logs remain.
+    vi.spyOn(db, "execute").mockResolvedValueOnce({ rows: [], fields: [] });
+
+    const raced = await purgeDeletedProjects(db, { batchSize: 2, batchPauseMs: 0 });
+
+    expect(raced).toEqual({ projectsPurged: 0, logsDeleted: 0, incidentsDeleted: 0, errors: [] });
+    expect(await db.select().from(project).where(eq(project.id, doomed.id))).toHaveLength(1);
+
+    const remaining = await db
+      .select({ incidentId: log.incidentId })
+      .from(log)
+      .where(eq(log.projectId, doomed.id));
+
+    expect(remaining).toEqual(Array.from({ length: 5 }, () => ({ incidentId: doomedIncident })));
+
+    vi.restoreAllMocks();
+
+    const resumed = await purgeDeletedProjects(db, { batchSize: 2, batchPauseMs: 0 });
+
+    expect(resumed).toEqual({ projectsPurged: 1, logsDeleted: 5, incidentsDeleted: 1, errors: [] });
     expect(await db.select().from(project).where(eq(project.id, doomed.id))).toHaveLength(0);
   });
 
