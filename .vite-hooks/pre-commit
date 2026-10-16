@@ -1,5 +1,9 @@
 set -e
 
+# vp runs outside pnpm's verifyDepsBeforeRun check, so node_modules left stale by a
+# pulled dependency change fails vite.config.ts with an unresolved import. No-op when current.
+pnpm install --frozen-lockfile --prefer-offline --silent
+
 vp staged
 vp check
 pnpm run knip
