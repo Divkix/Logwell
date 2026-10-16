@@ -92,6 +92,13 @@
       "when": 1789442132717,
       "tag": "0012_hot_toro",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1792142913521,
+      "tag": "0013_log_index_rework",
+      "breakpoints": true
     }
   ]
 }

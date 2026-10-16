@@ -48,8 +48,8 @@ export async function cleanupOldLogs(dbClient?: DatabaseClient): Promise<Cleanup
 
         while (true) {
           // Bind the cutoff as an ISO string: passing the Date object here is what broke cleanup.
-          // projectLogs + OLDEST_FIRST keep each batch on idx_log_project_timestamp. With a plain
-          // `project_id =` the planner may walk idx_log_timestamp through every other project's
+          // projectLogs + OLDEST_FIRST keep each batch on idx_log_project_timestamp_id. With a plain
+          // `project_id =` the planner may walk another index through every other project's
           // expired rows (measured on PG 18: 300k rows filtered for one empty batch), which the
           // pool's statement_timeout would cancel, stalling this project's retention for good.
           const raw = await db.execute(sql`

@@ -36,12 +36,12 @@ const logTimestamp = sql`${log}.${sql.identifier(log.timestamp.name)}`;
 
 /**
  * `log.project_id = projectId`, written as a degenerate range and paired with an ORDER BY on
- * the full (project_id, timestamp) key so only idx_log_project_timestamp can serve it.
+ * the (project_id, timestamp) key so only idx_log_project_timestamp_id can serve it.
  *
  * With a plain `=` the planner treats project_id as constant, reduces the ordering to
  * `timestamp` alone, and — whenever its estimate for the value is poor (a generic plan, a
  * correlated subquery, a table whose stats have seen only one busy project) — walks the
- * single-column idx_log_timestamp across every project's rows looking for this one. For an
+ * single-column idx_log_timestamp (dropped in 0013) across every project's rows. For an
  * empty or quiet project that is a full index scan (measured on PG 18: 540k rows filtered for
  * an empty project, vs. an immediate stop with this form). An extra `timestamp` bound does
  * not save the plain form, which is why retention cleanup uses this one too.

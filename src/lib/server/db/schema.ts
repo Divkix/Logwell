@@ -131,15 +131,17 @@ export const log = pgTable(
       table.incidentId,
       table.timestamp,
     ),
-    index("idx_log_project_fingerprint_timestamp").on(
+    // Keyset order (timestamp DESC, id DESC) in full, so a page is an index range with no sort
+    // step. Also serves retention cleanup and the per-project count/edge subqueries.
+    index("idx_log_project_timestamp_id").on(table.projectId, table.timestamp, table.id),
+    // The same order behind a level equality, for a single-level filter ("errors only"), and
+    // per-level stats over a window (skip scan over the five levels).
+    index("idx_log_project_level_timestamp_id").on(
       table.projectId,
-      table.fingerprint,
+      table.level,
       table.timestamp,
+      table.id,
     ),
-    index("idx_log_project_service_name").on(table.projectId, table.serviceName),
-    index("idx_log_timestamp").on(table.timestamp),
-    index("idx_log_level").on(table.level),
-    index("idx_log_project_timestamp").on(table.projectId, table.timestamp),
     index("idx_log_search").using("gin", table.search),
   ],
 );

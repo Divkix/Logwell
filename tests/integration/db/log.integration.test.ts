@@ -49,4 +49,26 @@ describe("Log Table Schema", () => {
 
     expect(searchResults.rows).toHaveLength(2);
   });
+
+  it("keeps only the log indexes a query uses (migration 0013)", async () => {
+    const indexes = await db.execute<{ indexname: string; indexdef: string }>(
+      `SELECT indexname, indexdef FROM pg_indexes WHERE tablename = 'log' ORDER BY indexname`,
+    );
+
+    expect(indexes.rows.map((row) => row.indexname)).toEqual([
+      "idx_log_project_incident_timestamp",
+      "idx_log_project_level_timestamp_id",
+      "idx_log_project_timestamp_id",
+      "idx_log_search",
+      "log_pkey",
+    ]);
+
+    const definitionOf = (name: string) =>
+      indexes.rows.find((row) => row.indexname === name)?.indexdef;
+
+    expect(definitionOf("idx_log_project_timestamp_id")).toContain('(project_id, "timestamp", id)');
+    expect(definitionOf("idx_log_project_level_timestamp_id")).toContain(
+      '(project_id, level, "timestamp", id)',
+    );
+  });
 });
