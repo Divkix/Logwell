@@ -21,7 +21,7 @@
   <img src="https://img.shields.io/badge/TypeScript-5.9-blue?logo=typescript&logoColor=white" alt="TypeScript">
   <img src="https://img.shields.io/badge/Python-3.9+-3776AB?logo=python&logoColor=white" alt="Python">
   <img src="https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go&logoColor=white" alt="Go">
-  <img src="https://img.shields.io/badge/Bun-runtime-black?logo=bun&logoColor=white" alt="Bun">
+  <img src="https://img.shields.io/badge/Node.js-runtime-5FA04E?logo=nodedotjs&logoColor=white" alt="Node.js">
   <img src="https://img.shields.io/badge/pnpm-12+-F69220?logo=pnpm&logoColor=white" alt="pnpm">
 </p>
 
@@ -112,13 +112,12 @@ Logwell is a lightweight, self-hosted log aggregation platform for developers wh
 | Auth      | better-auth                     |
 | UI        | shadcn-svelte + Tailwind CSS v4 |
 | Real-time | Server-Sent Events              |
-| Runtime   | Bun                             |
+| Runtime   | Node.js                         |
 
 ## Prerequisites
 
-- [Node.js](https://nodejs.org) ^22.22.2, ^24.15.0, or >=26 (build, tests, and Vite+ hooks)
+- [Node.js](https://nodejs.org) ^22.22.2, ^24.15.0, or >=26 (runtime, build, tests, and Vite+ hooks)
 - [pnpm](https://pnpm.io) 12 (`packageManager` pins the exact version)
-- [Bun](https://bun.sh) >= 1.2 (runtime for the built server and `scripts/*.ts`)
 - [Docker](https://docker.com) (for PostgreSQL)
 
 ## Quick Start
@@ -673,7 +672,7 @@ Response:
 
 ```bash
 pnpm run build
-bun ./build/index.js
+node ./build/index.js
 ```
 
 The app runs on port 3000 by default.

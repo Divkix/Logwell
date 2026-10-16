@@ -23,7 +23,7 @@ async function loadCsrf(origin: string | undefined): Promise<typeof CheckCsrfOri
   return checkCsrfOrigin;
 }
 
-// What the bun adapter synthesizes for a plain-HTTP request to localhost:3000 with
+// What adapter-node synthesizes for a plain-HTTP request to localhost:3000 with
 // ORIGIN unset: event.url is https://<Host> even though the browser speaks http.
 const ADAPTER_URL = "https://localhost:3000/api/projects";
 

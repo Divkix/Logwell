@@ -4,12 +4,12 @@ set -e
 echo "=== Logwell startup ==="
 
 echo "Running database migrations..."
-bun run drizzle-kit migrate || { echo "Migration failed! Aborting startup."; exit 1; }
+./node_modules/.bin/drizzle-kit migrate || { echo "Migration failed! Aborting startup."; exit 1; }
 echo "✓ Migrations completed successfully"
 
 if [ -n "$ADMIN_PASSWORD" ]; then
   echo "Seeding admin user..."
-  if ! bun run db:seed; then
+  if ! ./node_modules/.bin/tsx scripts/seed-admin.ts; then
     echo "Seed step failed! Aborting startup."
     exit 1
   fi
@@ -18,4 +18,4 @@ else
 fi
 
 echo "=== Starting application ==="
-exec bun run ./build/index.js
+exec node ./build/index.js

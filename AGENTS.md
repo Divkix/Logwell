@@ -12,7 +12,7 @@ Self-hosted, single-tenant logging + incident-intelligence platform. Services sh
   - `/v1/**`: API-key auth, per-project rate limit (`INGEST_RPM=600/min`, 429 + `Retry-After: 60`), CSRF-exempt.
 - **Ingest pipeline** (`src/lib/server/utils/ingest.ts:ingestLogs`): Content-Type guard → key validation (SHA-256 → project, re-verify row exists) → rate-limit → parse/normalize → fingerprint + incident upsert in one tx → `insert` with `incidentId` → SSE broadcast. `/v1` routes are thin adapters (`parseOtlpIngestBody` / `parseSimpleIngestBody`).
 - **Incidents:** error/fatal only; fingerprint = `SHA-256(service|sourceFile|lineNumber|normalizedMessage)[:32]`, normalize = lowercase/trim, mask UUIDs/hex/IPs/numbers, collapse whitespace (order load-bearing). Upsert on `(projectId, fingerprint)` bumps `lastSeen`/`totalEvents`/`highestLevel` (`LEVEL_RANK`: debug 10 … fatal 50). Status is time-derived (`getIncidentStatus(lastSeen)` vs `INCIDENT_AUTO_RESOLVE_MINUTES`), never stored.
-- **SSE bus** (`src/lib/server/events.ts`): in-process singleton, project-scoped listeners. `POST …/logs/stream`, `POST …/incidents/stream` (POST for CSRF). Batched `event: logs/incidents` + heartbeats; slow consumers drop batch, keep connection. Heartbeat is capped at half the server idle timeout (`IDLE_TIMEOUT`, the env `build/index.js` gives `Bun.serve`) — a longer heartbeat would be killed before it fires. Single-process — no cross-replica fan-out (same for rate limiter).
+- **SSE bus** (`src/lib/server/events.ts`): in-process singleton, project-scoped listeners. `POST …/logs/stream`, `POST …/incidents/stream` (POST for CSRF). Batched `event: logs/incidents` + heartbeats; slow consumers drop batch, keep connection. Heartbeat (`SSE_HEARTBEAT_INTERVAL_MS`, default 30s) only has to beat reverse-proxy read timeouts — Node never times out a response still being written. Open streams hold shutdown until `SHUTDOWN_TIMEOUT` (image: 8s) force-closes them. Single-process — no cross-replica fan-out (same for rate limiter).
 - **Auth:** better-auth `username()` plugin, 7d sessions, lazy `createAuth(db)` proxy (throws before `initAuth()`). Prod code MUST use `auth.api.getSession()`; `src/lib/server/session.ts` is test-only (unsigned cookie, forgeable).
 
 ## Key Directories
@@ -27,10 +27,10 @@ Self-hosted, single-tenant logging + incident-intelligence platform. Services sh
 
 ## Development Commands
 
-Always `pnpm run …` (`pnpm-lock.yaml`, `packageManager pnpm@12.6.0`). Bun 1.4.3 stays the runtime: it serves `build/index.js` and executes `scripts/*.ts`. Ports: dev **5173**, preview **4173**, prod **3000**.
+Always `pnpm run …` (`pnpm-lock.yaml`, `packageManager pnpm@12.6.0`). Node.js is the runtime: `node build/index.js` serves the app, `tsx` executes `scripts/*.ts`. Ports: dev **5173**, preview **4173**, prod **3000**.
 
 ```bash
-pnpm run dev / build / preview        # vp dev/build (svelte-adapter-bun → build/index.js, prod :3000)
+pnpm run dev / build / preview        # vp dev/build (@sveltejs/adapter-node → build/index.js, prod :3000)
 pnpm run lint                         # vp check (= format+lint+typecheck); --fix to fix
 pnpm run check                        # svelte-kit sync + svelte-check --tsgo
 pnpm run knip                         # dead code — run pre-commit with vp check
@@ -40,7 +40,7 @@ pnpm run test:e2e                     # Playwright; needs real Postgres + seeded
 pnpm run db:start / db:stop           # docker compose up -d / down -v (postgres:18-alpine)
 pnpm run db:generate / db:migrate     # after schema edit commit SQL; migrate in prod/CI, never push
 pnpm run db:push                      # dev/ephemeral only
-pnpm run db:seed / incidents:backfill # seed needs ADMIN_PASSWORD (≥8 chars); the script itself runs under bun
+pnpm run db:seed / incidents:backfill # seed needs ADMIN_PASSWORD (≥8 chars); scripts run under tsx
 pnpm run sdk:test / sdk:build / sdk:lint  # delegates to sdks/typescript
 ```
 
@@ -66,15 +66,15 @@ Local build needs dummy env: `DATABASE_URL=postgres://… BETTER_AUTH_SECRET=<�
 - `src/lib/server/events.ts`, `error-handler.ts`, `utils/owned-project.ts`
 - `src/lib/shared/schemas/project.ts` (name `^[a-zA-Z0-9_-]+$` 1–50, `retentionDays` null/0/1–3650), `log.ts`, `incident.ts`
 - `src/routes/v1/logs/+server.ts`, `v1/ingest/+server.ts`, `api/projects/[id]/logs/+server.ts`, `logs/stream/+server.ts`, `incidents/stream/+server.ts`
-- `drizzle/` SQL + `compose.yaml` + `Dockerfile` + `entrypoint.sh` (migrate → seed if `ADMIN_PASSWORD` → `bun ./build/index.js`)
+- `drizzle/` SQL + `compose.yaml` + `Dockerfile` + `entrypoint.sh` (migrate → seed if `ADMIN_PASSWORD` → `node ./build/index.js`)
 - `vite.config.ts` (vp: staged formatting, lint ignores `sdks/**`), `knip.json`, `pnpm-workspace.yaml` (pnpm settings + `allowBuilds`), `.vite-hooks/pre-commit` (`vp staged`, `vp check`, knip, conditional SDK check)
 
 ## Runtime/Tooling Preferences
 
-- **pnpm 12 + Bun.** pnpm manages dependencies (`packageManager pnpm@12.6.0`; the app and `sdks/typescript` share the root `pnpm-lock.yaml`). Settings live in `pnpm-workspace.yaml`, not `.npmrc`, and install scripts are denied unless listed under `allowBuilds` — an unreviewed one fails `pnpm install`, as does a `package.json` change (`pnpm install` is frozen by default; regenerate with `pnpm install --lockfile-only` first). Bun (`engines.bun >=1.2.0`, pinned 1.4.3 in the CI e2e jobs + Docker `oven/bun:1.4.3-alpine`) stays the runtime: it serves the built output and runs `scripts/*.ts`, which rely on bun's extensionless TS resolution. One-off CLIs: `pnpm dlx → bunx → npx`.
+- **pnpm 12 + Node.js.** pnpm manages dependencies (`packageManager pnpm@12.6.0`; the app and `sdks/typescript` share the root `pnpm-lock.yaml`). Settings live in `pnpm-workspace.yaml`, not `.npmrc`, and install scripts are denied unless listed under `allowBuilds` — an unreviewed one fails `pnpm install`, as does a `package.json` change (`pnpm install` is frozen by default; regenerate with `pnpm install --lockfile-only` first). Node.js (`engines.node`, Node 24 in CI + Docker `node:24.21.0-alpine`) is the runtime: it serves the built output, and `tsx` (a prod dependency — the image's entrypoint seeds with it) runs `scripts/*.ts`, which use extensionless TS imports Node's native type stripping can't resolve. adapter-node 5.x is the Kit 2 line; 6.x needs Kit 3. One-off CLIs: `pnpm dlx → bunx → npx`.
 - **Vite+ (`vp`) 1.0.0-rc.0**, **Vitest 5.0.1** via the workspace catalog/overrides; `@vitest/coverage-v8` must match the runner (hard-fail otherwise). Root TS 6 + `@typescript/native` 7 for `--tsgo` (svelte-check 4.x rejects TS7 main). Upgrade the toolchain from the workspace root with the current global `vp migrate --full`, not one package at a time.
 - **Postgres 18-alpine** everywhere (PG19 beta — don't bump). `db:push` dev-only; prod/CI `db:migrate`. `db:generate` needs TTY; if it replays old migrations (meta snapshots cover 0000–0005, 0011, 0012), hand-write SQL.
-- Env: `DATABASE_URL` (must start `postgres`, required), `BETTER_AUTH_SECRET` (≥32, required unless dev/test), `ORIGIN` (prod proxies), `RATE_LIMIT_*_RPM`, `SSE_*`, `LOG_*`, `IDLE_TIMEOUT` (Bun.serve idle timeout in seconds; image ships 120, heartbeat clamped to half), `INCIDENT_AUTO_RESOLVE_MINUTES=30`. Behind proxy set `ADDRESS_HEADER` + `XFF_DEPTH` or IP limiting sees socket IP.
+- Env: `DATABASE_URL` (must start `postgres`, required), `BETTER_AUTH_SECRET` (≥32, required unless dev/test), `ORIGIN` (prod proxies), `RATE_LIMIT_*_RPM`, `SSE_*`, `LOG_*`, `BODY_SIZE_LIMIT` (image: 1M; over-limit ingest → 413 `payload_too_large`), `SHUTDOWN_TIMEOUT` (image: 8s, under Docker's 10s stop grace). `IDLE_TIMEOUT` is adapter-node's socket-activation shutdown, not a connection timeout, `INCIDENT_AUTO_RESOLVE_MINUTES=30`. Behind proxy set `ADDRESS_HEADER` + `XFF_DEPTH` or IP limiting sees socket IP.
 - Never commit/push/rebase unless asked; never `reset --hard`, `clean -fd`, print secrets.
 
 ## Testing & QA

@@ -44,9 +44,8 @@ describe("Performance Configuration", () => {
       expect(SSE_CONFIG[configKey as keyof typeof SSE_CONFIG]).toBe(expected);
     });
 
-    it("respects SSE_HEARTBEAT_INTERVAL_MS when the idle timeout leaves room", async () => {
+    it("respects SSE_HEARTBEAT_INTERVAL_MS environment variable", async () => {
       vi.resetModules();
-      process.env.IDLE_TIMEOUT = "120";
       process.env.SSE_HEARTBEAT_INTERVAL_MS = "60000";
       const { SSE_CONFIG } = await import("./performance");
       expect(SSE_CONFIG.HEARTBEAT_INTERVAL_MS).toBe(60000);
@@ -81,42 +80,28 @@ describe("Performance Configuration", () => {
     );
   });
 
-  describe("SSE Heartbeat vs Server Idle Timeout", () => {
-    // IDLE_TIMEOUT is what build/index.js hands to Bun.serve; the config module reads it once at
-    // import time, so every case re-imports a fresh module with its own env.
-    // SAFETY: each row is [IDLE_TIMEOUT or unset, expected heartbeat, idle-window cap, label] —
-    // the literals below only take those four shapes.
-    it.each([
-      [undefined, 5000, 10_000, "unset → adapter default 10s"],
-      ["10", 5000, 10_000, "explicit 10s"],
-      ["20", 10000, 20_000, "half of 20s"],
-      ["120", 30000, 120_000, "shipped image: documented default survives"],
-      ["5", 2500, 5000, "idle timeout below the heartbeat floor lowers the floor too"],
-      ["0", 1000, 0, "idle timeout 0 (disabled) never becomes a 0ms hot loop"],
-      ["600", 30000, 255_000, "above Bun's 255s cap: heartbeat sized against the real window"],
-    ] as [string | undefined, number, number, string][])(
-      "IDLE_TIMEOUT=%s → heartbeat %dms (%s)",
-      async (idleTimeout, expected, idleMs) => {
-        vi.resetModules();
-
-        if (idleTimeout === undefined) delete process.env.IDLE_TIMEOUT;
-        else process.env.IDLE_TIMEOUT = idleTimeout;
-        const { SSE_CONFIG } = await import("./performance");
-        expect(SSE_CONFIG.HEARTBEAT_INTERVAL_MS).toBe(expected);
-
-        if (idleMs > 0) {
-          expect(SSE_CONFIG.HEARTBEAT_INTERVAL_MS).toBeLessThan(idleMs);
-        }
-      },
-    );
-
-    it("clamps an oversized SSE_HEARTBEAT_INTERVAL_MS below the idle timeout", async () => {
+  describe("SSE Heartbeat", () => {
+    it("defaults to 30s, inside common reverse-proxy read timeouts (nginx: 60s)", async () => {
       vi.resetModules();
-      delete process.env.IDLE_TIMEOUT;
-      process.env.SSE_HEARTBEAT_INTERVAL_MS = "60000";
+      delete process.env.SSE_HEARTBEAT_INTERVAL_MS;
       const { SSE_CONFIG } = await import("./performance");
-      expect(SSE_CONFIG.HEARTBEAT_INTERVAL_MS).toBe(5000);
-      expect(SSE_CONFIG.HEARTBEAT_INTERVAL_MS).toBeLessThan(10_000);
+      expect(SSE_CONFIG.HEARTBEAT_INTERVAL_MS).toBe(30000);
+    });
+
+    it("clamps SSE_HEARTBEAT_INTERVAL_MS to the 300s maximum", async () => {
+      vi.resetModules();
+      process.env.SSE_HEARTBEAT_INTERVAL_MS = "600000";
+      const { SSE_CONFIG } = await import("./performance");
+      expect(SSE_CONFIG.HEARTBEAT_INTERVAL_MS).toBe(300000);
+    });
+
+    // Under Bun, IDLE_TIMEOUT was the server idle window and capped the heartbeat. Under
+    // adapter-node it only drives socket-activation shutdown, so it must not shrink the heartbeat.
+    it("ignores IDLE_TIMEOUT", async () => {
+      vi.resetModules();
+      process.env.IDLE_TIMEOUT = "10";
+      const { SSE_CONFIG } = await import("./performance");
+      expect(SSE_CONFIG.HEARTBEAT_INTERVAL_MS).toBe(30000);
     });
   });
 

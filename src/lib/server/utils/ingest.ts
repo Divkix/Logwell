@@ -153,6 +153,12 @@ class RateLimited extends Data.TaggedError("RateLimited") {}
 
 class InvalidJson extends Data.TaggedError("InvalidJson") {}
 
+class PayloadTooLarge extends Data.TaggedError("PayloadTooLarge") {}
+
+// adapter-node enforces BODY_SIZE_LIMIT by erroring the request body stream with a SvelteKitError
+// carrying status 413, so it surfaces here from request.json() rather than before the handler.
+const payloadTooLargeSchema = z.object({ status: z.literal(413) });
+
 class BatchTooLarge extends Data.TaggedError("BatchTooLarge")<{ readonly message: string }> {}
 
 class ValidationFailed extends Data.TaggedError("ValidationFailed")<{ readonly message: string }> {}
@@ -226,7 +232,8 @@ function ingest(request: Request, db: DatabaseClient, parse: IngestBodyParser) {
 
     const body = yield* Effect.tryPromise({
       try: (): Promise<JsonValue | undefined> => request.json(),
-      catch: () => new InvalidJson(),
+      catch: (err) =>
+        payloadTooLargeSchema.safeParse(err).success ? new PayloadTooLarge() : new InvalidJson(),
     });
 
     const parsed = yield* Effect.try({
@@ -289,6 +296,10 @@ export async function ingestLogs(
           headers: { "Retry-After": "60" },
         }),
       InvalidJson: () => errorResponse("invalid_json", "Request body must be valid JSON"),
+      PayloadTooLarge: () =>
+        errorResponse("payload_too_large", "Request body exceeds BODY_SIZE_LIMIT", {
+          status: 413,
+        }),
       BatchTooLarge: ({ message }) => errorResponse("batch_too_large", message),
       ValidationFailed: ({ message }) => errorResponse("validation_error", message),
     }),
