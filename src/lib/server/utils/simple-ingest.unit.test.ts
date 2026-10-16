@@ -231,16 +231,19 @@ describe("parseSimpleIngestRequest", () => {
       expect(result.records[1]!.message).toBe("good");
     });
 
-    it("rejects only the entry whose message exceeds MAX_LOG_MESSAGE_LENGTH", () => {
+    it("truncates a message over MAX_LOG_MESSAGE_LENGTH instead of rejecting it", () => {
+      const length = MAX_LOG_MESSAGE_LENGTH + 1;
+
       const result = parseSimpleIngestRequest([
         entryWith({ message: "x".repeat(MAX_LOG_MESSAGE_LENGTH) }),
-        entryWith({ message: "x".repeat(MAX_LOG_MESSAGE_LENGTH + 1) }),
+        entryWith({ message: "x".repeat(length) }),
       ]);
 
-      expect(result.accepted).toBe(1);
-      expect(result.errors).toEqual([
-        `Entry at index 1: message exceeds ${MAX_LOG_MESSAGE_LENGTH} characters (got ${MAX_LOG_MESSAGE_LENGTH + 1})`,
-      ]);
+      expect(result.accepted).toBe(2);
+      expect(result.errors).toEqual([]);
+      expect(result.records[0]!.message).toBe("x".repeat(MAX_LOG_MESSAGE_LENGTH));
+      expect(result.records[1]!.message).toHaveLength(MAX_LOG_MESSAGE_LENGTH);
+      expect(result.records[1]!.message.endsWith(`… [truncated, ${length} characters]`)).toBe(true);
     });
 
     it.each([

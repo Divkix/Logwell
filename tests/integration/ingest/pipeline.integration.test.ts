@@ -20,7 +20,10 @@ import {
   MAX_INGEST_JSON_DEPTH,
   type IngestBodyParser,
 } from "../../../src/lib/server/utils/ingest";
-import { MAX_LOG_MESSAGE_LENGTH } from "../../../src/lib/server/utils/ingest-limits";
+import {
+  MAX_LOG_JSON_LENGTH,
+  MAX_LOG_MESSAGE_LENGTH,
+} from "../../../src/lib/server/utils/ingest-limits";
 import { parseOtlpIngestBody } from "../../../src/lib/server/utils/otlp";
 import { INGEST_RPM, ingestProjectLimiter } from "../../../src/lib/server/utils/rate-limit";
 import { parseSimpleIngestBody } from "../../../src/lib/server/utils/simple-ingest";
@@ -509,14 +512,78 @@ describe("ingestLogs pipeline", () => {
       parse: parseSimpleIngestBody,
       batch: (messages: string[]): JsonValue => messages.map(simpleBody),
     },
-  ])("$name: stores the rest of a batch when one record is oversized", async ({ parse, batch }) => {
+  ])("$name: stores long messages, truncating past the limit", async ({ parse, batch }) => {
     const project = await seedProjectWithApiKey(db);
-    const body = batch(["kept", "x".repeat(MAX_LOG_MESSAGE_LENGTH + 1)]);
+    const stackTrace = "at com.example.Service.handle(Service.java:42)\n".repeat(1000);
+    const huge = "x".repeat(MAX_LOG_MESSAGE_LENGTH * 3);
 
-    const response = await ingestLogs(post(body, project.apiKey), db, parse);
+    const response = await ingestLogs(post(batch([stackTrace, huge]), project.apiKey), db, parse);
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ accepted: 1, rejected: 1 });
+    expect(await response.json()).toEqual({ accepted: 2 });
+
+    const messages = (await db.select({ message: log.message }).from(log)).map(
+      (row) => row.message,
+    );
+
+    expect(messages).toContain(stackTrace);
+    expect(messages).toContainEqual(
+      expect.stringMatching(new RegExp(`… \\[truncated, ${huge.length} characters\\]$`)),
+    );
+  });
+
+  // Distinct two-character CJK words: the input that yields the most tsvector bytes per character.
+  function distinctWords(length: number, offset: number): string {
+    const words: string[] = [];
+
+    for (let i = offset; words.length * 3 < length; i++) {
+      words.push(String.fromCharCode(0x4e00 + (i % 2000), 0x4e00 + (Math.floor(i / 2000) % 2000)));
+    }
+
+    return words.join(" ").slice(0, length);
+  }
+
+  it.each([
+    {
+      name: "otlp",
+      parse: parseOtlpIngestBody,
+      body: (message: string, blob: string): JsonValue => ({
+        resourceLogs: [
+          {
+            scopeLogs: [
+              {
+                logRecords: [
+                  {
+                    body: { stringValue: message },
+                    attributes: [{ key: "blob", value: { stringValue: blob } }],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      }),
+    },
+    {
+      name: "simple",
+      parse: parseSimpleIngestBody,
+      body: (message: string, blob: string): JsonValue => [
+        { level: "info", message, metadata: { blob } },
+      ],
+    },
+  ])("$name: a record at every size limit still fits the search tsvector", async (input) => {
+    const project = await seedProjectWithApiKey(db);
+    const message = distinctWords(MAX_LOG_MESSAGE_LENGTH * 2, 0);
+    const blob = distinctWords(MAX_LOG_JSON_LENGTH - 100, 1_000_000);
+
+    const response = await ingestLogs(
+      post(input.body(message, blob), project.apiKey),
+      db,
+      input.parse,
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ accepted: 1 });
   });
 
   it("ingests partial batches with per-record errors as 200", async () => {

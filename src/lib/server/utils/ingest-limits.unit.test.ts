@@ -1,5 +1,34 @@
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
-import { clampFutureTimestamp, MAX_FUTURE_SKEW_MS } from "./ingest-limits";
+import {
+  clampFutureTimestamp,
+  MAX_FUTURE_SKEW_MS,
+  MAX_LOG_MESSAGE_LENGTH,
+  truncateLogText,
+} from "./ingest-limits";
+
+describe("truncateLogText", () => {
+  it("keeps text at the limit unchanged", () => {
+    const text = "x".repeat(MAX_LOG_MESSAGE_LENGTH);
+
+    expect(truncateLogText(text)).toBe(text);
+  });
+
+  it("cuts longer text to the limit and records the original length", () => {
+    const length = MAX_LOG_MESSAGE_LENGTH * 5;
+    const truncated = truncateLogText("x".repeat(length));
+
+    expect(truncated).toHaveLength(MAX_LOG_MESSAGE_LENGTH);
+    expect(truncated.endsWith(`… [truncated, ${length} characters]`)).toBe(true);
+    expect(truncated.startsWith("xxxx")).toBe(true);
+  });
+
+  it("never splits a surrogate pair", () => {
+    const truncated = truncateLogText("😀".repeat(MAX_LOG_MESSAGE_LENGTH));
+    const kept = truncated.slice(0, truncated.indexOf("…"));
+
+    expect(kept).toBe("😀".repeat(kept.length / 2));
+  });
+});
 
 describe("clampFutureTimestamp", () => {
   const now = Date.UTC(2026, 0, 1);

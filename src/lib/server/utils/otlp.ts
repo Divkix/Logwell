@@ -3,7 +3,7 @@ import type { LogLevel } from "#lib/shared/types.js";
 import { jsonObjectSchema, type JsonObject, type JsonValue } from "../../shared/schemas/json";
 import { API_CONFIG } from "../config/performance";
 import type { ParsedIngest } from "./ingest";
-import { clampFutureTimestamp, logRecordSizeError } from "./ingest-limits";
+import { clampFutureTimestamp, logRecordJsonSizeError, truncateLogText } from "./ingest-limits";
 
 export class OtlpValidationError extends Error {
   constructor(message: string) {
@@ -472,7 +472,7 @@ export function normalizeOtlpLogsRequest(body: JsonValue | undefined): Normalize
         const observedTimeUnixNano = parseUint64String(record.observedTimeUnixNano);
         const severityNumber = parseSeverityNumber(record.severityNumber);
         const severityText = decodeString(record.severityText);
-        const bodyValue = record.body ? parseOtlpAnyValue(record.body) : null;
+        const parsedBody = record.body ? parseOtlpAnyValue(record.body) : null;
         const attributes = parseAttributes(record.attributes);
         const droppedAttributesCount = parseOptionalNumber(record.droppedAttributesCount);
         const flags = parseOptionalNumber(record.flags);
@@ -481,22 +481,26 @@ export function normalizeOtlpLogsRequest(body: JsonValue | undefined): Normalize
 
         const timestamp = parseTimestamp(timeUnixNano, observedTimeUnixNano);
         const level = deriveLevel(severityNumber, severityText);
-        const message = deriveMessage(bodyValue, attributes);
+        const fullMessage = deriveMessage(parsedBody, attributes);
 
-        if (message.includes("\u0000")) {
+        if (fullMessage.includes("\u0000")) {
           rejectedLogRecords += 1;
           errors.push("Log record rejected: message cannot contain NUL characters");
           continue;
         }
 
-        if (!message.trim()) {
+        if (!fullMessage.trim()) {
           rejectedLogRecords += 1;
           errors.push(`Log record rejected: message cannot be empty`);
           continue;
         }
 
-        const sizeError = logRecordSizeError(message, [
-          bodyValue,
+        // A string body is text like the message and is truncated the same way below; only a
+        // structured body counts against the JSON budget.
+        const bodyString = decodeString(parsedBody);
+
+        const sizeError = logRecordJsonSizeError([
+          bodyString === null ? parsedBody : null,
           attributes,
           resourceAttributes,
           scopeAttributes,
@@ -507,6 +511,9 @@ export function normalizeOtlpLogsRequest(body: JsonValue | undefined): Normalize
           errors.push(`Log record rejected: ${sizeError}`);
           continue;
         }
+
+        const bodyValue = bodyString === null ? parsedBody : truncateLogText(bodyString);
+        const message = truncateLogText(fullMessage);
 
         records.push({
           timeUnixNano,

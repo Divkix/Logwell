@@ -8,7 +8,7 @@ import {
 import { LOG_LEVELS, logLevelSchema, type LogLevel } from "../../shared/schemas/log";
 import { API_CONFIG } from "../config/performance";
 import type { ParsedIngest } from "./ingest";
-import { clampFutureTimestamp, logRecordSizeError } from "./ingest-limits";
+import { clampFutureTimestamp, logRecordJsonSizeError, truncateLogText } from "./ingest-limits";
 import { BatchTooLargeError, mapOtlpAttributesToLogColumns } from "./otlp";
 
 export interface SimpleLogInput {
@@ -151,7 +151,7 @@ function validateLogEntry(
   const lineNumber = lineNumberResult.success ? lineNumberResult.data : null;
 
   const resourceAttributes = service ? { "service.name": service } : null;
-  const sizeError = logRecordSizeError(message, [metadata, resourceAttributes]);
+  const sizeError = logRecordJsonSizeError([metadata, resourceAttributes]);
 
   if (sizeError) {
     return { log: null, error: `Entry at index ${index}: ${sizeError}` };
@@ -162,7 +162,7 @@ function validateLogEntry(
   return {
     log: {
       level,
-      message,
+      message: truncateLogText(message),
       timestamp,
       resourceAttributes,
       metadata,

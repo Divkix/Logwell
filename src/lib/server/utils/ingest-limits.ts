@@ -4,29 +4,48 @@ import type { JsonValue } from "#lib/shared/schemas/json.js";
 /**
  * Per-record limits shared by both ingest parsers.
  *
- * Every record's message and JSON columns feed the generated `search` tsvector, which PostgreSQL
- * caps at 1 MB: one oversized record would fail the whole batch's INSERT with a 500. Records over
- * these limits are rejected individually instead (200 with an entry in `errors[]`), keeping the
- * searchable text of a record a few hundred KB at most regardless of BODY_SIZE_LIMIT.
+ * Every record's message and JSON columns feed the generated `search` tsvector, whose lexemes
+ * PostgreSQL caps at 1 MB: one oversized record would fail the whole batch's INSERT with a 500.
+ * Worst case (distinct multi-byte tokens) that cap is reached from roughly 300K characters of
+ * input, so a record's searchable text is kept to 256K characters: message and string body at
+ * most MAX_LOG_MESSAGE_LENGTH each, structured JSON at most MAX_LOG_JSON_LENGTH.
  */
-
-/** Longest accepted log message, in characters (UTF-16 code units). */
-export const MAX_LOG_MESSAGE_LENGTH = 32_768;
-
-/** Largest accepted combined serialized length of a record's JSON columns, in characters. */
-export const MAX_LOG_JSON_LENGTH = 65_536;
 
 /**
- * Why a record is too large to store, or null when it fits.
- *
- * @param jsonColumns The record's JSON columns (body, attributes/metadata, resource and scope
- *   attributes), measured together because they are concatenated into one tsvector.
+ * Longest stored log message or string body, in characters (UTF-16 code units). Longer text is
+ * truncated with a marker giving its original length, not rejected, so a long stack trace is
+ * still stored.
  */
-export function logRecordSizeError(message: string, jsonColumns: JsonValue[]): string | null {
-  if (message.length > MAX_LOG_MESSAGE_LENGTH) {
-    return `message exceeds ${MAX_LOG_MESSAGE_LENGTH} characters (got ${message.length})`;
-  }
+export const MAX_LOG_MESSAGE_LENGTH = 98_304;
 
+/**
+ * Largest accepted combined serialized length of a record's structured JSON columns, in
+ * characters. JSON cannot be cut without changing its meaning, so a record over this is rejected
+ * individually (200 with an entry in `errors[]`).
+ */
+export const MAX_LOG_JSON_LENGTH = 65_536;
+
+/** Cuts `text` to MAX_LOG_MESSAGE_LENGTH, ending it with a marker that records the original length. */
+export function truncateLogText(text: string): string {
+  if (text.length <= MAX_LOG_MESSAGE_LENGTH) return text;
+
+  const marker = `… [truncated, ${text.length} characters]`;
+  let end = MAX_LOG_MESSAGE_LENGTH - marker.length;
+  const last = text.charCodeAt(end - 1);
+
+  // Never leave the high half of a surrogate pair dangling before the marker.
+  if (last >= 0xd800 && last <= 0xdbff) end -= 1;
+
+  return text.slice(0, end) + marker;
+}
+
+/**
+ * Why a record's structured JSON is too large to store, or null when it fits.
+ *
+ * @param jsonColumns The record's JSON columns (non-string body, attributes/metadata, resource
+ *   and scope attributes), measured together because they are concatenated into one tsvector.
+ */
+export function logRecordJsonSizeError(jsonColumns: JsonValue[]): string | null {
   let jsonLength = 0;
 
   for (const value of jsonColumns) {

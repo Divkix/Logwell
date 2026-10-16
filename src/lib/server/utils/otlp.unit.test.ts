@@ -308,19 +308,29 @@ describe("normalizeOtlpLogsRequest record size limits", () => {
     };
   }
 
-  it("rejects only the record whose message exceeds MAX_LOG_MESSAGE_LENGTH", () => {
+  it("truncates an over-long string body and the message derived from it", () => {
+    const length = MAX_LOG_MESSAGE_LENGTH + 1;
+    const marker = `… [truncated, ${length} characters]`;
+
     const { records, rejectedLogRecords, errors } = normalizeOtlpLogsRequest(
-      request([
-        { body: { stringValue: "x".repeat(MAX_LOG_MESSAGE_LENGTH) } },
-        { body: { stringValue: "x".repeat(MAX_LOG_MESSAGE_LENGTH + 1) } },
-      ]),
+      request([{ body: { stringValue: "x".repeat(length) } }]),
     );
 
+    expect(rejectedLogRecords).toBe(0);
+    expect(errors).toEqual([]);
     expect(records).toHaveLength(1);
-    expect(rejectedLogRecords).toBe(1);
-    expect(errors).toEqual([
-      `Log record rejected: message exceeds ${MAX_LOG_MESSAGE_LENGTH} characters (got ${MAX_LOG_MESSAGE_LENGTH + 1})`,
-    ]);
+    expect(records[0]!.message).toHaveLength(MAX_LOG_MESSAGE_LENGTH);
+    expect(records[0]!.message.endsWith(marker)).toBe(true);
+    expect(records[0]!.body).toBe(records[0]!.message);
+  });
+
+  it("does not count a string body against MAX_LOG_JSON_LENGTH", () => {
+    const { records, errors } = normalizeOtlpLogsRequest(
+      request([{ body: { stringValue: "x".repeat(MAX_LOG_JSON_LENGTH + 1) } }]),
+    );
+
+    expect(errors).toEqual([]);
+    expect(records).toHaveLength(1);
   });
 
   it("counts body, attributes and resource attributes against MAX_LOG_JSON_LENGTH together", () => {
