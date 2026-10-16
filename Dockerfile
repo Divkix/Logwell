@@ -1,9 +1,11 @@
 # syntax=docker/dockerfile:1.4
 
-# SECURITY: pinned to an exact version + digest for reproducible builds (Node.js 24 LTS). Node
-# serves the built output and runs the TypeScript scripts through tsx; pnpm only installs
-# dependencies (see packageManager).
-FROM node:26.11.1-alpine@sha256:143494b1da2945f061539253adc65e4f1569ddf07da2d384c022c791a9d90a4a AS base
+# SECURITY: pinned to an exact version + digest for reproducible builds. Node.js 24 is the
+# current Active LTS line and matches CI (`runtime: node@24`); Node 26 only enters LTS on
+# 2026-10-28 (nodejs/Release schedule.json), so dependabot is told to skip node majors until
+# image and CI move together. Node serves the built output and runs the TypeScript scripts
+# through tsx; pnpm only installs dependencies (see packageManager).
+FROM node:24.22.0-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS base
 WORKDIR /app
 
 # Install curl for healthcheck (alpine minimal doesn't include it)

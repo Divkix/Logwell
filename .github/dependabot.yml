@@ -86,6 +86,12 @@ updates:
     labels:
       - dependencies
       - docker
+    ignore:
+      # The image must run the same Node major as CI (`runtime: node@24` in the workflows). Take
+      # only Node 24 LTS minors/patches; bump image + workflows together by hand once the next
+      # major reaches Active LTS (Node 26: 2026-10-28, nodejs/Release schedule.json).
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]
 
   # Python SDK
   - package-ecosystem: pip
