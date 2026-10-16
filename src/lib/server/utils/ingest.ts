@@ -1,5 +1,6 @@
 import { json } from "@sveltejs/kit";
 import { eq } from "drizzle-orm";
+import { Data, Effect } from "effect";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { API_CONFIG } from "$lib/server/config/performance";
@@ -142,82 +143,21 @@ export function buildIngestResponse(accepted: number, rejected: number, errors: 
   return { accepted, rejected, errors };
 }
 
-export async function ingestLogs(
-  request: Request,
-  db: DatabaseClient,
-  parse: IngestBodyParser,
-): Promise<Response> {
-  const contentTypeError = requireJsonContentType(request);
+// Batch-level failures, each mapped to exactly one response in `ingestLogs`.
+class Unauthorized extends Data.TaggedError("Unauthorized")<{
+  readonly status: number;
+  readonly message: string;
+}> {}
 
-  if (contentTypeError) return contentTypeError;
+class RateLimited extends Data.TaggedError("RateLimited") {}
 
-  let projectId: string;
+class InvalidJson extends Data.TaggedError("InvalidJson") {}
 
-  try {
-    projectId = await validateApiKey(request, db);
+class BatchTooLarge extends Data.TaggedError("BatchTooLarge")<{ readonly message: string }> {}
 
-    const [projectRow] = await db
-      .select({ id: project.id })
-      .from(project)
-      .where(eq(project.id, projectId));
+class ValidationFailed extends Data.TaggedError("ValidationFailed")<{ readonly message: string }> {}
 
-    if (!projectRow) {
-      throw new ApiKeyError(401, "Invalid API key");
-    }
-  } catch (err) {
-    if (err instanceof ApiKeyError) {
-      return json({ error: "unauthorized", message: err.message }, { status: err.status });
-    }
-
-    throw err;
-  }
-
-  if (!checkRateLimit(`ingest:${projectId}`, INGEST_RPM)) {
-    return json(
-      { error: "rate_limited", message: "Rate limit exceeded. Retry in 60 seconds." },
-      { status: 429, headers: { "Retry-After": "60" } },
-    );
-  }
-
-  let body: JsonValue | undefined;
-
-  try {
-    body = await request.json();
-  } catch {
-    return json(
-      { error: "invalid_json", message: "Request body must be valid JSON" },
-      { status: 400 },
-    );
-  }
-
-  let parsed: ParsedIngest;
-
-  try {
-    parsed = parse(body);
-  } catch (err) {
-    if (err instanceof BatchTooLargeError) {
-      return json({ error: "batch_too_large", message: err.message }, { status: 400 });
-    }
-
-    if (err instanceof OtlpValidationError || err instanceof SimpleIngestError) {
-      return json({ error: "validation_error", message: err.message }, { status: 400 });
-    }
-
-    throw err;
-  }
-
-  if (parsed.inputs.length > API_CONFIG.BATCH_INSERT_LIMIT) {
-    return json(
-      {
-        error: "batch_too_large",
-        message: `Batch exceeds maximum limit of ${API_CONFIG.BATCH_INSERT_LIMIT} logs. Received ${parsed.inputs.length} logs.`,
-      },
-      { status: 400 },
-    );
-  }
-
-  const inputs = parsed.inputs.map(sanitizeIngestInput);
-
+async function insertBatch(db: DatabaseClient, projectId: string, inputs: IngestInputRow[]) {
   const preparedLogs = prepareLogsForIncidents(
     inputs.map((input) => ({
       level: input.level,
@@ -230,45 +170,129 @@ export async function ingestLogs(
     })),
   );
 
-  const { insertedLogs, touchedIncidents } =
-    preparedLogs.length > 0
-      ? await db.transaction(async (tx) => {
-          const { incidentByFingerprint, touchedIncidents } = await upsertIncidentsForPreparedLogs(
-            tx,
-            projectId,
-            preparedLogs,
-          );
+  if (preparedLogs.length === 0) return { insertedLogs: [], touchedIncidents: [] };
 
-          const assigned = assignIncidentIds(preparedLogs, incidentByFingerprint);
+  return db.transaction(async (tx) => {
+    const { incidentByFingerprint, touchedIncidents } = await upsertIncidentsForPreparedLogs(
+      tx,
+      projectId,
+      preparedLogs,
+    );
 
-          const logEntries = assigned.map((prepared, index) => ({
-            ...inputs[index]!,
-            id: nanoid(),
-            projectId,
-            incidentId: prepared.incidentId,
-            fingerprint: prepared.fingerprint,
-            serviceName: prepared.serviceName,
-          }));
+    const assigned = assignIncidentIds(preparedLogs, incidentByFingerprint);
 
-          // SAFETY: DatabaseClient's union defeats overload resolution on the projected
-          // `.returning()`; both flavours declare it with this signature, so the builder is
-          // narrowed to the contract it already satisfies.
-          const projectedInsert = tx.insert(log).values(logEntries) as LogInsertReturning;
-          const insertedLogs: StreamLog[] = await projectedInsert.returning(LOG_RETURNING_COLUMNS);
+    const logEntries = assigned.map((prepared, index) => ({
+      ...inputs[index]!,
+      id: nanoid(),
+      projectId,
+      incidentId: prepared.incidentId,
+      fingerprint: prepared.fingerprint,
+      serviceName: prepared.serviceName,
+    }));
 
-          return { insertedLogs, touchedIncidents };
-        })
-      : { insertedLogs: [], touchedIncidents: [] };
+    // SAFETY: DatabaseClient's union defeats overload resolution on the projected
+    // `.returning()`; both flavours declare it with this signature, so the builder is
+    // narrowed to the contract it already satisfies.
+    const projectedInsert = tx.insert(log).values(logEntries) as LogInsertReturning;
+    const insertedLogs: StreamLog[] = await projectedInsert.returning(LOG_RETURNING_COLUMNS);
 
-  for (const insertedLog of insertedLogs) {
-    logEventBus.emitLog(insertedLog);
-  }
-
-  for (const touchedIncident of touchedIncidents) {
-    logEventBus.emitIncident(touchedIncident);
-  }
-
-  return json(buildIngestResponse(parsed.accepted, parsed.rejected, parsed.errors), {
-    status: 200,
+    return { insertedLogs, touchedIncidents };
   });
+}
+
+function ingest(request: Request, db: DatabaseClient, parse: IngestBodyParser) {
+  return Effect.gen(function* () {
+    // Both `catch` mappers below (key validation, parse) re-throw what they don't recognise:
+    // a throwing mapper makes the error a defect, which `Effect.runPromise` rejects with
+    // unchanged, so unexpected errors reach SvelteKit's handleError exactly as thrown.
+    const projectId = yield* Effect.tryPromise({
+      try: () => validateApiKey(request, db),
+      catch: (err) => {
+        if (err instanceof ApiKeyError) {
+          return new Unauthorized({ status: err.status, message: err.message });
+        }
+
+        throw err;
+      },
+    });
+
+    const [projectRow] = yield* Effect.promise(() =>
+      db.select({ id: project.id }).from(project).where(eq(project.id, projectId)),
+    );
+
+    if (!projectRow) return yield* new Unauthorized({ status: 401, message: "Invalid API key" });
+
+    if (!checkRateLimit(`ingest:${projectId}`, INGEST_RPM)) return yield* new RateLimited();
+
+    const body = yield* Effect.tryPromise({
+      try: (): Promise<JsonValue | undefined> => request.json(),
+      catch: () => new InvalidJson(),
+    });
+
+    const parsed = yield* Effect.try({
+      try: () => parse(body),
+      catch: (err) => {
+        // BatchTooLargeError extends OtlpValidationError, so it is matched first.
+        if (err instanceof BatchTooLargeError) return new BatchTooLarge({ message: err.message });
+
+        if (err instanceof OtlpValidationError || err instanceof SimpleIngestError) {
+          return new ValidationFailed({ message: err.message });
+        }
+
+        throw err;
+      },
+    });
+
+    if (parsed.inputs.length > API_CONFIG.BATCH_INSERT_LIMIT) {
+      return yield* new BatchTooLarge({
+        message: `Batch exceeds maximum limit of ${API_CONFIG.BATCH_INSERT_LIMIT} logs. Received ${parsed.inputs.length} logs.`,
+      });
+    }
+
+    const inputs = parsed.inputs.map(sanitizeIngestInput);
+
+    const { insertedLogs, touchedIncidents } = yield* Effect.promise(() =>
+      insertBatch(db, projectId, inputs),
+    );
+
+    for (const insertedLog of insertedLogs) {
+      logEventBus.emitLog(insertedLog);
+    }
+
+    for (const touchedIncident of touchedIncidents) {
+      logEventBus.emitIncident(touchedIncident);
+    }
+
+    return json(buildIngestResponse(parsed.accepted, parsed.rejected, parsed.errors));
+  });
+}
+
+const errorResponse = (error: string, message: string, init: ResponseInit = { status: 400 }) =>
+  Effect.succeed(json({ error, message }, init));
+
+export async function ingestLogs(
+  request: Request,
+  db: DatabaseClient,
+  parse: IngestBodyParser,
+): Promise<Response> {
+  const unsupported = requireJsonContentType(request);
+
+  if (unsupported) return unsupported;
+
+  // Annotated with no error channel, so a failure without a case here fails to compile.
+  const program: Effect.Effect<Response> = ingest(request, db, parse).pipe(
+    Effect.catchTags({
+      Unauthorized: ({ status, message }) => errorResponse("unauthorized", message, { status }),
+      RateLimited: () =>
+        errorResponse("rate_limited", "Rate limit exceeded. Retry in 60 seconds.", {
+          status: 429,
+          headers: { "Retry-After": "60" },
+        }),
+      InvalidJson: () => errorResponse("invalid_json", "Request body must be valid JSON"),
+      BatchTooLarge: ({ message }) => errorResponse("batch_too_large", message),
+      ValidationFailed: ({ message }) => errorResponse("validation_error", message),
+    }),
+  );
+
+  return Effect.runPromise(program);
 }

@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
-import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { z } from "zod";
 import { API_CONFIG } from "../../../src/lib/server/config/performance";
 import type * as schema from "../../../src/lib/server/db/schema";
@@ -495,5 +495,141 @@ describe("ingestLogs pipeline", () => {
 
     const rows = await db.select().from(log).where(eq(log.projectId, project.id));
     expect(rows[0]!.serviceName).toBe("web");
+  });
+
+  // Byte-level contract of every batch-level outcome: status, JSON body and headers.
+  describe("batch-level error contract", () => {
+    it("passes the content-type guard response through", async () => {
+      const project = await seedProjectWithApiKey(db);
+
+      const response = await ingestLogs(
+        post(otlpBody("x"), project.apiKey, "text/plain"),
+        db,
+        parseOtlpIngestBody,
+      );
+
+      expect(response.status).toBe(415);
+      expect(await response.json()).toEqual({
+        error: "unsupported_media_type",
+        message: "Content-Type must be application/json",
+      });
+    });
+
+    it("maps API key failures to unauthorized with the key error message", async () => {
+      const cases: Array<[string | undefined, string]> = [
+        [undefined, "Missing or invalid authorization header"],
+        ["lw_short", "Invalid API key format"],
+        [`lw_${"a".repeat(32)}`, "Invalid API key"],
+      ];
+
+      for (const [apiKey, message] of cases) {
+        const response = await ingestLogs(post(otlpBody("x"), apiKey), db, parseOtlpIngestBody);
+        expect(response.status).toBe(401);
+        expect(await response.json()).toEqual({ error: "unauthorized", message });
+      }
+    });
+
+    it("maps a cached key whose project row is gone to unauthorized", async () => {
+      const project = await seedProjectWithApiKey(db);
+      const warm = await ingestLogs(post(otlpBody("x"), project.apiKey), db, parseOtlpIngestBody);
+      expect(warm.status).toBe(200);
+
+      // The key stays cached, so only the pipeline's own project-row check can reject it.
+      await db.delete(projectTable).where(eq(projectTable.id, project.id));
+
+      const response = await ingestLogs(
+        post(otlpBody("x"), project.apiKey),
+        db,
+        parseOtlpIngestBody,
+      );
+
+      expect(response.status).toBe(401);
+      expect(await response.json()).toEqual({ error: "unauthorized", message: "Invalid API key" });
+    });
+
+    it("returns the full invalid_json body", async () => {
+      const project = await seedProjectWithApiKey(db);
+      const response = await ingestLogs(post("{not-json", project.apiKey), db, parseOtlpIngestBody);
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        error: "invalid_json",
+        message: "Request body must be valid JSON",
+      });
+    });
+
+    it("returns validation_error with the parser message for both parsers", async () => {
+      const project = await seedProjectWithApiKey(db);
+
+      const bodies: Array<[IngestBodyParser, JsonValue, string]> = [
+        [parseOtlpIngestBody, { resourceLogs: "nope" }, "resourceLogs must be an array."],
+        [parseSimpleIngestBody, [], "Request body cannot be an empty array"],
+      ];
+
+      for (const [parse, body, message] of bodies) {
+        const response = await ingestLogs(post(body, project.apiKey), db, parse);
+        expect(response.status).toBe(400);
+        expect(await response.json()).toEqual({ error: "validation_error", message });
+      }
+    });
+
+    it("rejects parsed batches over the insert limit with the received count", async () => {
+      const project = await seedProjectWithApiKey(db);
+      const size = API_CONFIG.BATCH_INSERT_LIMIT + 1;
+
+      const oversizedParse: IngestBodyParser = (body) => {
+        const parsed = parseSimpleIngestBody(body);
+
+        return { ...parsed, inputs: Array.from({ length: size }, () => parsed.inputs[0]!) };
+      };
+
+      const response = await ingestLogs(post(simpleBody("x"), project.apiKey), db, oversizedParse);
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        error: "batch_too_large",
+        message: `Batch exceeds maximum limit of ${API_CONFIG.BATCH_INSERT_LIMIT} logs. Received ${size} logs.`,
+      });
+
+      const rows = await db.select().from(log).where(eq(log.projectId, project.id));
+      expect(rows).toHaveLength(0);
+    });
+
+    it("rejects with the original error when the parser throws unexpectedly", async () => {
+      const project = await seedProjectWithApiKey(db);
+      const failure = new TypeError("parser bug");
+
+      const throwingParse: IngestBodyParser = () => {
+        throw failure;
+      };
+
+      await expect(
+        ingestLogs(post(simpleBody("x"), project.apiKey), db, throwingParse),
+      ).rejects.toBe(failure);
+    });
+
+    it("rejects with the original error when the key lookup fails", async () => {
+      const project = await seedProjectWithApiKey(db);
+      const failure = new Error("connection reset");
+
+      vi.spyOn(db, "select").mockImplementationOnce(() => {
+        throw failure;
+      });
+
+      await expect(
+        ingestLogs(post(simpleBody("x"), project.apiKey), db, parseSimpleIngestBody),
+      ).rejects.toBe(failure);
+    });
+
+    it("rejects with the original error when the insert transaction fails", async () => {
+      const project = await seedProjectWithApiKey(db);
+      const failure = new Error("deadlock detected");
+      vi.spyOn(db, "transaction").mockRejectedValueOnce(failure);
+
+      await expect(
+        ingestLogs(post(simpleBody("x"), project.apiKey), db, parseSimpleIngestBody),
+      ).rejects.toBe(failure);
+
+      const rows = await db.select().from(log).where(eq(log.projectId, project.id));
+      expect(rows).toHaveLength(0);
+    });
   });
 });
