@@ -20,6 +20,7 @@ import {
   MAX_INGEST_JSON_DEPTH,
   type IngestBodyParser,
 } from "../../../src/lib/server/utils/ingest";
+import { MAX_LOG_MESSAGE_LENGTH } from "../../../src/lib/server/utils/ingest-limits";
 import { parseOtlpIngestBody } from "../../../src/lib/server/utils/otlp";
 import { INGEST_RPM, ingestProjectLimiter } from "../../../src/lib/server/utils/rate-limit";
 import { parseSimpleIngestBody } from "../../../src/lib/server/utils/simple-ingest";
@@ -487,6 +488,35 @@ describe("ingestLogs pipeline", () => {
     const accepted = await ingestLogs(post(shallow, project.apiKey), db, parseSimpleIngestBody);
     expect(accepted.status).toBe(200);
     expect(await accepted.json()).toEqual({ accepted: 1 });
+  });
+
+  it.each([
+    {
+      name: "otlp",
+      parse: parseOtlpIngestBody,
+      batch: (messages: string[]): JsonValue => ({
+        resourceLogs: [
+          {
+            scopeLogs: [
+              { logRecords: messages.map((message) => ({ body: { stringValue: message } })) },
+            ],
+          },
+        ],
+      }),
+    },
+    {
+      name: "simple",
+      parse: parseSimpleIngestBody,
+      batch: (messages: string[]): JsonValue => messages.map(simpleBody),
+    },
+  ])("$name: stores the rest of a batch when one record is oversized", async ({ parse, batch }) => {
+    const project = await seedProjectWithApiKey(db);
+    const body = batch(["kept", "x".repeat(MAX_LOG_MESSAGE_LENGTH + 1)]);
+
+    const response = await ingestLogs(post(body, project.apiKey), db, parse);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ accepted: 1, rejected: 1 });
   });
 
   it("ingests partial batches with per-record errors as 200", async () => {

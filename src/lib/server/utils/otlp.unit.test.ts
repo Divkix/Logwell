@@ -8,6 +8,7 @@ import {
   parseUint64String,
   severityNumberToLogLevel,
 } from "./otlp";
+import { MAX_LOG_JSON_LENGTH, MAX_LOG_MESSAGE_LENGTH } from "./ingest-limits";
 
 describe("normalizeOtlpLogsRequest", () => {
   it("flattens resource/scope/log records and derives display fields", () => {
@@ -295,6 +296,50 @@ describe("zero timeUnixNano handling", () => {
     const { records } = normalizeOtlpLogsRequest(payload);
     expect(records).toHaveLength(1);
     expect(records[0]!.timestamp.toISOString()).toBe(new Date(1700000000000).toISOString());
+  });
+});
+
+describe("normalizeOtlpLogsRequest record size limits", () => {
+  const stringAttr = (key: string, value: string) => ({ key, value: { stringValue: value } });
+
+  function request(logRecords: JsonValue[], resourceAttributes: JsonValue[] = []): JsonValue {
+    return {
+      resourceLogs: [{ resource: { attributes: resourceAttributes }, scopeLogs: [{ logRecords }] }],
+    };
+  }
+
+  it("rejects only the record whose message exceeds MAX_LOG_MESSAGE_LENGTH", () => {
+    const { records, rejectedLogRecords, errors } = normalizeOtlpLogsRequest(
+      request([
+        { body: { stringValue: "x".repeat(MAX_LOG_MESSAGE_LENGTH) } },
+        { body: { stringValue: "x".repeat(MAX_LOG_MESSAGE_LENGTH + 1) } },
+      ]),
+    );
+
+    expect(records).toHaveLength(1);
+    expect(rejectedLogRecords).toBe(1);
+    expect(errors).toEqual([
+      `Log record rejected: message exceeds ${MAX_LOG_MESSAGE_LENGTH} characters (got ${MAX_LOG_MESSAGE_LENGTH + 1})`,
+    ]);
+  });
+
+  it("counts body, attributes and resource attributes against MAX_LOG_JSON_LENGTH together", () => {
+    const half = "x".repeat(MAX_LOG_JSON_LENGTH / 2);
+
+    const { records, errors } = normalizeOtlpLogsRequest(
+      request(
+        [
+          { body: { stringValue: "small" }, attributes: [stringAttr("a", "y")] },
+          { body: { stringValue: "big" }, attributes: [stringAttr("a", half)] },
+        ],
+        [stringAttr("service.name", half)],
+      ),
+    );
+
+    expect(records.map((record) => record.message)).toEqual(["small"]);
+    expect(errors).toEqual([
+      `Log record rejected: body and attributes exceed ${MAX_LOG_JSON_LENGTH} characters when serialized`,
+    ]);
   });
 });
 

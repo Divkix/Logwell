@@ -3,6 +3,7 @@ import type { LogLevel } from "#lib/shared/types.js";
 import { jsonObjectSchema, type JsonObject, type JsonValue } from "../../shared/schemas/json";
 import { API_CONFIG } from "../config/performance";
 import type { ParsedIngest } from "./ingest";
+import { logRecordSizeError } from "./ingest-limits";
 
 export class OtlpValidationError extends Error {
   constructor(message: string) {
@@ -491,6 +492,19 @@ export function normalizeOtlpLogsRequest(body: JsonValue | undefined): Normalize
         if (!message.trim()) {
           rejectedLogRecords += 1;
           errors.push(`Log record rejected: message cannot be empty`);
+          continue;
+        }
+
+        const sizeError = logRecordSizeError(message, [
+          bodyValue,
+          attributes,
+          resourceAttributes,
+          scopeAttributes,
+        ]);
+
+        if (sizeError) {
+          rejectedLogRecords += 1;
+          errors.push(`Log record rejected: ${sizeError}`);
           continue;
         }
 
