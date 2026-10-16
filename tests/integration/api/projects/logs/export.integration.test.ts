@@ -5,6 +5,7 @@ import type * as schema from "#lib/server/db/schema.js";
 import { setupTestDatabase } from "#lib/server/db/test-db.js";
 import { getSession } from "#lib/server/session.js";
 import { clearApiKeyCache } from "#lib/server/utils/api-key.js";
+import { MAX_SEARCH_LENGTH } from "#lib/shared/schemas/log.js";
 import { GET } from "../../../../../src/routes/api/projects/[id]/logs/export/+server";
 import { seedLog, seedLogs, seedProject } from "../../../../fixtures/db";
 
@@ -157,6 +158,22 @@ describe("GET /api/projects/[id]/logs/export", () => {
     expect(response.status).toBe(400);
     const body = await response.json();
     expect(body).toHaveProperty("error", "invalid_format");
+  });
+
+  it("returns 400 invalid_search for a search longer than MAX_SEARCH_LENGTH", async () => {
+    const testProject = await seedProject(db, { ownerId: userId });
+    const search = "a".repeat(MAX_SEARCH_LENGTH + 1);
+
+    const request = new Request(
+      `http://localhost/api/projects/${testProject.id}/logs/export?search=${search}`,
+      { method: "GET" },
+    );
+
+    const event = createRequestEvent(request, db, { id: testProject.id }, authenticatedLocals);
+    const response = await GET(event);
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toHaveProperty("error", "invalid_search");
   });
 
   it("exports every log across multiple pages", async () => {
