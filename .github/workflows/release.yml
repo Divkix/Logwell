@@ -43,6 +43,7 @@ jobs:
     outputs:
       tag: ${{ steps.resolve.outputs.tag }}
       sha: ${{ steps.resolve.outputs.sha }}
+      attest: ${{ steps.resolve.outputs.attest }}
 
     steps:
       - name: Resolve tag to commit
@@ -60,9 +61,24 @@ jobs:
             echo "::error::Tag '$TAG' does not exist in ${GITHUB_REPOSITORY}"
             exit 1
           fi
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "sha=$sha" >> "$GITHUB_OUTPUT"
-          echo "Releasing $TAG at $sha"
+
+          # actions/attest builds the SLSA source (ref + commit) from the run's OIDC claims,
+          # i.e. GITHUB_REF/GITHUB_SHA, not from what we check out. Those only name the tag
+          # commit when the run itself is on the tag (tag push, or dispatch "Use workflow
+          # from: <tag>"); otherwise the signed attestation would misstate the source.
+          attest=false
+          if [[ "$GITHUB_REF" == "refs/tags/$TAG" && "$GITHUB_SHA" == "$sha" ]]; then
+            attest=true
+          else
+            echo "::warning::Run is on $GITHUB_REF@$GITHUB_SHA, not $TAG@$sha; skipping the Sigstore provenance attestation (BuildKit provenance is still attached). Dispatch from the $TAG tag to attest."
+          fi
+
+          {
+            echo "tag=$TAG"
+            echo "sha=$sha"
+            echo "attest=$attest"
+          } >> "$GITHUB_OUTPUT"
+          echo "Releasing $TAG at $sha (attest=$attest)"
 
   # =============================================================================
   # Linting and Type Checking
@@ -432,6 +448,7 @@ jobs:
       # GitHub attestations API and pushed next to the image. Verify with
       # `gh attestation verify oci://ghcr.io/<owner>/logwell:<tag> -R <owner>/<repo>`.
       - name: Attest build provenance
+        if: needs.resolve.outputs.attest == 'true'
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-name: ${{ steps.image.outputs.name }}
