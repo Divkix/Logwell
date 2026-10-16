@@ -1,15 +1,15 @@
 # syntax=docker/dockerfile:1.4
 
-# SECURITY: pinned to an exact version + digest for reproducible builds (Bun 1.4.3; matches the
-# app runtime). Bun serves the built output and runs the TypeScript scripts; pnpm only installs
+# SECURITY: pinned to an exact version + digest for reproducible builds (Node.js 24 LTS). Node
+# serves the built output and runs the TypeScript scripts through tsx; pnpm only installs
 # dependencies (see packageManager).
-FROM oven/bun:1.4.3-alpine@sha256:629e17411f1f129dbec3af78d5af9c9f2a937435c80349437206c6b0b7422373 AS base
+FROM node:24.21.0-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS base
 WORKDIR /app
 
 # Install curl for healthcheck (alpine minimal doesn't include it)
 RUN apk add --no-cache curl
 
-# pnpm 12 ships a self-contained musl binary and needs no Node.js. Pinned to an exact release
+# pnpm 12 ships a self-contained musl binary. Pinned to an exact release
 # and per-architecture sha256, same policy as the base image.
 ARG PNPM_VERSION=12.6.0
 ARG TARGETARCH
@@ -46,7 +46,7 @@ ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 ENV PUPPETEER_SKIP_DOWNLOAD=1
 ENV PLAYWRIGHT_BROWSERS_PATH=/dev/null
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
-    pnpm --filter logwell-app install --frozen-lockfile --ignore-scripts && bun run prepare
+    pnpm --filter logwell-app install --frozen-lockfile --ignore-scripts && pnpm run prepare
 
 FROM deps-dev AS build
 WORKDIR /app
@@ -66,7 +66,7 @@ ENV NODE_ENV=production
 
 RUN DATABASE_URL=postgresql://build:build@localhost/build \
     BETTER_AUTH_SECRET=build-time-placeholder-secret-32chars \
-    bun run build
+    pnpm run build
 
 FROM base AS release
 WORKDIR /app
@@ -88,11 +88,13 @@ COPY --from=build --chown=logwell:logwell /app/src/lib/server ./src/lib/server
 COPY --from=build --chown=logwell:logwell /app/src/lib/shared ./src/lib/shared
 
 # entrypoint.sh runs these scripts against production dependencies alone; fail the build here
-# instead of at container start if one of their imports is a devDependency. $env/* is a
-# SvelteKit virtual module (injected at build time), not something node_modules provides.
-RUN bun build ./scripts/seed-admin.ts ./scripts/backfill-incidents.ts --target=bun \
-    --external '$env/*' --outdir /tmp/scripts-check && \
-    rm -rf /tmp/scripts-check
+# instead of at container start if one of their imports is a devDependency. ESM links the whole
+# import graph before evaluating anything, so reaching the DATABASE_URL check (unset here) proves
+# every import resolved; a missing package fails earlier with ERR_MODULE_NOT_FOUND.
+RUN for script in seed-admin backfill-incidents; do \
+      out=$(./node_modules/.bin/tsx "scripts/${script}.ts" 2>&1) || true; \
+      echo "$out" | grep -q "DATABASE_URL" || { echo "$out"; exit 1; }; \
+    done
 
 COPY --chown=logwell:logwell entrypoint.sh ./
 RUN chmod +x entrypoint.sh
@@ -104,8 +106,10 @@ EXPOSE 3000
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
 ENV PORT=3000
-# Bun.serve idle timeout (s) — MUST stay above the SSE heartbeat (capped at half this value)
-ENV IDLE_TIMEOUT=120
+# Seconds before shutdown force-closes open connections (adapter default 30). Live SSE streams never
+# end on their own, so keep this under Docker's 10s stop grace period or SIGKILL lands first and
+# the app's shutdown hook (DB pool close) never runs.
+ENV SHUTDOWN_TIMEOUT=8
 # Max request body (adapter default 512K) — bounds ingest batches, which can exceed 512K
 ENV BODY_SIZE_LIMIT=1M
 
