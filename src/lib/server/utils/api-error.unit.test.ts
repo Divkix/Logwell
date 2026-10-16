@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { isUniqueViolation } from "./api-error";
+import { isQueryCanceled, isUniqueViolation } from "./api-error";
 
 /** Mirrors drizzle's DrizzleQueryError: query/params plus a non-enumerable `cause`. */
 class DrizzleQueryError extends Error {
@@ -38,5 +38,23 @@ describe("isUniqueViolation", () => {
 
   it("reports a violation when no constraint is required", () => {
     expect(isUniqueViolation(postgresError({ code: "23505" }), undefined)).toBe(true);
+  });
+});
+
+describe("isQueryCanceled", () => {
+  it("finds SQLSTATE 57014 under the ORM wrapper", () => {
+    const error = new DrizzleQueryError(
+      Object.assign(new Error("canceling statement due to statement timeout"), { code: "57014" }),
+    );
+
+    expect(isQueryCanceled(error)).toBe(true);
+  });
+
+  it.each([
+    ["a unique violation", new DrizzleQueryError(postgresError({ code: "23505" }))],
+    ["a plain error", new Error("boom")],
+    ["a non-object", "57014"],
+  ])("ignores %s", (_label, error) => {
+    expect(isQueryCanceled(error)).toBe(false);
   });
 });

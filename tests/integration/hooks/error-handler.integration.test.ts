@@ -96,6 +96,38 @@ describe("Global Error Handler", () => {
     });
   });
 
+  describe("query timeout mapping", () => {
+    it("turns a statement_timeout cancellation (SQLSTATE 57014) into 503 query_timeout", () => {
+      // Shape verified against postgres:18 + postgres-js: drizzle's wrapper carries no code,
+      // the driver error on `cause` holds the SQLSTATE.
+      const driverError = Object.assign(new Error("canceling statement due to statement timeout"), {
+        code: "57014",
+      });
+
+      const wrapped = new Error("Failed query: select ... from log", { cause: driverError });
+
+      const result = handleError(createErrorContext({ error: wrapped, status: 500 }));
+
+      expect(result.status).toBe(503);
+      expect(result.error).toBe("query_timeout");
+      expect(result.message).toMatch(/narrow the time range/i);
+      expect(result.message).not.toContain("select");
+      expect(consoleErrorSpy.mock.calls[0][0]).toContain("Status: 503");
+    });
+
+    it("leaves other database errors as a sanitized 500 without overrides", () => {
+      const wrapped = new Error("Failed query", {
+        cause: Object.assign(new Error("deadlock detected"), { code: "40P01" }),
+      });
+
+      const result = handleError(createErrorContext({ error: wrapped, status: 500 }));
+
+      expect(result.status).toBeUndefined();
+      expect(result.error).toBeUndefined();
+      expect(result.message).toBe("Internal server error");
+    });
+  });
+
   describe("error ID generation", () => {
     it("generates unique error IDs for tracking", () => {
       const context = createErrorContext();
