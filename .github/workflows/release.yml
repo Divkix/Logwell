@@ -10,9 +10,9 @@ on:
         required: true
         type: string
 
+# Read-only by default; jobs that publish request exactly what they need.
 permissions:
-  contents: write
-  packages: write
+  contents: read
 
 # Do not cancel in-progress releases — partial releases can leave inconsistent state.
 # Keyed on the tag being released: a dispatch runs from a branch ref, not the tag.
@@ -289,6 +289,9 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 20
     needs: [resolve, lint, test-unit, test-integration, test-e2e, build]
+    permissions:
+      contents: read
+      packages: write
     strategy:
       fail-fast: false
       matrix:
@@ -335,7 +338,10 @@ jobs:
           outputs: type=image,name=${{ steps.image.outputs.name }},push-by-digest=true,name-canonical=true
           cache-from: type=gha,scope=${{ matrix.platform }}
           cache-to: type=gha,mode=max,scope=${{ matrix.platform }}
-          provenance: false
+          # BuildKit attaches SLSA provenance + an SPDX SBOM to each per-platform index as
+          # attestation manifests; 'imagetools create' below carries them into the merged list.
+          provenance: mode=max
+          sbom: true
 
       - name: Export digest
         run: |
@@ -359,6 +365,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: [resolve, docker-publish]
+    permissions:
+      packages: write
+      # actions/attest: OIDC token for the Sigstore cert, attestation + storage record writes.
+      id-token: write
+      attestations: write
+      artifact-metadata: write
     outputs:
       image-tags: ${{ steps.meta.outputs.tags }}
       image-digest: ${{ steps.digest.outputs.digest }}
@@ -416,6 +428,16 @@ jobs:
           digest=$(docker buildx imagetools inspect ${{ steps.image.outputs.name }}:${{ steps.version.outputs.tag }} --format '{{json .Manifest.Digest}}')
           echo "digest=${digest//\"/}" >> $GITHUB_OUTPUT
 
+      # Sigstore-signed SLSA provenance for the published manifest list, stored in the
+      # GitHub attestations API and pushed next to the image. Verify with
+      # `gh attestation verify oci://ghcr.io/<owner>/logwell:<tag> -R <owner>/<repo>`.
+      - name: Attest build provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ steps.image.outputs.name }}
+          subject-digest: ${{ steps.digest.outputs.digest }}
+          push-to-registry: true
+
       - name: Add build info to job summary
         run: |
           echo "## Release Build Complete" >> $GITHUB_STEP_SUMMARY
@@ -436,6 +458,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     needs: [resolve, docker-merge]
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout code

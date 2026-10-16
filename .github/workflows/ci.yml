@@ -374,7 +374,10 @@ jobs:
           outputs: type=image,name=${{ steps.image.outputs.name }},push-by-digest=true,name-canonical=true
           cache-from: type=gha,scope=${{ matrix.platform }}
           cache-to: type=gha,mode=max,scope=${{ matrix.platform }}
-          provenance: false
+          # BuildKit attaches SLSA provenance + an SPDX SBOM to each per-platform index as
+          # attestation manifests; 'imagetools create' below carries them into the merged list.
+          provenance: mode=max
+          sbom: true
 
       - name: Export digest
         run: |
