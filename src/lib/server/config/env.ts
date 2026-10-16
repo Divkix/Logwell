@@ -75,13 +75,29 @@ function getDatabaseUrl(): string {
 }
 
 // Validate BETTER_AUTH_SECRET
-const authSecret = process.env.BETTER_AUTH_SECRET;
+// Empty counts as unset: .env.example ships the key with an empty value.
+const authSecret = process.env.BETTER_AUTH_SECRET || undefined;
+
+// Publicly known values that pass the length check: shipped example/placeholder values and the
+// dev-only fallback. Signing sessions with one lets anyone who has read the repo forge a login.
+// (The Dockerfile's build-time placeholder is deliberately absent: the image build runs with
+// NODE_ENV=production, and that value never reaches the runtime environment.)
+const PLACEHOLDER_AUTH_SECRETS = new Set([
+  "your-32-character-secret-key-here",
+  "default-secret-for-development-only",
+]);
 
 if (!isDevExplicit) {
   if (!authSecret) {
     validationErrors.push({
       variable: "BETTER_AUTH_SECRET",
       message: "BETTER_AUTH_SECRET is required unless NODE_ENV=development",
+    });
+  } else if (PLACEHOLDER_AUTH_SECRETS.has(authSecret.trim().toLowerCase())) {
+    validationErrors.push({
+      variable: "BETTER_AUTH_SECRET",
+      message:
+        "BETTER_AUTH_SECRET is a published placeholder value; generate a real one with `openssl rand -base64 32`",
     });
   } else if (authSecret.length < 32) {
     validationErrors.push({
