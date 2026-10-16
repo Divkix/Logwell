@@ -10,13 +10,14 @@ on:
         required: true
         type: string
 
+# Read-only by default; jobs that publish request exactly what they need.
 permissions:
-  contents: write
-  packages: write
+  contents: read
 
-# Do not cancel in-progress releases — partial releases can leave inconsistent state
+# Do not cancel in-progress releases — partial releases can leave inconsistent state.
+# Keyed on the tag being released: a dispatch runs from a branch ref, not the tag.
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
 env:
@@ -29,17 +30,108 @@ env:
 
 jobs:
   # =============================================================================
+  # Resolve the release tag to the commit every later job checks out
+  # =============================================================================
+  # A tag push already runs on the tag; a manual dispatch runs on the branch it was
+  # started from, so without this every checkout would build that branch's HEAD and
+  # publish it under the requested version (and :latest). Resolving once also keeps
+  # all jobs on the same commit even if the tag were moved mid-run.
+  resolve:
+    name: Resolve Release Tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+      sha: ${{ steps.resolve.outputs.sha }}
+      prerelease: ${{ steps.resolve.outputs.prerelease }}
+      latest: ${{ steps.resolve.outputs.latest }}
+      attest: ${{ steps.resolve.outputs.attest }}
+
+    steps:
+      - name: Resolve tag to commit
+        id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: |
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::'$TAG' is not a release tag (expected vX.Y.Z)"
+            exit 1
+          fi
+          # The commits endpoint peels annotated tags to their commit and fails (422) on a missing tag.
+          if ! sha=$(gh api "repos/${GITHUB_REPOSITORY}/commits/refs/tags/${TAG}" --jq .sha); then
+            echo "::error::Tag '$TAG' does not exist in ${GITHUB_REPOSITORY}"
+            exit 1
+          fi
+
+          # The tag must name the version its commit ships. CI keeps compose.prod.yaml's default
+          # image equal to package.json's version but never runs on tags, so a tag pushed without
+          # the release bump would publish vX.Y.Z while compose.prod.yaml at that tag still runs
+          # the previous image. A prerelease (vX.Y.Z-rc.N) may also sit on the plain vX.Y.Z bump.
+          contents() {
+            gh api -H "Accept: application/vnd.github.raw+json" \
+              "repos/${GITHUB_REPOSITORY}/contents/$1?ref=${sha}"
+          }
+          if ! package_json=$(contents package.json) || ! compose=$(contents compose.prod.yaml); then
+            echo "::error::Could not read package.json and compose.prod.yaml at $TAG ($sha)"
+            exit 1
+          fi
+          version="v$(jq -r .version <<<"$package_json")"
+          if [[ "$version" != "$TAG" && "$version" != "${TAG%%-*}" ]]; then
+            echo "::error::$TAG is on a commit whose package.json version is $version; bump it (and compose.prod.yaml) before tagging"
+            exit 1
+          fi
+          if ! grep -qF "ghcr.io/divkix/logwell:\${LOGWELL_VERSION:-${version}}" <<<"$compose"; then
+            echo "::error::compose.prod.yaml at $TAG does not default to ghcr.io/divkix/logwell:${version}"
+            exit 1
+          fi
+
+          # Prereleases (vX.Y.Z-rc.N) never move :latest or the repo's latest GitHub Release,
+          # and neither does re-releasing an older tag: only the highest stable tag does.
+          prerelease=false
+          latest=false
+          if [[ "$TAG" == *-* ]]; then
+            prerelease=true
+          else
+            highest=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/git/matching-refs/tags/v" --jq '.[].ref' \
+              | sed 's#^refs/tags/##' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1)
+            [[ "$TAG" == "$highest" ]] && latest=true
+          fi
+
+          # actions/attest builds the SLSA source (ref + commit) from the run's OIDC claims,
+          # i.e. GITHUB_REF/GITHUB_SHA, not from what we check out. Those only name the tag
+          # commit when the run itself is on the tag (tag push, or dispatch "Use workflow
+          # from: <tag>"); otherwise the signed attestation would misstate the source.
+          attest=false
+          if [[ "$GITHUB_REF" == "refs/tags/$TAG" && "$GITHUB_SHA" == "$sha" ]]; then
+            attest=true
+          else
+            echo "::warning::Run is on $GITHUB_REF@$GITHUB_SHA, not $TAG@$sha; skipping the Sigstore provenance attestation (BuildKit provenance is still attached). Dispatch from the $TAG tag to attest."
+          fi
+
+          {
+            echo "tag=$TAG"
+            echo "sha=$sha"
+            echo "prerelease=$prerelease"
+            echo "latest=$latest"
+            echo "attest=$attest"
+          } >> "$GITHUB_OUTPUT"
+          echo "Releasing $TAG at $sha (prerelease=$prerelease latest=$latest attest=$attest)"
+
+  # =============================================================================
   # Linting and Type Checking
   # =============================================================================
   lint:
     name: Lint & Type Check
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    needs: [resolve]
 
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ needs.resolve.outputs.sha }}
           persist-credentials: false
 
       - name: Install pnpm and Node.js
@@ -65,11 +157,13 @@ jobs:
     name: Unit Tests
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    needs: [resolve]
 
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ needs.resolve.outputs.sha }}
           persist-credentials: false
 
       - name: Install pnpm and Node.js
@@ -92,11 +186,13 @@ jobs:
     name: Integration Tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    needs: [resolve]
 
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ needs.resolve.outputs.sha }}
           persist-credentials: false
 
       - name: Install pnpm and Node.js
@@ -119,6 +215,7 @@ jobs:
     name: E2E Tests (${{ matrix.browser }} ${{ matrix.shard }}/${{ matrix.total }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    needs: [resolve]
 
     strategy:
       fail-fast: false
@@ -152,6 +249,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ needs.resolve.outputs.sha }}
           persist-credentials: false
 
       - name: Install pnpm and Node.js
@@ -169,7 +267,7 @@ jobs:
         run: echo "version=$(pnpm exec playwright --version | cut -d' ' -f2)" >> $GITHUB_OUTPUT
 
       - name: Cache Playwright browsers
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
@@ -188,7 +286,7 @@ jobs:
           timeout 30 bash -c 'until pg_isready -h localhost -p 5432 -U postgres; do sleep 1; done'
 
       - name: Run database migrations
-        run: pnpm exec drizzle-kit migrate
+        run: pnpm run db:migrate
 
       - name: Seed admin user
         run: pnpm run db:seed
@@ -200,7 +298,7 @@ jobs:
 
       - name: Upload Playwright artifacts
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-report-${{ matrix.browser }}-${{ github.run_id }}-shard-${{ matrix.shard }}
           path: |
@@ -215,11 +313,13 @@ jobs:
     name: Build Verification
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    needs: [resolve]
 
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ needs.resolve.outputs.sha }}
           persist-credentials: false
 
       - name: Install pnpm and Node.js
@@ -242,7 +342,10 @@ jobs:
     name: Build ${{ matrix.platform }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 20
-    needs: [lint, test-unit, test-integration, test-e2e, build]
+    needs: [resolve, lint, test-unit, test-integration, test-e2e, build]
+    permissions:
+      contents: read
+      packages: write
     strategy:
       fail-fast: false
       matrix:
@@ -256,13 +359,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ needs.resolve.outputs.sha }}
           persist-credentials: false
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@v4
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -280,7 +384,7 @@ jobs:
 
       - name: Build and push by digest
         id: build
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           platforms: ${{ matrix.platform }}
@@ -288,7 +392,10 @@ jobs:
           outputs: type=image,name=${{ steps.image.outputs.name }},push-by-digest=true,name-canonical=true
           cache-from: type=gha,scope=${{ matrix.platform }}
           cache-to: type=gha,mode=max,scope=${{ matrix.platform }}
-          provenance: false
+          # BuildKit attaches SLSA provenance + an SPDX SBOM to each per-platform index as
+          # attestation manifests; 'imagetools create' below carries them into the merged list.
+          provenance: mode=max
+          sbom: true
 
       - name: Export digest
         run: |
@@ -297,7 +404,7 @@ jobs:
           touch "/tmp/digests/${digest#sha256:}"
 
       - name: Upload digest
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: digests-${{ steps.platform.outputs.slug }}
           path: /tmp/digests/*
@@ -311,7 +418,13 @@ jobs:
     name: Create Multi-Platform Manifest
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: [docker-publish]
+    needs: [resolve, docker-publish]
+    permissions:
+      packages: write
+      # actions/attest: OIDC token for the Sigstore cert, attestation + storage record writes.
+      id-token: write
+      attestations: write
+      artifact-metadata: write
     outputs:
       image-tags: ${{ steps.meta.outputs.tags }}
       image-digest: ${{ steps.digest.outputs.digest }}
@@ -319,17 +432,17 @@ jobs:
 
     steps:
       - name: Download digests
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: /tmp/digests
           pattern: digests-*
           merge-multiple: true
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@v4
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -337,12 +450,7 @@ jobs:
 
       - name: Determine version tag
         id: version
-        run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "tag=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
-          else
-            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-          fi
+        run: echo "tag=${{ needs.resolve.outputs.tag }}" >> $GITHUB_OUTPUT
 
       - name: Set image name
         id: image
@@ -350,12 +458,12 @@ jobs:
 
       - name: Extract metadata
         id: meta
-        uses: docker/metadata-action@v6
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: ${{ steps.image.outputs.name }}
           tags: |
             type=raw,value=${{ steps.version.outputs.tag }}
-            type=raw,value=latest
+            type=raw,value=latest,enable=${{ needs.resolve.outputs.latest == 'true' }}
           labels: |
             org.opencontainers.image.title=Logwell
             org.opencontainers.image.description=Self-hosted logging platform with real-time streaming
@@ -374,6 +482,17 @@ jobs:
           digest=$(docker buildx imagetools inspect ${{ steps.image.outputs.name }}:${{ steps.version.outputs.tag }} --format '{{json .Manifest.Digest}}')
           echo "digest=${digest//\"/}" >> $GITHUB_OUTPUT
 
+      # Sigstore-signed SLSA provenance for the published manifest list, stored in the
+      # GitHub attestations API and pushed next to the image. Verify with
+      # `gh attestation verify oci://ghcr.io/<owner>/logwell:<tag> -R <owner>/<repo>`.
+      - name: Attest build provenance
+        if: needs.resolve.outputs.attest == 'true'
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ steps.image.outputs.name }}
+          subject-digest: ${{ steps.digest.outputs.digest }}
+          push-to-registry: true
+
       - name: Add build info to job summary
         run: |
           echo "## Release Build Complete" >> $GITHUB_STEP_SUMMARY
@@ -382,7 +501,9 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Docker Images" >> $GITHUB_STEP_SUMMARY
           echo "- **Version:** \`${{ steps.image.outputs.name }}:${{ steps.version.outputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Latest:** \`${{ steps.image.outputs.name }}:latest\`" >> $GITHUB_STEP_SUMMARY
+          if [[ "${{ needs.resolve.outputs.latest }}" == "true" ]]; then
+            echo "- **Latest:** \`${{ steps.image.outputs.name }}:latest\`" >> $GITHUB_STEP_SUMMARY
+          fi
           echo "- **Digest:** \`${{ steps.digest.outputs.digest }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Platforms:** \`linux/amd64\`, \`linux/arm64\`" >> $GITHUB_STEP_SUMMARY
 
@@ -393,12 +514,15 @@ jobs:
     name: Create GitHub Release
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [docker-merge]
+    needs: [resolve, docker-merge]
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ needs.resolve.outputs.sha }}
           persist-credentials: false
 
       - name: Set image name
@@ -406,11 +530,13 @@ jobs:
         run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> $GITHUB_OUTPUT
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: ${{ needs.docker-merge.outputs.version-tag }}
           name: ${{ needs.docker-merge.outputs.version-tag }}
           generate_release_notes: true
+          prerelease: ${{ needs.resolve.outputs.prerelease }}
+          make_latest: ${{ needs.resolve.outputs.latest }}
           body: |
             ## Docker Images
 
@@ -433,6 +559,7 @@ jobs:
     timeout-minutes: 5
     needs:
       [
+        resolve,
         lint,
         test-unit,
         test-integration,
@@ -447,7 +574,8 @@ jobs:
     steps:
       - name: Check all jobs status
         run: |
-          if [[ "${{ needs.lint.result }}" != "success" ]] || \
+          if [[ "${{ needs.resolve.result }}" != "success" ]] || \
+             [[ "${{ needs.lint.result }}" != "success" ]] || \
              [[ "${{ needs.test-unit.result }}" != "success" ]] || \
              [[ "${{ needs.test-integration.result }}" != "success" ]] || \
              [[ "${{ needs.test-e2e.result }}" != "success" ]] || \

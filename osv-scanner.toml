@@ -1,62 +1,19 @@
-# osv-scanner configuration for Logwell.
+# osv-scanner configuration for Logwell (read by .github/workflows/osv-scanner.yml).
 #
-# These overrides suppress advisories for transitive dependencies that exist
-# ONLY in build / dev / test tooling and never run in the production runtime
-# that ships to users. Each entry records the dependency path (verified with
-# `pnpm why <pkg>`) and why it is not production-reachable.
+# No suppressions are active. The package-wide ignores that used to live here (effect, hono,
+# @hono/node-server, undici, ws, esbuild, picomatch) all claimed "never in production", which was
+# wrong: `effect` is a direct runtime dependency, `tsx` runs esbuild at container start, and the
+# image's `pnpm install --prod` also links undici, ws and picomatch (verified by listing
+# /app/node_modules/.pnpm in the built image). The Prisma/hono chain is no longer in the lockfile.
+# None of them had an open advisory at the locked version when the ignores were removed.
 #
-# Production-reachable advisories are FIXED, not suppressed: see the "overrides"
-# block in package.json (cookie, kysely, defu, lodash, lodash-es pinned to
-# patched versions). Do not add production packages here.
+# Policy:
+#   1. Fix first: bump the dependency, or pin a patched version under `overrides` in
+#      pnpm-workspace.yaml and regenerate pnpm-lock.yaml.
+#   2. Only if no fix exists and the code is provably unreachable, suppress the single advisory,
+#      never a whole package, and give it an expiry so it gets re-checked:
 #
-# ecosystem = "npm" scopes every override to the JS lockfile (pnpm-lock.yaml) so the
-# Go and Python SDK manifests are unaffected.
-
-# --- Prisma toolchain: optional peer of better-auth's prisma-adapter ----------
-# Logwell authenticates with the better-auth *drizzle* adapter
-# (src/lib/server/auth.ts) and never imports Prisma. pnpm still resolves
-# `prisma` -> `@prisma/dev` as an optional peer, dragging in hono and effect.
-# None of this is imported or executed by the app.
-[[PackageOverrides]]
-name = "hono"
-ecosystem = "npm"
-ignore = true
-reason = "Transitive of prisma->@prisma/dev (optional peer of better-auth's prisma-adapter). App uses the drizzle adapter; Prisma/hono never run in production."
-
-[[PackageOverrides]]
-name = "@hono/node-server"
-ecosystem = "npm"
-ignore = true
-reason = "Transitive of prisma->@prisma/dev (optional peer). Never imported or run; app uses the better-auth drizzle adapter."
-
-[[PackageOverrides]]
-name = "effect"
-ecosystem = "npm"
-ignore = true
-reason = "Transitive of prisma->@prisma/config (optional peer). Prisma is never imported; not in the production runtime."
-
-# --- Test tooling -------------------------------------------------------------
-[[PackageOverrides]]
-name = "undici"
-ecosystem = "npm"
-ignore = true
-reason = "Transitive of jsdom (devDependency, test DOM environment). Not shipped in the production runtime."
-
-[[PackageOverrides]]
-name = "ws"
-ecosystem = "npm"
-ignore = true
-reason = "Transitive of the vitest test runner (devDependency). Not shipped in the production runtime."
-
-# --- Build tooling ------------------------------------------------------------
-[[PackageOverrides]]
-name = "esbuild"
-ecosystem = "npm"
-ignore = true
-reason = "Build-time transform tool (vite/drizzle-kit/tsx/@esbuild-kit). The vulnerable 0.18.20 copy is a dev-server CORS issue; esbuild is not part of the shipped runtime."
-
-[[PackageOverrides]]
-name = "picomatch"
-ecosystem = "npm"
-ignore = true
-reason = "Glob matcher used only by build/dev tooling (knip, micromatch, tinyglobby, chokidar, fdir). Not in the production runtime."
+#        [[IgnoredVulns]]
+#        id = "GHSA-xxxx-xxxx-xxxx"
+#        ignoreUntil = 2026-12-31
+#        reason = "<package> <version>: why the vulnerable code path cannot run in Logwell"

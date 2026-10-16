@@ -42,6 +42,16 @@ jobs:
       - name: Validate SDK CI gates
         run: python3 -m unittest discover -s scripts -p test_sdk_ci_gate.py
 
+      # compose.prod.yaml pins the image users run by default; a release commit that bumps
+      # package.json must bump it too, or self-hosters stay on the previous release.
+      - name: Check compose.prod.yaml pins the current version
+        run: |
+          version="v$(jq -r .version package.json)"
+          if ! grep -qF "ghcr.io/divkix/logwell:\${LOGWELL_VERSION:-${version}}" compose.prod.yaml; then
+            echo "::error file=compose.prod.yaml::default image tag must be ${version} (package.json version)"
+            exit 1
+          fi
+
       - name: Install pnpm and Node.js
         uses: pnpm/setup@a0881977cd8ea73b1ed212236c99ca10dcc80cf4 # v3.1.1
         with:
@@ -101,7 +111,7 @@ jobs:
 
       - name: Upload blob report
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: blob-report-${{ matrix.shard }}
           path: .vitest/blob/
@@ -135,7 +145,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Download blob reports
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: .vitest/blob
           pattern: blob-report-*
@@ -194,7 +204,7 @@ jobs:
         run: echo "version=$(pnpm exec playwright --version | cut -d' ' -f2)" >> $GITHUB_OUTPUT
 
       - name: Cache Playwright browsers
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
@@ -215,7 +225,7 @@ jobs:
       # Applies the committed drizzle/ SQL to an empty Postgres the same way
       # entrypoint.sh migrates production, proving it applies from scratch.
       - name: Run database migrations
-        run: pnpm exec drizzle-kit migrate
+        run: pnpm run db:migrate
 
       - name: Seed admin user
         run: pnpm run db:seed
@@ -230,7 +240,7 @@ jobs:
 
       - name: Upload Playwright artifacts
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-report-${{ github.run_id }}-shard-${{ matrix.shard }}
           path: |
@@ -246,6 +256,22 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
+    # Empty database for the smoke test: the image must migrate it from scratch.
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: smoke_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -253,10 +279,10 @@ jobs:
           persist-credentials: false
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Build Docker image
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           push: false
@@ -265,6 +291,42 @@ jobs:
           # Exporting a mode=max cache costs ~2 min; only main writes it, PRs
           # read main's layers.
           cache-to: ${{ github.event_name == 'push' && 'type=gha,mode=max,scope=main' || '' }}
+          # Keep the image in the local daemon for the smoke test below.
+          load: true
+
+      # Boots the built image the way users run it: entrypoint.sh migrates the empty
+      # database and seeds the admin, then the image's own HEALTHCHECK (probed every 2s
+      # instead of 30s) must report healthy and /api/health must see the database.
+      - name: Smoke test image
+        env:
+          IMAGE: logwell:ci-${{ github.sha }}
+        run: |
+          docker run -d --name logwell-smoke --network host \
+            --health-interval=2s --health-start-period=60s \
+            -e DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/smoke_db \
+            -e BETTER_AUTH_SECRET="$BETTER_AUTH_SECRET" \
+            -e ADMIN_PASSWORD=smoke-admin-pass \
+            -e ORIGIN=http://127.0.0.1:3000 \
+            "$IMAGE"
+
+          status=starting
+          for _ in $(seq 1 60); do
+            status=$(docker inspect --format '{{.State.Health.Status}}' logwell-smoke 2>/dev/null || echo exited)
+            [ "$status" = "healthy" ] && break
+            [ "$(docker inspect --format '{{.State.Running}}' logwell-smoke)" = "true" ] || break
+            sleep 2
+          done
+
+          docker logs logwell-smoke
+          if [ "$status" != "healthy" ]; then
+            echo "::error::Container never became healthy (last status: $status)"
+            exit 1
+          fi
+          curl -fsS http://127.0.0.1:3000/api/health | tee /dev/stderr | grep -q '"database":"connected"'
+
+      - name: Remove smoke container
+        if: always()
+        run: docker rm -f logwell-smoke || true
 
   # =============================================================================
   # Build Docker images for each platform (native runners)
@@ -293,10 +355,10 @@ jobs:
           persist-credentials: false
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@v4
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -314,7 +376,7 @@ jobs:
 
       - name: Build and push by digest
         id: build
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           platforms: ${{ matrix.platform }}
@@ -322,7 +384,10 @@ jobs:
           outputs: type=image,name=${{ steps.image.outputs.name }},push-by-digest=true,name-canonical=true
           cache-from: type=gha,scope=${{ matrix.platform }}
           cache-to: type=gha,mode=max,scope=${{ matrix.platform }}
-          provenance: false
+          # BuildKit attaches SLSA provenance + an SPDX SBOM to each per-platform index as
+          # attestation manifests; 'imagetools create' below carries them into the merged list.
+          provenance: mode=max
+          sbom: true
 
       - name: Export digest
         run: |
@@ -331,7 +396,7 @@ jobs:
           touch "/tmp/digests/${digest#sha256:}"
 
       - name: Upload digest
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: digests-${{ steps.platform.outputs.slug }}
           path: /tmp/digests/*
@@ -355,17 +420,17 @@ jobs:
 
     steps:
       - name: Download digests
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: /tmp/digests
           pattern: digests-*
           merge-multiple: true
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@v4
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -381,7 +446,7 @@ jobs:
 
       - name: Extract metadata
         id: meta
-        uses: docker/metadata-action@v6
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: ghcr.io/${{ github.repository }}
           tags: |

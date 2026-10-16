@@ -1,3 +1,6 @@
+# Render Blueprint. Costs money as written: neither the web service nor the database sets a plan,
+# so Render uses its default paid instance types (render.com/docs/blueprint-spec). Keep the web
+# service at ONE instance: rate limits, live streams and the retention job are in-process.
 services:
   - type: web
     name: logwell
@@ -12,10 +15,17 @@ services:
         generateValue: true
       - key: NODE_ENV
         value: production
+      # Public URL, e.g. https://logwell.onrender.com (or your custom domain) - CSRF + auth origin.
       - key: ORIGIN
+        sync: false
+      # Seeds the admin user on boot (min 8 chars). Sign-up is disabled, so without it nobody can
+      # log in. Prompted once when the Blueprint is created.
+      - key: ADMIN_PASSWORD
         sync: false
 
 databases:
   - name: logwell-db
     databaseName: logwell
-    plan: free
+    # No `plan: free` on purpose: free Render Postgres expires 30 days after creation and is
+    # deleted with all its data 14 days later (render.com/docs/free). The default paid instance
+    # keeps logs. To trial for free anyway, set `plan: free` and migrate off before day 30.

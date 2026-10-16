@@ -1,12 +1,17 @@
 # syntax=docker/dockerfile:1.4
 
-# SECURITY: pinned to an exact version + digest for reproducible builds (Node.js 24 LTS). Node
-# serves the built output and runs the TypeScript scripts through tsx; pnpm only installs
-# dependencies (see packageManager).
-FROM node:26.11.1-alpine@sha256:143494b1da2945f061539253adc65e4f1569ddf07da2d384c022c791a9d90a4a AS base
+# SECURITY: pinned to an exact version + digest for reproducible builds. Node.js 24 is the
+# current Active LTS line and matches CI (`runtime: node@24`); Node 26 only enters LTS on
+# 2026-10-28 (nodejs/Release schedule.json), so dependabot is told to skip node majors until
+# image and CI move together. Node serves the built output and runs the TypeScript scripts
+# through tsx; pnpm only installs dependencies (see packageManager).
+FROM node:24.22.0-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS node
+
+# Build-only toolchain: curl fetches pnpm, pnpm installs dependencies. The release stage starts
+# again from the bare node stage, so neither ships in the runtime image.
+FROM node AS base
 WORKDIR /app
 
-# Install curl for healthcheck (alpine minimal doesn't include it)
 RUN apk add --no-cache curl
 
 # pnpm 12 ships a self-contained musl binary. Pinned to an exact release
@@ -52,7 +57,6 @@ FROM deps-dev AS build
 WORKDIR /app
 
 COPY package.json tsconfig.json vite.config.ts ./
-COPY drizzle.config.ts ./
 
 COPY static ./static
 COPY drizzle ./drizzle
@@ -68,7 +72,7 @@ RUN DATABASE_URL=postgresql://build:build@localhost/build \
     BETTER_AUTH_SECRET=build-time-placeholder-secret-32chars \
     pnpm run build
 
-FROM base AS release
+FROM node AS release
 WORKDIR /app
 
 RUN addgroup --system --gid 1001 logwell && \
@@ -82,7 +86,6 @@ COPY --from=build --chown=logwell:logwell /app/build ./build
 COPY --from=build --chown=logwell:logwell /app/package.json ./
 
 COPY --from=build --chown=logwell:logwell /app/drizzle ./drizzle
-COPY --from=build --chown=logwell:logwell /app/drizzle.config.ts ./
 COPY --from=build --chown=logwell:logwell /app/scripts ./scripts
 COPY --from=build --chown=logwell:logwell /app/src/lib/server ./src/lib/server
 COPY --from=build --chown=logwell:logwell /app/src/lib/shared ./src/lib/shared
@@ -91,7 +94,7 @@ COPY --from=build --chown=logwell:logwell /app/src/lib/shared ./src/lib/shared
 # instead of at container start if one of their imports is a devDependency. ESM links the whole
 # import graph before evaluating anything, so reaching the DATABASE_URL check (unset here) proves
 # every import resolved; a missing package fails earlier with ERR_MODULE_NOT_FOUND.
-RUN for script in seed-admin backfill-incidents; do \
+RUN for script in migrate seed-admin backfill-incidents; do \
       out=$(./node_modules/.bin/tsx "scripts/${script}.ts" 2>&1) || true; \
       echo "$out" | grep -q "DATABASE_URL" || { echo "$out"; exit 1; }; \
     done
@@ -113,7 +116,9 @@ ENV SHUTDOWN_TIMEOUT=8
 # Max request body (adapter default 512K) — bounds ingest batches, which can exceed 512K
 ENV BODY_SIZE_LIMIT=1M
 
+# Node's built-in fetch, so the image needs no curl/wget. 127.0.0.1 rather than localhost: musl
+# may resolve localhost to ::1 first, which HOST=0.0.0.0 does not listen on.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:3000/api/health || exit 1
+    CMD ["node", "-e", "fetch('http://127.0.0.1:' + (process.env.PORT || 3000) + '/api/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
 
 ENTRYPOINT ["./entrypoint.sh"]

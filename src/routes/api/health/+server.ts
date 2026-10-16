@@ -6,7 +6,8 @@ const serverStartTime = Date.now();
 
 /**
  * Overall deadline for the database probe, well under the 10s Docker/compose HEALTHCHECK
- * timeout so the endpoint always answers (503) instead of letting curl time out.
+ * timeout so the endpoint always answers (503) instead of letting the healthcheck probe time
+ * out.
  */
 const HEALTH_CHECK_TIMEOUT_MS = 3000;
 

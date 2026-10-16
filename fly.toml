@@ -1,15 +1,23 @@
 app = "logwell"
 primary_region = "iad"
 
+# Shutdown: adapter-node drains for SHUTDOWN_TIMEOUT (image: 8s) before force-closing SSE streams.
+# Fly's default kill_timeout is 5s, which would SIGKILL mid-drain and skip the DB pool close.
+kill_timeout = 10
+
 [build]
 dockerfile = "Dockerfile"
 
+# Run exactly ONE always-on machine (`fly scale count 1` - `fly launch` may create two).
+# Rate limits, the API-key cache, the SSE event bus and the retention cleanup scheduler all live
+# in process memory: a stopped machine drops live streams and never runs retention, and a second
+# machine splits rate limits and misses the other's live events.
 [http_service]
 internal_port = 3000
 force_https = true
-auto_stop_machines = "stop"
+auto_stop_machines = "off"
 auto_start_machines = true
-min_machines_running = 0
+min_machines_running = 1
 
 [[http_service.checks]]
 grace_period = "30s"
@@ -20,4 +28,11 @@ path = "/api/health"
 
 [env]
 NODE_ENV = "production"
-# ORIGIN must be set via: fly secrets set ORIGIN=https://your-app.fly.dev
+
+# Secrets (never put these in [env]):
+#   fly secrets set DATABASE_URL=postgres://...                 # required
+#   fly secrets set BETTER_AUTH_SECRET="$(openssl rand -base64 32)"   # required
+#   fly secrets set ORIGIN=https://<app>.fly.dev                 # required: public URL, used for
+#                                                                # CSRF + auth (or your custom domain)
+#   fly secrets set ADMIN_PASSWORD=...                           # required for the first boot:
+#                                                                # seeds the only login (signup is off)
