@@ -50,7 +50,7 @@ describe("Log Table Schema", () => {
     expect(searchResults.rows).toHaveLength(2);
   });
 
-  it("keeps only the log indexes a query uses (migration 0013)", async () => {
+  it("declares only the log indexes a query uses in schema.ts", async () => {
     const indexes = await db.execute<{ indexname: string; indexdef: string }>(
       `SELECT indexname, indexdef FROM pg_indexes WHERE tablename = 'log' ORDER BY indexname`,
     );
