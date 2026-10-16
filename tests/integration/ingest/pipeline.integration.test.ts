@@ -1,3 +1,6 @@
+import { IncomingMessage } from "node:http";
+import { Socket } from "node:net";
+import { getRequest } from "@sveltejs/kit/node";
 import { eq } from "drizzle-orm";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
@@ -139,6 +142,34 @@ describe("ingestLogs pipeline", () => {
         const response = await ingestLogs(post("{not-json", project.apiKey), db, parse);
         expect(response.status).toBe(400);
         expect((await response.json()).error).toBe("invalid_json");
+      });
+
+      it("returns 413 when the body exceeds the adapter's BODY_SIZE_LIMIT", async () => {
+        const project = await seedProjectWithApiKey(db);
+        const payload = Buffer.from(JSON.stringify(validBody("x".repeat(2048))));
+        const incoming = new IncomingMessage(new Socket());
+        incoming.method = "POST";
+        incoming.url = "/v1/ingest";
+        incoming.httpVersionMajor = 1;
+        incoming.headers = {
+          "content-type": "application/json",
+          "content-length": String(payload.length),
+          authorization: `Bearer ${project.apiKey}`,
+          host: "localhost",
+        };
+        incoming.push(payload);
+        incoming.push(null);
+
+        // The exact request adapter-node hands SvelteKit with BODY_SIZE_LIMIT=1K.
+        const request = await getRequest({
+          request: incoming,
+          base: "http://localhost",
+          bodySizeLimit: 1024,
+        });
+
+        const response = await ingestLogs(request, db, parse);
+        expect(response.status).toBe(413);
+        expect((await response.json()).error).toBe("payload_too_large");
       });
 
       it("accepts a valid batch and broadcasts logs", async () => {

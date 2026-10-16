@@ -8,7 +8,7 @@
  * Configuration can be overridden via environment variables:
  * - SSE_BATCH_WINDOW_MS: Time window for batching SSE events (default: 1500ms)
  * - SSE_MAX_BATCH_SIZE: Maximum logs per batch before flush (default: 50)
- * - SSE_HEARTBEAT_INTERVAL_MS: Heartbeat interval (default: 30000ms, capped at half IDLE_TIMEOUT)
+ * - SSE_HEARTBEAT_INTERVAL_MS: Heartbeat interval (default: 30000ms)
  * - LOG_STREAM_MAX_LOGS: Maximum logs in memory per client (default: 1000)
  * - LOG_RETENTION_DAYS: System default retention in days (default: 30, 0 = disabled)
  * - LOG_CLEANUP_INTERVAL_MS: Cleanup job interval in ms (default: 3600000 = 1 hour)
@@ -58,27 +58,13 @@ const SSE_BOUNDS = {
   HEARTBEAT_INTERVAL_MS: { min: 5000, max: 300000 },
 } as const;
 
-// svelte-adapter-bun reads this straight into Bun.serve's idleTimeout (seconds), defaulting to 10
-// exactly as build/index.js does. Bun closes a connection idle for that long, so the SSE heartbeat
-// MUST land inside it — the heartbeat below is capped at half this value (jitter headroom).
-// Bun's documented maximum is 255s; a larger IDLE_TIMEOUT is silently clamped by Bun, so clamp it
-// here too or the heartbeat would be sized against an idle window the server never had.
-const SERVER_IDLE_TIMEOUT_MS = Math.min(parseEnvInt("IDLE_TIMEOUT", 10), 255) * 1000;
-
-// The cap must also lower the heartbeat floor: for IDLE_TIMEOUT <= 10s the floor (5s) would
-// otherwise win the clamp and leave a heartbeat that arrives no earlier than the idle timeout.
-// Never below 1000ms so an idle timeout of 0 (Bun: disabled) cannot become a 0ms hot loop.
-const HEARTBEAT_MAX_MS = Math.max(
-  1000,
-  Math.min(SSE_BOUNDS.HEARTBEAT_INTERVAL_MS.max, Math.floor(SERVER_IDLE_TIMEOUT_MS / 2)),
-);
-
 /**
  * SSE (Server-Sent Events) streaming configuration.
  *
  * - BATCH_WINDOW_MS: Time window to batch logs before sending (reduces network overhead)
  * - MAX_BATCH_SIZE: Maximum logs per batch (flush immediately when reached)
- * - HEARTBEAT_INTERVAL_MS: Keep-alive ping interval (prevents connection timeout)
+ * - HEARTBEAT_INTERVAL_MS: Keep-alive ping interval. Node never times out a response that is
+ *   still being written, so this only has to beat reverse-proxy read timeouts (nginx: 60s).
  */
 export const SSE_CONFIG = {
   BATCH_WINDOW_MS: clamp(
@@ -93,8 +79,8 @@ export const SSE_CONFIG = {
   ),
   HEARTBEAT_INTERVAL_MS: clamp(
     parseEnvInt("SSE_HEARTBEAT_INTERVAL_MS", SSE_DEFAULTS.HEARTBEAT_INTERVAL_MS),
-    Math.min(SSE_BOUNDS.HEARTBEAT_INTERVAL_MS.min, HEARTBEAT_MAX_MS),
-    HEARTBEAT_MAX_MS,
+    SSE_BOUNDS.HEARTBEAT_INTERVAL_MS.min,
+    SSE_BOUNDS.HEARTBEAT_INTERVAL_MS.max,
   ),
 } as const;
 

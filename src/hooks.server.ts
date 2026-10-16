@@ -34,7 +34,8 @@ async function gracefulShutdown(reason: string): Promise<void> {
   }
 }
 
-// svelte-adapter-bun emits this on SIGTERM/SIGINT before it stops Bun.serve.
+// adapter-node emits this on SIGTERM/SIGINT once the HTTP server has closed — open SSE streams
+// hold that until SHUTDOWN_TIMEOUT, when the adapter force-closes them.
 process.once("sveltekit:shutdown", (reason: string) => void gracefulShutdown(reason));
 
 export const handle: Handle = async ({ event, resolve }) => {

@@ -54,6 +54,7 @@
     "@electric-sql/pglite": "^0.5.9",
     "@internationalized/date": "^3.12.4",
     "@playwright/test": "^1.64.0",
+    "@sveltejs/adapter-node": "^5.5.7",
     "@sveltejs/kit": "^2.70.3",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@tailwindcss/vite": "^4.3.3",
@@ -70,7 +71,6 @@
     "knip": "^6.41.0",
     "mode-watcher": "^1.1.0",
     "svelte": "^5.57.2",
-    "svelte-adapter-bun": "^1.0.1",
     "svelte-check": "^4.7.6",
     "svelte-sonner": "^1.2.1",
     "tailwindcss": "^4.3.3",
@@ -80,7 +80,6 @@
     "vitest": "catalog:"
   },
   "engines": {
-    "bun": ">=1.2.0",
     "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
   },
   "packageManager": "pnpm@12.6.0"

@@ -13,8 +13,6 @@ allowBuilds:
 # Accepted peer mismatches, recorded so installs stay quiet:
 peerDependencyRules:
   allowedVersions:
-    # svelte-adapter-bun declares typescript ^5; the repo builds with TypeScript 6.
-    typescript: "6"
     vite: "*"
     vitest: "*"
   allowAny:
