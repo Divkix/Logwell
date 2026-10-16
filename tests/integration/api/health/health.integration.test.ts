@@ -40,6 +40,13 @@ describe("GET /api/health", () => {
     expect(body.database).toBe("connected");
   });
 
+  it("does not disclose the app version on the public endpoint", async () => {
+    const body = await (await GET(healthEvent())).json();
+
+    expect(body).not.toHaveProperty("version");
+    expect(Object.keys(body).sort()).toEqual(["database", "status", "timestamp", "uptime"]);
+  });
+
   it("returns 503 when the database is unreachable", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     vi.spyOn(db, "execute").mockImplementation(() => {

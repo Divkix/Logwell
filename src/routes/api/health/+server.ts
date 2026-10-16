@@ -46,7 +46,6 @@ interface HealthResponse {
   database: "connected" | "disconnected";
   timestamp: string;
   uptime: number;
-  version: string;
   error?: string;
 }
 
@@ -54,7 +53,7 @@ interface HealthResponse {
  * GET /api/health
  *
  * Health check endpoint for monitoring and Docker health checks.
- * Does NOT require authentication (public endpoint).
+ * Does NOT require authentication (public endpoint), so it reports no version or build detail.
  * Probes the database over a dedicated connection with a 3s deadline.
  *
  * Returns:
@@ -67,7 +66,6 @@ interface HealthResponse {
  *   database: "connected" | "disconnected",
  *   timestamp: string (ISO 8601),
  *   uptime: number (seconds),
- *   version: string,
  *   error?: string (only when unhealthy)
  * }
  */
@@ -88,7 +86,6 @@ export async function GET(event: RequestEvent): Promise<Response> {
     database: dbStatus.connected ? "connected" : "disconnected",
     timestamp: new Date().toISOString(),
     uptime: uptimeSeconds,
-    version: __APP_VERSION__,
   };
 
   if (!isHealthy && dbStatus.error) {
