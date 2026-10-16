@@ -213,3 +213,18 @@ export function isProduction(): boolean {
 export function isDevelopment(): boolean {
   return isDevExplicit;
 }
+
+/**
+ * Logs, once at server start, when production runs without ORIGIN. Not a hard failure: existing
+ * deployments that never set it keep starting. Without it the CSRF guard falls back to matching
+ * the request Host, and better-auth has no trusted origin, so sign-out fails on plain HTTP.
+ */
+export function warnIfOriginUnset(): void {
+  if (env.ORIGIN || isDevExplicit) return;
+
+  console.warn(
+    "[config] WARNING: ORIGIN is not set. Set it to the public URL users load " +
+      "(e.g. https://logs.example.com): without it the CSRF guard only compares the request " +
+      "Host header and sign-out fails over plain HTTP.",
+  );
+}

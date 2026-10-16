@@ -21,7 +21,7 @@ vi.mock("$app/env", () => ({ building: false }));
 
 vi.mock("#lib/server/db/index.js", () => ({ db: mocks.db, closeDb: mocks.closeDb }));
 
-vi.mock("#lib/server/config/env.js", () => ({ env: mocks.env }));
+vi.mock("#lib/server/config/env.js", () => ({ env: mocks.env, warnIfOriginUnset: vi.fn() }));
 
 vi.mock("#lib/server/auth.js", () => ({
   CLIENT_IP_HEADER: "x-logwell-client-ip",

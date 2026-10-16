@@ -3,7 +3,7 @@ import { svelteKitHandler } from "better-auth/svelte-kit";
 import { z } from "zod";
 import { building } from "$app/env";
 import { auth, CLIENT_IP_HEADER, initAuth } from "#lib/server/auth.js";
-import { env } from "#lib/server/config/env.js";
+import { env, warnIfOriginUnset } from "#lib/server/config/env.js";
 import { closeDb, db } from "#lib/server/db/index.js";
 import { handleError as buildErrorResponse } from "#lib/server/error-handler.js";
 import { startCleanupScheduler, stopCleanupScheduler } from "#lib/server/jobs/cleanup-scheduler.js";
@@ -22,6 +22,8 @@ let initialized = false;
 async function ensureInitialized(): Promise<void> {
   if (!initialized) {
     await initAuth();
+
+    warnIfOriginUnset();
 
     startCleanupScheduler();
 

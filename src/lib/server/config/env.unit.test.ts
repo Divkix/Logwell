@@ -79,6 +79,24 @@ describe("Environment Configuration", () => {
     expect(env.BETTER_AUTH_SECRET).toBe("default-secret-for-development-only");
   });
 
+  it.each([
+    ["production", undefined, true],
+    ["staging", undefined, true],
+    ["production", "https://logs.example.com", false],
+    ["development", undefined, false],
+  ])("NODE_ENV=%s ORIGIN=%s → startup warning %s", async (nodeEnv, origin, warns) => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    try {
+      const { warnIfOriginUnset } = await loadEnv({ NODE_ENV: nodeEnv, ORIGIN: origin });
+      warnIfOriginUnset();
+
+      expect(warn.mock.calls.some(([message]) => String(message).includes("ORIGIN"))).toBe(warns);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it("allows missing BETTER_AUTH_SECRET in development", async () => {
     const { env } = await loadEnv({ NODE_ENV: "development", BETTER_AUTH_SECRET: undefined });
     expect(env.BETTER_AUTH_SECRET).toBeDefined();
