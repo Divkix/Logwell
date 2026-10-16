@@ -13,9 +13,13 @@
  * - ADMIN_PASSWORD: Password for seeding admin user
  * - ORIGIN: Base URL for production (CORS/trusted origins)
  * - RATE_LIMIT_INGEST_IP_RPM: Pre-auth /v1 requests per minute per client IP (default 60000)
+ * - DB_STATEMENT_TIMEOUT_MS: Postgres statement_timeout for the app pool (default 30000, 0 = off)
+ * - DB_IDLE_IN_TRANSACTION_TIMEOUT_MS: Postgres idle_in_transaction_session_timeout
+ *   for the app pool (default 60000, 0 = off)
  * - NODE_ENV: Environment mode (development/production)
  */
 
+import { z } from "zod";
 import { parseEnvInt } from "./performance";
 
 /**
@@ -94,6 +98,43 @@ if (rawOrigin && !URL.canParse(rawOrigin)) {
   });
 }
 
+// Postgres-side query limits for the app pool. Unlike the tuning knobs in performance.ts these
+// fail startup on a bad value: a typo silently falling back would leave runaway statements
+// uncancelled (or cancel healthy ones) with nothing in the logs to say why.
+const DB_TIMEOUT_DEFAULTS = {
+  DB_STATEMENT_TIMEOUT_MS: 30_000,
+  DB_IDLE_IN_TRANSACTION_TIMEOUT_MS: 60_000,
+} as const;
+
+// Whole milliseconds, 0 = disabled (Postgres semantics), at most one hour.
+const dbTimeoutMsSchema = z
+  .string()
+  .trim()
+  .regex(/^\d+$/, "must be a whole number of milliseconds")
+  .transform(Number)
+  .pipe(z.number().max(3_600_000, "must be at most 3600000 (1 hour)"));
+
+function parseDbTimeout(key: keyof typeof DB_TIMEOUT_DEFAULTS): number {
+  const raw = process.env[key];
+
+  if (raw === undefined || raw.trim() === "") return DB_TIMEOUT_DEFAULTS[key];
+
+  const parsed = dbTimeoutMsSchema.safeParse(raw);
+
+  if (parsed.success) return parsed.data;
+
+  validationErrors.push({
+    variable: key,
+    message: `${key} ${parsed.error.issues[0]?.message ?? "is invalid"} (0 disables it)`,
+  });
+
+  return DB_TIMEOUT_DEFAULTS[key];
+}
+
+const dbStatementTimeoutMs = parseDbTimeout("DB_STATEMENT_TIMEOUT_MS");
+
+const dbIdleInTransactionTimeoutMs = parseDbTimeout("DB_IDLE_IN_TRANSACTION_TIMEOUT_MS");
+
 // Throw aggregated error if validation failed
 if (validationErrors.length > 0) {
   const errorMessages = validationErrors.map((e) => `- ${e.variable}: ${e.message}`).join("\n");
@@ -129,6 +170,12 @@ export const env = {
 
   /** Pre-auth /v1 requests per minute per client IP, checked before API-key validation */
   RATE_LIMIT_INGEST_IP_RPM: ingestIpRpm > 0 ? ingestIpRpm : DEFAULT_INGEST_IP_RPM,
+
+  /** Postgres statement_timeout (ms) for every app-pool connection; 0 = server default */
+  DB_STATEMENT_TIMEOUT_MS: dbStatementTimeoutMs,
+
+  /** Postgres idle_in_transaction_session_timeout (ms) for the app pool; 0 = server default */
+  DB_IDLE_IN_TRANSACTION_TIMEOUT_MS: dbIdleInTransactionTimeoutMs,
 
   /** Current environment mode */
   NODE_ENV: nodeEnv,
