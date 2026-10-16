@@ -1,6 +1,6 @@
 import type { HttpError, Redirect, RequestEvent } from "@sveltejs/kit";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
-import { beforeEach, describe, expect, it } from "vite-plus/test";
+import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
 import { createAuth } from "#lib/server/auth.js";
 import type * as schema from "#lib/server/db/schema.js";
 import { setupTestDatabase } from "#lib/server/db/test-db.js";
@@ -57,13 +57,17 @@ async function expectHttpError(
 
 describe("Auth Guard - requireAuth", () => {
   let db: PgliteDatabase<typeof schema>;
+  let cleanup: () => Promise<void>;
   let auth: ReturnType<typeof createAuth>;
 
   beforeEach(async () => {
     const setup = await setupTestDatabase();
     db = setup.db;
+    cleanup = setup.cleanup;
     auth = createAuth(db);
   });
+
+  afterEach(() => cleanup());
 
   function mockEvent(
     request: Request,

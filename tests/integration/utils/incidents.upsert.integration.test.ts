@@ -11,10 +11,14 @@ import { seedProject } from "../../fixtures/db";
 
 describe("Incident upsert race condition", () => {
   let db: PgliteDatabase<typeof schema>;
+  let cleanup: () => Promise<void>;
   beforeEach(async () => {
     const setup = await setupTestDatabase();
     db = setup.db;
+    cleanup = setup.cleanup;
   });
+
+  afterEach(() => cleanup());
 
   it("handles concurrent upserts for the same new fingerprint without error", async () => {
     const project = await seedProject(db);

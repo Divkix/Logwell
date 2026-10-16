@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
-import { beforeEach, describe, expect, it } from "vite-plus/test";
+import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
 import { CLIENT_IP_HEADER, createAuth } from "../../../src/lib/server/auth";
 import type * as schema from "../../../src/lib/server/db/schema";
 import { session, user } from "../../../src/lib/server/db/schema";
@@ -8,13 +8,17 @@ import { setupTestDatabase } from "../../../src/lib/server/db/test-db";
 
 describe("better-auth Integration", () => {
   let db: PgliteDatabase<typeof schema>;
+  let cleanup: () => Promise<void>;
   let auth: ReturnType<typeof createAuth>;
 
   beforeEach(async () => {
     const setup = await setupTestDatabase();
     db = setup.db;
+    cleanup = setup.cleanup;
     auth = createAuth(db);
   });
+
+  afterEach(() => cleanup());
 
   describe("User signup and authentication", () => {
     it("should create user via signUpEmail", async () => {

@@ -10,11 +10,15 @@ import { seedLog, seedLogs, seedProject } from "../../fixtures/db";
 
 describe("cleanupOldLogs", () => {
   let db: PgliteDatabase<typeof schema>;
+  let cleanup: () => Promise<void>;
 
   beforeEach(async () => {
     const setup = await setupTestDatabase();
     db = setup.db;
+    cleanup = setup.cleanup;
   });
+
+  afterEach(() => cleanup());
 
   describe("effective retention calculation", () => {
     it("should use project retention_days when set", async () => {
@@ -295,10 +299,13 @@ describe("cleanupOldLogs batch selection", () => {
 
 describe("cleanupOldLogs pacing", () => {
   let db: PgliteDatabase<typeof schema>;
+  let cleanup: () => Promise<void>;
 
   beforeEach(async () => {
-    ({ db } = await setupTestDatabase());
+    ({ db, cleanup } = await setupTestDatabase());
   });
+
+  afterEach(() => cleanup());
 
   const tenDaysAgo = () => new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
 
@@ -339,12 +346,15 @@ describe("cleanupOldLogs pacing", () => {
 
 describe("cleanupOldLogs incident pruning", () => {
   let db: PgliteDatabase<typeof schema>;
+  let cleanup: () => Promise<void>;
   const DAY_MS = 24 * 60 * 60 * 1000;
   const daysAgo = (days: number) => new Date(Date.now() - days * DAY_MS);
 
   beforeEach(async () => {
-    ({ db } = await setupTestDatabase());
+    ({ db, cleanup } = await setupTestDatabase());
   });
+
+  afterEach(() => cleanup());
 
   async function seedIncident(projectId: string, lastSeen: Date): Promise<string> {
     const id = nanoid();
