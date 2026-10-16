@@ -5,14 +5,12 @@ import { cleanup, render, screen, waitFor } from "@testing-library/svelte";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type { ClientLog } from "#lib/stores/logs.svelte.js";
+import { navigating } from "../../../../../../tests/fixtures/app-state.svelte";
 import type { PageData } from "../$types";
-
-type NavigatingState = { to: { url: URL } | null; from: null; type: "goto" } | null;
 
 const mocks = vi.hoisted(() => ({
   goto: vi.fn().mockResolvedValue(undefined),
   toastError: vi.fn(),
-  navigating: { set(_value: NavigatingState) {} },
   onLogs: (_logs: ClientLog[]) => {},
   connect: vi.fn(),
   disconnect: vi.fn(),
@@ -23,17 +21,10 @@ vi.mock("$app/navigation", () => ({
   goto: mocks.goto,
 }));
 
-// The factory runs while modules are still loading, so `svelte/store` cannot be a
-// top-level binding here.
-vi.mock("$app/stores", async () => {
-  const { writable } = await import("svelte/store");
-  mocks.navigating = writable(null);
-
-  return {
-    navigating: mocks.navigating,
-    page: writable({ url: { pathname: "/projects/proj_1" } }),
-  };
-});
+vi.mock(
+  "$app/state",
+  async () => await import("../../../../../../tests/fixtures/app-state.svelte"),
+);
 
 vi.mock("#lib/utils/toast.js", () => ({
   toastError: mocks.toastError,
@@ -143,7 +134,7 @@ describe("LogsPage", () => {
   const user = userEvent.setup();
 
   beforeEach(() => {
-    mocks.navigating.set(null);
+    navigating.to = null;
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 500 }));
   });
 
@@ -154,17 +145,13 @@ describe("LogsPage", () => {
   });
 
   it("clears the loading skeleton once the navigation that mounted the page finishes", async () => {
-    mocks.navigating.set({
-      to: { url: new URL("http://localhost/projects/proj_1") },
-      from: null,
-      type: "goto",
-    });
+    navigating.to = { url: new URL("http://localhost/projects/proj_1") };
 
     render(LogsPage, { props: { data: makeData() } });
 
     expect(screen.getByTestId("log-stream-skeleton")).toBeInTheDocument();
 
-    mocks.navigating.set(null);
+    navigating.to = null;
 
     await waitFor(() => {
       expect(screen.queryByTestId("log-stream-skeleton")).not.toBeInTheDocument();

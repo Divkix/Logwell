@@ -1,7 +1,7 @@
 <script lang="ts">
 import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
 import { goto } from '$app/navigation';
-import { navigating } from '$app/stores';
+import { navigating } from '$app/state';
 import BottomNav from '#lib/components/bottom-nav.svelte';
 import LevelChart from '#lib/components/level-chart.svelte';
 import StatsSkeleton from '#lib/components/stats-skeleton.svelte';
@@ -71,7 +71,7 @@ $effect(() => {
   };
 });
 
-const isNavigating = $derived($navigating?.to?.url.pathname.endsWith('/stats') ?? false);
+const isNavigating = $derived(navigating.to?.url.pathname.endsWith('/stats') ?? false);
 
 function handleTimeRangeChange(range: TimeRange) {
   selectedRange = range;

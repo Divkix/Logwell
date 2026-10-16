@@ -3,7 +3,7 @@ import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
 import LoaderIcon from '@lucide/svelte/icons/loader';
 import { z } from 'zod';
 import { goto } from '$app/navigation';
-import { navigating } from '$app/stores';
+import { navigating } from '$app/state';
 import BottomNav from '#lib/components/bottom-nav.svelte';
 import ConnectionStatus from '#lib/components/connection-status.svelte';
 import IncidentTable from '#lib/components/incident-table.svelte';
@@ -64,7 +64,7 @@ const { data }: { data: PageData } = $props();
 // svelte-ignore state_referenced_locally
 const projectId = data.project.id;
 
-const isNavigating = $derived($navigating?.to?.url.pathname.endsWith('/incidents') ?? false);
+const isNavigating = $derived(navigating.to?.url.pathname.endsWith('/incidents') ?? false);
 
 // svelte-ignore state_referenced_locally
 let incidents = $state<IncidentListItem[]>([...data.incidents]);

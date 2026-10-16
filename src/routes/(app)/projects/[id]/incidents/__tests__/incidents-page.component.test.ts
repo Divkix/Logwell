@@ -35,14 +35,10 @@ vi.mock("#lib/utils/toast.js", () => ({
   toastSuccess: vi.fn(),
 }));
 
-vi.mock("$app/stores", async () => {
-  const { writable } = await import("svelte/store");
-
-  return {
-    navigating: writable(null),
-    page: writable({ url: { pathname: "/projects/proj_1/incidents" } }),
-  };
-});
+vi.mock(
+  "$app/state",
+  async () => await import("../../../../../../../tests/fixtures/app-state.svelte"),
+);
 
 vi.mock("#lib/hooks/use-incident-stream.svelte.js", () => ({
   useIncidentStream: (options: {

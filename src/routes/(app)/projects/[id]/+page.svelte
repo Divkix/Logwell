@@ -5,7 +5,7 @@ import LoaderIcon from '@lucide/svelte/icons/loader';
 import SettingsIcon from '@lucide/svelte/icons/settings';
 import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 import { goto } from '$app/navigation';
-import { navigating } from '$app/stores';
+import { navigating } from '$app/state';
 import ActiveFilterChips from '#lib/components/active-filter-chips.svelte';
 import BottomNav from '#lib/components/bottom-nav.svelte';
 import ClearFiltersButton from '#lib/components/clear-filters-button.svelte';
@@ -36,7 +36,7 @@ const { data }: { data: PageData } = $props();
 const MAX_STREAMED_LOGS = 10000;
 
 const isNavigating = $derived.by(() => {
-  const navTo = $navigating?.to?.url.pathname;
+  const navTo = navigating.to?.url.pathname;
 
   return (
     !!navTo &&
