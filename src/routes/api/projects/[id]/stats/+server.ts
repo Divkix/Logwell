@@ -16,11 +16,11 @@ import type { RequestEvent } from "./$types";
  * Requires session authentication and project ownership.
  *
  * Query Parameters:
- * - from: string (ISO 8601) - Start timestamp, defaults to `to` minus 90 days
+ * - from: string (ISO 8601) - Start timestamp, defaults to `to` minus 24 hours
  * - to: string (ISO 8601) - End timestamp, defaults to now
  *
- * The window is capped at 90 days (MAX_STATS_WINDOW_DAYS) so the aggregate never scans a
- * project's whole retention.
+ * The window is capped at 7 days (MAX_STATS_WINDOW_DAYS), the stats page's widest range, so
+ * the aggregate reads at most a week of a project's logs rather than its whole retention.
  *
  * Response:
  * {
@@ -45,7 +45,7 @@ import type { RequestEvent } from "./$types";
  *
  * Error responses:
  * - 400 invalid_date: from/to is not a valid timestamp
- * - 400 invalid_range: from is after to, or the window exceeds 90 days
+ * - 400 invalid_range: from is after to, or the window exceeds 7 days
  * - 303 redirect to /login: Not authenticated
  * - 404 not_found: Project does not exist or not owned by user
  */

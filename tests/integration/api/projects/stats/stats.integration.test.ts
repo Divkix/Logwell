@@ -357,7 +357,9 @@ describe("GET /api/projects/[id]/stats", () => {
   });
 
   describe("Window Limits", () => {
-    const DAY_MS = 24 * 60 * 60 * 1000;
+    const HOUR_MS = 60 * 60 * 1000;
+
+    const DAY_MS = 24 * HOUR_MS;
 
     async function getStats(projectId: string, query: string) {
       const request = new Request(`http://localhost/api/projects/${projectId}/stats${query}`, {
@@ -370,14 +372,14 @@ describe("GET /api/projects/[id]/stats", () => {
       return GET(event as never);
     }
 
-    it("defaults to the last 90 days and reports the effective window", async () => {
+    it("defaults to the last 24 hours and reports the effective window", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
       const now = Date.now();
       await seedLogs(db, testProject.id, 4, {
         level: "debug",
-        timestamp: new Date(now - 91 * DAY_MS),
+        timestamp: new Date(now - 2 * DAY_MS),
       });
-      await seedLogs(db, testProject.id, 2, { level: "info", timestamp: new Date(now - DAY_MS) });
+      await seedLogs(db, testProject.id, 2, { level: "info", timestamp: new Date(now - HOUR_MS) });
 
       const response = await getStats(testProject.id, "");
 
@@ -385,19 +387,35 @@ describe("GET /api/projects/[id]/stats", () => {
       const body = await response.json();
       expect(body.totalLogs).toBe(2);
       expect(body.levelCounts).toEqual({ info: 2 });
-      expect(Date.parse(body.to) - Date.parse(body.from)).toBe(90 * DAY_MS);
+      expect(Date.parse(body.to) - Date.parse(body.from)).toBe(DAY_MS);
     });
 
-    it("returns 400 invalid_range for a window wider than 90 days", async () => {
+    it("accepts an explicit window of 7 days", async () => {
       const testProject = await seedProject(db, { ownerId: userId });
-      const from = new Date(Date.now() - 91 * DAY_MS).toISOString();
+      const now = Date.now();
+      await seedLogs(db, testProject.id, 3, {
+        level: "warn",
+        timestamp: new Date(now - 6 * DAY_MS),
+      });
+      const from = new Date(now - 7 * DAY_MS).toISOString();
+      const to = new Date(now).toISOString();
+
+      const response = await getStats(testProject.id, `?from=${from}&to=${to}`);
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toHaveProperty("levelCounts", { warn: 3 });
+    });
+
+    it("returns 400 invalid_range for a window wider than 7 days", async () => {
+      const testProject = await seedProject(db, { ownerId: userId });
+      const from = new Date(Date.now() - 8 * DAY_MS).toISOString();
 
       const response = await getStats(testProject.id, `?from=${from}`);
 
       expect(response.status).toBe(400);
       expect(await response.json()).toEqual({
         error: "invalid_range",
-        message: "The time window cannot exceed 90 days",
+        message: "The time window cannot exceed 7 days",
       });
     });
 

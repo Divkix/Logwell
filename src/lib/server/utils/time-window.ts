@@ -1,7 +1,18 @@
-/** Widest window an aggregate over `log` may cover; also the default when `from` is omitted. */
-export const MAX_STATS_WINDOW_DAYS = 90;
+const HOUR_MS = 60 * 60 * 1000;
 
-const MAX_STATS_WINDOW_MS = MAX_STATS_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+/**
+ * Widest window an aggregate over `log` may cover. Matches the widest range the stats page
+ * offers (7d) and stays well under the default 30-day retention: the window is the only bound
+ * on the rows the aggregate reads, so one as long as retention bounds nothing.
+ */
+export const MAX_STATS_WINDOW_DAYS = 7;
+
+/** Window used when `from` is omitted; the stats page's default range (24h). */
+export const DEFAULT_STATS_WINDOW_HOURS = 24;
+
+const MAX_STATS_WINDOW_MS = MAX_STATS_WINDOW_DAYS * 24 * HOUR_MS;
+
+const DEFAULT_STATS_WINDOW_MS = DEFAULT_STATS_WINDOW_HOURS * HOUR_MS;
 
 export interface StatsWindow {
   from: Date;
@@ -29,9 +40,9 @@ function parseTimestamp(name: string, value: string): Date {
 }
 
 /**
- * Resolves `from`/`to` query parameters into a window of at most MAX_STATS_WINDOW_DAYS, so an
- * aggregate never scans a project's whole retention. `to` defaults to `now` and `from` to
- * `to` minus the maximum window.
+ * Resolves `from`/`to` query parameters into a window of at most MAX_STATS_WINDOW_DAYS. This
+ * caps time, not rows: the aggregate still reads every log of the project inside the window.
+ * `to` defaults to `now` and `from` to `to` minus DEFAULT_STATS_WINDOW_HOURS.
  *
  * @throws InvalidTimeWindowError for an unparseable timestamp, `from` after `to`, or a window
  * wider than the maximum.
@@ -45,7 +56,7 @@ export function resolveStatsWindow(
 
   const from = fromParam
     ? parseTimestamp("from", fromParam)
-    : new Date(to.getTime() - MAX_STATS_WINDOW_MS);
+    : new Date(to.getTime() - DEFAULT_STATS_WINDOW_MS);
 
   if (from > to) {
     throw new InvalidTimeWindowError("invalid_range", "from must not be after to");
