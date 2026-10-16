@@ -1,3 +1,4 @@
+import { parseEnvInt } from "#lib/server/config/performance.js";
 import type { JsonValue } from "#lib/shared/schemas/json.js";
 
 /**
@@ -37,4 +38,20 @@ export function logRecordSizeError(message: string, jsonColumns: JsonValue[]): s
   }
 
   return null;
+}
+
+/**
+ * How far past the server's clock a record's timestamp may be (env `INGEST_MAX_FUTURE_SKEW_MS`,
+ * default 5 minutes) before it is clamped to the receive time.
+ */
+export const MAX_FUTURE_SKEW_MS = parseEnvInt("INGEST_MAX_FUTURE_SKEW_MS", 300_000);
+
+/**
+ * Clamps a client-supplied timestamp that lies more than MAX_FUTURE_SKEW_MS ahead to `now`.
+ *
+ * A far-future record would otherwise sit at the top of every newest-first view, keep its
+ * incident's time-derived status open until that date, and outlive retention cleanup.
+ */
+export function clampFutureTimestamp(timestamp: Date, now = Date.now()): Date {
+  return timestamp.getTime() - now > MAX_FUTURE_SKEW_MS ? new Date(now) : timestamp;
 }

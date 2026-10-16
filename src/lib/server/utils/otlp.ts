@@ -3,7 +3,7 @@ import type { LogLevel } from "#lib/shared/types.js";
 import { jsonObjectSchema, type JsonObject, type JsonValue } from "../../shared/schemas/json";
 import { API_CONFIG } from "../config/performance";
 import type { ParsedIngest } from "./ingest";
-import { logRecordSizeError } from "./ingest-limits";
+import { clampFutureTimestamp, logRecordSizeError } from "./ingest-limits";
 
 export class OtlpValidationError extends Error {
   constructor(message: string) {
@@ -165,7 +165,7 @@ function parseTimestamp(timeUnixNano: string | null, observedTimeUnixNano: strin
       return new Date();
     }
 
-    return date;
+    return clampFutureTimestamp(date);
   } catch {
     return new Date();
   }

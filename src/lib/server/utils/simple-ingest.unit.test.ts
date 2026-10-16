@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import type { JsonValue } from "../../shared/schemas/json";
-import { MAX_LOG_JSON_LENGTH, MAX_LOG_MESSAGE_LENGTH } from "./ingest-limits";
+import { MAX_FUTURE_SKEW_MS, MAX_LOG_JSON_LENGTH, MAX_LOG_MESSAGE_LENGTH } from "./ingest-limits";
 import { parseSimpleIngestRequest, SimpleIngestError } from "./simple-ingest";
 
 describe("parseSimpleIngestRequest", () => {
@@ -253,6 +253,21 @@ describe("parseSimpleIngestRequest", () => {
       expect(result.errors).toEqual([
         `Entry at index 1: body and attributes exceed ${MAX_LOG_JSON_LENGTH} characters when serialized`,
       ]);
+    });
+
+    it("clamps a timestamp beyond the future skew to the receive time", () => {
+      const before = Date.now();
+      const farFuture = new Date(before + MAX_FUTURE_SKEW_MS + 60_000).toISOString();
+      const nearFuture = new Date(before + MAX_FUTURE_SKEW_MS - 60_000).toISOString();
+
+      const [clamped, kept] = parseSimpleIngestRequest([
+        entryWith({ timestamp: farFuture }),
+        entryWith({ timestamp: nearFuture }),
+      ]).records;
+
+      expect(clamped!.timestamp.getTime()).toBeGreaterThanOrEqual(before);
+      expect(clamped!.timestamp.getTime()).toBeLessThanOrEqual(Date.now());
+      expect(kept!.timestamp.toISOString()).toBe(nearFuture);
     });
 
     it("includes index in error messages", () => {

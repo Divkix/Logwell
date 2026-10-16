@@ -8,7 +8,7 @@ import {
   parseUint64String,
   severityNumberToLogLevel,
 } from "./otlp";
-import { MAX_LOG_JSON_LENGTH, MAX_LOG_MESSAGE_LENGTH } from "./ingest-limits";
+import { MAX_FUTURE_SKEW_MS, MAX_LOG_JSON_LENGTH, MAX_LOG_MESSAGE_LENGTH } from "./ingest-limits";
 
 describe("normalizeOtlpLogsRequest", () => {
   it("flattens resource/scope/log records and derives display fields", () => {
@@ -340,6 +340,38 @@ describe("normalizeOtlpLogsRequest record size limits", () => {
     expect(errors).toEqual([
       `Log record rejected: body and attributes exceed ${MAX_LOG_JSON_LENGTH} characters when serialized`,
     ]);
+  });
+});
+
+describe("normalizeOtlpLogsRequest future timestamps", () => {
+  const nanos = (ms: number) => (BigInt(ms) * 1_000_000n).toString();
+
+  it("clamps a timestamp beyond the future skew to the receive time but keeps the raw nanos", () => {
+    const before = Date.now();
+    const farFuture = nanos(before + MAX_FUTURE_SKEW_MS + 60_000);
+    const nearFutureMs = before + MAX_FUTURE_SKEW_MS - 60_000;
+
+    const { records } = normalizeOtlpLogsRequest({
+      resourceLogs: [
+        {
+          scopeLogs: [
+            {
+              logRecords: [
+                { timeUnixNano: farFuture, body: { stringValue: "far" } },
+                { timeUnixNano: nanos(nearFutureMs), body: { stringValue: "near" } },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    const [clamped, kept] = records;
+
+    expect(clamped!.timestamp.getTime()).toBeGreaterThanOrEqual(before);
+    expect(clamped!.timestamp.getTime()).toBeLessThanOrEqual(Date.now());
+    expect(clamped!.timeUnixNano).toBe(farFuture);
+    expect(kept!.timestamp.getTime()).toBe(nearFutureMs);
   });
 });
 
