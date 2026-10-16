@@ -630,7 +630,7 @@ export DB_PASSWORD="$(openssl rand -base64 24)"
 export ORIGIN="https://logs.example.com"
 
 # Optional: run a release other than the one compose.prod.yaml is pinned to
-# export LOGWELL_VERSION="v1.4.0"
+# export LOGWELL_VERSION="v1.5.0"
 
 # Start the full stack
 docker compose -f compose.prod.yaml up -d
@@ -670,7 +670,7 @@ If you have an external PostgreSQL database:
 
 ```bash
 # Pick a release tag (see GitHub Releases) and pull it from GitHub Container Registry
-export LOGWELL_VERSION="v1.4.0"
+export LOGWELL_VERSION="v1.5.0"
 docker pull "ghcr.io/divkix/logwell:$LOGWELL_VERSION"
 
 # Generate the secret once and keep it: a new one signs everyone out
