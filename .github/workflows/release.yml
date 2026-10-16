@@ -43,6 +43,8 @@ jobs:
     outputs:
       tag: ${{ steps.resolve.outputs.tag }}
       sha: ${{ steps.resolve.outputs.sha }}
+      prerelease: ${{ steps.resolve.outputs.prerelease }}
+      latest: ${{ steps.resolve.outputs.latest }}
       attest: ${{ steps.resolve.outputs.attest }}
 
     steps:
@@ -62,6 +64,18 @@ jobs:
             exit 1
           fi
 
+          # Prereleases (vX.Y.Z-rc.N) never move :latest or the repo's latest GitHub Release,
+          # and neither does re-releasing an older tag: only the highest stable tag does.
+          prerelease=false
+          latest=false
+          if [[ "$TAG" == *-* ]]; then
+            prerelease=true
+          else
+            highest=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/git/matching-refs/tags/v" --jq '.[].ref' \
+              | sed 's#^refs/tags/##' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1)
+            [[ "$TAG" == "$highest" ]] && latest=true
+          fi
+
           # actions/attest builds the SLSA source (ref + commit) from the run's OIDC claims,
           # i.e. GITHUB_REF/GITHUB_SHA, not from what we check out. Those only name the tag
           # commit when the run itself is on the tag (tag push, or dispatch "Use workflow
@@ -76,9 +90,11 @@ jobs:
           {
             echo "tag=$TAG"
             echo "sha=$sha"
+            echo "prerelease=$prerelease"
+            echo "latest=$latest"
             echo "attest=$attest"
           } >> "$GITHUB_OUTPUT"
-          echo "Releasing $TAG at $sha (attest=$attest)"
+          echo "Releasing $TAG at $sha (prerelease=$prerelease latest=$latest attest=$attest)"
 
   # =============================================================================
   # Linting and Type Checking
@@ -425,7 +441,7 @@ jobs:
           images: ${{ steps.image.outputs.name }}
           tags: |
             type=raw,value=${{ steps.version.outputs.tag }}
-            type=raw,value=latest
+            type=raw,value=latest,enable=${{ needs.resolve.outputs.latest == 'true' }}
           labels: |
             org.opencontainers.image.title=Logwell
             org.opencontainers.image.description=Self-hosted logging platform with real-time streaming
@@ -463,7 +479,9 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Docker Images" >> $GITHUB_STEP_SUMMARY
           echo "- **Version:** \`${{ steps.image.outputs.name }}:${{ steps.version.outputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Latest:** \`${{ steps.image.outputs.name }}:latest\`" >> $GITHUB_STEP_SUMMARY
+          if [[ "${{ needs.resolve.outputs.latest }}" == "true" ]]; then
+            echo "- **Latest:** \`${{ steps.image.outputs.name }}:latest\`" >> $GITHUB_STEP_SUMMARY
+          fi
           echo "- **Digest:** \`${{ steps.digest.outputs.digest }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Platforms:** \`linux/amd64\`, \`linux/arm64\`" >> $GITHUB_STEP_SUMMARY
 
@@ -495,6 +513,8 @@ jobs:
           tag_name: ${{ needs.docker-merge.outputs.version-tag }}
           name: ${{ needs.docker-merge.outputs.version-tag }}
           generate_release_notes: true
+          prerelease: ${{ needs.resolve.outputs.prerelease }}
+          make_latest: ${{ needs.resolve.outputs.latest }}
           body: |
             ## Docker Images
 
