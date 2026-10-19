@@ -37,8 +37,8 @@
     "sdk:version": "pnpm --dir sdks/typescript exec npm version"
   },
   "dependencies": {
-    "@lucide/svelte": "^1.55.0",
-    "better-auth": "^1.7.7",
+    "@lucide/svelte": "^1.58.0",
+    "better-auth": "^1.7.10",
     "clsx": "^2.1.1",
     "d3-scale": "^4.0.2",
     "drizzle-orm": "^0.45.4",
@@ -70,7 +70,7 @@
     "@vitest/ui": "catalog:",
     "bits-ui": "^2.19.5",
     "drizzle-kit": "^0.31.11",
-    "jsdom": "^30.1.2",
+    "jsdom": "^30.1.3",
     "knip": "^6.41.0",
     "mode-watcher": "^1.1.0",
     "svelte": "^5.57.2",
