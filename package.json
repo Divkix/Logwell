@@ -74,7 +74,7 @@
     "knip": "^6.41.0",
     "mode-watcher": "^1.1.0",
     "svelte": "^5.57.2",
-    "svelte-check": "^4.7.6",
+    "svelte-check": "^4.7.7",
     "svelte-sonner": "^1.2.1",
     "tailwindcss": "^4.3.3",
     "typescript": "6.0.3",
