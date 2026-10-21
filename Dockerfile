@@ -16,11 +16,11 @@ RUN apk add --no-cache curl
 
 # pnpm 12 ships a self-contained musl binary. Pinned to an exact release
 # and per-architecture sha256, same policy as the base image.
-ARG PNPM_VERSION=12.6.0
+ARG PNPM_VERSION=12.14.0
 ARG TARGETARCH
 RUN case "${TARGETARCH}" in \
-      amd64) asset="pnpm-linux-x64-musl.tar.gz";  sha256="bf23d242a6c7a4d42b21bf1d93bff9d6a473cf8b6a7a990c6ed3094228513048" ;; \
-      arm64) asset="pnpm-linux-arm64-musl.tar.gz"; sha256="61e5a2b9aa8c1ebb73ea22203021531f88b8aff9499b68be03f695d9377928c1" ;; \
+      amd64) asset="pnpm-linux-x64-musl.tar.gz";  sha256="d7115e2f2791d79bf9e7e448609537595bb7787de1ef5292ce91ff3d1be2629e" ;; \
+      arm64) asset="pnpm-linux-arm64-musl.tar.gz"; sha256="511a54809bdfd28270d30011d1697f582c8130d555b4fa0e2856b1a7534c98bf" ;; \
       *) echo "unsupported architecture: ${TARGETARCH}" >&2; exit 1 ;; \
     esac \
  && curl -fsSL -o /tmp/pnpm.tgz \
