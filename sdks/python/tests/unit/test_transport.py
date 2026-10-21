@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock, call, patch
 
@@ -102,7 +102,7 @@ class TestSerializationFailure:
         entry: LogEntry = {
             "level": "info",
             "message": "with unserializable metadata",
-            "metadata": {"when": datetime.now(timezone.utc)},
+            "metadata": {"when": datetime.now(UTC)},
         }
 
         with pytest.raises(LogwellError) as exc_info:

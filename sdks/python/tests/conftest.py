@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock
 
@@ -284,7 +284,7 @@ def sample_log_entry_full() -> LogEntry:
     return {
         "level": "error",
         "message": "Something went wrong",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "service": "test-service",
         "metadata": {"user_id": "123", "request_id": "abc-def"},
         "sourceFile": "/app/main.py",
@@ -349,7 +349,7 @@ def capture_flushes() -> tuple[list[int], Callable[[int], None]]:
 
 @pytest.fixture
 def timestamp_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 @pytest.fixture

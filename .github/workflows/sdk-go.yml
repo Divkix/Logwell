@@ -77,16 +77,16 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          # Pinned to the repo toolchain (go.mod + test matrix): golangci-lint
-          # v2.10.1 is built with Go 1.26 and panics loading Go 1.27 stdlib sources.
-          go-version: "1.26.x"
+          # golangci-lint v2.15.0 is built with Go 1.27 and analyzes the module
+          # fine; go.mod stays at 1.26 so the test matrix proves both versions.
+          go-version: "1.27.x"
           # The module lives in sdks/go, so caching needs the explicit path
           # (the default lookup only checks the repository root).
           cache-dependency-path: sdks/go/go.mod
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
-          version: v2.10.1
+          version: v2.15.0
           working-directory: sdks/go
 
   # =============================================================================
@@ -101,7 +101,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go-version: ["1.26.x"]
+        go-version: ["1.26.x", "1.27.x"]
 
     steps:
       - name: Checkout code

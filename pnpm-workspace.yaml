@@ -13,9 +13,8 @@ allowBuilds:
 # Accepted peer mismatches, recorded so installs stay quiet:
 peerDependencyRules:
   allowedVersions:
-    # Optional Kit peers still declared as ^2. better-auth accepts ^3 from 1.7.8 (auth bump kept
-    # out of the Kit 3 migration); runed only touches $app/* in useSearchParams, which we don't use.
-    better-auth>@sveltejs/kit: "3"
+    # Optional Kit peer still declared as ^2; runed only touches $app/* in useSearchParams,
+    # which we don't use. better-auth accepts ^3 from 1.7.8, so it needs no override.
     runed>@sveltejs/kit: "3"
     vite: "*"
     vitest: "*"
@@ -24,11 +23,11 @@ peerDependencyRules:
     - vite
     - vitest
 catalog:
-  vite: npm:@voidzero-dev/vite-plus-core@1.0.0-rc.0
-  vitest: 5.0.1
-  vite-plus: 1.0.0-rc.0
-  "@vitest/coverage-v8": 5.0.1
-  "@vitest/ui": 5.0.1
+  vite: npm:@voidzero-dev/vite-plus-core@1.3.0
+  vitest: 5.0.5
+  vite-plus: 1.3.0
+  "@vitest/coverage-v8": 5.0.5
+  "@vitest/ui": 5.0.5
 overrides:
   "@esbuild-kit/core-utils>esbuild": ^0.25.12
   defu: ^6.1.7
@@ -41,3 +40,15 @@ overrides:
   source-map-js: ^1.2.2
   vite@*: "catalog:"
   vitest@*: "catalog:"
+# Deliberate upgrades newer than pnpm's supply-chain cool-off; pnpm added these when
+# resolving the 2026-10 dependency bump. Remove once the releases age past the policy.
+minimumReleaseAgeExclude:
+  - "@better-auth/core@1.7.12"
+  - "@better-auth/drizzle-adapter@1.7.12"
+  - "@better-auth/kysely-adapter@1.7.12"
+  - "@better-auth/memory-adapter@1.7.12"
+  - "@better-auth/mongo-adapter@1.7.12"
+  - "@better-auth/prisma-adapter@1.7.12"
+  - "@better-auth/telemetry@1.7.12"
+  - "@lucide/svelte@1.60.0"
+  - better-auth@1.7.12

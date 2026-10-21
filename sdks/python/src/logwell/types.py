@@ -6,12 +6,10 @@ and API responses using TypedDict for zero runtime overhead.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, NotRequired, Required, TypedDict
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-
-from typing_extensions import NotRequired, Required, TypedDict
 
 LogLevel = Literal["debug", "info", "warn", "error", "fatal"]
 

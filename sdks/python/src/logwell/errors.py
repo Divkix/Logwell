@@ -6,10 +6,10 @@ for handling Logwell-specific errors.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 
-class LogwellErrorCode(str, Enum):
+class LogwellErrorCode(StrEnum):
     """Error codes for Logwell SDK errors.
 
     Each code represents a specific category of error that can occur
