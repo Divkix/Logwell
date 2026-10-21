@@ -7,7 +7,7 @@ logging to the Logwell platform.
 from __future__ import annotations
 
 import atexit
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from logwell.config import validate_config
@@ -105,7 +105,7 @@ class Logwell:
                 source_file = location.source_file
                 line_number = location.line_number
 
-        default_timestamp = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        default_timestamp = datetime.now(UTC).isoformat().replace("+00:00", "Z")
         timestamp = entry.get("timestamp") or default_timestamp
         full_entry: LogEntry = {
             "level": entry["level"],

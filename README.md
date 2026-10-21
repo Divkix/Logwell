@@ -19,8 +19,8 @@
   <a href="https://pypi.org/project/logwell/"><img src="https://img.shields.io/pypi/v/logwell" alt="PyPI version"></a>
   <a href="https://pkg.go.dev/github.com/Divkix/Logwell/sdks/go/logwell"><img src="https://pkg.go.dev/badge/github.com/Divkix/Logwell/sdks/go/logwell.svg" alt="Go Reference"></a>
   <img src="https://img.shields.io/badge/TypeScript-5.9-blue?logo=typescript&logoColor=white" alt="TypeScript">
-  <img src="https://img.shields.io/badge/Python-3.9+-3776AB?logo=python&logoColor=white" alt="Python">
-  <img src="https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go&logoColor=white" alt="Go">
+  <img src="https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white" alt="Python">
+  <img src="https://img.shields.io/badge/Go-1.27+-00ADD8?logo=go&logoColor=white" alt="Go">
   <img src="https://img.shields.io/badge/Node.js-runtime-5FA04E?logo=nodedotjs&logoColor=white" alt="Node.js">
   <img src="https://img.shields.io/badge/pnpm-12+-F69220?logo=pnpm&logoColor=white" alt="pnpm">
 </p>
