@@ -5,7 +5,7 @@
 <p align="center">
   <a href="https://pkg.go.dev/github.com/Divkix/Logwell/sdks/go/logwell"><img src="https://pkg.go.dev/badge/github.com/Divkix/Logwell/sdks/go/logwell.svg" alt="Go Reference" /></a>
   <a href="https://github.com/Divkix/Logwell/blob/main/LICENSE"><img src="https://img.shields.io/github/license/Divkix/Logwell" alt="license" /></a>
-  <img src="https://img.shields.io/badge/Go-1.27+-00ADD8?logo=go" alt="Go version" />
+  <img src="https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go" alt="Go version" />
 </p>
 
 # Logwell Go SDK

@@ -1,3 +1,3 @@
 module github.com/Divkix/Logwell/sdks/go
 
-go 1.27
+go 1.26
