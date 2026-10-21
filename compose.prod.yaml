@@ -29,7 +29,7 @@ services:
   app:
     # Pinned so a restart never silently pulls a new release (and its migrations). CI fails
     # unless this default equals package.json's version, so release commits bump it.
-    image: ghcr.io/divkix/logwell:${LOGWELL_VERSION:-v1.5.0}
+    image: ghcr.io/divkix/logwell:${LOGWELL_VERSION:-v1.5.1}
     restart: unless-stopped
     ports:
       - "${PORT:-3000}:3000"
